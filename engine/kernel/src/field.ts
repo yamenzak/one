@@ -176,13 +176,47 @@ export function checkerForAll(fields: Fields): v.GenericSchema {
  */
 export type Checked =
   | { readonly ok: true; readonly values: Record<string, unknown> }
-  | { readonly ok: false; readonly why: string };
+  | {
+    readonly ok: false;
+    readonly why: string;
+    /**
+     * ⚠️ WHICH FIELD, SO THE SENTENCE LANDS UNDER THE INPUT THAT CAUSED IT. A
+     * refusal reported only as one joined message arrives at a form as the
+     * catalogue's generic "check the highlighted fields" with nothing
+     * highlighted — which is the shape this repository already refuses one
+     * layer up (`Problem.fields`), and it was missing at the bottom of it.
+     */
+    readonly fields: Readonly<Record<string, string>>;
+  };
+
+/**
+ * ⚠️ VALIBOT'S ISSUE PATHS, TURNED INTO FIELD NAMES. Only the first issue per
+ * field survives: a person fixing a value reads one sentence about it, and three
+ * about the same box is a form arguing with itself.
+ */
+const named = (issues: readonly unknown[]): Readonly<Record<string, string>> => {
+  const out: Record<string, string> = {};
+  for (const raw of issues) {
+    const issue = raw as {
+      message: string;
+      path?: readonly { readonly key?: unknown }[];
+    };
+    const key = issue.path?.[0]?.key;
+    if (typeof key !== "string" || out[key] !== undefined) continue;
+    out[key] = issue.message;
+  }
+  return out;
+};
 
 export function checkAll(fields: Fields, values: unknown): Checked {
   const out = v.safeParse(checkerForAll(fields), values);
   return out.success
     ? { ok: true, values: out.output as Record<string, unknown> }
-    : { ok: false, why: out.issues.map((i: { message: string }) => i.message).join("; ") };
+    : {
+      ok: false,
+      why: out.issues.map((i: { message: string }) => i.message).join("; "),
+      fields: named(out.issues),
+    };
 }
 
 /**
@@ -203,12 +237,16 @@ export function checkAll(fields: Fields, values: unknown): Checked {
  */
 export function checkSome(fields: Fields, values: unknown): Checked {
   if (values === null || typeof values !== "object" || Array.isArray(values)) {
-    return { ok: false, why: "expected an object" };
+    return { ok: false, why: "expected an object", fields: {} };
   }
   const given = values as Record<string, unknown>;
   const unknownNames = Object.keys(given).filter((name) => !(name in fields));
   if (unknownNames.length) {
-    return { ok: false, why: `no such field: ${unknownNames.join(", ")}` };
+    return {
+      ok: false,
+      why: `no such field: ${unknownNames.join(", ")}`,
+      fields: Object.fromEntries(unknownNames.map((n) => [n, "No such field"])),
+    };
   }
 
   const shape: Record<string, v.GenericSchema> = {};
@@ -219,7 +257,11 @@ export function checkSome(fields: Fields, values: unknown): Checked {
   const out = v.safeParse(v.object(shape as never), given);
   return out.success
     ? { ok: true, values: out.output as Record<string, unknown> }
-    : { ok: false, why: out.issues.map((i: { message: string }) => i.message).join("; ") };
+    : {
+      ok: false,
+      why: out.issues.map((i: { message: string }) => i.message).join("; "),
+      fields: named(out.issues),
+    };
 }
 
 /* --------------------------------------------------------------- the rules --- */

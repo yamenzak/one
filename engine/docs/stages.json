@@ -393,6 +393,12 @@
       "status": "shipped",
       "title": "The spreadsheet somebody already has — the import, and the supplier it names",
       "ends": "Nobody types in eight hundred products, so a paste of a stock list is the difference between a trial and a workspace. Quotes are parsed rather than stripped, the separator is read off the heading and a European decimal is not a thousands separator — each of those is a catalogue that looks complete and is wrong. The mapping is GUESSED and then SHOWN, editable, because a guess that puts the supplier's name in the product name for eight hundred rows is only catchable before it happens; every refused row comes back with its line number and its reason rather than being dropped. `one-planner.test.mjs` fails if the preview and the commit ever stop being one function — two walks of one sheet agree until the day they do not, and on that day nothing throws. A supplier is the last step of the reorder report's own workflow: it can say what to buy and, without this, not who to ring — and its own lead time beats the workspace's, which is the slowest supplier a place has."
+    },
+    {
+      "n": 72,
+      "status": "shipped",
+      "title": "An operation's declared input is checked at the door, and `now` is one type",
+      "ends": "`checkAll` was reached by collection records and by settings and by nothing else, so every operation's `input` map was a declaration the tool catalogue, the OpenAPI document and every generated form were written from, with nothing standing behind it — a required field could be absent, a four-hundred-thousand-character bound was advisory, and a `day` could be any string. The symptom was never a 400: the field arrived as `undefined`, reached a statement, and D1 answered `Type 'undefined' not supported` in a 503 naming a value rather than a field. It is checked before the handler now, it names the field, and the generated verbs stay exempt because `records.ts` owns create-versus-update. `Ctx.now` is a STRING, the same as `JobCtx.now` — one word had two types in one framework and the one an app can write to a row is the string. And a job's budget is wall-clock from the start of the pass rather than from the logical instant, which had made every run handed a past instant break before the first workspace and report a clean night. `input-checked.test.mjs` holds the door; all of it was found by making real requests to a real worker, which nothing in this repository had done for an app."
     }
   ]
 }

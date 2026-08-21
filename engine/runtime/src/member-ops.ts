@@ -225,7 +225,7 @@ export function memberOps(app: AppSpec): Readonly<Record<string, Resolved>> {
 
         const made = await invite(ctx.db, ctx.tenantId as TenantId,
           { email, platformRole, appRoles }, await granter(ctx), registryFor(ctx),
-          { counts: seats.counts, allowed: typeof allowed === "number" ? allowed : -1 }, ctx.now);
+          { counts: seats.counts, allowed: typeof allowed === "number" ? allowed : -1 }, new Date(ctx.now));
 
         if (made === "beyond_you") return ctx.fail("platform.forbidden");
         if (made === "already_here") return ctx.fail("platform.conflict");
@@ -235,7 +235,7 @@ export function memberOps(app: AppSpec): Readonly<Record<string, Resolved>> {
         /* ⚠️ THE INDEX IS WHAT MAKES IT CLAIMABLE. Without this row the person
            signs in, belongs to nothing, and the only way to find their
            invitation is to search every shard for it (D5). */
-        await noteInvitation(ctx.directory, email, ctx.tenantId as TenantId, ctx.now);
+        await noteInvitation(ctx.directory, email, ctx.tenantId as TenantId, new Date(ctx.now));
         return { id: made.id, email: made.email, platformRole: made.platformRole, appRoles: made.appRoles };
       },
       /* ⚠️ The kernel's own canonical opt-out, made real: a model that can
@@ -301,7 +301,7 @@ export function memberOps(app: AppSpec): Readonly<Record<string, Resolved>> {
       async (ctx, input) => {
         if (!ctx.accountId) return ctx.fail("platform.unauthorized");
         await markSeen(ctx.db, ctx.tenantId as TenantId, ctx.accountId,
-          input.id ? String(input.id) : null, ctx.now);
+          input.id ? String(input.id) : null, new Date(ctx.now));
         return { seen: true };
       }),
 
@@ -414,7 +414,7 @@ export function memberOps(app: AppSpec): Readonly<Record<string, Resolved>> {
           spec.access.roles,
           new Set(spec.access.permissions),
           await ctx.permissionsIn(appId),
-          ctx.now,
+          new Date(ctx.now),
         );
 
         if (out === "id") {
@@ -457,7 +457,7 @@ export function memberOps(app: AppSpec): Readonly<Record<string, Resolved>> {
     "member.remove": op("member.remove", "write", "member:manage", "Remove somebody.",
       async (ctx, input) => {
         const out = await remove(ctx.db, ctx.tenantId as TenantId, String(input.id ?? ""),
-          await granter(ctx), registryFor(ctx), ctx.now);
+          await granter(ctx), registryFor(ctx), new Date(ctx.now));
         if (out === "beyond_you") return ctx.fail("platform.forbidden");
         if (out === "no_such_member") return ctx.fail("platform.not_found");
         /* ⚠️ Removing the last person who can run the place does not close it —
@@ -512,7 +512,7 @@ export function memberOps(app: AppSpec): Readonly<Record<string, Resolved>> {
           theme: (input.theme ?? {}) as Theme,
           surfaces: Array.isArray(input.surfaces) ? input.surfaces.map(String) : [],
           ...(typeof input.ourMark === "boolean" ? { ourMark: input.ourMark } : {}),
-        }, ctx.now);
+        }, new Date(ctx.now));
         /* ⚠️ Three refusals and three different things to do next: become a
            business, pick a readable pair, or ask for a surface that exists. */
         if (done === "not_commercial") {
@@ -552,7 +552,7 @@ export function memberOps(app: AppSpec): Readonly<Record<string, Resolved>> {
         if (!(body instanceof ArrayBuffer)) return ctx.fail("platform.invalid");
         const done = await setIcon(
           ctx.directory, tenant.id, tenant.kind, new Uint8Array(body),
-          ctx.accountId ?? null, ctx.now);
+          ctx.accountId ?? null, new Date(ctx.now));
 
         /* ⚠️ SIX REFUSALS AND SIX DIFFERENT THINGS TO DO NEXT — become a
            business, export a smaller file, export a PNG, crop it square, export

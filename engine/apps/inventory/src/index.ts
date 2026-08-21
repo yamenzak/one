@@ -312,7 +312,10 @@ const code = collection({
        when two of them disagree. */
     source: field.enum({
       label: "Learned from", holds: "none",
-      values: ["scanned", "typed", "imported", "ai-assisted"],
+      /* ⚠️ `minted` IS OURS AND IS THE MOST TRUSTWORTHY OF THE FIVE. It is the
+         only value here that names a code this workspace PRINTED rather than
+         read off a box, so when two codes disagree it is the one that wins. */
+      values: ["scanned", "typed", "imported", "ai-assisted", "minted"],
     }),
   },
 });
@@ -1425,9 +1428,10 @@ const arrive = operation<
     }
     /* ⚠️ A SHELF LABEL IS NOT A THING TO RECEIVE. It moves the session, and a
        screen that sent one here is a screen with a bug — refused rather than
-       filed as a product called `ONE-L-4K2P`. */
-    if (of.ours) {
-      return c.fail("inventory.unreadable", {}, { fields: { raw: "That is a place, not a thing" } });
+       filed as a product called `ONE-L-4K2P`. A product's OWN label is a
+       product, and receiving against it is the whole reason it is printed. */
+    if (of.ours && of.ours !== "product") {
+      return c.fail("inventory.unreadable", {}, { fields: { raw: notAThing(of.ours) } });
     }
 
     const known = await db.prepare(
@@ -1782,8 +1786,14 @@ const tallyUp = operation<
       names THIS object, so the same label twice is a mistake the app can see.
     */
     if (of.ours === "unit") return tallyItem(c, input.count, of.value);
-    if (of.ours) {
-      return c.fail("inventory.unreadable", {}, { fields: { raw: "That is a place, not a thing" } });
+    /* ⚠️ A PRODUCT'S OWN LABEL IS A PRODUCT, AND THAT IS WHY IT IS PRINTED. Most
+       of what a workshop or a kitchen holds has no barcode at all; refusing ours
+       here made `product.label` a sticker the counting flow could not read, so
+       the one gesture the product is fastest at was unavailable for exactly the
+       things that need it most. It resolves through the code book like every
+       other code, below. */
+    if (of.ours && of.ours !== "product") {
+      return c.fail("inventory.unreadable", {}, { fields: { raw: notAThing(of.ours) } });
     }
 
     const known = await db.prepare(
@@ -1968,6 +1978,24 @@ const closeCount = operation<
  * history that cannot be untangled afterwards. A hash would be shorter and would
  * collide; the id is already unique, and uppercasing it is injective.
  */
+/**
+ * ⚠️ WHAT A SCAN WAS, WHEN IT WAS NOT A THING — and it names WHICH, because
+ * "that did not read" over a label that read perfectly is the most confusing
+ * sentence this product can say. Somebody is holding a sticker; the answer is
+ * what the sticker is for.
+ */
+const NOT_A_THING: Readonly<Record<string, string>> = {
+  location: "That is a place, not a thing",
+  batch: "That is a delivery — scan what is in it",
+  kit: "That is a kit, not a thing",
+  unit: "That is one object, not a quantity",
+  product: "",
+};
+
+/* ⚠️ A LOOKUP WITH A FALLBACK, because a sentence that renders as `undefined`
+   under a scan box is worse than a vague one. */
+const notAThing = (of: string): string => NOT_A_THING[of] || "That is not a thing";
+
 const ourLabel = (of: "L" | "P" | "U" | "K", id: string): string =>
   `ONE-${of}-${id.slice(id.indexOf("_") + 1).toUpperCase()}`;
 
@@ -3580,6 +3608,17 @@ async function planImport(c: Ctx, text: string, said?: unknown) {
  * anybody could notice is before it happens. The guess is worth making because
  * it is right most of the time; the preview is what makes being wrong
  * survivable.
+ *
+ * ⚠️ A WRITE THAT WRITES NOTHING, AND THE REASON IS THE BODY. A read answers on
+ * a GET, and a GET carries its input in the URL — so a spreadsheet of eight
+ * hundred rows would be a query string of a hundred kilobytes, refused somewhere
+ * between the browser and the worker at a limit nobody can predict and nobody
+ * controls. `product.identify` is a write for the same kind of reason one level
+ * along: what the verb does is not the only thing that decides the method.
+ *
+ * ⚠️ AND THE AUDIT ROW IS HONEST RATHER THAN CEREMONIAL. Somebody pasted a
+ * workspace's whole catalogue into this product; that is worth a line whether or
+ * not they went on to press the button.
  */
 const seeImport = operation<
   { text: string; columns?: unknown },
@@ -3589,7 +3628,7 @@ const seeImport = operation<
   }
 >({
   id: "product.preview",
-  kind: "read",
+  kind: "write",
   summary: "What this spreadsheet would do",
   input: {
     text: field.long({ label: "Rows", required: true, holds: "none", max: 400_000 }),
@@ -3605,7 +3644,11 @@ const seeImport = operation<
   },
   permission: "product:write",
   entitlement: "imports",
+  /* ⚠️ REPLAYABLE, BECAUSE IT CHANGES NOTHING. A key here would make the second
+     look at the same sheet answer with the first one's cached verdict, which is
+     wrong the moment somebody adds a product between the two. */
   idempotency: { mode: "none" },
+  audit: () => ({ subject: "a spreadsheet", verb: "looked at" }),
   async handler(ctx, input) {
     const c = ctx as Ctx;
     const out = await planImport(c, input.text, input.columns);
@@ -3758,19 +3801,33 @@ const doImport = operation<
         changed++;
       }
 
-      /* ⚠️ THE CODE IS LEARNED RATHER THAN OVERWRITTEN, through the same rule
-         `code.learn` follows: one code names one product, and a second owner is
-         refused rather than replaced. `DO NOTHING` is that refusal, quietly,
-         which is right for a bulk paste — the row is reported below. */
+      /*
+        ⚠️ THE CODE IS LEARNED RATHER THAN OVERWRITTEN, through the same rule
+        `code.learn` follows: one code names one product, and a second owner is
+        refused rather than replaced. Learning it twice would make every future
+        scan of that string ambiguous, and the resolver would answer with
+        whichever row it read first — a wrong product, confidently, for ever.
+
+        ⚠️ READ THEN WRITE, RATHER THAN `ON CONFLICT`. The `code` table is a
+        declared collection and the platform's generated DDL carries no unique
+        index on `(tenant_id, value)` — so an upsert naming one is not a
+        stricter write, it is `SQLITE_ERROR` at run time and a 503 for the whole
+        import. The window between the read and the insert is a bulk paste
+        racing itself, which cannot happen: `planIn` has already refused the
+        second row.
+      */
       if (row.code) {
-        const out = await db.prepare(
-          `INSERT INTO code (id, tenant_id, value, product, kind, pack, at, by)
-            VALUES (?, ?, ?, ?, 'other', 1, ?, ?)
-            ON CONFLICT (tenant_id, value) DO NOTHING`)
-          .bind(newId("cod", new Date(c.now)), c.tenantId, row.code, product, c.now,
-            c.accountId ?? null).run();
-        if ((out.meta?.changes ?? 0) === 0) {
+        const taken = await db.prepare(
+          `SELECT product FROM code WHERE tenant_id = ? AND value = ?`)
+          .bind(c.tenantId, row.code).first<{ product: string }>();
+        if (taken && taken.product !== product) {
           refused.push(`Line ${row.line}: "${row.code}" already names something else`);
+        } else if (!taken) {
+          await db.prepare(
+            `INSERT INTO code (id, tenant_id, value, product, kind, pack, source, at, by)
+              VALUES (?, ?, ?, ?, 'other', 1, 'imported', ?, ?)`)
+            .bind(newId("code", new Date(c.now)), c.tenantId, row.code, product, c.now,
+              c.accountId ?? null).run();
         }
       }
 
@@ -3994,7 +4051,71 @@ const mintLabels = (
 });
 
 const labelPlaces = mintLabels("location.label", "L", "location", "location:write");
-const labelThings = mintLabels("product.label", "P", "product", "product:write");
+
+/**
+ * A PRODUCT'S OWN LABEL, AND IT GOES IN THE CODE BOOK.
+ *
+ * ⚠️ NOT A COLUMN ON THE PRODUCT, WHICH IS THE WHOLE DIFFERENCE FROM A SHELF. A
+ * place has exactly one code and it is always ours; a product has as many as the
+ * world has printed on it — a GTIN, a wholesaler's part number, a national code
+ * — and `code` is the one table the camera resolves against. A label written
+ * into a column of its own would be a code that resolves to nothing: the scan
+ * reads it, the resolver looks in the book, and the product it is stuck to is
+ * reported as unknown.
+ *
+ * ⚠️ AND IT IS MINTED ONCE. `ourLabel` derives the string from the row's id, so
+ * a second print of the same product finds the same code already in the book and
+ * writes nothing — a re-issued label is a sticker on a box that now points at
+ * something else.
+ */
+const labelThings = operation<
+  { ids: readonly string[] }, { items: readonly { id: string; code: string }[] }
+>({
+  id: "product.label",
+  kind: "write",
+  summary: "Give products a label of ours",
+  input: { ids: field.json({ label: "Which", required: true, holds: "none" }) },
+  output: { items: field.json({ label: "Labels", holds: "none" }) },
+  permission: "product:write",
+  idempotency: { mode: "key" },
+  emits: ["product.labelled"],
+  outcome: { message: "Labelled.", tone: "success", invalidates: ["code.list"] },
+  fails: ["platform.invalid"],
+  audit: (input) => ({ subject: `${(input.ids ?? []).length} row(s)`, verb: "labelled" }),
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const db = c.db as Db;
+    const ids = Array.isArray(input.ids) ? input.ids.map((one) => String(one)) : [];
+    if (!ids.length) {
+      return c.fail("platform.invalid", {}, { fields: { ids: "Choose something to label" } });
+    }
+
+    const out: { id: string; code: string }[] = [];
+    for (const one of ids) {
+      /* ⚠️ ONE AT A TIME AND SCOPED, because a list of ids arrives from a
+         browser. A single statement with an `IN` would label whatever the caller
+         named, in whichever workspace it happened to live. */
+      const row = await db.prepare(
+        `SELECT id FROM product WHERE id = ? AND tenant_id = ?`)
+        .bind(one, c.tenantId).first<{ id: string }>();
+      if (!row) continue;
+
+      const code = ourLabel("P", row.id);
+      const already = await db.prepare(
+        `SELECT id FROM code WHERE tenant_id = ? AND value = ?`)
+        .bind(c.tenantId, code).first<{ id: string }>();
+      if (!already) {
+        await db.prepare(
+          `INSERT INTO code (id, tenant_id, product, value, kind, pack, source, at, by)
+            VALUES (?, ?, ?, ?, 'ours', 1, 'minted', ?, ?)`)
+          .bind(newId("code", new Date(c.now)), c.tenantId, row.id, code, c.now,
+            c.accountId ?? null).run();
+      }
+      out.push({ id: row.id, code });
+    }
+    return { items: out };
+  },
+});
 
 /* ------------------------------------------------------------ the morning --- */
 

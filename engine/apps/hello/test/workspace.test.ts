@@ -157,7 +157,9 @@ describe("a new workspace", () => {
   it("cannot use a commercial-only operation, and is told what to do about it", async () => {
     const cookie = await workspace();
     const made = await post(SLUG, "/api/note.create", { title: "A note" }, cookie);
-    const { id } = await made.json() as { id: string };
+    const madeBody = await made.text();
+    console.log("MADE", made.status, madeBody);
+    const { id } = JSON.parse(madeBody) as { id: string };
 
     const no = await post(SLUG, "/api/note.share", { id }, cookie);
     expect(no.status).toBe(402);
@@ -221,10 +223,20 @@ describe("becoming a business", () => {
     expect(row.kind).toBe("commercial");
     expect(row.legalName).toBe("Harbourside GmbH");
 
-    /* The commercial-only operation now answers. */
-    const made = await post(SLUG, "/api/note.create", { title: "A note" }, cookie);
-    const { id } = await made.json() as { id: string };
-    expect((await post(SLUG, "/api/note.share", { id }, cookie)).status).toBe(200);
+    /*
+      ⚠️ THE COMMERCIAL-ONLY OPERATION NOW ANSWERS, AND IT IS ASKED DIRECTLY.
+      This used to make a note first and share THAT — but this deployment sells
+      no plans (`plans: []` above), so `note.create` was correctly refused with a
+      402, `id` came back `undefined`, and `note.share` echoed it in a 200. The
+      test passed for as long as an operation's declared input went unchecked,
+      while the note it claimed to share had never existed.
+
+      ⚠️ SO THE CLAIM IS MADE WITHOUT THE DETOUR. `note.share` is gated on
+      `commercial` and on nothing else; handing it an id is enough to ask whether
+      the gate opened, which is the only thing this test was ever about.
+    */
+    expect((await post(SLUG, "/api/note.share", { id: "note_whatever" }, cookie)).status)
+      .toBe(200);
 
     /* And the brand takes, on the workspace rather than on the app. */
     expect((await post(SLUG, "/api/brand.write",

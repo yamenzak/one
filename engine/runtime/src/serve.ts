@@ -24,8 +24,8 @@ import type {
   PlanSpec, Problem, Resolved as _Resolved, Roots, Standing, TenantId,
 } from "@engine/kernel";
 import {
-  IN_GOOD_STANDING, LEGAL_INDEX, LEGAL_PATH, PLATFORM_PROBLEMS, PROOF_WINDOW_MS, check, doorFor,
-  newId, passagesOf, problem, resolveFlags,
+  IN_GOOD_STANDING, LEGAL_INDEX, LEGAL_PATH, PLATFORM_PROBLEMS, PROOF_WINDOW_MS, check,
+  checkAll, doorFor, newId, passagesOf, problem, resolveFlags,
 } from "@engine/kernel";
 import { compose, type Composed, type Resolved as ResolvedOp } from "./compose.js";
 import { switchesFor } from "./flags.js";
@@ -971,7 +971,10 @@ export async function performOperation(
     db: located.db,
     tenantId: located.tenantId,
     accountId: who.accountId,
-    now,
+    /* ⚠️ THE INSTANT AS A STRING, WHICH IS THE ONLY SHAPE A HANDLER CAN WRITE.
+       `now` is a `Date` in here because the bookkeeping below does arithmetic
+       with it; what crosses into an app is the ISO text, the same as a job's. */
+    now: now.toISOString(),
     directory: wiring.directory,
     permissions: caller.permissions,
     permissionsIn: who.permissionsIn,
@@ -1088,6 +1091,36 @@ export async function performOperation(
     fail: (code, values, extra) => { throw new Refused(problem(catalog, code, values, extra)); },
   };
 
+  /*
+    ⚠️ THE DECLARED INPUT IS CHECKED HERE, AND FOR A LONG TIME IT WAS CHECKED
+    NOWHERE. `checkAll` was reached by collection records and by settings, so an
+    operation's `input` map was a declaration the tool catalogue and the OpenAPI
+    document were generated from and nothing enforced: a required field could be
+    absent, a `max` of four hundred thousand characters was advisory, and a `day`
+    could be any string at all.
+
+    ⚠️ AND THE SYMPTOM WAS NEVER A 400. A missing required field reached the
+    handler as `undefined`, went into a statement, and D1 answered
+    `D1_TYPE_ERROR: Type 'undefined' not supported` — a 503 naming a value,
+    thrown from whichever bind happened to hold it, with nothing pointing at the
+    field or the caller.
+
+    ⚠️ IT GATES RATHER THAN REPLACES. A checked object drops the keys nothing
+    declared, and a handler reading one would then see `undefined` for a value
+    the caller did send — the same failure one step along. What crosses is what
+    arrived; what this decides is whether it may.
+  */
+  if (!op.generated && Object.keys(op.spec.input).length) {
+    const checked = checkAll(op.spec.input, input);
+    if (!checked.ok) {
+      await recordOutcome(located, who, op, input, { ok: false, problem: "platform.invalid" }, now);
+      return {
+        kind: "refused",
+        problem: problem(catalog, "platform.invalid", {}, { fields: checked.fields }),
+      };
+    }
+  }
+
   try {
     const answer = await op.run(ctx, input);
     /*
@@ -1187,6 +1220,7 @@ async function answerPersonal(
     },
     fail: (code, values, extra) => { throw new Refused(problem(catalog, code, values, extra)); },
   };
+
 
   try {
     const answer = await op.run(ctx, input);

@@ -63,7 +63,7 @@ export function moneyOps(app: AppSpec): Readonly<Record<string, Resolved>> {
         that has to fetch them separately is one that shows the number first and
         the explanation second, if at all.
       */
-      const since = new Date(ctx.now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      const since = new Date(Date.parse(ctx.now) - 30 * 24 * 60 * 60 * 1000).toISOString();
       const spent = await spentByApp(ctx.directory, ctx.tenantId as TenantId, since);
 
       /*

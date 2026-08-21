@@ -53,7 +53,20 @@ export interface Ctx {
   readonly db: Db;
   readonly tenantId: string;
   readonly accountId: string | null;
-  readonly now: Date;
+  /**
+   * ⚠️ A STRING, THE SAME AS `JobCtx.now`, AND THE UNIFICATION IS THE POINT. It
+   * was a `Date` here and a string there — one word, two types, in one
+   * framework — and the one a handler can write into a row is the string. D1
+   * refuses an object outright, at runtime, with a message naming the VALUE
+   * rather than the declaration: `D1_TYPE_ERROR: Type 'object' not supported`,
+   * thrown from whichever statement happened to bind it. Every write in a
+   * product 503s and nothing anywhere says why.
+   *
+   * ⚠️ ARITHMETIC IS `new Date(ctx.now)`, which is what the job side has always
+   * done. That is one conversion at the two places that need one, against a trap
+   * at every place that does not.
+   */
+  readonly now: string;
   /** ⚠️ Refuse from inside a handler with a catalogue code, never a bare throw. */
   /**
    * ⚠️ `values` FILLS THE SENTENCE'S TOKENS; `fields` SAYS WHICH INPUT IS WRONG.
@@ -144,6 +157,15 @@ export interface Resolved {
   readonly permission: Permission;
   readonly spec: AnyOperation;
   readonly run: (ctx: Ctx, input: Record<string, unknown>) => Promise<unknown>;
+  /**
+   * ⚠️ THE GENERATED VERBS CHECK THEIR OWN INPUT, AND THEY HAVE TO. A create
+   * demands every required field and an update must not — an edit that had to
+   * resend a body to rename a note is not an edit — and `records.ts` is where
+   * that difference already lives, together with the vault rules a door cannot
+   * see. Everything else is checked ONCE, at the door, against what it
+   * declared.
+   */
+  readonly generated?: true;
 }
 
 export interface Composed {
@@ -238,14 +260,14 @@ function refuse(ctx: Pick<Ctx, "fail">, done: WriteRefusal, spec: CollectionSpec
         return row;
       }
       case "create": {
-        const done = await put(ctx.db, spec, scope, input, ctx.accountId, ctx.now, ctx.vault);
+        const done = await put(ctx.db, spec, scope, input, ctx.accountId, new Date(ctx.now), ctx.vault);
         if ("why" in done) refuse(ctx, done, spec);
         /* ⚠️ MARKED HERE RATHER THAN IN THE JOB, because only the write knows a
            write happened. A job that scanned for un-indexed rows would have to
            read every record of every searchable collection every night to find
            the handful that changed. `noteWritten` returns immediately for a
            collection that is not searchable. */
-        await noteWritten(ctx.db, spec, appId, scope, done.id, ctx.now);
+        await noteWritten(ctx.db, spec, appId, scope, done.id, new Date(ctx.now));
         return done;
       }
       case "update": {
@@ -254,12 +276,12 @@ function refuse(ctx: Pick<Ctx, "fail">, done: WriteRefusal, spec: CollectionSpec
            this operation used to be the read WITHOUT the write: it answered 200
            with the id and changed nothing. */
         const done = await patch(ctx.db, spec, scope, String(input.id ?? ""),
-          input, ctx.accountId, ctx.now, ctx.vault);
+          input, ctx.accountId, new Date(ctx.now), ctx.vault);
         if ("why" in done) refuse(ctx, done, spec);
         /* ⚠️ RE-INDEXED ON EVERY EDIT, INCLUDING ONE THAT CHANGED NOTHING — see
            `noteWritten`. An index that only tracked edits it could prove were
            relevant is one that silently drifts. */
-        await noteWritten(ctx.db, spec, appId, scope, done.id, ctx.now);
+        await noteWritten(ctx.db, spec, appId, scope, done.id, new Date(ctx.now));
         return done;
       }
       case "delete": {
@@ -273,13 +295,16 @@ function refuse(ctx: Pick<Ctx, "fail">, done: WriteRefusal, spec: CollectionSpec
         /* ⚠️ MARKED GONE, NOT FORGOTTEN. The ledger row is the only handle on the
            item in the index — dropping it here would leave a deleted record
            findable by meaning with nothing anywhere pointing at it. */
-        await noteGone(ctx.db, spec, appId, String(input.id), ctx.now);
+        await noteGone(ctx.db, spec, appId, String(input.id), new Date(ctx.now));
         return { id: String(input.id) };
       }
     }
   };
 
-  return { id, kind, ...routeFor(operation), permission: operation.permission, spec: operation, run };
+  return {
+    id, kind, ...routeFor(operation), permission: operation.permission,
+    spec: operation, run, generated: true,
+  };
 }
 
 const verbSummary = (spec: CollectionSpec, verb: CrudVerb): string => {

@@ -264,7 +264,7 @@ export function packageOps(app: AppSpec): Readonly<Record<string, Resolved>> {
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)`)
           .bind(def.id, ctx.tenantId, def.app, def.name, def.priceCents, def.currency,
             def.periodDays, def.graceDays, JSON.stringify(def.grants),
-            def.retentionDays, def.oncePer ? 1 : 0, ctx.now.toISOString()).run();
+            def.retentionDays, def.oncePer ? 1 : 0, ctx.now).run();
         return { id: def.id };
       },
       { why: "It defines what a payment buys, which only a person weighs." }),
@@ -280,7 +280,7 @@ export function packageOps(app: AppSpec): Readonly<Record<string, Resolved>> {
         if (!seen) return ctx.fail("platform.not_found");
         await ctx.db.prepare(
           `UPDATE package SET archived_at = ? WHERE tenant_id = ? AND app = ? AND id = ?`)
-          .bind(ctx.now.toISOString(), ctx.tenantId, target.id, id).run();
+          .bind(ctx.now, ctx.tenantId, target.id, id).run();
         return { id };
       }),
 
@@ -294,7 +294,7 @@ export function packageOps(app: AppSpec): Readonly<Record<string, Resolved>> {
         if (!member) return ctx.fail("platform.not_found");
         const all = await packagesOf(ctx.db, ctx.tenantId as TenantId, target.id);
         const held = await Promise.all(all.map(async (pkg) => ({
-          ...(await holdingOf(ctx.db, ctx.tenantId as TenantId, memberId, pkg, ctx.now)),
+          ...(await holdingOf(ctx.db, ctx.tenantId as TenantId, memberId, pkg, new Date(ctx.now))),
           name: pkg.name,
         })));
         return { items: held.filter((h) => h.paidUntil !== null) };
@@ -320,7 +320,7 @@ export function packageOps(app: AppSpec): Readonly<Record<string, Resolved>> {
         if (pkg.grants.some((k) => !mine.has(k))) return ctx.fail("platform.forbidden");
 
         const out = await applyPackage(ctx.db, ctx.tenantId as TenantId, memberId, packageId,
-          target.id, `staff:${ctx.accountId ?? "unknown"}`, ctx.now);
+          target.id, `staff:${ctx.accountId ?? "unknown"}`, new Date(ctx.now));
         if (out === "no_such_package" || out === "no_such_member") return ctx.fail("platform.not_found");
         if (out === "archived") return ctx.fail("platform.invalid");
         if (out === "once") return ctx.fail("platform.conflict");

@@ -124,7 +124,7 @@ export function aiOps(app: AppSpec): Readonly<Record<string, Resolved>> {
         }
         /* ⚠️ Stored beside the wording, keyed apart — one row per workspace per
            action per thing, so clearing a choice cannot clear the words. */
-        await word(ctx.db, ctx.tenantId as TenantId, app.id, `${actionId}:model`, wanted, ctx.now);
+        await word(ctx.db, ctx.tenantId as TenantId, app.id, `${actionId}:model`, wanted, new Date(ctx.now));
       }
 
       if (input.addendum !== undefined) {
@@ -140,7 +140,7 @@ export function aiOps(app: AppSpec): Readonly<Record<string, Resolved>> {
             return ctx.fail("platform.invalid", {}, { fields: { addendum: said(wrong[0]!) } });
           }
         }
-        await word(ctx.db, ctx.tenantId as TenantId, app.id, actionId, text, ctx.now);
+        await word(ctx.db, ctx.tenantId as TenantId, app.id, actionId, text, new Date(ctx.now));
       }
 
       return { ok: true };

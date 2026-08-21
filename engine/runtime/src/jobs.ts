@@ -275,7 +275,20 @@ export async function runJob(
 ): Promise<RunRow | null> {
   if (!def.overlap && await inFlight(deps.directory, def.id)) return null;
 
-  const deadline = now.getTime() + (def.budgetSeconds ?? 60) * 1000;
+  /*
+    ⚠️ THE BUDGET IS WALL-CLOCK, MEASURED FROM WHEN THE PASS STARTS — never from
+    the logical instant. They are the same thing in production, where `now` IS
+    the clock, and they are not the same thing anywhere else: a caller passing a
+    fixed instant (a test, a replay, a run scheduled from a stored time) sets a
+    deadline in the past, `Date.now()` is already beyond it, and the loop breaks
+    before the first workspace.
+
+    ⚠️ AND THE SYMPTOM IS A CLEAN NIGHT. The run reports `ok`, with "stopped on
+    its budget, carries on next time" — a sweep that touched nothing and said so
+    politely. The suite that caught this passed or failed by the hour of the day
+    it was run at, which is the most expensive kind of test there is.
+  */
+  const deadline = Date.now() + (def.budgetSeconds ?? 60) * 1000;
   const at = now.toISOString();
 
   const body = async (): Promise<{ touched: number; detail?: string }> => {

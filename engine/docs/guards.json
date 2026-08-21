@@ -2827,6 +2827,15 @@
       "impl": "scripts/one-planner.test.mjs",
       "proves": "does not call",
       "fails": "a screen that says “412 new, 3 updated” over a write that walks the same spreadsheet a second time and does something else — identical until the day it is not, and on that day nothing throws"
+    },
+    {
+      "id": "what-an-operation-declared-about-its-input-is-enforced",
+      "protects": "D12",
+      "stage": "72",
+      "status": "live",
+      "impl": "scripts/input-checked.test.mjs",
+      "proves": "checkAll(op.spec.input",
+      "fails": "a required field arriving as `undefined`, reaching a statement, and the caller being told “Type 'undefined' not supported” in a 503 that names a value rather than a field"
     }
   ]
 }

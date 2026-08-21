@@ -94,7 +94,7 @@ export function mediaOps(app: AppSpec): Readonly<Record<string, Resolved>> {
         body,
         contentType: String(input.contentType ?? "application/octet-stream"),
         by: ctx.accountId ?? null,
-      }, ctx.now);
+      }, new Date(ctx.now));
 
       return typeof out === "string" ? ctx.fail("platform.unavailable") : out;
     }),

@@ -168,7 +168,7 @@ export function settingOps(app: AppSpec): Readonly<Record<string, Resolved>> {
           const refused = refusePrompt(action.ai, text, "tenant");
           if (refused.length) return ctx.fail("platform.invalid", { detail: refused.join(", ") });
         }
-        await word(ctx.db, ctx.tenantId as TenantId, target.id, action.id, text, ctx.now);
+        await word(ctx.db, ctx.tenantId as TenantId, target.id, action.id, text, new Date(ctx.now));
         return { action: action.id };
       }),
 
@@ -311,7 +311,7 @@ export function settingOps(app: AppSpec): Readonly<Record<string, Resolved>> {
           return ctx.fail("platform.not_found");
         }
         const on = input.on === null ? null : input.on === true;
-        await setPersonFlag(ctx.directory, ctx.tenantId, at, def.id, on, ctx.now);
+        await setPersonFlag(ctx.directory, ctx.tenantId, at, def.id, on, new Date(ctx.now));
         return { id: def.id, person: at, on };
       }),
 
@@ -335,7 +335,7 @@ export function settingOps(app: AppSpec): Readonly<Record<string, Resolved>> {
           return ctx.fail("platform.not_found");
         }
         const on = input.on === null ? null : input.on === true;
-        await setTenantFlag(ctx.directory, ctx.tenantId, def.id, on, ctx.now);
+        await setTenantFlag(ctx.directory, ctx.tenantId, def.id, on, new Date(ctx.now));
         return { id: def.id, on };
       }),
 
@@ -393,10 +393,10 @@ export function settingOps(app: AppSpec): Readonly<Record<string, Resolved>> {
           const mine = await ctx.permissionsIn(target.id);
           if (!def.needs || !mine.has(def.needs)) return ctx.fail("platform.forbidden");
           await writeSetting(ctx.db, ctx.tenantId as TenantId, target.id, "", id,
-            checked.values[id], ctx.now);
+            checked.values[id], new Date(ctx.now));
         } else {
           await writeSetting(ctx.db, ctx.tenantId as TenantId, target.id, ctx.accountId, id,
-            checked.values[id], ctx.now);
+            checked.values[id], new Date(ctx.now));
         }
         return { id };
       }),

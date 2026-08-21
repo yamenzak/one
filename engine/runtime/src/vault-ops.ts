@@ -145,7 +145,7 @@ export function vaultOps(app: AppSpec): Readonly<Record<string, Resolved>> {
         if (!(purpose in purposes)) return ctx.fail("platform.not_found");
         if (await shredded(ctx.db, subject)) return ctx.fail("platform.not_found");
         await consent(ctx.db, ctx.tenantId as TenantId, subject, purpose,
-          input.given === true, ctx.now);
+          input.given === true, new Date(ctx.now));
         return { purpose, given: input.given === true };
       }),
 
@@ -185,10 +185,10 @@ export function vaultOps(app: AppSpec): Readonly<Record<string, Resolved>> {
         }
         /* ⚠️ AN EXPIRY IN THE PAST IS REFUSED RATHER THAN STORED. It would read
            on the screen as access given and behave as access withheld. */
-        if (Number.isNaN(until.getTime()) || until <= ctx.now) {
+        if (Number.isNaN(until.getTime()) || until <= new Date(ctx.now)) {
           return ctx.fail("platform.invalid", {}, { fields: { until: "pick a date in the future" } });
         }
-        await grant(ctx.db, ctx.tenantId as TenantId, subject, to, purpose, fields, until, ctx.now);
+        await grant(ctx.db, ctx.tenantId as TenantId, subject, to, purpose, fields, until, new Date(ctx.now));
         return { to, purpose, fields, until: until.toISOString() };
       }),
 
@@ -197,7 +197,7 @@ export function vaultOps(app: AppSpec): Readonly<Record<string, Resolved>> {
       async (ctx, input) => {
         const to = String(input.to ?? "").trim();
         if (!to) return ctx.fail("platform.invalid");
-        await revoke(ctx.db, me(ctx), to, ctx.now);
+        await revoke(ctx.db, me(ctx), to, new Date(ctx.now));
         return { to };
       }),
 
@@ -246,7 +246,7 @@ export function vaultOps(app: AppSpec): Readonly<Record<string, Resolved>> {
       async (ctx) => {
         const subject = me(ctx);
         if (await shredded(ctx.db, subject)) return ctx.fail("platform.not_found");
-        await shred(ctx.db, subject, ctx.now);
+        await shred(ctx.db, subject, new Date(ctx.now));
         return { erased: true };
       },
       /* ⚠️ A code to an inbox, because the threat is a borrowed laptop with an

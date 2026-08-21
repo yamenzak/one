@@ -51,6 +51,42 @@ const deps = (extra: Partial<RunnerDeps> = {}): RunnerDeps => ({
 
 beforeEach(() => { told.length = 0; });
 
+/* ------------------------------------------------------------- the budget --- */
+
+describe("how long a pass may take", () => {
+  /*
+    ⚠️ THE BUDGET IS WALL-CLOCK, AND MIXING IT WITH THE LOGICAL INSTANT MADE
+    EVERY PASS A NO-OP. The deadline was `now.getTime() + budget`, so a caller
+    handing over any instant in the past — a test, a replay, a run scheduled
+    from a stored time — set a deadline that `Date.now()` was already past. The
+    loop broke before the first workspace and the run reported `ok` with
+    "stopped on its budget", which reads as a busy night that ran out of time.
+
+    ⚠️ AND IT PASSED OR FAILED BY THE HOUR. Every test in this file used a fixed
+    05:00, so the whole suite was green before six in the morning and red after
+    it — the most expensive shape a test can have, because the first person to
+    see it red assumes they broke it.
+  */
+  it("runs a pass handed an instant from long ago", async () => {
+    const row = await runJob(deps(), sweep(async () => ({ touched: 7 })),
+      new Date("2020-01-01T00:00:00.000Z"));
+
+    expect(row?.ok).toBe(true);
+    expect(row?.touched).toBe(7);
+    expect(row?.detail ?? "").not.toContain("budget");
+  });
+
+  /* ⚠️ AND THE INSTANT IS STILL WHAT THE WORK IS TOLD, because what a sweep
+     records happened at the time it was run FOR, not at the moment the machine
+     got round to it. */
+  it("hands the work the instant it was given", async () => {
+    let said = "";
+    await runJob(deps(), sweep(async (ctx) => { said = ctx.now; return { touched: 0 }; }),
+      new Date("2020-01-01T00:00:00.000Z"));
+    expect(said).toBe("2020-01-01T00:00:00.000Z");
+  });
+});
+
 describe("a job that tells somebody", () => {
   /*
     ⚠️ THE ORDINARY CASE, AND IT IS THE ONE THAT DID NOT EXIST. The job is called

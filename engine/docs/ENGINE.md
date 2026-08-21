@@ -877,6 +877,7 @@ its own header, cited by other files, and doing nothing.
 | `a-shelf-life-is-counted-in-local-days` | D12 | stock expires a day late west of Greenwich — the direction that matters, on medicine and food |
 | `an-expiry-says-which-clock-ended-it` | D12 | a shelf that says “expires Tuesday” and cannot say why, which is a shelf nobody acts on |
 | `the-preview-and-the-commit-are-the-same-function` | D12 | a screen that says “412 new, 3 updated” over a write that walks the same spreadsheet a second time and does something else — identical until the day it is not, and on that day nothing throws |
+| `what-an-operation-declared-about-its-input-is-enforced` | D12 | a required field arriving as `undefined`, reaching a statement, and the caller being told “Type 'undefined' not supported” in a 503 that names a value rather than a field |
 <!-- /generated -->
 
 ### And how well each decision is defended
@@ -895,7 +896,7 @@ its own header, cited by other files, and doing nothing.
 | D9 | Libraries encode decisions; we write invariants | 3 |
 | D10 | Five primary destinations, maximum | 5 |
 | D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 19 |
-| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 130 |
+| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 131 |
 | D13 | The agent surface is derived: every operation is an MCP tool unless it says why not | 4 |
 | D14 | Provider AI calls go through the unified AI binding and its gateway, never direct fetch | 1 |
 | D15 | One membership, two authorities: a platform role for the workspace, a role per app inside it | 5 |
@@ -1029,8 +1030,9 @@ that names no stage, so this list cannot grow by forgetting.
 | 64 | Itemised things — one object for its whole life, and the kits composed of them | shipped |
 | 63 | The guide and the milestones are ticked by what a workspace has actually done | **planned** |
 | 71 | The spreadsheet somebody already has — the import, and the supplier it names | shipped |
+| 72 | An operation's declared input is checked at the door, and `now` is one type | shipped |
 
-**54 shipped, 17 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**55 shipped, 17 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---

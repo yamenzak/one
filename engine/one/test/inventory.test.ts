@@ -1,0 +1,487 @@
+/**
+ * ONEINVENTORY, DRIVEN — the golden path, through the real worker.
+ *
+ * ⚠️ EVERY OTHER TEST THIS PRODUCT HAS IS OVER A PURE FUNCTION OR A
+ * DECLARATION. Fifty operations, fourteen collections and a chokepoint were
+ * composed, typechecked, guarded and green without one of them ever having been
+ * EXECUTED against a database. That is the failure class this repository is a
+ * catalogue of — declared, mounted, and reached by nothing — and the only thing
+ * that closes it is a request.
+ *
+ * ⚠️ IT DRIVES THE WORKSPACE'S OWN DOOR, over `/api/<operation>`, with a session
+ * cookie. Calling the handlers directly would skip the gate, the permission, the
+ * entitlement, the quota, the problem catalogue and the routing — which is most
+ * of what could be wrong.
+ *
+ * ⚠️ AND THE ASSERTIONS ARE ABOUT WHAT THE PRODUCT PROMISES, not about which
+ * rows moved. "Taking more than there is is refused" and "a count's correction
+ * is attributed to the count" are the two sentences the whole model rests on.
+ */
+
+import { env } from "cloudflare:test";
+import { beforeAll, describe, expect, it } from "vitest";
+import {
+  MEMBERSHIP, addShard, compPlan, createTenant, found, noteBelonging, noteShardApp,
+  startSession, upsertAccount, type Db,
+} from "@engine/runtime";
+import worker, { APPS, LEGAL } from "../src/index.js";
+import { warm } from "./warm.js";
+
+const { ctx, settled } = warm();
+
+/* ⚠️ `development` is what `wrangler dev` passes, and it is what the suite needs
+   for the same reason every other file here does: the deployed config says
+   `production`, and this one has no signing secret of its own. */
+const asDev = { ...env, ROOT: "localhost", ENVIRONMENT: "development", AUTH_SECRET: "test" };
+
+const SLUG = "ironworks";
+const directory = () => env.DIRECTORY as unknown as Db;
+
+let cookie = "";
+let tenantId = "";
+
+/** The workspace's own door — the only place a product's operations answer. */
+const at = (path: string, init: RequestInit = {}) =>
+  worker.fetch(new Request(`http://${SLUG}.localhost:8080${path}`, init), asDev as never, ctx);
+
+interface Said { readonly status: number; readonly body: Record<string, unknown> }
+
+const read = async (op: string, input: Record<string, string> = {}): Promise<Said> => {
+  const query = new URLSearchParams(input).toString();
+  const res = await at(`/api/${op}${query ? `?${query}` : ""}`, { headers: { cookie } });
+  return { status: res.status, body: await res.json() as Record<string, unknown> };
+};
+
+const write = async (op: string, input: unknown = {}): Promise<Said> => {
+  const res = await at(`/api/${op}`, {
+    method: "POST",
+    headers: { cookie, "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  return { status: res.status, body: await res.json() as Record<string, unknown> };
+};
+
+/** ⚠️ Reads the id off a create, and fails loudly rather than returning "". */
+const idOf = (said: Said): string => {
+  expect(said.status, JSON.stringify(said.body)).toBe(200);
+  const id = said.body.id;
+  expect(typeof id, JSON.stringify(said.body)).toBe("string");
+  return String(id);
+};
+
+/** ⚠️ The code `product.label` minted, which is the only handle a count takes. */
+const codeOf = (said: Said, product: string): string => {
+  expect(said.status, JSON.stringify(said.body)).toBe(200);
+  const items = said.body.items as { id: string; code: string }[];
+  const mine = items.find((one) => one.id === product);
+  expect(mine, JSON.stringify(said.body)).toBeDefined();
+  return String(mine?.code);
+};
+
+const TODAY = "2026-08-21";
+
+beforeAll(async () => {
+  await at("/health");
+  await settled();
+  await addShard(directory(), "eu-1", "eu", 100);
+  for (const id of Object.keys(APPS)) await noteShardApp(directory(), "eu-1", id);
+
+  const made = await createTenant(directory(), {
+    slug: SLUG, name: "Ironworks", country: "DE", where: "eu", apps: ["inventory"],
+  });
+  if (typeof made === "string") throw new Error(made);
+  tenantId = made.tenant.id;
+
+  /*
+    ⚠️ A PLAN, BECAUSE THE PARKING ROW SELLS NOTHING. `none` is what a workspace
+    that never chose sits on: no products, no locations, no import — so a suite
+    without this would be asserting the gate rather than the product.
+
+    ⚠️ AND IT IS WRITTEN AGAINST `MEMBERSHIP`, NOT AGAINST THE APP. One plan
+    covers the whole account (OneMembership); a row filed under `inventory` is a
+    row `heldBy` never looks at, and every operation would fall through to the
+    parking tier while the row sat there looking correct.
+  */
+  await compPlan(directory(), tenantId as never, MEMBERSHIP, "solo");
+
+  const shard = env.SHARD_EU_1 as unknown as Db;
+  const who = await upsertAccount(directory(), "keeper@example.com", null);
+  /* ⚠️ `keeper` holds `stock:adjust`, which is the grant the sharp half of this
+     product is behind — correcting a number is not the same as taking one. */
+  await found(shard, tenantId as never, who as never, "keeper@example.com",
+    { inventory: "keeper" });
+  await noteBelonging(directory(), who as never, tenantId as never);
+  cookie = `one_session=${(await startSession(directory(), who as never)).id}`;
+
+  /* ⚠️ THE WALL COMES FIRST, and it holds the whole product including reads —
+     so a suite that skipped it would get 451 on every assertion below and read
+     as a product that does not work. */
+  for (const doc of Object.values(LEGAL.documents)) {
+    const done = await at("/api/me.accept", {
+      method: "POST", headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({ document: doc.id, version: doc.version }),
+    });
+    expect(done.status, doc.id).toBe(200);
+  }
+});
+
+/* ------------------------------------------------------------- the shelves --- */
+
+describe("what is where, and how many", () => {
+  /*
+    ⚠️ THE FIRST REQUEST IS THE WHOLE POINT OF THE FILE. A product can be
+    declared, composed, mounted, guarded and green while its very first operation
+    500s on a column that was never created — and nothing anywhere would have
+    said so.
+  */
+  it("answers a generated list before anything is in it", async () => {
+    const said = await read("product.list");
+    expect(said.status, JSON.stringify(said.body)).toBe(200);
+    expect(said.body.items).toEqual([]);
+  });
+
+  it("makes a place and a product", async () => {
+    const place = idOf(await write("location.create", { name: "Store room", kind: "room" }));
+    const product = idOf(await write("product.create", {
+      name: "Nitrile gloves, M", brand: "Ansell", unit: "box", tracking: "counted",
+    }));
+    /* ⚠️ THE COLLECTION'S OWN NAME IS THE PREFIX — `newId` is the platform's,
+       and an app inventing a three-letter stem for a generated record would be
+       two id conventions in one database. */
+    expect(place).toMatch(/^location_/);
+    expect(product).toMatch(/^product_/);
+  });
+
+  /*
+    ⚠️ RECEIVING MOVES THE BALANCE AND WRITES THE HISTORY IN ONE ACT. The
+    chokepoint is the product's central claim — every balance change goes through
+    `stockMove`, so the ledger is the whole story — and it is a claim about
+    RUNTIME that no structural guard can make.
+  */
+  it("puts stock on a shelf, and the shelf says so", async () => {
+    const place = idOf(await write("location.create", { name: "Bay 1", kind: "room" }));
+    const product = idOf(await write("product.create", {
+      name: "Masking tape", unit: "roll", tracking: "counted",
+    }));
+
+    const got = await write("stock.receive", {
+      product, location: place, quantity: 24, day: TODAY, capture: "typed" });
+    expect(got.status, JSON.stringify(got.body)).toBe(200);
+
+    const lines = await read("stock.list");
+    const mine = (lines.body.items as { product: string; quantity: number }[])
+      .filter((l) => l.product === product);
+    expect(mine).toHaveLength(1);
+    expect(mine[0]?.quantity).toBe(24);
+  });
+
+  /*
+    ⚠️ AND TAKING MORE THAN THERE IS IS REFUSED, IN THE PRODUCT'S OWN WORDS.
+    Landing on zero instead is the single most damaging thing an inventory can
+    do quietly: the shelf then agrees with whoever took the last of it, and the
+    discrepancy that would have found the problem is gone.
+  */
+  it("refuses to take more than is there, and says which", async () => {
+    const place = idOf(await write("location.create", { name: "Cabinet 2", kind: "room" }));
+    const product = idOf(await write("product.create", {
+      name: "Isopropanol 99%", unit: "bottle", tracking: "counted",
+    }));
+    await write("stock.receive", { product, location: place, quantity: 3, day: TODAY, capture: "typed" });
+
+    const short = await write("stock.take", {
+      product, location: place, quantity: 5, day: TODAY, capture: "typed" });
+    expect(short.status).toBe(409);
+    expect(JSON.stringify(short.body)).toContain("not that much");
+
+    /* ⚠️ AND THE REFUSAL LEFT THE SHELF ALONE. A 409 over a write that had
+       already landed is worse than no refusal at all. */
+    const lines = await read("stock.list");
+    const mine = (lines.body.items as { product: string; quantity: number }[])
+      .filter((l) => l.product === product);
+    expect(mine[0]?.quantity).toBe(3);
+  });
+
+  /* ⚠️ TAKING WHAT IS THERE WORKS, which is the half a test asserting only the
+     refusal would let somebody break by refusing everything. */
+  it("takes what is there", async () => {
+    const place = idOf(await write("location.create", { name: "Bench", kind: "room" }));
+    const product = idOf(await write("product.create", {
+      name: "Screws, M4 × 20", unit: "item", tracking: "counted",
+    }));
+    await write("stock.receive", { product, location: place, quantity: 100, day: TODAY, capture: "typed" });
+    const took = await write("stock.take", {
+      product, location: place, quantity: 40, day: TODAY, capture: "typed" });
+    expect(took.status, JSON.stringify(took.body)).toBe(200);
+
+    const lines = await read("stock.list");
+    const mine = (lines.body.items as { product: string; quantity: number }[])
+      .filter((l) => l.product === product);
+    expect(mine[0]?.quantity).toBe(60);
+  });
+});
+
+/* ------------------------------------------------------------- the history --- */
+
+describe("what the record says happened", () => {
+  /*
+    ⚠️ A MOVEMENT IS A ROW SOMEBODY CAN READ, and the reason the ledger exists is
+    that the balance alone cannot answer "who took it". A product where the two
+    could disagree is one where neither is worth reading.
+  */
+  it("writes a line of history for every movement", async () => {
+    const place = idOf(await write("location.create", { name: "Shelf A", kind: "room" }));
+    const product = idOf(await write("product.create", {
+      name: "Cutting fluid, 5 L", unit: "item", tracking: "counted",
+    }));
+    await write("stock.receive", { product, location: place, quantity: 10, day: TODAY, capture: "typed" });
+    await write("stock.take", { product, location: place, quantity: 4, day: TODAY, capture: "typed" });
+
+    const said = await read("ledger.list");
+    expect(said.status, JSON.stringify(said.body)).toBe(200);
+    const mine = (said.body.items as { product: string; move: string; delta: number }[])
+      .filter((r) => r.product === product);
+    expect(mine.map((r) => r.move).sort()).toEqual(["received", "taken"]);
+    expect(mine.reduce((n, r) => n + r.delta, 0)).toBe(6);
+  });
+});
+
+/* --------------------------------------------------------------- the count --- */
+
+describe("counting a shelf", () => {
+  /*
+    ⚠️ A COUNT'S CORRECTION IS ATTRIBUTED TO THE COUNT, and that attribution is
+    what the recorded-share figure is computed from. Written as an ordinary
+    adjustment it is indistinguishable from somebody fixing a typo, and the one
+    number that says whether anybody is actually scanning reads a hundred per
+    cent for ever — in the flattering direction, with every test green.
+  */
+  it("settles a session, and the correction names the session", async () => {
+    const place = idOf(await write("location.create", { name: "Cage", kind: "room" }));
+    const product = idOf(await write("product.create", {
+      name: "Cable ties", unit: "bag", tracking: "counted",
+    }));
+    await write("stock.receive", { product, location: place, quantity: 50, day: TODAY, capture: "typed" });
+
+    /*
+      ⚠️ A COUNT IS DRIVEN BY WHAT THE CAMERA READ, NEVER BY A PRODUCT ID — which
+      is why the label has to exist before the shelf can be counted. A product
+      with no barcode gets one of ours, minted by printing, and that is the whole
+      reason `product.label` is a WRITE rather than a rendering.
+    */
+    const code = codeOf(await write("product.label", { ids: [product] }), product);
+
+    const session = idOf(await write("count.open", { location: place, day: TODAY }));
+
+
+    /* ⚠️ Forty found where fifty was expected: ten gone, and nobody said so. */
+    const told = await write("count.tally", {
+      count: session, raw: code, year: 2026, quantity: 40,
+    });
+    expect(told.status, JSON.stringify(told.body)).toBe(200);
+
+    const closed = await write("count.close", { count: session, day: TODAY });
+    expect(closed.status, JSON.stringify(closed.body)).toBe(200);
+
+    const lines = await read("stock.list");
+    const mine = (lines.body.items as { product: string; quantity: number }[])
+      .filter((l) => l.product === product);
+    expect(mine[0]?.quantity).toBe(40);
+
+    const history = await read("ledger.list");
+    const fix = (history.body.items as { product: string; move: string; against: string }[])
+      .filter((r) => r.product === product && r.move === "adjusted");
+    expect(fix).toHaveLength(1);
+    /* ⚠️ THE SESSION'S OWN ID, which is what the report's `BY_COUNT` prefix
+       recognises. The two have to agree, and this is where they meet. */
+    expect(fix[0]?.against).toBe(session);
+    expect(fix[0]?.against.startsWith("cnt_")).toBe(true);
+  });
+});
+
+/* -------------------------------------------------------------- the report --- */
+
+describe("the figures", () => {
+  /*
+    ⚠️ THE RECORDED SHARE IS THE NUMBER THAT MAKES THE PRODUCT LOOK BAD, and it
+    only means anything if the two halves are computed from the same history. A
+    report answering zeroes over a workspace with movements in it is a screen
+    nobody would question.
+  */
+  it("tells what was scanned out from what a count found gone", async () => {
+    const place = idOf(await write("location.create", { name: "Stores", kind: "room" }));
+    const product = idOf(await write("product.create", {
+      name: "Gloves, L", unit: "box", tracking: "counted",
+    }));
+    await write("stock.receive", { product, location: place, quantity: 100, day: TODAY, capture: "typed" });
+    await write("stock.take", { product, location: place, quantity: 30, day: TODAY, capture: "typed" });
+
+    const code = codeOf(await write("product.label", { ids: [product] }), product);
+    const session = idOf(await write("count.open", { location: place, day: TODAY }));
+    await write("count.tally", { count: session, raw: code, year: 2026, quantity: 60 });
+    await write("count.close", { count: session, day: TODAY });
+
+    const said = await read("stock.report", { from: "2026-08-01", to: TODAY });
+    expect(said.status, JSON.stringify(said.body)).toBe(200);
+    const told = said.body.told as { recorded: number; inferred: number; share: number };
+    expect(told.recorded).toBe(30);
+    /* ⚠️ Ten the count found gone that nobody recorded taking. */
+    expect(told.inferred).toBe(10);
+    expect(told.share).toBeCloseTo(0.75);
+  });
+});
+
+/* -------------------------------------------------------------- the import --- */
+
+describe("bringing a spreadsheet in", () => {
+  const SHEET = [
+    "product name,brand,ean,qty,shelf,supplier",
+    "\"Gloves, nitrile, M\",Ansell,5012345678900,40,Import bay,Medline",
+    "Isopropanol 99%,,5012345678917,6,Import bay,Kaufmann",
+    "Masking tape,,,12,,",
+    "Cutting fluid 5L,,,4,Import bay,",
+  ].join("\n");
+
+  /*
+    ⚠️ THE PREVIEW IS A POST, AND THAT IS NOT A DETAIL. A read answers on a GET,
+    and a GET carries its input in the URL — eight hundred rows of somebody's
+    catalogue in a query string is a request refused between the browser and the
+    worker at a limit nobody controls. This assertion is what would have caught
+    it: the screen calls `post`, and until the operation was declared a write the
+    two disagreed and nothing anywhere said so.
+  */
+  it("says what the sheet would do before it does any of it", async () => {
+    await write("location.create", { name: "Import bay", kind: "room" });
+
+    const seen = await write("product.preview", { text: SHEET });
+    expect(seen.status, JSON.stringify(seen.body)).toBe(200);
+
+    const columns = seen.body.columns as Record<string, number>;
+    expect(columns.name).toBe(0);
+    expect(columns.code).toBe(2);
+    expect(columns.quantity).toBe(3);
+    expect(columns.location).toBe(4);
+    expect(columns.supplier).toBe(5);
+
+    const tally = seen.body.tally as Record<string, number>;
+    /* ⚠️ Three new, and the tape refused — it has a quantity and no place, which
+       imported anyway would be a product created without its stock. */
+    expect(tally).toEqual({ new: 3, update: 0, refused: 1 });
+
+    /* ⚠️ AND NOTHING HAPPENED. A preview that created a product would be the one
+       failure this whole shape exists to prevent. */
+    const kinds = await read("product.list");
+    expect((kinds.body.items as unknown[]).length).toBe(0);
+  });
+
+  /*
+    ⚠️ AND THE COMMIT DOES EXACTLY WHAT THE PREVIEW SAID. `one-planner.test.mjs`
+    makes the two share a function structurally; this is the same claim asserted
+    from outside, which is the half a structural check cannot make.
+  */
+  it("does what it said, and names what it would not do", async () => {
+    await write("location.create", { name: "Import bay", kind: "room" });
+    const seen = await write("product.preview", { text: SHEET });
+    const tally = seen.body.tally as Record<string, number>;
+
+    const done = await write("product.import", { text: SHEET, day: TODAY });
+    expect(done.status, JSON.stringify(done.body)).toBe(200);
+    expect(done.body.made).toBe(tally.new);
+    expect(done.body.changed).toBe(tally.update);
+    /* ⚠️ Three rows carried a place, so three landed on a shelf. */
+    expect(done.body.received).toBe(3);
+    /* ⚠️ Two suppliers named in the sheet, learned rather than dropped. */
+    expect(done.body.learned).toBe(2);
+
+    const refused = done.body.refused as string[];
+    expect(refused).toHaveLength(tally.refused ?? 0);
+    /* ⚠️ WITH ITS LINE NUMBER, which is the fact that makes it fixable in the
+       file somebody still has open. */
+    expect(refused[0]).toContain("Line 4");
+
+    const kinds = await read("product.list");
+    expect((kinds.body.items as unknown[]).length).toBe(3);
+
+    const suppliers = await read("supplier.list");
+    expect((suppliers.body.items as { name: string }[]).map((s) => s.name).sort())
+      .toEqual(["Kaufmann", "Medline"]);
+  });
+
+  /*
+    ⚠️ A SECOND IMPORT OF THE SAME SHEET UPDATES RATHER THAN DUPLICATING. Matched
+    on the code first, because a name is what somebody typed and two exports of
+    one catalogue spell it differently — matching on the name alone is how an
+    import makes a second "Gloves, Nitrile M" beside the first, for ever.
+  */
+  it("recognises what it already imported", async () => {
+    await write("location.create", { name: "Import bay", kind: "room" });
+    await write("product.import", { text: SHEET, day: TODAY });
+
+    const again = await write("product.preview", { text: SHEET });
+    const tally = again.body.tally as Record<string, number>;
+    expect(tally.new).toBe(0);
+    expect(tally.update).toBe(3);
+
+    await write("product.import", { text: SHEET, day: TODAY });
+    const kinds = await read("product.list");
+    expect((kinds.body.items as unknown[]).length).toBe(3);
+  });
+
+  /* ⚠️ AND A CORRECTED MAPPING IS OBEYED. The whole reason the guess is shown is
+     that it can be wrong; a screen that could show it and not change it would be
+     a report rather than a control. */
+  it("obeys a corrected column mapping", async () => {
+    const seen = await write("product.preview", {
+      text: SHEET,
+      /* ⚠️ `-1` is "leave it out" — the correction somebody makes most. */
+      columns: { quantity: -1, location: -1 },
+    });
+    const tally = seen.body.tally as Record<string, number>;
+    /* ⚠️ Nothing is refused now: the tape's only problem was a quantity with
+       nowhere to put it, and the sheet no longer claims either. */
+    expect(tally).toEqual({ new: 4, update: 0, refused: 0 });
+  });
+});
+
+/* ------------------------------------------------------------------ scope --- */
+
+describe("what another workspace can see", () => {
+  /*
+    ⚠️ THE INVARIANT UNDER ALL OF IT. Every read above is scoped by the tenant
+    the door resolved, and a product that leaked across that line would leak a
+    competitor's whole catalogue. It is asserted from the OUTSIDE — a second
+    workspace on the same shard, asking the same question — because that is the
+    only way to ask it that a wrong `WHERE` cannot pass.
+  */
+  it("sees none of somebody else's stock", async () => {
+    const made = await createTenant(directory(), {
+      slug: "elsewhere", name: "Elsewhere", country: "DE", where: "eu", apps: ["inventory"],
+    });
+    if (typeof made === "string") throw new Error(made);
+    const shard = env.SHARD_EU_1 as unknown as Db;
+    const who = await upsertAccount(directory(), "other@example.com", null);
+    await found(shard, made.tenant.id, who as never, "other@example.com", { inventory: "keeper" });
+    await noteBelonging(directory(), who as never, made.tenant.id);
+    const theirs = `one_session=${(await startSession(directory(), who as never)).id}`;
+
+    /* Ours: one product on one shelf. */
+    const place = idOf(await write("location.create", { name: "Private", kind: "room" }));
+    const product = idOf(await write("product.create", {
+      name: "A secret consumable", unit: "item", tracking: "counted",
+    }));
+    await write("stock.receive", { product, location: place, quantity: 7, day: TODAY, capture: "typed" });
+
+    for (const doc of Object.values(LEGAL.documents)) {
+      await worker.fetch(new Request("http://elsewhere.localhost:8080/api/me.accept", {
+        method: "POST", headers: { cookie: theirs, "content-type": "application/json" },
+        body: JSON.stringify({ document: doc.id, version: doc.version }),
+      }), asDev as never, ctx);
+    }
+
+    const res = await worker.fetch(
+      new Request("http://elsewhere.localhost:8080/api/stock.list", {
+        headers: { cookie: theirs },
+      }), asDev as never, ctx);
+    expect(res.status).toBe(200);
+    expect((await res.json() as { items: unknown[] }).items).toEqual([]);
+  });
+});
