@@ -153,6 +153,11 @@ export function Receive({
       <Viewfinder
         says={place ? "Scan the next thing, or another shelf" : "Scan the shelf you are standing at"}
         onRead={onRead}
+        typed={{
+          label: "Or type the code",
+          placeholder: "What is printed on it",
+          help: "A shelf label works here too",
+        }}
       />
 
       {!place

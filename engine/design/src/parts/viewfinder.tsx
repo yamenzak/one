@@ -14,10 +14,21 @@
  * the permission refusal, because the person writing it granted permission on
  * the first run and never saw the state again.
  *
- * ⚠️ AND TYPING IT IN IS ALWAYS OFFERED. Every one of those states ends in
- * somebody standing in front of a shelf with a job to do, and a scanner is a
- * convenience over a keyboard rather than a replacement for one. A scanning
- * surface with no way in but the camera is a surface that strands people.
+ * ⚠️ AND TYPING IT IN IS ALWAYS OFFERED — BY THE SHAPE, NOT BY THE CALLER. The
+ * field is part of this control and `typed` is required, so every scanning
+ * surface has one whether or not whoever wrote it thought about the camera
+ * failing. Every one of those states ends in somebody standing in front of a
+ * shelf with a job to do, and a scanner is a convenience over a keyboard rather
+ * than a replacement for one; a surface with no way in but the camera strands
+ * them. As an optional callback it was left out of three of the four, including
+ * the count session — where the camera failing meant a shelf half counted.
+ *
+ * ⚠️ AND THE FIELD IS ON THE SCREEN, NOT BEHIND THE CAMERA'S FAILURE. A code
+ * somebody can read off a box is faster to type than to line up — and MOST
+ * WAREHOUSE SCANNERS ARE KEYBOARD WEDGES, which type into whatever holds the
+ * caret and press Enter. A visible field that answers Enter is a hardware
+ * integration nobody had to write; the same field behind "the camera did not
+ * work" is a device that appears to be broken.
  *
  * ⚠️ THE TORCH IS PART OF THE CONTROL, NOT A FEATURE. Stock lives in basements,
  * cold rooms and the backs of racks. A torch button on the surface that needs it
@@ -25,9 +36,12 @@
  */
 
 import * as React from "react";
+import { CameraOff } from "lucide-react";
 import { Button } from "@heroui/react";
-import { Cluster, Stack } from "./arrange.js";
-import { DROP_PAD, SPACE } from "../tokens/metrics.js";
+import { Stack } from "./arrange.js";
+import { TextInput } from "./forms.js";
+import { Nothing } from "./state.js";
+import { SPACE } from "../tokens/metrics.js";
 import { TYPE } from "../tokens/type.js";
 import { MOTION } from "../tokens/motion.js";
 
@@ -124,9 +138,22 @@ export interface ViewfinderProps {
   readonly paused?: boolean;
   /** ⚠️ The app's words for what to point at. This package has no nouns. */
   readonly says?: string;
-  /** The way in that always works. Offered beside the frame and in every fault. */
-  readonly onType?: () => void;
-  readonly typeLabel?: string;
+  /**
+   * ⚠️ THE WAY IN THAT ALWAYS WORKS, AND IT IS REQUIRED. Every caller gets a
+   * field under the frame that reads the same `onRead`, so a camera that is
+   * refused, absent, busy or undecodable costs somebody a keystroke rather than
+   * their job. It was an OPTIONAL callback and three of four scanning surfaces
+   * left it out — including the count session, where the camera failing meant a
+   * shelf half counted and no way to finish it.
+   *
+   * ⚠️ THE WORDS ARE THE APP'S because this package has no nouns; the SHAPE is
+   * the package's because that is what stops it being forgotten.
+   */
+  readonly typed: {
+    readonly label: string;
+    readonly placeholder?: string;
+    readonly help?: string;
+  };
 }
 
 /* ------------------------------------------------------------------ camera --- */
@@ -256,11 +283,40 @@ function useReading(
 /* ------------------------------------------------------------------ surface --- */
 
 export function Viewfinder({
-  onRead, again = 1_500, paused = false, says, onType, typeLabel = "Type it in",
+  onRead, again = 1_500, paused = false, says, typed,
 }: ViewfinderProps) {
   const video = React.useRef<HTMLVideoElement>(null);
   const { trouble, live, track } = useCamera(paused, video);
   useReading(live && !paused, video, onRead, again);
+
+  /*
+    ⚠️ THE FIELD CLEARS ITSELF ON SUBMIT, and that is what makes it a scanner
+    port rather than a text box. A handheld reader types a code and presses
+    Enter; leaving the last one in place means the next read appends to it, and
+    the person finds out at the shelf.
+
+    ⚠️ AND AN EMPTY SUBMIT IS NOTHING, not a read of "". Enter is pressed on an
+    empty field by everybody who is thinking.
+  */
+  const [code, setCode] = React.useState("");
+  const enter = React.useCallback(() => {
+    const said = code.trim();
+    if (!said) return;
+    setCode("");
+    onRead(said);
+  }, [code, onRead]);
+
+  const port = (
+    <TextInput
+      label={typed.label}
+      value={code}
+      onChange={setCode}
+      onSubmit={enter}
+      name="code"
+      {...(typed.placeholder === undefined ? {} : { placeholder: typed.placeholder })}
+      {...(typed.help === undefined ? {} : { help: typed.help })}
+    />
+  );
 
   const [lit, setLit] = React.useState(false);
   /* ⚠️ OFFERED ONLY WHERE IT EXISTS. A torch button on a laptop is a control
@@ -281,15 +337,22 @@ export function Viewfinder({
   }, [track]);
 
   if (trouble) {
+    /* ⚠️ THE SAME EMPTY STATE EVERY OTHER SURFACE DRAWS, not a centred block of
+       its own. A fault here is the `nothing` outcome: there is no frame to show,
+       and the field under it is the way on. Written by hand it centred the two
+       sentences and left the control under them at the left margin, which is
+       what a second implementation of a shared shape costs — the divergence is
+       in the half nobody re-reads. */
     const said = SAYS[trouble];
     return (
-      <div className={`text-center ${DROP_PAD}`}>
-        <Stack space="snug">
-          <strong className={TYPE.label}>{said.says}</strong>
-          <p className={TYPE.note}>{said.under}</p>
-          {onType ? <Button variant="secondary" onPress={onType}>{typeLabel}</Button> : null}
-        </Stack>
-      </div>
+      <Stack space="snug">
+        {/* ⚠️ THE MARK NAMES WHAT IS MISSING, which the neutral circle cannot.
+            Drawn straight from lucide for `Circle`'s reason: it is a STILL mark
+            and the registry lives in the shell, so routing it through `glyphOf`
+            would make a leaf control import the frame above it. */}
+        <Nothing icon={<CameraOff />} says={said.says} under={said.under} />
+        {port}
+      </Stack>
     );
   }
 
@@ -325,10 +388,8 @@ export function Viewfinder({
         ) : null}
       </div>
 
-      <Cluster>
-        <p className={`min-w-0 grow ${TYPE.note}`}>{says ?? "Point it at a code"}</p>
-        {onType ? <Button size="sm" variant="ghost" onPress={onType}>{typeLabel}</Button> : null}
-      </Cluster>
+      <p className={TYPE.note}>{says ?? "Point it at a code"}</p>
+      {port}
     </Stack>
   );
 }

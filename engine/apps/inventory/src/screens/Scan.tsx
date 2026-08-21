@@ -29,7 +29,7 @@
 import * as React from "react";
 import {
   Await, FieldRow, Group, Lookup, NoteRow, PickFile, RowsWaiting, Screen, Section,
-  TextInput, Viewfinder, asDataUrl, glyphOf, type Loaded,
+  Viewfinder, asDataUrl, glyphOf, type Loaded,
 } from "@engine/design";
 import { Button } from "@heroui/react";
 
@@ -126,24 +126,6 @@ export function Scan({
   title, of, products, onRead, onOpen, onPlace, onLearn, again, paused,
   guess, onIdentify, onLabel, onAdd, busy,
 }: ScanProps) {
-  /*
-    ⚠️ THE FIELD IS ALWAYS ON THE SCREEN, NOT BEHIND THE CAMERA'S FAILURE. Two
-    reasons, and the second is the one that pays: a code somebody reads off a
-    box is faster to type than to line up, and MOST WAREHOUSE SCANNERS ARE
-    KEYBOARD WEDGES — they type into whatever has the caret and press Enter. A
-    visible field that answers Enter is a hardware integration nobody had to
-    write; the same field hidden behind "the camera did not work" is a device
-    that appears to be broken.
-  */
-  const [typed, setTyped] = React.useState("");
-  const at = React.useRef<HTMLDivElement>(null);
-
-  const look = () => {
-    const code = typed.trim();
-    if (!code) return;
-    onRead(code);
-    setTyped("");
-  };
   /* ⚠️ HELD HERE RATHER THAN ASKED FOR TWICE. The answer to "what is this?" is
      one choice and one press, and a `Lookup` that reset between renders would
      make the second press choose nothing. */
@@ -188,22 +170,13 @@ export function Scan({
       <Viewfinder
         says="Point it at a barcode, or at one of our shelf labels"
         onRead={onRead}
-        onType={() => at.current?.querySelector("input")?.focus()}
-        typeLabel="Type it below"
+        typed={{
+          label: "Or type the code",
+          placeholder: "What is printed on it",
+          help: "A handheld scanner types here by itself",
+        }}
         paused={paused}
       />
-
-      <div ref={at}>
-        <TextInput
-          label="Or type the code"
-          value={typed}
-          onChange={setTyped}
-          onSubmit={look}
-          placeholder="What is printed on it"
-          help="A handheld scanner types here by itself"
-          name="code"
-        />
-      </div>
 
       <Await
         of={of}

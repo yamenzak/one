@@ -189,12 +189,10 @@ export function Write({ title, onBack, onSave }: {
                   setReference(code);
                   notice.ok("Scanned.");
                 }}
-                /* ⚠️ THE WAY IN THAT ALWAYS WORKS, and here it is the field
-                   directly above — so the fallback is not a second screen. */
-                onType={() => {
-                  document.querySelector<HTMLInputElement>('input[name="reference"]')?.focus();
-                }}
-                typeLabel="Type it above"
+                /* ⚠️ THE WAY IN THAT ALWAYS WORKS, and it fills the same field
+                   as the lens does — so a camera that will not start costs a
+                   keystroke rather than the feature. */
+                typed={{ label: "Or type it", placeholder: "What is printed on it" }}
               />
             </Reveal>
           </Stack>

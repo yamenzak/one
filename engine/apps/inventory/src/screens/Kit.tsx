@@ -97,6 +97,10 @@ export function Kit({
               <Viewfinder
                 says="Scan an item's label to put it in"
                 onRead={onRead}
+                typed={{
+                  label: "Or type the item's code",
+                  placeholder: "What is printed on it",
+                }}
               />
             )
             : null}

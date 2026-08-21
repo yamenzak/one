@@ -107,6 +107,10 @@ export function Count({
           <Viewfinder
             says={counting ? "Scan what is on the shelf" : "Scan the shelf label"}
             onRead={onRead}
+            typed={{
+              label: counting ? "Or type the code" : "Or type the shelf label",
+              placeholder: "What is printed on it",
+            }}
           />
 
           {/* ⚠️ SAID, NEVER BLOCKED. A trigger held against a pallet of identical
