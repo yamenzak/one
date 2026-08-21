@@ -7,6 +7,6 @@ import { defineConfig } from "vitest/config";
  * project would make every screen assertion pay for a runtime it never touches.
  */
 export default defineConfig({
-  test: { include: ["test/**/*.screens.test.tsx"], environment: "node" },
+  test: { include: ["test/**/*.screens.test.tsx"], exclude: ["**/*.seen.test.*"], environment: "node" },
   esbuild: { jsx: "automatic" },
 });

@@ -12,8 +12,11 @@ import { defineWorkersConfig } from "@cloudflare/vitest-pool-workers/config";
  */
 export default defineWorkersConfig({
   test: {
-    /* ⚠️ The screen suite is its own project — see vitest.screens.config.ts. */
-    exclude: ["**/*.screens.test.tsx", "**/node_modules/**"],
+    /* ⚠️ The screen suite is its own project — see vitest.screens.config.ts —
+       and the browser suite is a third, see vitest.seen.config.ts. Left in, a
+       `.seen.` file would boot Miniflare AND launch Chromium to measure a
+       stylesheet, which is the slowest way available to ask about a margin. */
+    exclude: ["**/*.screens.test.tsx", "**/*.seen.test.*", "**/node_modules/**"],
     /*
       ⚠️ ONE FILE AT A TIME, AND EVERY TEST GETS ITS OWN WORLD. These suites
       describe a deployment's life — shards registered, tenants placed, schema

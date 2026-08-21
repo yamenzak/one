@@ -530,7 +530,7 @@ ever changes.
   than the real one. That is the jump again. Pieces get bones; the page gets
   `recall`.
 
-`design/test/bones.test.tsx` measures the pair in a browser at two widths and
+`design/test/bones.seen.test.tsx` measures the pair in a browser at two widths and
 fails on a difference in height OR in `gridTemplateColumns` — the column count is
 the half a height check misses, and it is the half that was wrong.
 

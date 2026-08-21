@@ -8,6 +8,9 @@ import { defineConfig } from "vitest/config";
  * library's internals; the golden paths are a browser's job.
  */
 export default defineConfig({
-  test: { include: ["test/**/*.test.ts?(x)"], environment: "node" },
+  /* ⚠️ THE BROWSER SUITE IS A SECOND PROJECT — see `vitest.seen.config.ts`. */
+  test: {
+    include: ["test/**/*.test.ts?(x)"], exclude: ["**/*.seen.test.*"], environment: "node",
+  },
   esbuild: { jsx: "automatic" },
 });

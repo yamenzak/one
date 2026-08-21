@@ -191,7 +191,7 @@ function WordingRow({ app, line, onDone }: {
       {/* ⚠️ NO `Stack` — a card is already one. Nested, the card's own rhythm
           applied to the stack and the stack's to its children, so these two sat
           12 apart where every other card spaces its children 24. See
-          `design/test/rhythm.test.tsx`. */}
+          `design/test/rhythm.seen.test.tsx`. */}
       <LongText
         label="Instructions"
         value={text}

@@ -518,7 +518,10 @@ if (what === "guards") {
   const SAYS = {
     "engine:dev": "the worker on :8080 and OneSpace on :5173, every door on `*.localhost`",
     "engine:typecheck": "every package",
-    "engine:test": "every suite — kernel, runtime, design, OneSpace, the reference app",
+    "engine:test": "every suite that needs no browser — kernel, runtime, design, OneSpace, "
+      + "the apps. This is what CI runs",
+    "engine:seen": "the browser suites (`*.seen.test.*`) — real Chromium, real pixels. Minutes, "
+      + "and NOT part of the deploy gate",
     "engine:gate": "every guard in `docs/guards.json`",
   };
   console.log("| Command | What it runs |");

@@ -117,7 +117,7 @@ export const inTwo = (phrase: string): readonly string[] => {
  * fits the square runs out through the border, and a second line has less room
  * than the first because it sits further from the middle.
  *
- * ⚠️ THE THREE RATIOS ARE MEASURED, NOT ASSUMED, and `hazard.screens.test.tsx`
+ * ⚠️ THE THREE RATIOS ARE MEASURED, NOT ASSUMED, and `hazard.seen.test.tsx`
  * is what measures them: it lays every hazard the product knows out in a real
  * browser and reads the box back. A guess at how wide a bold sans runs is a
  * guess that holds for the word it was checked against.

@@ -108,6 +108,16 @@ const commands = [
   readFileSync(join(ENGINE, "scripts/gate.mjs"), "utf8"),
   ...generators,
 ].join(" ");
+/**
+ * ⚠️ THERE ARE TWO TEST LANES NOW, AND A GUARD MUST SAY WHICH IT IS IN. A
+ * `*.seen.test.*` file launches a browser, so it is excluded from `engine:test`
+ * and runs in `engine:seen`, which CI does not call — a deliberate trade, and
+ * exactly the kind that becomes a lie the moment a registry goes on claiming CI
+ * runs it. `"lane": "seen"` is the declaration; it has to match the filename in
+ * both directions, so neither a guard quietly leaving the fast lane nor a stale
+ * tag left behind by a rename can pass.
+ */
+let slow = 0;
 for (const g of live) {
   /* A vitest file is reached by `engine:test`; an .mjs guard has to be named. */
   const stem = g.impl.replace(/^scripts\//, "").replace(/\.test\.mjs$/, "");
@@ -117,8 +127,25 @@ for (const g of live) {
       && !commands.includes(g.impl) && !commands.includes(`"${stem}"`)) {
     fail(`${g.id}: ${g.impl} is not named by engine:gate, so it never runs`);
   }
+
+  const browser = /\.seen\.test\./.test(g.impl);
+  if (browser && g.lane !== "seen") {
+    fail(`${g.id}: ${g.impl} runs in the browser lane and the entry does not say so.\n`
+      + `       Add "lane": "seen". CI does not run it — a registry claiming otherwise is `
+      + "how a guard comes to be trusted for something nobody checks.");
+  } else if (!browser && g.lane === "seen") {
+    fail(`${g.id}: tagged \`lane: "seen"\` and ${g.impl} is not a \`.seen.\` file.\n`
+      + "       It runs in `engine:test` after all, so the tag understates it — a guard filed as "
+      + "slow is one nobody expects a red run from.");
+  } else if (browser) {
+    slow++;
+    if (!scripts["engine:seen"]) {
+      fail(`${g.id}: the browser lane has no \`engine:seen\` command to run it.`);
+    }
+  }
 }
-ok(`invoked: every live guard is reached by a command CI runs`);
+ok(`invoked: every live guard is reached by a command — ${live.length - slow} by CI, `
+  + `${slow} by \`pnpm engine:seen\``);
 
 /* ----------------------------------------------------------------- owed --- */
 

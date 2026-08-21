@@ -8,6 +8,7 @@ import { defineConfig } from "vitest/config";
  * the same thing more slowly and less legibly.
  */
 export default defineConfig({
-  test: { environment: "node" },
+  /* ⚠️ THE BROWSER SUITES ARE A SECOND PROJECT — see `vitest.seen.config.ts`. */
+  test: { exclude: ["**/node_modules/**", "**/*.seen.test.*"], environment: "node" },
   esbuild: { jsx: "automatic" },
 });

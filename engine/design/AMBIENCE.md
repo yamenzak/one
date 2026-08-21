@@ -245,7 +245,7 @@ weave under the setting that asks for calm.
   .q-medium, .q-large, …` — and a descendant combinator binds to the FIRST
   selector only, so six of the seven beats were `animation: none` for everybody,
   unconditionally, from the day the line was written. Every guard in the
-  repository checked that motion had been DECLARED. `design/test/sky.test.tsx`
+  repository checked that motion had been DECLARED. `design/test/sky.seen.test.tsx`
   takes two screenshots and compares them.
 - **A beat is a fade OR a turn, and the turn is what a lattice has.** A field of
   interlocking arcs has no brightness to give — what it has is ORIENTATION, and

@@ -26,7 +26,7 @@ const ENGINE = join(HERE, "..");
    else here. `inert` leads because "can this reach production" is the question
    whose wrong answer costs the most. */
 const GUARDS = [
-  "inert", "deploy", "runaway", "metering", "searching", "docs", "guards", "kernel", "declarations", "shards", "apps",
+  "inert", "deploy", "seen", "runaway", "metering", "searching", "docs", "guards", "kernel", "declarations", "shards", "apps",
   "heroui", "ground", "motion", "metrics", "rhythm", "travel", "cards", "glyphs", "attrs", "showcase", "states", "shape", "face", "scene",
   "gates",
   "present", "keys",

@@ -116,6 +116,28 @@
       "dependsOn": ["^build", "@scena/app#build"],
       "outputs": ["coverage/**"]
     },
+    /*
+      ⚠️ SEEN IS A SECOND TEST LANE, AND THE LINE IS WHAT A SUITE CAN TELL YOU.
+      A browser-backed suite asks whether a screen LOOKS right — where a row
+      wraps, how tall a control is, whether two glyphs collide. That question is
+      worth asking and none of its answers is "the deployment does not boot", so
+      it does not belong in front of a deploy. It also costs more than everything
+      else in this repository put together: `@engine/design` is 97 seconds and 96
+      of them are one file.
+
+      So `*.seen.test.*` is excluded from every `test` config and runs here
+      instead. `pnpm engine:seen` is the local command; nothing in CI calls it,
+      which is the point.
+
+      ⚠️ AND IT KEEPS THE STYLESHEET EDGE, because it needs it MOST. These are
+      the suites that measure real geometry against the CSS that actually ships;
+      run against a stale `dist` they measure a product nobody is served and stay
+      green while doing it.
+    */
+    "seen": {
+      "dependsOn": ["^build", "@engine/space#build"],
+      "outputs": []
+    },
     "e2e": {
       // Every worker serves its app's `dist` through an `assets` binding, which
       // is a filesystem path and NOT a package dependency — turbo cannot infer

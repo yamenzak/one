@@ -6,6 +6,6 @@ import { defineConfig } from "vitest/config";
  * this one renders the real components and reads the result.
  */
 export default defineConfig({
-  test: { include: ["test/**/*.screens.test.tsx"], environment: "node" },
+  test: { include: ["test/**/*.screens.test.tsx"], exclude: ["**/*.seen.test.*"], environment: "node" },
   esbuild: { jsx: "automatic" },
 });

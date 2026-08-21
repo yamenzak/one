@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "OneInventory — everything, counted. General-purpose inventory: the boxes in a basement, a clinic's stock room, a hospital's wards and a factory's stores, on one model with the setting demoted from premise to profile.",
+  "description": "OneInventory \u2014 everything, counted. General-purpose inventory: the boxes in a basement, a clinic's stock room, a hospital's wards and a factory's stores, on one model with the setting demoted from premise to profile.",
   "exports": {
     ".": "./src/index.ts",
     "./screens": "./src/screens/index.tsx",
@@ -15,7 +15,8 @@
     "shots": "vitest run --config vitest.shots.config.ts",
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit",
-    "clean": "rm -rf .turbo *.tsbuildinfo"
+    "clean": "rm -rf .turbo *.tsbuildinfo",
+    "seen": "vitest run --config vitest.seen.config.ts"
   },
   "dependencies": {
     "@engine/kernel": "workspace:*",

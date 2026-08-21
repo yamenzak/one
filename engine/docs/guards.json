@@ -10,6 +10,9 @@
     "     so a guard cannot quietly stop existing.",
     "  2. A `live` guard must actually RUN — reached by `pnpm engine:gate`,",
     "     `engine:test` or `engine:typecheck`. A check nobody invokes is no check.",
+    "     A guard whose implementation is a `*.seen.test.*` file launches a",
+    "     browser, so it runs in `pnpm engine:seen` and NOT in CI; it declares",
+    "     `\"lane\": \"seen\"`, and the tag has to match the filename both ways.",
     "  3. Every guard names the DECISION it protects. A guard defending nothing",
     "     recorded is one whose reason is forgotten and which is then deleted as",
     "     noise by somebody who cannot see what it was for.",
@@ -2914,7 +2917,8 @@
       "protects": "D7",
       "stage": "19",
       "status": "live",
-      "impl": "apps/inventory/test/geometry.screens.test.tsx",
+      "impl": "apps/inventory/test/geometry.seen.test.tsx",
+      "lane": "seen",
       "proves": "does not push the page sideways",
       "fails": "a screen a phone scrolls horizontally, which no source-reading check can see — the width is a computed value produced by a stylesheet, a flex container and four components that each did something defensible"
     },
@@ -2923,7 +2927,8 @@
       "protects": "D7",
       "stage": "19",
       "status": "live",
-      "impl": "apps/inventory/test/geometry.screens.test.tsx",
+      "impl": "apps/inventory/test/geometry.seen.test.tsx",
+      "lane": "seen",
       "proves": "is big enough for a finger",
       "fails": "`ROW.tap` calling 44px non-negotiable while every button ships 40, 36 above the breakpoint and 32 for `sm` — the rule true of the rows and false of the things people press, in a product used one-handed"
     },
@@ -2932,7 +2937,8 @@
       "protects": "D7",
       "stage": "19",
       "status": "live",
-      "impl": "apps/hello/test/geometry.screens.test.tsx",
+      "impl": "apps/hello/test/geometry.seen.test.tsx",
+      "lane": "seen",
       "proves": "does not push the page sideways on ${name}",
       "fails": "a layout fault in the app every new screen is tried in first, which is then copied into a product before anything measures it"
     },
@@ -2941,7 +2947,8 @@
       "protects": "D7",
       "stage": "19",
       "status": "live",
-      "impl": "one-space/test/geometry.test.tsx",
+      "impl": "one-space/test/geometry.seen.test.tsx",
+      "lane": "seen",
       "proves": "does not push the page sideways on ${name}",
       "fails": "the half of every screen a product cannot opt out of — the world, the hem, the nav, the crown, the room reserved for the island — measured by nothing, so a screen that fits on its own is still pushed sideways by the chrome around it"
     },
@@ -2989,6 +2996,42 @@
       "impl": "apps/hello/test/workspace.test.ts",
       "proves": "leaves the screens ours where the workspace did not ask for them",
       "fails": "a theme applied to every screen of a workspace that asked for it on none — or, the way it actually was, applied to none of them at all"
+    },
+    {
+      "id": "a-browser-suite-is-named-for-its-lane",
+      "protects": "D49",
+      "stage": "77",
+      "status": "live",
+      "impl": "scripts/seen.test.mjs",
+      "proves": "suite(s) launch a browser without the",
+      "fails": "a geometry suite back in the lane a deploy waits for — the tests pass, the run is simply minutes longer, and CI gets slow again by a route nobody chose"
+    },
+    {
+      "id": "a-slow-lane-has-a-command-that-runs-it",
+      "protects": "D49",
+      "stage": "77",
+      "status": "live",
+      "impl": "scripts/seen.test.mjs",
+      "proves": "cannot run the lane they were put in",
+      "fails": "a `.seen.` file excluded from `test` by name and reachable by no command — a deleted test wearing a filename, green for ever"
+    },
+    {
+      "id": "the-fast-lane-does-not-pick-up-a-browser-suite",
+      "protects": "D49",
+      "stage": "77",
+      "status": "live",
+      "impl": "scripts/seen.test.mjs",
+      "proves": "are still in the fast lane",
+      "fails": "the deploy paying for the browser AND `pnpm engine:seen` running it a second time, because a second config in the same package was never given the exclusion"
+    },
+    {
+      "id": "the-deploy-gate-opens-no-browser",
+      "protects": "D49",
+      "stage": "77",
+      "status": "live",
+      "impl": "scripts/seen.test.mjs",
+      "proves": "the deploy gate ",
+      "fails": "~400 MB of browser, its system libraries and every pixel assertion put back in front of shipping in one line, by somebody fixing a red run for a reason that looked good at the time"
     }
   ]
 }

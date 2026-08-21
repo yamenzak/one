@@ -1464,3 +1464,36 @@ hands out one extra exactly when somebody double-presses; a commercial tier put
 on a personal workspace, where the kind gates refuse what the plan grants; a
 console that can change what a person holds and cannot list the people; or a
 priced row over a workspace with no card behind it.
+
+## D49 — A browser test does not gate a deploy
+
+**Nothing that opens a browser can tell you whether the deployment boots.** A
+`.seen.` suite renders the shipped stylesheet in real Chromium and asks about
+pixels — where a row wraps, how tall a control is, whether the world actually
+moves. Every one of those questions is worth asking and none of them is the
+question a deploy is waiting on, which is whether the thing answers at all.
+
+**And they are the whole cost.** Measured on this repository: the design
+package's suite ran 97 seconds, 96 of which were one file; the CI job also
+downloaded ~400 MB of browser and its system libraries to get there. Everything
+else — every guard, every typecheck, every runtime suite — was minutes short of
+that combined.
+
+**So there are two lanes and the filename decides.** `*.seen.test.*` is excluded
+from every `test` config and runs in `pnpm engine:seen`, which nothing in CI
+calls. The cost is paid by whoever is changing a screen, which is the person
+looking at the screen anyway; the deploy pays for the questions a deploy is
+asking. Design's own fast lane went 97s → 8s.
+
+**The split is a filename, so it is guarded.** `scripts/seen.test.mjs` fails on a
+suite that launches a browser without the suffix, on a suffixed suite that
+launches none, on a package holding one with no `seen` script to run it, on a
+`test` config whose own globs still pick one up — evaluated, not read for the
+word — and on a workflow that installs a browser again. `docs/guards.json` gained
+a `lane` field for the same reason: a registry that goes on claiming CI runs a
+guard it no longer runs is worse than no registry.
+
+**Therefore never:** a browser suite in the lane a deploy waits for; a `.seen.`
+file in a package with no command that runs it, which is a deleted test wearing a
+filename; a suffix applied to a suite that needs no browser, which quietly takes
+a real check out of CI; or a guard registered as CI-run when it is not.

@@ -385,7 +385,10 @@ Four properties make this more than a list:
 1. **`proves` must appear in the implementation.** Rename the assertion and the
    registry fails — a guard cannot quietly stop existing.
 2. **A live guard must actually run**, reached by `pnpm engine:gate`,
-   `engine:test` or `engine:typecheck`. A check nobody invokes is no check.
+   `engine:test` or `engine:typecheck`. A check nobody invokes is no check. A
+   guard whose implementation is a `*.seen.test.*` file needs a browser, so it
+   runs in `pnpm engine:seen` and NOT in CI — it declares `"lane": "seen"`, and
+   the tag has to match the filename in both directions.
 3. **`protects` must name a real decision.** A guard defending nothing recorded
    is one whose reason will be forgotten and then removed as noise.
 4. **`stage` must name a row in `docs/stages.json`**, so a guard cannot protect
@@ -547,7 +550,8 @@ to describe the one that is there.
 ## 8. The six-minute checklist, before a commit
 
 1. `pnpm engine:typecheck`
-2. `pnpm engine:test`
+2. `pnpm engine:test` — and `pnpm engine:seen` too, if you touched a screen. The
+   browser suites are a separate lane and CI does not run them (D49).
 3. `pnpm engine:gate`
 4. New behaviour has a guard, and the guard names its decision and its stage.
 5. New decisions are in [DECISIONS.md](DECISIONS.md) with what they forbid.

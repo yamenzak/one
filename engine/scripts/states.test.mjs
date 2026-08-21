@@ -177,7 +177,7 @@ const STATE = readFileSync(join(ENGINE, "design/src/parts/state.tsx"), "utf8");
  * there is no second geometry to keep in step. What this asserts is only that it
  * still does — a rewrite back to hand-drawn bars would pass every other check
  * here and reintroduce exactly the drift above. The SIZES are asserted by
- * `design/test/bones.test.tsx`, which measures both in a browser at two widths;
+ * `design/test/bones.seen.test.tsx`, which measures both in a browser at two widths;
  * a string cannot do that and should not pretend to.
  */
 const COMPOSED = [

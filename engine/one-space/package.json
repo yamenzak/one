@@ -3,13 +3,14 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "The OneSpace — the page a person opens at the signpost, the account door and the setup door. Sign in with an emailed code, see your workspaces, make one, leave one.",
+  "description": "The OneSpace \u2014 the page a person opens at the signpost, the account door and the setup door. Sign in with an emailed code, see your workspaces, make one, leave one.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "clean": "rm -rf dist .turbo *.tsbuildinfo"
+    "clean": "rm -rf dist .turbo *.tsbuildinfo",
+    "seen": "vitest run --config vitest.seen.config.ts"
   },
   "dependencies": {
     "@engine/design": "workspace:*",

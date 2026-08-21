@@ -134,49 +134,71 @@ for (const [f] of [...names].map(([n, file]) => [file, n])) {
 }
 
 /**
- * A SUITE THAT LAUNCHES A BROWSER NEEDS ONE INSTALLED, AND CI HAD NONE.
+ * THE DEPLOY GATE OPENS NO BROWSER, AND NOTHING IN ITS LANE NEEDS ONE.
  *
- * Three `@engine/design` suites measure real geometry in real Chromium —
- * spacing, and whether a ground actually moves — because no static check can
- * see either. They passed for a week on a sandbox image that happens to carry
- * browsers, and failed at LAUNCH the first time they reached a runner:
- * `Executable doesn't exist at …/chromium_headless_shell-1194`, on the whole
- * file, so every test in them counted as skipped rather than failed.
+ * A dozen suites measure real geometry in real Chromium — spacing, wrapping,
+ * whether a ground actually moves — because no static check can see any of it.
+ * None of their answers is "the deployment boots", which is the only question a
+ * deploy is waiting on, and together they cost more than every other check in
+ * this repository. So they are `*.seen.test.*`, excluded from every `test`
+ * config, and run by `pnpm engine:seen`, which CI does not call.
  *
- * ⚠️ THE POINT IS THAT THE TWO HALVES ARE CHECKED TOGETHER. A workflow that
- * installs a browser nothing uses is a wasted minute; a suite that needs one
- * nobody installs is a suite that cannot run — and this repository's whole
- * argument for measuring in a browser is that the measurement HAPPENS.
+ * ⚠️ THE TWO HALVES ARE CHECKED TOGETHER, WHICH IS THE WHOLE POINT. A browser
+ * suite without the suffix is back in the lane a deploy waits for and nothing
+ * says so — the tests pass, the run is simply minutes longer. A workflow that
+ * installs a browser is paying ~400 MB and its system libraries for a lane that
+ * opens none.
+ *
+ * ⚠️ THIS IS THE HALF THAT RUNS BEFORE `pnpm install`. The rest of the rule —
+ * a suffixed suite with no command to run it, a second `test` config in the same
+ * package whose globs still pick one up — is `engine/scripts/seen.test.mjs`,
+ * which needs the workspace. Both are in the gate; only this one can guard the
+ * workflow that installs the workspace.
  */
 {
   const root = new URL("../../", import.meta.url).pathname;
-  /* ⚠️ Walked rather than listed: a fourth browser suite is asked the same
-     question the day it is written. */
-  const uses = [];
+  /* ⚠️ A LAUNCH, NOT AN IMPORT, and only in a test file. `design/src/measure`
+     names playwright in an `import type`, which runs nothing; the shots sweep
+     launches one and is its own command. A rule keyed on the word would report
+     both and be waived. */
+  const LAUNCHES = /\b(?:chromium|firefox|webkit)\s*\.\s*launch\s*\(/;
+  const opens = [];
   const walk = (at) => {
     for (const e of readdirSync(at, { withFileTypes: true })) {
       if (e.name === "node_modules" || e.name === "dist" || e.name === ".git") continue;
       const full = join(at, e.name);
       if (e.isDirectory()) { walk(full); continue; }
-      if (!/\.(m?[jt]sx?)$/.test(e.name)) continue;
-      const src = readFileSync(full, "utf8");
-      if (/from "playwright"|require\("playwright"\)/.test(src)) {
-        uses.push(full.slice(root.length));
-      }
+      if (!/\.test\.m?[jt]sx?$/.test(e.name)) continue;
+      if (LAUNCHES.test(readFileSync(full, "utf8"))) opens.push(full.slice(root.length));
     }
   };
   walk(join(root, "engine"));
 
-  if (uses.length) {
-    const engine = readFileSync(join(DIR, "engine.yml"), "utf8");
-    if (!/playwright install/.test(engine)) {
-      console.error(
-        `BAD  engine.yml installs no browser, and ${uses.length} suite(s) launch one:\n`
-        + uses.map((u) => `       ${u}`).join("\n")
-        + `\n       Every test in them fails at launch and is reported as SKIPPED, which is`
-        + `\n       the whole file being unrunnable wearing a passing suite's clothes.`);
-      bad++;
-    }
+  const engine = readFileSync(join(DIR, "engine.yml"), "utf8");
+  const installs = /playwright install/.test(engine);
+  const fast = opens.filter((u) => !/\.seen\.test\./.test(u));
+
+  if (!opens.length) {
+    console.error("BAD  no test file in engine/ launches a browser — either the geometry suites\n"
+      + "       are gone, or the launch moved behind a helper this check cannot see. Either way\n"
+      + "       it is passing over nothing.");
+    bad++;
+  } else if (fast.length && !installs) {
+    console.error(
+      `BAD  ${fast.length} suite(s) launch a browser and are in the lane CI runs:\n`
+      + fast.map((u) => `       ${u}`).join("\n")
+      + "\n       Rename each to `<name>.seen.test.tsx`, which is what keeps it out of"
+      + "\n       `pnpm engine:test`. Left as it is, every test in them fails at launch and is"
+      + "\n       reported as SKIPPED — the whole file unrunnable, wearing a passing suite's"
+      + "\n       clothes — or the deploy waits minutes for pixels it is not asking about.");
+    bad++;
+  } else if (installs && !fast.length) {
+    console.error(
+      "BAD  engine.yml installs a browser and no suite in its lane opens one.\n"
+      + `       All ${opens.length} are \`.seen.\` and run in \`pnpm engine:seen\`, which this`
+      + "\n       workflow does not call — so this is ~400 MB, its system libraries and a minute"
+      + "\n       on every deploy, for nothing.");
+    bad++;
   }
 }
 

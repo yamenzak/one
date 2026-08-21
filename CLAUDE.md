@@ -914,6 +914,17 @@ and the day there is a second deployment the split is what makes that cheap.
 `pnpm engine:test`, `engine:typecheck`, and `engine:gate`, which is inside the root
 `pnpm gate`.
 
+⚠️ **THERE IS A SECOND TEST LANE AND CI DOES NOT RUN IT.** A suite that launches
+Chromium to measure real pixels is `*.seen.test.*`, is excluded from every `test`
+config, and runs in **`pnpm engine:seen`** — because a browser answers whether a
+screen LOOKS right, which is not what a deploy is waiting to know, and because it
+cost more than every other check in the repository put together (the design
+package alone: 97s → 8s). **Run `engine:seen` after touching a screen.** The
+split is a filename, so `engine/scripts/seen.test.mjs` (in `engine:gate`) fails
+on a browser suite without the suffix, a suffixed suite that opens none, a
+package holding one with no `seen` script, a `test` config whose globs still pick
+one up, and a workflow that installs a browser again. DECISIONS.md D49.
+
 **That whole class is a guard now.** `scripts/capability-reachable.test.mjs` (in
 `pnpm gate`) fails on any app — the template included — that applies a package's
 `SchemaModule` and never mounts its route tree. The shape it catches is the one

@@ -913,6 +913,10 @@ its own header, cited by other files, and doing nothing.
 | `a-blocked-control-says-which-gate-stopped-it` | D7 | one sentence for all nine gates, which is a boolean wearing a name — "you cannot yet" and "your plan does not include this" are different controls |
 | `a-brand-reaches-only-the-surfaces-it-was-asked-to` | D22 | every switch on the branding screen saving and changing nothing — the tile painted from the entitlement alone, so a business that turned its icon off still installed as itself |
 | `the-screens-wear-the-brand-where-the-shell-was-picked` | D22 | a theme applied to every screen of a workspace that asked for it on none — or, the way it actually was, applied to none of them at all |
+| `a-browser-suite-is-named-for-its-lane` | D49 | a geometry suite back in the lane a deploy waits for — the tests pass, the run is simply minutes longer, and CI gets slow again by a route nobody chose |
+| `a-slow-lane-has-a-command-that-runs-it` | D49 | a `.seen.` file excluded from `test` by name and reachable by no command — a deleted test wearing a filename, green for ever |
+| `the-fast-lane-does-not-pick-up-a-browser-suite` | D49 | the deploy paying for the browser AND `pnpm engine:seen` running it a second time, because a second config in the same package was never given the exclusion |
+| `the-deploy-gate-opens-no-browser` | D49 | ~400 MB of browser, its system libraries and every pixel assertion put back in front of shipping in one line, by somebody fixing a red run for a reason that looked good at the time |
 <!-- /generated -->
 
 ### And how well each decision is defended
@@ -968,6 +972,7 @@ its own header, cited by other files, and doing nothing.
 | D46 | Five is what a phone's bar holds, not what an app may have | 0 |
 | D47 | One screen draws every moment One cannot show you a screen | 0 |
 | D48 | A gift is a row about a person, not a state on a workspace | 0 |
+| D49 | A browser test does not gate a deploy | 4 |
 <!-- /generated -->
 
 ---
@@ -1072,8 +1077,9 @@ that names no stage, so this list cannot grow by forgetting.
 | 74 | The foot of a phone is a vignette, and everywhere an app declares is reachable from it | shipped |
 | 75 | A raw ALTER is a 503 on every door, and every standard page wears the curtain | shipped |
 | 76 | A person is a subject, and an operator may give them things | shipped |
+| 77 | A browser test does not gate a deploy | shipped |
 
-**66 shipped, 10 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**67 shipped, 10 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---
@@ -1103,7 +1109,8 @@ which collapses every door onto one.
 |---|---|
 | `pnpm engine:dev` | the worker on :8080 and OneSpace on :5173, every door on `*.localhost` |
 | `pnpm engine:typecheck` | every package |
-| `pnpm engine:test` | every suite — kernel, runtime, design, OneSpace, the reference app |
+| `pnpm engine:test` | every suite that needs no browser — kernel, runtime, design, OneSpace, the apps. This is what CI runs |
+| `pnpm engine:seen` | the browser suites (`*.seen.test.*`) — real Chromium, real pixels. Minutes, and NOT part of the deploy gate |
 | `pnpm engine:gate` | every guard in `docs/guards.json` |
 <!-- /generated -->
 

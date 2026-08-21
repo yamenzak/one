@@ -693,7 +693,7 @@ describe("a workspace's branding", () => {
       second, for a wash sliding two percent over twenty-four seconds.
 
       ⚠️ THE SCENE STILL MOVES — in SMIL, inside the tile, where it redraws the
-      pattern rather than resampling the picture of it. `test/sky.test.tsx`
+      pattern rather than resampling the picture of it. `test/sky.seen.test.tsx`
       photographs that; this is what stops the stylesheet growing a second answer
       beside it.
     */
@@ -743,7 +743,7 @@ describe("a workspace's branding", () => {
       times a second for a wash sliding two percent.
 
       ⚠️ THE SCENE STILL MOVES — in SMIL, inside the tile, where it redraws the
-      pattern rather than resampling the picture of it. `test/sky.test.tsx`
+      pattern rather than resampling the picture of it. `test/sky.seen.test.tsx`
       photographs that; this is what keeps the stylesheet from growing a second
       answer beside it.
     */

@@ -15,7 +15,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit",
-    "clean": "rm -rf .turbo *.tsbuildinfo"
+    "clean": "rm -rf .turbo *.tsbuildinfo",
+    "seen": "vitest run --config vitest.seen.config.ts"
   },
   "dependencies": {
     "@dicebear/core": "^10.4.0",
