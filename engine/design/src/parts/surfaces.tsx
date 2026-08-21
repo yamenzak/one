@@ -920,13 +920,18 @@ export function AmountRow({ icon, face, label, under, amount, aside, mark, tone 
    */
   readonly aside?: React.ReactNode;
   /**
-   * ⚠️ A STATE MARKER, AND IT GOES BEFORE THE AMOUNT SO THE AMOUNTS LINE UP.
-   * Everything after the growing label is packed to the right, so a chip that
+   * ⚠️ THE EXCEPTION, AND IT GOES BEFORE THE AMOUNT SO THE AMOUNTS LINE UP.
+   * Everything after the growing label is packed to the right, so anything that
    * appears on one row in four and sits AFTER the amount pushes that row's
    * amount left by its own width — measured on the price list, where comparing
-   * the four numbers is the entire reason they are in a column. A control
-   * (`aside`) is on every row of its list or on none, so it does not do this;
-   * a marker is by definition the exception, so it must not follow the number.
+   * the four numbers is the entire reason they are in a column.
+   *
+   * ⚠️ WHICH SIDE A THING GOES ON IS DECIDED BY HOW OFTEN IT APPEARS, NOT BY
+   * WHETHER IT IS A CHIP OR A BUTTON. `aside` is for what every row of a list
+   * has; this is for what one row has — a state chip, and equally a control
+   * that only some rows can offer. A run's "Unfreeze" belongs to the frozen
+   * item alone and went in `aside`, which moved that row's verdict out of the
+   * column the other three were read in.
    */
   readonly mark?: React.ReactNode;
   readonly tone?: Tone;

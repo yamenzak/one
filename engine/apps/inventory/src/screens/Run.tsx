@@ -58,7 +58,12 @@ const SAID: Readonly<Record<Covered["verdict"], string>> = {
   pending: "Waiting",
   released: "Released",
   failed: "Frozen",
-  lifted: "Unfrozen — still not released",
+  /* ⚠️ ONE WORD, LIKE THE OTHER THREE. It was "Unfrozen — still not released":
+     a sentence in a column of statuses, wide enough to wrap the row's own name
+     onto four lines. The second half is not dropped — it moves under the row,
+     where the lot and the reason already are, and only while it is TRUE: once
+     the run is released, an unfrozen item is released with it. */
+  lifted: "Unfrozen",
 };
 
 const INK: Readonly<Record<Covered["verdict"], "danger" | "warning" | undefined>> = {
@@ -103,7 +108,10 @@ export function Run({
       then={(items) => (
         <>
           <Group label="Now">
-            <FieldRow label="Standing" value={SAID_RUN[state]} />
+            {/* ⚠️ NO STANDING ROW: THE CROWN ALWAYS CARRIES IT, under the run's
+                own name, and where it needs explaining the notice at the foot
+                of this card explains it. The row made three statements of one
+                fact within a screen's height of each other. */}
             {/* ⚠️ THROUGH `sayDate`, LIKE THE THREE UNDER IT. Written straight
                 out this was an ISO stamp — "2026-08-21" over "Aug 21, 2026" in
                 the very next row, two formats for the same kind of fact an inch
@@ -138,13 +146,29 @@ export function Run({
                 <AmountRow
                   key={item.batch}
                   label={item.name}
-                  under={[item.lot ? `Lot ${item.lot}` : "", item.reason]
-                    .filter(Boolean).join(" · ") || undefined}
+                  under={[
+                    item.lot ? `Lot ${item.lot}` : "",
+                    item.reason,
+                    /* ⚠️ THE HALF THAT MATTERS ABOUT AN UNFROZEN ITEM, and it
+                       is a sentence rather than a status: the freeze was
+                       lifted, and nothing in a run that has not been released
+                       may be used. Said only while it is true. */
+                    item.verdict === "lifted" && state !== "released"
+                      ? "still not released"
+                      : "",
+                  ].filter(Boolean).join(" · ") || undefined}
                   amount={<span data-ink={INK[item.verdict]}>{SAID[item.verdict]}</span>}
                   /* ⚠️ LIFTING IS OFFERED ONLY ON WHAT IS ACTUALLY FROZEN.
                      Anything else would be a release arriving by the wrong
-                     door — see `mayLift`. */
-                  aside={item.verdict === "failed"
+                     door — see `mayLift`.
+
+                     ⚠️ AND BECAUSE IT IS THE EXCEPTION, IT SITS BEFORE THE
+                     VERDICT RATHER THAN AFTER IT (`mark`, not `aside`). This
+                     list exists to be read down its right-hand column — four
+                     standings, one of them the reason somebody opened the
+                     screen — and a control after the number moves the one row
+                     that matters out of the column. */
+                  mark={item.verdict === "failed"
                     ? (
                       <Button
                         size="sm"

@@ -944,10 +944,28 @@ describe("one run", () => {
     expect(out).not.toContain("Release it");
   });
 
-  /* ⚠️ THE LIFTED ROW SAYS BOTH HALVES. Unfrozen is the good news and still not
-     released is the one that matters. */
+  /*
+    ⚠️ THE LIFTED ROW SAYS BOTH HALVES. Unfrozen is the good news and still not
+    released is the one that matters.
+
+    ⚠️ AND THEY ARE IN DIFFERENT PLACES, which is what keeps the first one
+    readable. The verdict is one word in a column of four verdicts read against
+    each other; the caveat is a sentence under the row, beside the lot and the
+    reason. Written as one string it was wide enough to wrap the item's own name
+    onto four lines.
+  */
   it("says a lifted item is unfrozen and still not released", () => {
-    expect(running("ended")).toContain("Unfrozen — still not released");
+    const out = running("ended");
+    expect(out).toContain("Unfrozen");
+    expect(out).toContain("still not released");
+    expect(out).not.toContain("Unfrozen — still not released");
+  });
+
+  /* ⚠️ AND THE CAVEAT GOES WHEN IT STOPS BEING TRUE. An item whose freeze was
+     lifted IS released once the run is, so a row still saying otherwise would
+     be the screen contradicting the standing above it. */
+  it("stops saying so once the run is released", () => {
+    expect(running("released")).not.toContain("still not released");
   });
 
   /* ⚠️ AND UNFREEZING IS OFFERED ONLY ON WHAT IS FROZEN — anything else is a

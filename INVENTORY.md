@@ -335,7 +335,7 @@ container in `src/screens/live.tsx`, and rendered over a sample world by
 | `/where` | A location | none | `location:read` | `screens/Where.tsx:34` | `screens/live.tsx:402` |
 | `/item` | An item | none | `stock:read` | `screens/Item.tsx:84` | `screens/live.tsx:862` |
 | `/kit` | A kit | none | `stock:read` | `screens/Kit.tsx:66` | `screens/live.tsx:1022` |
-| `/run` | A run | none | `process:read` | `screens/Run.tsx:68` | `screens/live.tsx:1275` |
+| `/run` | A run | none | `process:read` | `screens/Run.tsx:73` | `screens/live.tsx:1275` |
 | `/case` | A job | none | `process:read` | `screens/Case.tsx:58` | `screens/live.tsx:1332` |
 | `/due` | Running out | secondary | `stock:read` | `screens/Due.tsx:79` | `screens/live.tsx:1415` |
 | `/labels` | Labels | secondary | `location:read` | `screens/Labels.tsx:248` | `screens/live.tsx:1478` |
