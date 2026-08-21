@@ -289,7 +289,7 @@ const oneLine = (s: string): string => s.replace(/\s*\n\s*/g, " ").trim();
 
 /* ------------------------------------------------------------------ rules --- */
 
-export type SqlRefusal = "no_semicolon" | "has_comment" | "destructive" | "multiple";
+export type SqlRefusal = "no_semicolon" | "has_comment" | "destructive" | "multiple" | "altered";
 
 export interface SqlProblem { readonly module: string; readonly statement: string; readonly why: SqlRefusal }
 
@@ -301,6 +301,18 @@ export interface SqlProblem { readonly module: string; readonly statement: strin
  * comment survives the newline-flattening above and comments out the rest of the
  * batch; and a `DROP` in a module whose stamp changed is a destructive migration
  * that runs itself on every shard the moment somebody edits a declaration.
+ *
+ * ⚠️ AND AN `ALTER` HERE IS A 503 ON EVERY DOOR, WHICH IS THE ONE THAT SHIPPED.
+ * A statement is re-run whenever the module's stamp changes, and the stamp is a
+ * HASH of the statements — so any later edit to the module replays the `ALTER`
+ * against a table that already has the column, SQLite answers "duplicate column
+ * name", and the throw comes out of `boot`, which answers 503 on every door of
+ * the deployment. It is invisible until then: on a fresh database, and therefore
+ * in every test, the column is genuinely missing and the statement is correct.
+ *
+ * ⚠️ `columns` IS THE ONE THAT WORKS, and it is not a style preference. It is
+ * reconciled against `liveTable` before anything is written, so it is idempotent
+ * by construction and a re-run costs a read. Three modules carried the raw form.
  */
 export function refuseSql(module: SchemaModule): readonly SqlProblem[] {
   const out: SqlProblem[] = [];
@@ -309,6 +321,7 @@ export function refuseSql(module: SchemaModule): readonly SqlProblem[] {
     if (!statement.trim().endsWith(";")) at("no_semicolon");
     if (statement.includes("--")) at("has_comment");
     if (/\b(DROP|TRUNCATE)\b/i.test(statement)) at("destructive");
+    if (/\bALTER\b/i.test(statement)) at("altered");
     if (statement.trim().slice(0, -1).includes(";")) at("multiple");
   }
   return out;

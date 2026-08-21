@@ -43,12 +43,15 @@ export const SPEND_SCHEMA: SchemaModule = {
     `CREATE INDEX IF NOT EXISTS ix_ai_run_scope ON ai_run (tenant_id, at);`,
     /* ⚠️ The true-up sweep's own index: rows with a log id and no cost yet. */
     `CREATE INDEX IF NOT EXISTS ix_ai_run_open ON ai_run (trued, at);`,
-    /* ⚠️ THE FRACTION OF A CREDIT NOT YET DRAWN — see `settle`. Every meter
-       carries into the same column deliberately: two carries would each sit
-       under a whole credit indefinitely, so a workspace running both would be
-       charged for neither. WHAT it was spent on is the `ai_run` row's job. */
-    `ALTER TABLE billing_account ADD COLUMN spend_milli INTEGER;`,
   ],
+  /* ⚠️ THE FRACTION OF A CREDIT NOT YET DRAWN — see `settle`. Every meter
+     carries into the same column deliberately: two carries would each sit under
+     a whole credit indefinitely, so a workspace running both would be charged
+     for neither. WHAT it was spent on is the `ai_run` row's job.
+
+     ⚠️ DECLARED RATHER THAN ALTERED — `columns` is reconciled against the live
+     table and a raw `ALTER` is not; see `refuseSql`. */
+  columns: { billing_account: { spend_milli: "INTEGER" } },
 };
 
 /* ------------------------------------------------------------------ shape --- */

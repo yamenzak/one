@@ -42,19 +42,21 @@ export const MEMBERSHIP_SCHEMA: SchemaModule = {
     `CREATE TABLE IF NOT EXISTS membership (id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, account_id TEXT, email TEXT NOT NULL, platform_role TEXT NOT NULL, app_roles_json TEXT, grants_json TEXT, revoked_json TEXT, at TEXT NOT NULL, accepted_at TEXT, removed_at TEXT);`,
     `CREATE UNIQUE INDEX IF NOT EXISTS ix_membership_one ON membership (tenant_id, email);`,
     `CREATE INDEX IF NOT EXISTS ix_membership_account ON membership (tenant_id, account_id);`,
-    /* ⚠️ ADDED RATHER THAN PUT IN THE CREATE, because the table exists on every
-       deployment that has ever run. A column inside a `CREATE TABLE IF NOT
-       EXISTS` is a column no live database ever gets.
-
-       ⚠️ AND NULL IS THE WHOLE WORKSPACE (`reachOf`). Every membership that
-       predates this keeps exactly what it had, which is the only migration a
-       narrowing feature may have — the other direction takes access away from
-       people who never asked for it. */
-    `ALTER TABLE membership ADD COLUMN reach_json TEXT;`,
     /* ⚠️ A custom role composes ONE app's keys — see `CustomRole`. */
     `CREATE TABLE IF NOT EXISTS custom_role (id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, app TEXT NOT NULL, name TEXT NOT NULL, permissions_json TEXT NOT NULL, at TEXT NOT NULL);`,
     `CREATE INDEX IF NOT EXISTS ix_custom_role_tenant ON custom_role (tenant_id, app);`,
   ],
+  /* ⚠️ DECLARED RATHER THAN ALTERED, because the table exists on every
+     deployment that has ever run and a column inside a `CREATE TABLE IF NOT
+     EXISTS` is a column no live database ever gets. `columns` is reconciled
+     against what the table actually has, which is the half a raw `ALTER` does
+     not do — see `refuseSql`.
+
+     ⚠️ AND NULL IS THE WHOLE WORKSPACE (`reachOf`). Every membership that
+     predates this keeps exactly what it had, which is the only migration a
+     narrowing feature may have — the other direction takes access away from
+     people who never asked for it. */
+  columns: { membership: { reach_json: "TEXT" } },
 };
 
 /* ------------------------------------------------------------------- rows --- */

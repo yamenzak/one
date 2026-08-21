@@ -30,11 +30,12 @@ export const BRANDING_SCHEMA: SchemaModule = {
   id: "branding",
   statements: [
     `CREATE TABLE IF NOT EXISTS tenant_branding (tenant_id TEXT PRIMARY KEY, theme_json TEXT NOT NULL, surfaces_json TEXT NOT NULL, our_mark INTEGER NOT NULL DEFAULT 1, at TEXT NOT NULL);`,
-    /* ⚠️ ADDED RATHER THAN PUT IN THE CREATE, because the table already exists
-       on every deployment that has run. A column in a `CREATE TABLE IF NOT
-       EXISTS` is a column no live database ever gets. */
-    `ALTER TABLE tenant_branding ADD COLUMN reply_to TEXT;`,
   ],
+  /* ⚠️ DECLARED RATHER THAN ALTERED, because the table already exists on every
+     deployment that has run and a column in a `CREATE TABLE IF NOT EXISTS` is a
+     column no live database ever gets. `columns` is reconciled against the live
+     table; a raw `ALTER` is not, and re-runs — see `refuseSql`. */
+  columns: { tenant_branding: { reply_to: "TEXT" } },
 };
 
 /* ------------------------------------------------------------------ store --- */
