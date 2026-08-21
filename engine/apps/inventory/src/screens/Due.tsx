@@ -18,8 +18,9 @@
  */
 
 import {
-  AmountRow, Group, NoteRow, Screen, Section, glyphOf, type Loaded,
+  AmountRow, Group, NoteRow, Screen, Section, glyphOf, useShown, type Loaded,
 } from "@engine/design";
+import { sayDate, type Instant } from "@engine/kernel";
 
 /** One thing with a date, whichever clock put it there. */
 export interface Dated {
@@ -76,6 +77,14 @@ const under = (row: Dated): string =>
   [row.which, sayDays(row.days), SAID_BY[row.by] ?? ""].filter(Boolean).join(" · ");
 
 export function Due({ title, of, services, again, onOpen, onItem }: DueProps) {
+  /* ⚠️ THE READER'S OWN CALENDAR, NOT THE STORED STRING. `row.on` is an ISO day
+     because that is what a date is in a record; rendered straight out, this
+     screen said "2026-08-19" while the run beside it said "Aug 21, 2026" — two
+     formats for one kind of fact, and neither of them the format anybody has
+     chosen. Storage is ISO; a screen is a person's. */
+  const shown = useShown();
+  const on = (row: Dated) => sayDate(shown, row.on as Instant, "short");
+
   return (
     <Screen
       shape="list"
@@ -106,7 +115,7 @@ export function Due({ title, of, services, again, onOpen, onItem }: DueProps) {
                       key={row.id}
                       label={row.name}
                       under={under(row)}
-                      amount={<span data-ink="danger">{row.on}</span>}
+                      amount={<span data-ink="danger">{on(row)}</span>}
                       onOpen={() => { onOpen(row); }}
                     />
                   ))}
@@ -124,7 +133,7 @@ export function Due({ title, of, services, again, onOpen, onItem }: DueProps) {
                   under={under(row)}
                   amount={(
                     <span data-ink={row.standing === "soon" ? "warning" : undefined}>
-                      {row.on}
+                      {on(row)}
                     </span>
                   )}
                   onOpen={() => { onOpen(row); }}
@@ -152,7 +161,7 @@ export function Due({ title, of, services, again, onOpen, onItem }: DueProps) {
                         ? "danger"
                         : row.standing === "soon" ? "warning" : undefined}
                     >
-                      {row.on}
+                      {on(row)}
                     </span>
                   )}
                   onOpen={() => { onItem(row); }}

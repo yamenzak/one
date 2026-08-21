@@ -1513,3 +1513,52 @@ describe("a list that is a page", () => {
     expect(out).not.toContain(" of ");
   });
 });
+
+/* ------------------------------------------------------------- a date --- */
+
+/**
+ * A DATE ON A SCREEN IS THE READER'S, NOT THE RECORD'S.
+ *
+ * ⚠️ `2026-08-19` IS WHAT A DATE IS IN A ROW OF A TABLE, and rendering it
+ * straight out is the shortest thing to write — so two screens did, while the
+ * ones beside them said "Aug 19, 2026". On the run screen the two formats were
+ * in ADJACENT rows of one card. Nothing fails: both are dates, both are
+ * correct, and the product simply has two calendars.
+ *
+ * ⚠️ THE PRINTED LABEL IS THE ONE EXEMPTION AND IT IS THE OPPOSITE RULE. A
+ * decant sticker goes on a bottle that may be read in another country by
+ * somebody who reads dates the other way round; ISO is unambiguous, which is
+ * exactly why it is wrong on a screen with a locale and right on a label
+ * without one.
+ *
+ * ⚠️ AND IT READS THE TEXT, NOT THE ATTRIBUTES. A date field's placeholder is
+ * ISO because that is the format the field ACCEPTS — it is telling somebody how
+ * to type, which is the one place the stored shape is the right thing to show.
+ */
+const ISO_DAY = /\b\d{4}-\d{2}-\d{2}\b/;
+
+const saidDates = (markup: string): readonly string[] =>
+  [...markup.matchAll(/>([^<]+)</g)]
+    .map((found) => ISO_DAY.exec(found[1] ?? "")?.[0])
+    .filter((one): one is string => one !== undefined);
+
+/** ⚠️ Written down rather than skipped — a silent exemption is a rule with a hole. */
+const PRINTS_ISO = new Set(["/labels"]);
+
+describe("what a date looks like", () => {
+  for (const route of INVENTORY_ROUTES) {
+    if (PRINTS_ISO.has(route)) continue;
+    it(`is said in the reader's calendar: ${route}`, () => {
+      const found = saidDates(renderToStaticMarkup(<InventoryScreen route={route} />));
+      expect(found, `${route} shows ${found.join(", ")} — a stored day, not a said one`)
+        .toEqual([]);
+    });
+  }
+
+  /* ⚠️ AND THE SWEEP CAN SEE ONE, or every assertion above is about a screen
+     with no dates on it. The label sheet is where ISO is correct. */
+  it("still finds the one place ISO belongs", () => {
+    expect(saidDates(renderToStaticMarkup(<InventoryScreen route="/labels" />)).length)
+      .toBeGreaterThan(0);
+  });
+});

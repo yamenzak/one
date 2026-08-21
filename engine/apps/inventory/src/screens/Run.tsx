@@ -104,7 +104,11 @@ export function Run({
         <>
           <Group label="Now">
             <FieldRow label="Standing" value={SAID_RUN[state]} />
-            <FieldRow label="Started" value={started} />
+            {/* ⚠️ THROUGH `sayDate`, LIKE THE THREE UNDER IT. Written straight
+                out this was an ISO stamp — "2026-08-21" over "Aug 21, 2026" in
+                the very next row, two formats for the same kind of fact an inch
+                apart, and neither one the reader's own. */}
+            <FieldRow label="Started" value={sayDate(shown, started as Instant, "short")} />
             {ended
               ? <FieldRow label="Finished" value={sayDate(shown, ended as Instant, "short")} />
               : null}

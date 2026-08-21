@@ -143,7 +143,9 @@ export function Item({
                 <FieldRow
                   label="With"
                   value={of.holder}
-                  under={of.issued ? `Since ${of.issued}` : undefined}
+                  under={of.issued
+                    ? `Since ${sayDate(shown, of.issued as Instant, "short")}`
+                    : undefined}
                 />
               )
               : null}
@@ -177,7 +179,7 @@ export function Item({
                     ? (
                       <AmountRow
                         label="Next service"
-                        under={of.due}
+                        under={sayDate(shown, of.due as Instant, "short")}
                         amount={<span data-ink={INK[of.standing]}>{saysDays(of.days)}</span>}
                       />
                     )

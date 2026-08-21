@@ -262,6 +262,13 @@ the `settings` guard enforces).
 | `apps/inventory/test/geometry.screens.test.tsx` | every declared screen MEASURED, in real Chromium, in the frame, at a phone and a desk — 56 |
 | `apps/inventory/test/acts.screens.test.tsx` | every primary action names the operation it calls, and it is real — 31 |
 | `apps/inventory/test/hazard.screens.test.tsx` | every hazard name, whole and inside its diamond, measured in a browser — 3 |
+
+⚠️ **AND A DATE ON A SCREEN IS THE READER'S, NOT THE RECORD'S.** `ground.screens`
+fails on any screen that renders a stored `2026-08-19` — five did, and on the run
+screen the two formats were in ADJACENT rows of one card. The printed label is
+the one exemption and it is the opposite rule: a decant sticker may be read in
+another country by somebody who reads dates the other way round, so ISO is right
+there and only there.
 | `one/test/inventory.test.ts` | the golden path through the **real worker** — 16 |
 | `one/test/inventory-deep.test.ts` | batches, items, kits, the rail, the night — 19 |
 
@@ -311,7 +318,7 @@ container in `src/screens/live.tsx`, and rendered over a sample world by
 |---|---|---|---|---|---|
 | `/` | Stock | primary | `stock:read` | `screens/Stock.tsx:77` | `screens/live.tsx:358` |
 | `/scan` | Scan | primary | `product:read` | `screens/Scan.tsx:125` | `screens/live.tsx:544` |
-| `/receive` | Receive | primary | `stock:move` | `screens/Receive.tsx:99` | `screens/live.tsx:588` |
+| `/receive` | Receive | primary | `stock:move` | `screens/Receive.tsx:100` | `screens/live.tsx:588` |
 | `/count` | Count | primary | `stock:move` | `screens/Count.tsx:80` | `screens/live.tsx:709` |
 | `/work` | Work | primary | `process:read` | `screens/Work.tsx:65` | `screens/live.tsx:1222` |
 | `/thing` | A product | none | `product:read` | `screens/Thing.tsx:123` | `screens/live.tsx:358` |
@@ -320,7 +327,7 @@ container in `src/screens/live.tsx`, and rendered over a sample world by
 | `/kit` | A kit | none | `stock:read` | `screens/Kit.tsx:66` | `screens/live.tsx:1022` |
 | `/run` | A run | none | `process:read` | `screens/Run.tsx:68` | `screens/live.tsx:1275` |
 | `/case` | A job | none | `process:read` | `screens/Case.tsx:58` | `screens/live.tsx:1332` |
-| `/due` | Running out | secondary | `stock:read` | `screens/Due.tsx:78` | `screens/live.tsx:1415` |
+| `/due` | Running out | secondary | `stock:read` | `screens/Due.tsx:79` | `screens/live.tsx:1415` |
 | `/labels` | Labels | secondary | `location:read` | `screens/Labels.tsx:248` | `screens/live.tsx:1478` |
 | `/reports` | Reports | secondary | `ledger:read` | `screens/Reports.tsx:78` | `screens/live.tsx:1478` |
 | `/ask` | Ask | secondary | `stock:read` | `screens/Ask.tsx:54` | `screens/live.tsx:1130` |

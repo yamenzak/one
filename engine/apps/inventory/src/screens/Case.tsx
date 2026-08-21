@@ -111,8 +111,10 @@ export function Case({
           <Group label="Now">
             <FieldRow label="Reference" value={ref} />
             <FieldRow label="Standing" value={state === "closed" ? "Closed" : "Open"} />
-            <FieldRow label="Opened" value={opened} />
-            {closed ? <FieldRow label="Closed" value={closed} /> : null}
+            <FieldRow label="Opened" value={sayDate(shown, opened as Instant, "short")} />
+            {closed
+              ? <FieldRow label="Closed" value={sayDate(shown, closed as Instant, "short")} />
+              : null}
             {/* ⚠️ SAID WHERE IT IS TRUE, because "nothing is in doubt" is a real
                 answer to the question somebody came with — and an absent section
                 is indistinguishable from one that failed to load. */}

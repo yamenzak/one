@@ -20,9 +20,10 @@
 import * as React from "react";
 import {
   AmountRow, Await, Group, FieldRow, NoteRow, Num, NumberInput, PickFile, RowsWaiting,
-  Screen, Section, Steps, TextInput, Viewfinder, asDataUrl, glyphOf, notice,
+  Screen, Section, Steps, TextInput, Viewfinder, asDataUrl, glyphOf, useShown, notice,
   type Loaded, type Step,
 } from "@engine/design";
+import { sayDate, type Instant } from "@engine/kernel";
 import { Button } from "@heroui/react";
 import type { Seen } from "./Scan.js";
 
@@ -100,6 +101,8 @@ export function Receive({
   title, place, seen, onRead, onForget, onReceive, onUndo, busy,
   note, onNote, onLine, done, again,
 }: ReceiveProps) {
+  /* ⚠️ The reader's own calendar — see the expiry in the list below. */
+  const shown = useShown();
   /*
     ⚠️ THE QUANTITY STARTS AT WHAT THE CODE IMPLIES AND IS RE-SEEDED PER SCAN. A
     field holding the last item's number is how somebody receives eleven of the
@@ -284,7 +287,12 @@ export function Receive({
                             label={line.name || line.code}
                             under={[
                               line.lot ? `Lot ${line.lot}` : "",
-                              line.expiry,
+                              /* ⚠️ SAID, NOT STORED. `line.expiry` is an ISO day
+                                 because that is what a date is in a record; put
+                                 straight into the row it made this list the one
+                                 place in the product that writes a date the
+                                 reader's own calendar does not. */
+                              line.expiry ? sayDate(shown, line.expiry as Instant, "short") : "",
                               /* ⚠️ THE TICK IS THE POINT OF THE LIST. Thirty
                                  lines with no record of which are done is a page
                                  somebody loses their place in. */
