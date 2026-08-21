@@ -63,8 +63,12 @@ export const NOBODY: Supplier = {
   row is filing.
 */
 const under = (of: Supplier, standingDays: number): string => [
+  /* ⚠️ A FALLBACK SAYS IT IS ONE, IN WORDS. "7 days (the workspace's)" reads
+     as a parenthesis somebody forgot to finish — the row is a list of facts
+     joined by dots, and the one that is a DEFAULT rather than this supplier's
+     own is the one worth spelling out. */
   of.leadDays === null
-    ? `${standingDays} days (the workspace's)`
+    ? `${standingDays} days by default`
     : of.leadDays === 1 ? "next day" : `${of.leadDays} days`,
   of.contact,
   of.phone || of.email,
@@ -94,23 +98,24 @@ export function Suppliers({
           under: "Add one, or import a spreadsheet with a supplier column and they appear here",
         }}
         then={(rows) => (
-          <Section label="Suppliers">
-            <Group>
-              {rows.map((row) => (
-                <NavRow
-                  key={row.id}
-                  icon={glyphOf("box")}
-                  label={row.name}
-                  under={under(row, standingDays)}
-                  /* ⚠️ HOW MANY PRODUCTS NAME THEM, because a supplier nothing
-                     comes from is a row to delete and there is no other way to
-                     tell. */
-                  aside={row.products === 1 ? "1 product" : `${row.products} products`}
-                  onOpen={() => { onOpen(row); }}
-                />
-              ))}
-            </Group>
-          </Section>
+          /* ⚠️ NO SECTION HEADING: the screen is already called Suppliers, and
+             a heading repeating its own title is a line of type that carries
+             nothing. A section earns a label when it is one of several. */
+          <Group>
+            {rows.map((row) => (
+              <NavRow
+                key={row.id}
+                icon={glyphOf("box")}
+                label={row.name}
+                under={under(row, standingDays)}
+                /* ⚠️ HOW MANY PRODUCTS NAME THEM, because a supplier nothing
+                   comes from is a row to delete and there is no other way to
+                   tell. */
+                aside={row.products === 1 ? "1 product" : `${row.products} products`}
+                onOpen={() => { onOpen(row); }}
+              />
+            ))}
+          </Group>
         )}
       />
       {editing ? (

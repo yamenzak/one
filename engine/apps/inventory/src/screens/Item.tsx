@@ -169,9 +169,13 @@ export function Item({
             ? (
               <Section label="Service">
                 <Group
+                  /* ⚠️ THE VERB, NOT THE STATE IT PRODUCES. "Serviced" on a
+                     control that records a service is the one place a person
+                     cannot tell whether they are reading a fact or pressing
+                     one — and this row sits beside two that ARE facts. */
                   does={(
                     <Button variant="secondary" onPress={() => { setServing(true); }}>
-                      Serviced
+                      Record a service
                     </Button>
                   )}
                 >
@@ -187,10 +191,14 @@ export function Item({
                        fact about a machine somebody is responsible for; an empty
                        row reads as a screen that failed to load one. */
                     : <NoteRow>Nothing is booked</NoteRow>}
+                  {/* ⚠️ "Services · 4" IS TWO READINGS — four booked, or four
+                      done. The row above is the next one due, so this is the
+                      history, and the label says which. */}
                   <FieldRow
-                    label="Services"
-                    value={String(of.services)}
-                    under={of.services === 0 ? "None recorded yet" : undefined}
+                    label="Serviced"
+                    value={of.services === 0
+                      ? "Never"
+                      : of.services === 1 ? "Once" : `${of.services} times`}
                   />
                 </Group>
               </Section>

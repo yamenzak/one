@@ -342,7 +342,7 @@ container in `src/screens/live.tsx`, and rendered over a sample world by
 | `/reports` | Reports | secondary | `ledger:read` | `screens/Reports.tsx:78` | `screens/live.tsx:1478` |
 | `/ask` | Ask | secondary | `stock:read` | `screens/Ask.tsx:54` | `screens/live.tsx:1130` |
 | `/import` | Import | secondary | `product:write` | `screens/Import.tsx:131` | `screens/live.tsx:1587` |
-| `/suppliers` | Suppliers | secondary | `product:write` | `screens/Suppliers.tsx:73` | `screens/live.tsx:1714` |
+| `/suppliers` | Suppliers | secondary | `product:write` | `screens/Suppliers.tsx:77` | `screens/live.tsx:1714` |
 | `/start` | Getting started | secondary | `product:read` | `screens/Start.tsx:67` | `screens/live.tsx:1785` |
 
 ### The surfaces that are not routes

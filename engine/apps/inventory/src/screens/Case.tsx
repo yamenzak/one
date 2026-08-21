@@ -109,7 +109,10 @@ export function Case({
             : null}
 
           <Group label="Now">
-            <FieldRow label="Reference" value={ref} />
+            {/* ⚠️ NO REFERENCE ROW: THE CROWN IS ALWAYS ALREADY SHOWING IT. A
+                job with a name carries the reference under its title, and a job
+                without one is TITLED by it — so the row was the heading said a
+                second time, either way, three lines below itself. */}
             <FieldRow label="Standing" value={state === "closed" ? "Closed" : "Open"} />
             <FieldRow label="Opened" value={sayDate(shown, opened as Instant, "short")} />
             {closed

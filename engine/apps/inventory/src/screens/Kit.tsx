@@ -126,7 +126,12 @@ export function Kit({
                     <AmountRow
                       key={line.product}
                       label={line.name}
-                      under={line.have ? `${line.have} of ${line.want} in it` : undefined}
+                      /* ⚠️ ON EVERY ROW, INCLUDING THE ONES AT ZERO. Hidden
+                         where nothing is in yet, two rows of the same list read
+                         as two different kinds of fact — and the bare figure
+                         beside them is how many are SHORT, which is the number
+                         this line explains. */
+                      under={`${line.have} of ${line.want} in it`}
                       amount={<span data-ink="warning">{line.want - line.have}</span>}
                     />
                   ))}

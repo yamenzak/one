@@ -1480,9 +1480,7 @@ describe("the suppliers", () => {
     off the reorder list until the shelf is empty.
   */
   it("says what a blank lead time falls back to", () => {
-    /* ⚠️ The apostrophe is escaped in the markup, so the assertion stops
-       short of it — the sentence, not the entity. */
-    expect(listing()).toContain("7 days (the workspace");
+    expect(listing()).toContain("7 days by default");
   });
 
   /* ⚠️ AND HOW MANY PRODUCTS NAME THEM, because a supplier nothing comes from is
