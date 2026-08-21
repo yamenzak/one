@@ -3023,6 +3023,29 @@ const loadRun = operation<{ process: string; batch: string }, { items: number }>
       .bind(`pri_${run.id}_${input.batch}`, c.tenantId, run.id, input.batch, c.now,
         c.accountId ?? null).run();
 
+    /*
+      ⚠️ LOADING SOMETHING INTO A RUN HOLDS IT, AND THAT IS THE WHOLE RAIL. The
+      gap between a machine finishing and a qualified person signing for what
+      came out of it is what this product has instead of deciding that a green
+      light is a qualification — and until this line, nothing enforced it. The
+      run opened, the cycle ended, the screen showed "waiting to be released",
+      and the tray could be taken off the shelf and used on somebody.
+
+      ⚠️ A BADGE ON A SCREEN IS NOT A QUARANTINE. That sentence was already
+      written, one file over, about a state only a FAILED run could reach —
+      which is the state where somebody has already noticed. The dangerous one
+      is the ordinary night where nobody has looked yet.
+
+      ⚠️ AND IT COMES OFF AT EXACTLY THREE PLACES: `process.release` stamps it
+      `ok`, `process.lift` unfreezes one item deliberately with a reason, and
+      nothing else. Receiving MORE of a held lot stays possible — a quarantine
+      is about what may leave.
+    */
+    await db.prepare(
+      `UPDATE batch SET standing = 'held', edited_at = ?, edited_by = ?
+        WHERE id = ? AND tenant_id = ?`)
+      .bind(c.now, c.accountId ?? null, input.batch, c.tenantId).run();
+
     return { items: (await membersOf(c, run.id)).length };
   },
 });

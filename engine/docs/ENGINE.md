@@ -1031,8 +1031,9 @@ that names no stage, so this list cannot grow by forgetting.
 | 63 | The guide and the milestones are ticked by what a workspace has actually done | **planned** |
 | 71 | The spreadsheet somebody already has — the import, and the supplier it names | shipped |
 | 72 | An operation's declared input is checked at the door, and `now` is one type | shipped |
+| 73 | The other half of OneInventory, driven — and the quarantine that was a badge on a screen | shipped |
 
-**55 shipped, 17 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**56 shipped, 17 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---
