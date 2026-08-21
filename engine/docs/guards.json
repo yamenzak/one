@@ -2728,6 +2728,42 @@
       "impl": "scripts/gates.test.mjs",
       "proves": "never fills",
       "fails": "a gate whose input nothing supplies — `flags: located.flags ?? {}` where no deployment ever set it, so every request carried an empty map, the console wrote rows only the console read back, and switching a flag changed nothing anywhere with every suite green"
+    },
+    {
+      "id": "a-balance-moves-in-one-place-and-the-history-moves-with-it",
+      "protects": "D12",
+      "stage": "60",
+      "status": "live",
+      "impl": "scripts/ledger-chokepoint.test.mjs",
+      "proves": "outside the chokepoint",
+      "fails": "a number the ledger cannot rebuild — the balance is plausible, the screen redraws, and every report over that line stops adding up, permanently"
+    },
+    {
+      "id": "a-movement-refuses-rather-than-landing-on-zero",
+      "protects": "D12",
+      "stage": "60",
+      "status": "live",
+      "impl": "apps/inventory/test/ledger.test.ts",
+      "proves": "refuses rather than landing on zero",
+      "fails": "a mis-scan, a wrong shelf or a count that was already wrong is silently absorbed, and the only evidence any of them happened is gone"
+    },
+    {
+      "id": "a-shelf-life-is-counted-in-local-days",
+      "protects": "D12",
+      "stage": "60",
+      "status": "live",
+      "impl": "apps/inventory/test/ledger.test.ts",
+      "proves": "counts a shelf life in local days",
+      "fails": "stock expires a day late west of Greenwich — the direction that matters, on medicine and food"
+    },
+    {
+      "id": "an-expiry-says-which-clock-ended-it",
+      "protects": "D12",
+      "stage": "60",
+      "status": "live",
+      "impl": "apps/inventory/test/ledger.test.ts",
+      "proves": "takes the earliest clock, and says which it was",
+      "fails": "a shelf that says “expires Tuesday” and cannot say why, which is a shelf nobody acts on"
     }
   ]
 }

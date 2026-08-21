@@ -15,7 +15,8 @@
   "dependencies": {
     "@engine/kernel": "workspace:*",
     "@engine/runtime": "workspace:*",
-    "@engine/hello": "workspace:*"
+    "@engine/hello": "workspace:*",
+    "@engine/inventory": "workspace:*"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "0.8.55",

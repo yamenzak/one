@@ -605,6 +605,22 @@ importers:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.49.0)(tsx@4.23.9)
 
+  engine/apps/inventory:
+    dependencies:
+      '@engine/kernel':
+        specifier: workspace:*
+        version: link:../../kernel
+      '@engine/runtime':
+        specifier: workspace:*
+        version: link:../../runtime
+    devDependencies:
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.49.0)(tsx@4.23.9)
+
   engine/design:
     dependencies:
       '@dicebear/core':
@@ -678,6 +694,9 @@ importers:
       '@engine/hello':
         specifier: workspace:*
         version: link:../apps/hello
+      '@engine/inventory':
+        specifier: workspace:*
+        version: link:../apps/inventory
       '@engine/kernel':
         specifier: workspace:*
         version: link:../kernel

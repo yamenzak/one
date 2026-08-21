@@ -107,6 +107,35 @@ const MARK_H: Readonly<Record<MarkSize, number>> = {
  */
 export type { MarkOf };
 
+/**
+ * AMBER — the one hue a product's mark carries, and the argument for it.
+ *
+ * ⚠️ THE SECOND CONVENTION-RATHER-THAN-CHOICE HUE IN THIS PRODUCT, and it is
+ * here for the same reason `AgreedMark`'s blue is: a monochrome theme resolves
+ * every tone to a value, so a mark drawn in the theme's own colours is exactly
+ * the ink beside it. What distinguishes ONE product from another on a shelf of
+ * them cannot be a value — they all share the silhouette by design.
+ *
+ * ⚠️ AND IT IS THE BEAK, NEVER THE COUNTERS OR THE STEM. The beak is the one
+ * asymmetry in the family; colouring it names the product and leaves the numeral
+ * the platform's. A coloured stem would be a second brand, and a coloured
+ * counter would put a hue inside a barcode.
+ *
+ * ⚠️ IT MUST NEVER REACH A STATE. This is an app whose commonest condition is
+ * "expiring soon", which every product ever made draws in amber — so the rule
+ * that keeps the two apart is the one the whole monochrome design already has:
+ * a hue in the GROUND or the MARK, a tone as INK on the value that reports it.
+ * The moment amber lands on a number, a healthy shelf and an expiring one are
+ * the same picture.
+ *
+ * ⚠️ ONE PLACE, NOT A TOKEN. A token is a colour every surface can reach for;
+ * this is a fact about one mark. If a second thing ever needs it, that is when
+ * it becomes a token — not before.
+ */
+const AMBER = "oklch(0.77 0.16 71)";
+
+const beakHue = (of: MarkOf): string | undefined => (of === "inventory" ? AMBER : undefined);
+
 export function Mark({ size = "crown", of = "one", label }: {
   readonly size?: MarkSize;
   readonly of?: MarkOf;
@@ -173,12 +202,13 @@ export function Mark({ size = "crown", of = "one", label }: {
         </mask>
       </defs>
 
-      {/* ⚠️ THE BEAK IS DIMMED, NOT COLOURED. The product drawing tinted it slate
-          blue, which is a hue in a system that decided to be monochrome — the
-          same ink at lower opacity says the same thing on any ground and needs
-          no second token. */}
+      {/* ⚠️ THE BEAK IS DIMMED, NOT COLOURED — with one stated exception below.
+          The product drawing tinted it slate blue, which is a hue in a system
+          that decided to be monochrome; the same ink at lower opacity says the
+          same thing on any ground and needs no second token. */}
       <path d={`M ${beak[0].x} ${beak[0].y} L ${beak[1].x} ${beak[1].y} L ${beak[2].x} ${beak[2].y} Z`}
-        opacity={beakOpacity(of)} />
+        opacity={beakOpacity(of)}
+        fill={beakHue(of)} />
       <path d={`M ${MARK_STEM.x} ${MARK_STEM.y} H ${MARK_STEM.x + MARK_STEM.w}`
         + ` V ${MARK_STEM.y + MARK_STEM.h} H ${MARK_STEM.x} Z`}
         mask={`url(#${mask})`} />

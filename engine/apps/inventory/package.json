@@ -1,0 +1,25 @@
+{
+  "name": "@engine/inventory",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "OneInventory — everything, counted. General-purpose inventory: the boxes in a basement, a clinic's stock room, a hospital's wards and a factory's stores, on one model with the setting demoted from premise to profile.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit",
+    "clean": "rm -rf .turbo *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@engine/kernel": "workspace:*",
+    "@engine/runtime": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

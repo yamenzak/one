@@ -28,8 +28,19 @@
  */
 export const MARK_INK = { x: 28, y: 18, w: 38, h: 64 } as const;
 
-/** Whose mark: the deployment's, a product's, or the wallet's. */
-export type MarkOf = "one" | "space" | "wallet";
+/**
+ * Whose mark: the deployment's, OneSpace's, the wallet's, or OneInventory's.
+ *
+ * ⚠️ EVERY ONE OF THESE IS A SURFACE OF THIS DEPLOYMENT, WHICH IS WHY IT IS
+ * ADMISSIBLE HERE. The kernel holds no product vocabulary — a collection called
+ * `invoice` or a role called `coach` would be an app's word in shared code — but
+ * a MARK is not vocabulary, it is geometry, and it is in the kernel because two
+ * packages draw it and neither may import the other. What a member of this list
+ * costs is a drawing, and what it buys is that the family cannot drift: a
+ * product with its own outline makes a shelf of products read as a folder of
+ * logos.
+ */
+export type MarkOf = "one" | "space" | "wallet" | "inventory";
 
 /**
  * ⚠️ THE WALLET'S INK IS WIDER, BECAUSE ITS BARS LEAVE THE NUMERAL. They cross
@@ -158,6 +169,35 @@ export function partsOf(of: MarkOf): MarkParts {
         { x: 52, y: 36, cut: 4.5, keep: 2 },
         { x: 60, y: 62, cut: 4.5, keep: 2 },
       ],
+      bars: [],
+    };
+  }
+  /*
+    ⚠️ ONEINVENTORY'S COUNTERS ARE A BARCODE, AND THE UNEVENNESS IS THE WHOLE
+    DRAWING. Six slots of six widths inside the same stem: a numeral read as a
+    code, which is what the product does to everything it is pointed at. Matched
+    widths would be a grating; these are the bar pattern a scanner would see.
+
+    ⚠️ AND THEY ARE INSIDE THE STEM, WHICH IS THE RULE THE WALLET BREAKS AND THIS
+    DOES NOT. The silhouette stays the family's; only the light through it
+    changes.
+
+    ⚠️ THE BEAK IS THE ONE PLACE THIS PRODUCT IS ALLOWED A HUE, and it is not
+    here — a colour in this file would be a brand decision made in the package
+    that holds none. `AMBER` is the design system's, applied where the mark is
+    drawn.
+  */
+  if (of === "inventory") {
+    return {
+      slots: [
+        { x: 49, y1: 18, y2: 82, width: 1.8 },
+        { x: 52, y1: 18, y2: 82, width: 1 },
+        { x: 54.5, y1: 18, y2: 82, width: 2.5 },
+        { x: 58, y1: 18, y2: 82, width: 1.2 },
+        { x: 61, y1: 18, y2: 82, width: 3 },
+        { x: 65, y1: 18, y2: 82, width: 1.5 },
+      ],
+      rings: [],
       bars: [],
     };
   }

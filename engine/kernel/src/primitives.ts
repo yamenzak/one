@@ -46,6 +46,31 @@ export const instant = (at: Date | string = new Date()): Instant =>
 export const dayOf = (at: Instant): Day => at.slice(0, 10) as Day;
 
 /**
+ * A DAY, PLUS SOME DAYS. It is the only correct way to move a calendar date.
+ *
+ * ⚠️ ARITHMETIC ON AN INSTANT LANDS A DAY OUT, AND ONLY ON ONE SIDE OF THE
+ * WORLD. `+ 7 * 86_400_000` on a local midnight is right where the offset does
+ * not change and wrong where it does; a shelf life counted that way expires
+ * stock early east of Greenwich (safe) and late west of it (not). A `Day` has no
+ * time in it, so the arithmetic has to be done on the calendar rather than on a
+ * clock.
+ *
+ * ⚠️ AND IT IS HERE RATHER THAN IN THE APP THAT NEEDED IT FIRST. A shelf life, a
+ * due date, a grace period and a retention window are the same operation, and
+ * the second product to write it would write it slightly differently — which is
+ * a whole day, in one hemisphere, on the day the clocks change.
+ */
+export const dayPlus = (day: Day, days: number): Day => {
+  const [y, m, d] = day.split("-").map(Number);
+  const at = new Date(Date.UTC(y ?? 0, (m ?? 1) - 1, d ?? 1));
+  at.setUTCDate(at.getUTCDate() + days);
+  /* ⚠️ UTC THROUGHOUT, WHICH IS SAFE HERE AND NOWHERE ELSE. The date went in
+     with no time on it and comes out the same way; what makes this correct is
+     that no local clock was ever consulted. */
+  return dayOf(at.toISOString() as Instant);
+};
+
+/**
  * ⚠️ SORTABLE, AND THAT IS THE WHOLE REASON IT IS NOT `randomUUID`. A v4 uuid is
  * random in its high bits, so a table keyed on it inserts into the middle of the
  * index for ever and a list ordered by id is ordered by nothing. This is time

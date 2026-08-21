@@ -200,3 +200,52 @@ describe("the marks we draw ourselves", () => {
     }
   });
 });
+
+/**
+ * ONEINVENTORY'S MARK — the same numeral, its counters cut as a code.
+ *
+ * ⚠️ A PRODUCT'S MARK IS THE FAMILY'S SILHOUETTE WITH DIFFERENT LIGHT THROUGH
+ * IT. That is the rule the wallet breaks deliberately and every product must
+ * not: a product with its own outline makes a shelf of products read as a
+ * folder of logos, and the moment there are three of them nobody can tell they
+ * are one company.
+ */
+describe("a product's mark", () => {
+  it("is the platform's numeral, at the platform's proportion", () => {
+    const one = box(svgOf(<Mark of="one" size="crown" />));
+    const inventory = box(svgOf(<Mark of="inventory" size="crown" />));
+    expect(inventory.w).toBe(one.w);
+    expect(inventory.h).toBe(one.h);
+  });
+
+  /*
+    ⚠️ SIX COUNTERS OF SIX WIDTHS, AND THE UNEVENNESS IS THE DRAWING. Matched
+    widths are a grating; these are a bar pattern — a numeral read as a code,
+    which is what this product does to everything it is pointed at.
+  */
+  it("cuts six counters of six widths, all inside the stem", () => {
+    const svg = svgOf(<Mark of="inventory" size="crown" />);
+    const masked = svg.slice(svg.indexOf("<mask"), svg.indexOf("</mask>"));
+    const widths = [...masked.matchAll(/stroke-width="([\d.]+)"/g)].map((m) => Number(m[1]));
+    expect(widths).toHaveLength(6);
+    expect(new Set(widths).size).toBe(6);
+    /* ⚠️ Cut rather than added — a counter outside the mask is a bar drawn ON
+       the stem, which is the wallet's shape and not a product's. */
+    expect(masked).toContain("<line");
+  });
+
+  /*
+    ⚠️ THE BEAK IS THE ONE PLACE A PRODUCT CARRIES A HUE, and the stem is never
+    one. A coloured stem is a second brand; the beak is the family's own
+    asymmetry, so colouring it names the product and leaves the numeral the
+    platform's.
+  */
+  it("colours the beak and nothing else", () => {
+    const svg = svgOf(<Mark of="inventory" size="crown" />);
+    const fills = [...svg.matchAll(/<path[^>]*fill="(oklch[^"]*)"/g)].map((m) => m[1]);
+    expect(fills).toHaveLength(1);
+    /* ⚠️ And the platform's own mark keeps none of it, which is what stops a
+       hue added for one product leaking into the family. */
+    expect(svgOf(<Mark of="one" size="crown" />)).not.toContain("oklch");
+  });
+});

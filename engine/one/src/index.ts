@@ -48,6 +48,7 @@ import {
   type Searcher,
 } from "@engine/runtime";
 import { hello } from "@engine/hello";
+import { inventory } from "@engine/inventory";
 
 /* ------------------------------------------------------------------ what --- */
 
@@ -72,6 +73,7 @@ const APPS: Readonly<Record<string, () => AppSpec>> = {
      recipient nobody disclosed is the disclosure failure that gets found from
      outside. See `under`. */
   hello: once(() => under(LEGAL, hello())),
+  inventory: once(() => under(LEGAL, inventory())),
 };
 
 /**
@@ -113,31 +115,36 @@ const PLANS: readonly PlanSpec[] = [
     id: "none", name: "No plan", kind: "personal", order: 0, parking: true,
     said: "Read and export what is here. Nothing new can be added.",
     price: 0, currency: "USD", credits: 0,
-    includes: { seats: 1, storage: GB, domains: 0, notes: 0, publishing: false },
+    includes: { seats: 1, storage: GB, domains: 0, notes: 0, publishing: false,
+      products: 0, locations: 0 },
   },
   {
     id: "solo", name: "Solo", kind: "personal", order: 1, trialDays: 14,
     said: "One person, everything we make.",
     price: 1200, currency: "USD", credits: 1_500,
-    includes: { seats: 1, storage: 10 * GB, domains: 0, notes: -1, publishing: true },
+    includes: { seats: 1, storage: 10 * GB, domains: 0, notes: -1, publishing: true,
+      products: 200, locations: 25 },
   },
   {
     id: "plus", name: "Plus", kind: "personal", order: 2, trialDays: 14,
     said: "Room to work, and somebody beside you.",
     price: 2500, currency: "USD", credits: 4_000,
-    includes: { seats: 2, storage: 50 * GB, domains: 0, notes: -1, publishing: true },
+    includes: { seats: 2, storage: 50 * GB, domains: 0, notes: -1, publishing: true,
+      products: 1_000, locations: 100 },
   },
   {
     id: "studio", name: "Studio", kind: "commercial", order: 3, trialDays: 14,
     said: "A business: your own name on it, your own address, your own database.",
     price: 4900, currency: "USD", credits: 7_500,
-    includes: { seats: 5, storage: 250 * GB, domains: 1, notes: -1, publishing: true },
+    includes: { seats: 5, storage: 250 * GB, domains: 1, notes: -1, publishing: true,
+      products: 10_000, locations: 1_000 },
   },
   {
     id: "company", name: "Company", kind: "commercial", order: 4, trialDays: 14,
     said: "A team, and the room a team needs.",
     price: 19900, currency: "USD", credits: 40_000,
-    includes: { seats: 25, storage: 2048 * GB, domains: 3, notes: -1, publishing: true },
+    includes: { seats: 25, storage: 2048 * GB, domains: 3, notes: -1, publishing: true,
+      products: -1, locations: -1 },
   },
 ];
 

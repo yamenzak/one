@@ -8,7 +8,20 @@
  * copy, and the copy is the one that goes stale.
  */
 
+import { readdirSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import { files, read } from "./rules.mjs";
+
+/**
+ * ⚠️ EVERY APP, DERIVED — never a list beside this one. Both consumer lists
+ * named `apps/hello/src` by hand, so the second product to arrive would have
+ * made a kernel export it alone reaches read as unreachable: the guard reporting
+ * a capability as dead precisely because a new app is using it. A narrow check
+ * is the one that gets waived, and this is how it starts.
+ */
+const APPS = readdirSync(join(dirname(fileURLToPath(import.meta.url)), "../../apps"))
+  .map((name) => `apps/${name}/src`);
 
 /**
  * ⚠️ THE KERNEL IS ASKED THE SAME QUESTION, and it is not a smaller one. A
@@ -22,9 +35,9 @@ import { files, read } from "./rules.mjs";
  */
 const PACKAGES = [
   { pkg: "runtime", barrel: "@engine/runtime",
-    consumers: ["one/src", "one-space/src", "apps/hello/src"] },
+    consumers: ["one/src", "one-space/src", ...APPS] },
   { pkg: "kernel", barrel: "@engine/kernel",
-    consumers: ["runtime/src", "design/src", "one/src", "one-space/src", "apps/hello/src"] },
+    consumers: ["runtime/src", "design/src", "one/src", "one-space/src", ...APPS] },
 ];
 
 /**

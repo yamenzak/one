@@ -376,7 +376,7 @@ and a manifest that does not compose refuses to boot.
 <!-- generated: node scripts/inventory.mjs declares -->
 | Module | What it is for | Ships | Waiting |
 |---|---|---|---|
-| `primitives` | ids, days, instants, slugs — the words everything else is spelled in | 10 | — |
+| `primitives` | ids, days, instants, slugs — the words everything else is spelled in | 11 | — |
 | `present` | how a date, a number, a price and a measurement are written for one reader | 17 | — |
 | `infra` | what a product needs underneath it, and what each kind can promise | 11 | — |
 | `field` | what a value is: its kind, its bounds, what it holds, whether it is the app's to keep | 8 | — |
@@ -406,7 +406,7 @@ and a manifest that does not compose refuses to boot.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**269 of them**, 264 reached by something today.
+**270 of them**, 265 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -863,6 +863,10 @@ its own header, cited by other files, and doing nothing.
 | `an-edited-price-reaches-the-whole-product` | D12 | the price list edited on one screen and read from the code everywhere else — the gate, the bill and the checkout resolving against a catalogue nobody can see, which is a screen promising what a route refuses |
 | `every-design-guard-is-named-in-the-design-language` | D12 | DESIGN.md §8 typed by hand and five guards missing from it — the sharpest being `metrics`, which holds card padding, the spacing scale, the page gutter and the floor under a pressable row, so the section answering “is spacing enforced?” did not mention the guard enforcing spacing |
 | `a-gate-is-never-handed-a-constant` | D12 | a gate whose input nothing supplies — `flags: located.flags ?? {}` where no deployment ever set it, so every request carried an empty map, the console wrote rows only the console read back, and switching a flag changed nothing anywhere with every suite green |
+| `a-balance-moves-in-one-place-and-the-history-moves-with-it` | D12 | a number the ledger cannot rebuild — the balance is plausible, the screen redraws, and every report over that line stops adding up, permanently |
+| `a-movement-refuses-rather-than-landing-on-zero` | D12 | a mis-scan, a wrong shelf or a count that was already wrong is silently absorbed, and the only evidence any of them happened is gone |
+| `a-shelf-life-is-counted-in-local-days` | D12 | stock expires a day late west of Greenwich — the direction that matters, on medicine and food |
+| `an-expiry-says-which-clock-ended-it` | D12 | a shelf that says “expires Tuesday” and cannot say why, which is a shelf nobody acts on |
 <!-- /generated -->
 
 ### And how well each decision is defended
@@ -881,7 +885,7 @@ its own header, cited by other files, and doing nothing.
 | D9 | Libraries encode decisions; we write invariants | 3 |
 | D10 | Five primary destinations, maximum | 5 |
 | D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 19 |
-| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 120 |
+| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 124 |
 | D13 | The agent surface is derived: every operation is an MCP tool unless it says why not | 4 |
 | D14 | Provider AI calls go through the unified AI binding and its gateway, never direct fetch | 1 |
 | D15 | One membership, two authorities: a platform role for the workspace, a role per app inside it | 5 |
@@ -1004,8 +1008,9 @@ that names no stage, so this list cannot grow by forgetting.
 | 57 | Records move between workspaces — a garage becomes a business and its history goes with it | **planned** |
 | 58 | An operation's ceiling is in force — calls per minute, per caller, refused rather than declared | **planned** |
 | 59 | A write says it worked — the sentence the operation declared, and the reads it made stale | shipped |
+| 60 | OneInventory exists — the model, the one chokepoint that moves a balance, and the arithmetic under both | shipped |
 
-**44 shipped, 15 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**45 shipped, 15 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---
