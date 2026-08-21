@@ -197,29 +197,10 @@ export interface IdentityDeps {
    * operator surface, which answers `false` for everybody.
    */
   readonly isOperator?: (email: string | null) => boolean;
-  /**
-   * ⚠️ WHETHER A WORKSPACE NEEDS SOMEBODY'S ATTENTION, ASKED RATHER THAN READ.
-   * The answer lives in the money module, which a deployment may not have
-   * applied — reading its table from here made `me.who` throw
-   * `no such table: subscription` on one that had not, and `me.who` is the one
-   * call every door makes before it can draw anything. Absent means nothing is
-   * flagged, which is the honest answer when nothing is being charged.
-   */
-  readonly needsAttention?: (
-    directory: Db, tenantId: TenantId, appId: string,
-  ) => Promise<boolean>;
-  /**
-   * ⚠️ THE DEPLOYMENT'S CATALOGUE, FOR THE GIFT A FOUNDING SPENDS. Absent is a
-   * deployment that sells nothing, where a plan gift can be recorded and cannot
-   * be applied — which is honest, and is the state of every test run and of a
-   * self-host before its first plan is declared. A required parameter would be
-   * satisfied with `() => []` by whoever was in a hurry, and that reads exactly
-   * like a catalogue with nothing in it.
-   */
   readonly plans?: () => readonly PlanSpec[];
   /**
    * ⚠️ WHAT A WORKSPACE IS ON, AND WHETHER ANYBODY IS PAYING FOR IT. Injected
-   * for the reason `needsAttention` is: the subscription table belongs to a
+   * for the reason the money reads all are: the subscription table belongs to a
    * module a deployment may not have applied, and reading it from `me.who` —
    * the one call every door makes before it draws anything — made a deployment
    * without it answer `no such table` to everybody.
@@ -228,9 +209,28 @@ export interface IdentityDeps {
    * paying for Max is two rows a person cannot tell apart, and only one of them
    * has a card that can decline and a term that can end.
    */
+  /**
+   * ⚠️ WHAT A WORKSPACE IS ON, AND WHETHER ANYBODY IS PAYING FOR IT. Injected
+   * rather than read, because the subscription table belongs to a module a
+   * deployment may not have applied — reading it from `me.who`, the one call
+   * every door makes before it draws anything, made a deployment without it
+   * answer `no such table` to everybody.
+   */
   readonly membership?: (directory: Db, tenantId: TenantId) => Promise<{
     readonly planId: string | null;
     readonly given: { readonly at: string; readonly until: string | null } | null;
+    /**
+     * ⚠️ WHETHER IT NEEDS SOMEBODY, AND IT REPLACED A WALK THAT COULD NOT ANSWER.
+     * This was `needsAttention(directory, tenantId, appId)`, called once per
+     * PRODUCT — and the plan moved to the workspace, where the row is filed
+     * under no app. So `subscriptionFor(db, id, "hello")` matched nothing on
+     * every deployment, the answer was always `false`, and the "Needs attention"
+     * chip could not appear for a workspace whose card had been declined.
+     *
+     * ⚠️ ONE MEMBERSHIP, SO ONE ASK. It is also cheaper than what it replaces:
+     * one read per workspace rather than one per product in it.
+     */
+    readonly attention: boolean;
   } | null>;
 }
 
@@ -639,21 +639,15 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
           const [member, unseen, sub] = await Promise.all([
             memberFor(ctx.shardOf(t), t.id, accountId),
             unseenCount(ctx.shardOf(t), t.id, accountId),
-            /* ⚠️ AND WHAT IT IS ON, ASKED RATHER THAN READ — the same seam
-               `needsAttention` uses and for the same reason. The subscription
-               table is a module a deployment may not have applied, and reading
-               it from here made `me.who` throw `no such table` on one that had
-               not — on the call every door makes before it can draw anything. */
+            /* ⚠️ AND WHAT IT IS ON, ASKED RATHER THAN READ. The subscription
+               table belongs to a module a deployment may not have applied, and
+               reading it from here made `me.who` throw `no such table` on one
+               that had not — on the call every door makes before it can draw
+               anything. */
             deps.membership
               ? deps.membership(ctx.directory, t.id)
               : Promise.resolve(null),
           ]);
-          /* ⚠️ Only where it is worth saying. A badge on every row is texture;
-             one on the workspace that stopped paying is why somebody looked. */
-          const owing = deps.needsAttention
-            ? await Promise.all(apps.map((appId) =>
-              deps.needsAttention!(ctx.directory, t.id, appId)))
-            : [];
           return {
             slug: t.slug, name: t.name,
             /* ⚠️ WHAT IT IS TRAVELS WITH THE LIST, because every screen that
@@ -672,7 +666,9 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
             platformRole: member?.platformRole ?? null,
             appRoles: member?.appRoles ?? {},
             apps,
-            attention: owing.some(Boolean),
+            /* ⚠️ Only where it is worth saying. A badge on every row is texture;
+               one on the workspace that stopped paying is why somebody looked. */
+            attention: sub?.attention ?? false,
             /* ⚠️ CARRIED BY THE READ EVERY DOOR ALREADY MAKES. A bell with no
                number is a bell somebody has to open to learn anything from, and
                the count is the one fact that decides whether they do. Fetched

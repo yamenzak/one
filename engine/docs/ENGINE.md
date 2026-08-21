@@ -194,6 +194,11 @@ live inside workspaces and an operator stands outside all of them.
 | `op.plan.reset` | write |
 | `op.tenant.app` | write |
 | `op.account.commercial` | write |
+| `op.accounts` | read |
+| `op.account` | read |
+| `op.account.give` | write |
+| `op.account.give.apply` | write |
+| `op.account.give.stop` | write |
 | `op.config` | read |
 | `op.config.set` | write |
 | `op.flags` | read |
@@ -315,6 +320,7 @@ before an app is resolved draws on them.
 | `tenant_app` | — *which products a workspace enabled* | — | `tenant_id: delete` |
 | `belongs` | The workspaces you are in | `account_id: delete` | `tenant_id: delete` |
 | `invited` | Invitations sent to you | `email: delete` | `tenant_id: delete` |
+| `given` | What you were given | `email: delete` | kept |
 | `session` | Where you have been signed in | `account_id: delete` | kept |
 | `code` | Sign-in codes sent to you | `email: delete` | kept |
 | `api_token` | The access tokens you minted | `account_id: delete` | kept |

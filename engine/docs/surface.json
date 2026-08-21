@@ -800,6 +800,26 @@
       "kind": "write"
     },
     {
+      "id": "op.accounts",
+      "kind": "read"
+    },
+    {
+      "id": "op.account",
+      "kind": "read"
+    },
+    {
+      "id": "op.account.give",
+      "kind": "write"
+    },
+    {
+      "id": "op.account.give.apply",
+      "kind": "write"
+    },
+    {
+      "id": "op.account.give.stop",
+      "kind": "write"
+    },
+    {
       "id": "op.config",
       "kind": "read"
     },
@@ -956,6 +976,15 @@
           "email: delete"
         ],
         "onClose": "tenant_id: delete"
+      },
+      {
+        "table": "given",
+        "export": "What you were given",
+        "why": null,
+        "onForget": [
+          "email: delete"
+        ],
+        "onClose": null
       },
       {
         "table": "session",

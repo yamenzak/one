@@ -181,8 +181,19 @@ describe("what the account door costs", () => {
     const res = await get("id", "/api/me.who", cookie);
     expect(res.status).toBe(200);
     const at = spent();
+    /*
+      ⚠️ THE DEPTH IS UNCHANGED AT FOUR, AND THAT IS THE NUMBER THAT DECIDES HOW
+      LONG OPENING THE APP TAKES. What grew is the total: this read now also
+      answers what is WAITING for the person — a workspace an operator gave the
+      address before they signed in, which is the whole of what a gift is for and
+      is worth nothing if the one screen they land on cannot say so.
+
+      ⚠️ RAISED DELIBERATELY, WHICH IS WHAT THIS FILE'S HEADER ASKS FOR. It runs
+      BESIDE the account and the workspace list rather than after them, so it
+      costs a trip and not a wait.
+    */
     expect(at.depth, `depth ${at.depth}, trips ${at.trips}`).toBeLessThanOrEqual(4);
-    expect(at.trips, `depth ${at.depth}, trips ${at.trips}`).toBeLessThanOrEqual(6);
+    expect(at.trips, `depth ${at.depth}, trips ${at.trips}`).toBeLessThanOrEqual(7);
   });
 });
 

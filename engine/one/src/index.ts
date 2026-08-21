@@ -1761,26 +1761,31 @@ const handler = async (env: Env) => {
            the operator's place from this, and a place drawn over nothing is a
            promise the next screen takes back. */
         isOperator,
-        /* ⚠️ Injected because the money tables are a module a deployment may
-           not have applied — see `IdentityDeps`. Only a workspace that stopped
-           paying carries a badge; one on every row is texture. */
-        needsAttention: async (db, tenantId, appId) =>
-          (await subscriptionFor(db, tenantId, appId))?.status === "past_due",
         /* ⚠️ THE CATALOGUE, SO A FOUNDING CAN SPEND A GIFT. The plan an operator
            gave somebody is comped onto the workspace they make, and comping onto
            an id with no plan behind it is an empty entitlement set — so the
            application resolves the plan from here rather than from the row. */
         plans: () => PLANS,
-        /* ⚠️ AND WHAT EACH WORKSPACE IS ON, through the same seam
-           `needsAttention` uses. A given workspace says so on the screen
-           somebody LANDS on rather than only on a billing page they may never
-           open — which is the whole point of giving one. */
+        /*
+          ⚠️ WHAT EACH WORKSPACE IS ON, INJECTED — the money tables are a module
+          a deployment may not have applied. A given workspace says so on the
+          screen somebody LANDS on rather than only on a billing page they may
+          never open, which is the whole point of giving one.
+
+          ⚠️ AND IT CARRIES THE STANDING, WHICH USED TO BE ASKED PER PRODUCT AND
+          COULD NOT BE ANSWERED. `needsAttention` read the subscription with an
+          APP's id; the membership moved to the workspace, where the row is filed
+          under none — so it matched nothing on every deployment, always answered
+          `false`, and the "Needs attention" chip could not appear for a
+          workspace whose card had been declined. One membership, one ask.
+        */
         membership: async (db, tenantId) => {
           const sub = await subscriptionFor(db, tenantId, MEMBERSHIP);
           if (!sub) return null;
           return {
             planId: sub.planId,
             given: sub.compedAt ? { at: sub.compedAt, until: sub.compedUntil } : null,
+            attention: sub.status === "past_due",
           };
         },
       }),
