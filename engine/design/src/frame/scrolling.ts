@@ -92,9 +92,39 @@ export function useScrolling(
        has to be able to change from `null` to an element. */
     const again = () => { host = scrollerOf(ref.current); read(); };
 
+    /**
+     * ⚠️ AND A SCROLL EVENT KNOWS WHO SCROLLED, WHICH IS THE ONLY ANSWER THAT
+     * CANNOT BE STALE. The walk above is a guess made once, and it is wrong
+     * whenever the ancestor was not overflowing YET — the overflow test is
+     * there so a container that scrolls nothing cannot shadow the real
+     * scroller, and it means a dialog still opening resolves to nothing.
+     *
+     * ⚠️ AND NOTHING RE-ASKS, BECAUSE NOTHING THE FRAME WATCHES MOVED. The
+     * observers are on this page's own box and on the document; a scroller
+     * whose overflow arrives from a SIBLING — a dialog's body growing around
+     * the page inside it — changes neither. So the reading falls back to the
+     * window, which inside a dialog never moves, and the chrome sits at zero
+     * for the rest of the visit however far somebody scrolls.
+     *
+     * ⚠️ THE EVENT SETTLES IT IN ONE LINE. The listener is on `document` in the
+     * capture phase, so its target IS the scroller — the document for the page
+     * itself, or the element for anything inside it. Where that element
+     * contains this page, it is this page's scroller by definition, and it is
+     * remembered so every later reading with no event to go on is right too.
+     */
+    const from = (e: Event) => {
+      const on = e.target;
+      if (on === document) host = null;
+      else if (on instanceof HTMLElement && ref.current && on.contains(ref.current)) host = on;
+      /* ⚠️ A scroller INSIDE the page — a rail, a picker — is somebody else's
+         movement, and answering it would report this page as having moved. */
+      else return;
+      read();
+    };
+
     read();
     const settle = requestAnimationFrame(again);
-    document.addEventListener("scroll", read, { passive: true, capture: true });
+    document.addEventListener("scroll", from, { passive: true, capture: true });
     addEventListener("resize", again);
 
     /* ⚠️ ON THE SCROLLER'S CONTENT AND ON THE NODE THAT ASKED, because either
@@ -108,7 +138,7 @@ export function useScrolling(
     return () => {
       cancelAnimationFrame(settle);
       watch.disconnect();
-      document.removeEventListener("scroll", read, { capture: true } as EventListenerOptions);
+      document.removeEventListener("scroll", from, { capture: true } as EventListenerOptions);
       removeEventListener("resize", again);
     };
   }, [ref]);

@@ -394,9 +394,22 @@ function useHems(ref: React.RefObject<HTMLElement | null>): void {
        enough page behind the hem to fill the part of it that hides anything. */
     const now = Math.min(1, Math.max(0, behind / (HEM_HOLD * 16)));
     const to = Number(now.toFixed(2));
-    if (to === was.current[edge]) return;
+    if (to === was.current[edge] || !ref.current) return;
     was.current[edge] = to;
-    document.documentElement.style.setProperty(
+    /*
+      ⚠️ ON THIS PAGE'S OWN ELEMENT, NEVER ON THE ROOT. A custom property
+      inherits, and this page's crown and nav are both inside it — so writing it
+      here reaches exactly the two hems it is about, and no others.
+
+      ⚠️ AND TWO PAGES ARE MOUNTED AT ONCE WHENEVER ONE IS PRESENTED OVER
+      ANOTHER, which is what the account centre is. Both listen — the scroll
+      listener is on `document` in the capture phase, so it hears every scroller
+      in the tree — so a scroll of the dialog woke the page UNDERNEATH it too,
+      which read its own (unmoved) position and wrote 0 over the value the dialog
+      had just written. One root property, two writers, and which one lands is
+      the order the listeners happened to register in.
+    */
+    ref.current.style.setProperty(
       edge === "top" ? "--hem-top" : "--hem-bottom", String(to));
   };
 
@@ -412,13 +425,10 @@ function useHems(ref: React.RefObject<HTMLElement | null>): void {
     show("foot", under);
   });
 
-  React.useEffect(() => () => {
-    /* ⚠️ CLEARED RATHER THAN LEFT AT WHATEVER IT WAS, because the property is on
-       the ROOT and outlives this page — a screen that unmounted while scrolled
-       would hand the next one a hem it never asked for. */
-    document.documentElement.style.removeProperty("--hem-top");
-    document.documentElement.style.removeProperty("--hem-bottom");
-  }, []);
+  /* ⚠️ AND NOTHING TO CLEAN UP, BECAUSE THE VALUE LIVES ON THE PAGE. It used to
+     be cleared on unmount, which is what a global needs and is also an admission
+     that it was one — a screen that unmounted while scrolled would otherwise
+     have handed the next one a hem it never asked for. */
 }
 
 /**

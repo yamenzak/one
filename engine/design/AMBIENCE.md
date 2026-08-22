@@ -172,6 +172,16 @@ depth.
     toolbar and no sub-pixel viewport, so the layer reaches the edge exactly in
     every measurement this repository can take. What is structural, and what
     `scene.test.mjs` asks, is that both edges overshoot at all.
+- **And it reads whatever is actually scrolling, which the scroll EVENT names.**
+  A page presented over a product scrolls inside a dialog's body, and the window
+  never moves at all — so the reading has to come from the right element or it is
+  a constant zero. Walking up for an overflowing ancestor is a guess made once,
+  and it is wrong whenever the ancestor was not overflowing yet; nothing re-asks,
+  because the observers are on the page's own box and on the document, and a
+  scroller whose overflow arrives from a SIBLING changes neither. The listener is
+  on `document` in the capture phase, so its target IS the scroller — that
+  settles it in one line, and it is remembered for every later reading that has
+  no event to go on.
 - **A hem answers on arrival and on every change of shape, not on the first
   scroll.** "Is anything behind the crown" and "is anything still below the fold"
   are readings, and a reading taken only in a scroll handler does not exist until

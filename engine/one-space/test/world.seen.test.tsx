@@ -220,11 +220,15 @@ describe("the world a person actually opens", () => {
     const walk = await page.evaluate(async () => {
       const wait = () => new Promise((go) => { setTimeout(go, 90); });
       const scroller = document.scrollingElement!;
+      const crown = document.querySelector('[data-hem="top"]') as HTMLElement;
       const out: { y: number; hem: number }[] = [];
       for (const y of [0, 16, 34, 52, 200]) {
         scroller.scrollTo(0, y);
         await wait();
-        out.push({ y, hem: Number(getComputedStyle(document.documentElement)
+        /* ⚠️ READ OFF THE CROWN, WHERE THE HEM ITSELF READS IT. The value lives
+           on the page and inherits down; reading the document root is reading
+           the global this deliberately stopped being. */
+        out.push({ y, hem: Number(getComputedStyle(crown)
           .getPropertyValue("--hem-top").trim() || "0") });
       }
       return out;
