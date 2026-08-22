@@ -2,7 +2,7 @@ import * as React from "react";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import {
-  seedShapes, runtimeCss, brandCss, applyAppearance, applyLiveliness, Presenting,
+  seedShapes, runtimeCss, productCss, applyAppearance, applyLiveliness, Presenting,
 } from "@engine/design";
 import "./styles.css";
 import { ONE_ACCENT } from "./brand.js";
@@ -67,7 +67,7 @@ sky.textContent = [
      else's text metrics on every screen. */
   runtimeCss(),
   /*
-    ⚠️ ONE'S OWN BRAND, AND IT IS MONOCHROME. `GROUND_CSS` ships a blue as the
+    ⚠️ ONE'S OWN COLOUR, AND IT IS MONOCHROME. `GROUND_CSS` ships a blue as the
     colour a deployment has before anybody chooses — right for a framework,
     wrong for this product. Every tier, every surface and the ambience behind
     every screen are `color-mix`es with `--brand`, so one neutral value makes
@@ -77,14 +77,18 @@ sky.textContent = [
     hue nobody asked for shows up first, and at the size of a phone screen
     "almost neutral" reads as a colour chosen badly rather than as monochrome.
 
-    ⚠️ AND IT IS `brandCss`, NOT A RULE IN `styles.css`. The first attempt was
-    exactly that and changed nothing: this block is appended to `<head>` AFTER
-    the stylesheet, so the framework default won on source order and the whole
-    product stayed blue with every check green. Going through the same function
-    a workspace's branding goes through means it lands in the same place, in the
-    same order, and a tenant's own choice still wins after it.
+    ⚠️ AND IT IS A DECLARATION APPENDED HERE, NOT A RULE IN `styles.css`. The
+    first attempt was exactly that and changed nothing: this block goes into
+    `<head>` AFTER the stylesheet, so the framework default won on source order
+    and the whole product stayed blue with every check green.
+
+    ⚠️ THIS IS THE DEPLOYMENT'S FLOOR, AND A PRODUCT'S OWN `hue` BEATS IT. A
+    page carrying one writes `--brand` on the page element, which is narrower
+    than `:root` and therefore wins wherever that product is drawn. Nothing a
+    WORKSPACE sets reaches either — their brand is their nameplate, not the
+    interface.
   */
-  brandCss({ accent: ONE_ACCENT }),
+  productCss(ONE_ACCENT),
 ].join("\n");
 document.head.append(sky);
 

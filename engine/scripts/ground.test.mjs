@@ -370,17 +370,44 @@ if (!/`--focus: \$\{FOCUS\};`/.test(GROUND_SRC)) {
 }
 
 /**
- * ⚠️ AND A WORKSPACE SETS `--brand`, NEVER `--accent`. The moment a tenant can
- * write the accent the interface is coloured again, by somebody who has not read
- * any of this — and it is a one-word change in a file about branding, which is
+ * ⚠️ AND A WORKSPACE'S OWN VALUES BECOME NO CSS VARIABLE AT ALL. This once read
+ * "a workspace sets `--brand`, never `--accent`", which conceded the wrong half:
+ * a colour somebody picks in a settings card underneath every component is what
+ * stops a screen being designable, and which variable it lands in only decides
+ * how loudly. A brand is a NAMEPLATE — the tile, the letterhead — resolved where
+ * those are served. What a screen is made of is `AppSpec.hue`.
+ *
+ * ⚠️ THE CHECK IS THAT `Theme` CANNOT CARRY ONE, because that is the field a
+ * settings screen would have to add first. It is three tile tokens; a fourth is
+ * the whole regression, and it is a one-word change in a file about branding —
  * the last place anybody would look for it.
+ */
+const BRAND_SRC = readFileSync(join(ENGINE, "kernel/src/brand.ts"), "utf8");
+const themeBody = /export interface Theme \{([\s\S]*?)\n\}/.exec(BRAND_SRC)?.[1] ?? "";
+const themeFields = [...themeBody.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/readonly (\w+)\??:/g)]
+  .map((m) => m[1]).sort();
+if (themeFields.join(",") !== "ground,ink,mark") {
+  mono++;
+  fail(`kernel/src/brand.ts: \`Theme\` carries ${themeFields.join(", ") || "nothing"}.\n` +
+       `       It is the TILE's three — ground, ink, mark — and nothing else.\n` +
+       `       A fourth is a workspace painting the interface again, which is what\n` +
+       `       stopped any screen being designable. A product's colour is \`AppSpec.hue\`.`);
+}
+
+/**
+ * ⚠️ AND NOTHING TURNS A `Theme` INTO A DECLARATION BLOCK. The field check above
+ * is what a settings screen would have to get past; this is what the paint would
+ * have to go through, and the two together are why it cannot come back quietly.
  */
 const THEME_SRC = readFileSync(join(ENGINE, "design/src/tokens/theme.ts"), "utf8")
   .replace(/\/\*[\s\S]*?\*\//g, "");
-if (/put\(TOKENS\.accent/.test(THEME_SRC) || /accent: "--accent"/.test(THEME_SRC)) {
+/* ⚠️ SET, NOT READ. `TONE_CSS` legitimately paints an informational value with
+   `var(--accent)` — the fault is a rule that ASSIGNS it, which is the interface
+   being coloured by somebody who has not read any of this. */
+if (/\bTheme\b/.test(THEME_SRC) || /--accent\s*:/.test(THEME_SRC)) {
   mono++;
-  fail(`design/src/tokens/theme.ts: a workspace can still write \`--accent\`.\n` +
-       `       Their colour is \`--brand\` — the ground, the surfaces and the ambience.\n` +
+  fail(`design/src/tokens/theme.ts: a workspace's \`Theme\` reaches CSS again.\n` +
+       `       The only colour this file writes is \`--brand\`, from a PRODUCT's hue.\n` +
        `       The accent is the interface, and the interface is ours and monochrome.`);
 }
 

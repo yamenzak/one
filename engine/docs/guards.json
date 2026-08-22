@@ -681,13 +681,13 @@
       "fails": "a nav item that leads to a 403, which the person cannot tell from something simply broken"
     },
     {
-      "id": "branding-is-tokens-and-never-a-stylesheet",
+      "id": "a-colour-is-one-variable-and-it-is-the-products",
       "protects": "D7",
       "stage": "5",
       "status": "live",
       "impl": "design/test/surface.test.tsx",
-      "proves": "is a handful of variables and nothing else",
-      "fails": "a workspace able to break its own customers' screens on our infrastructure, and to make a page look like something it is not"
+      "proves": "is one variable and nothing else",
+      "fails": "the ground behind every page and the wash on every card being a colour somebody picked in a settings card, so no screen can be composed against anything"
     },
     {
       "id": "one-workspace-with-two-products-pays-one-membership",
@@ -2989,13 +2989,13 @@
       "fails": "every switch on the branding screen saving and changing nothing — the tile painted from the entitlement alone, so a business that turned its icon off still installed as itself"
     },
     {
-      "id": "the-screens-wear-the-brand-where-the-shell-was-picked",
+      "id": "no-workspace-colour-reaches-a-screen",
       "protects": "D22",
       "stage": "41",
       "status": "live",
       "impl": "ground/test/workspace.test.ts",
-      "proves": "leaves the screens ours where the workspace did not ask for them",
-      "fails": "a theme applied to every screen of a workspace that asked for it on none — or, the way it actually was, applied to none of them at all"
+      "proves": "puts no colour of theirs on a screen, whatever they picked",
+      "fails": "a workspace's brand painting the interface again — which is what it did, and what stopped any screen being designable"
     },
     {
       "id": "a-browser-suite-is-named-for-its-lane",

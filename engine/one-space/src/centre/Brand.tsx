@@ -23,18 +23,16 @@ import { api } from "../api.js";
 import { useLoad } from "./data.js";
 
 /**
- * ⚠️ THE TOKENS A WORKSPACE EDITS, DECLARED — so each gets the control its kind
- * implies, from the one renderer every settings screen uses.
- *
- * ⚠️ AND THE MARK IS NOT A COLOUR, SO IT IS NOT UNDER "COLOUR". It was, and that
- * one misfiling is most of what made the card read as crammed: a group named for
- * one kind of thing, holding three of them and a text field. The mark is what
- * the TILE says, so it belongs beside the tile.
+ * ⚠️ THREE FIELDS, AND ALL THREE ARE THE TILE'S. There was a fourth — an accent
+ * — and it painted the INTERFACE: the ground behind every page, the wash on
+ * every card, the one coloured thing on a screen. What a screen is made of is
+ * the product's, chosen by whoever designed the screen; what a workspace owns is
+ * where its own NAME appears. So these are not "your colours", they are the
+ * square of colour their staff will look for on a phone, and the labels say so.
  */
-const COLOURS = {
-  ground: field.colour({ label: "Behind everything", holds: "none" }),
-  ink: field.colour({ label: "Words and marks", holds: "none" }),
-  accent: field.colour({ label: "What draws the eye", holds: "none" }),
+const TILE = {
+  ground: field.colour({ label: "Tile colour", holds: "none" }),
+  ink: field.colour({ label: "Letter colour", holds: "none" }),
 } as const;
 
 const MARK = field.text({
@@ -71,11 +69,10 @@ interface BrandAnswer {
 
 /**
  * ⚠️ THE SURFACES A WORKSPACE MAY BRAND ARE THE PLATFORM'S CLOSED SET, and their
- * words are here because a wire value is not copy (DESIGN.md). `shell` on a
+ * words are here because a wire value is not copy (DESIGN.md). `sign-in` on a
  * screen is a key somebody has to translate.
  */
 const SAID: Readonly<Record<string, { readonly label: string; readonly under: string }>> = {
-  shell: { label: "The app itself", under: "Colour, and your mark in the corner" },
   email: { label: "Email", under: "Anything sent from here" },
   documents: { label: "Documents", under: "Anything printed or downloaded" },
   "sign-in": { label: "Signing in", under: "The page before anybody is in" },
@@ -239,7 +236,7 @@ export function Editor({ name, slug, answer, again }: {
       {/* ⚠️ THE TILE IS NOT A ROW, SO IT IS NOT IN A CARD OF ROWS. It is one
           object being decided, centred, with air around it — `Center` owns that
           and a hand-written `py-6` inside a `Group` does not. */}
-      <Group label="On a home screen" under="What your staff will look for">
+      <Group label="On a home screen" under="What your staff look for. A pair too close to read is refused">
         <Center space="roomy">
           {/* ⚠️ THE UPLOAD IS SHOWN AS THE TILE, NOT BESIDE IT. A preview that
               kept drawing the letter while a logo was stored would be a screen
@@ -287,18 +284,20 @@ export function Editor({ name, slug, answer, again }: {
           value={theme.mark ?? ""}
           onSave={(value) => write({ theme: { ...theme, mark: String(value ?? "") } })}
         />
-      </Group>
 
-      {/* ⚠️ THE SWATCH AND THE HEX ARE WHAT THE ROW SAYS; THE PICKER IS BEHIND
-          THE PENCIL. Three inline colour triggers and a stacked text field in
-          one card was four controls, two grammars, no row height in common and
-          no column the labels shared — and every one of them applied on a
-          keystroke, against a server that refuses a pair it cannot read. */}
-      <Group label="Colour" under="Refused if the pair is too close to read">
-        {(Object.keys(COLOURS) as (keyof typeof COLOURS)[]).map((key) => (
+        {/* ⚠️ THE TWO COLOURS ARE IN THIS CARD AND NOT IN ONE OF THEIR OWN. They
+            are what the square above is made of — a "Colour" group beside a
+            "On a home screen" group was two cards for one object, and the second
+            one read as though it were about the app.
+
+            ⚠️ THE SWATCH AND THE HEX ARE WHAT THE ROW SAYS; THE PICKER IS BEHIND
+            THE PENCIL. Applied on a keystroke, against a server that refuses a
+            pair it cannot read, the row rolls back while somebody is still
+            typing the second colour of the pair. */}
+        {(Object.keys(TILE) as (keyof typeof TILE)[]).map((key) => (
           <EditRow
             key={key}
-            spec={COLOURS[key]}
+            spec={TILE[key]}
             name={key}
             value={theme[key] ?? ""}
             onSave={(value) => write({ theme: { ...theme, [key]: String(value ?? "") } })}

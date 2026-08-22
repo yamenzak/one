@@ -72,7 +72,11 @@ const SURFACES = {
   flags: { file: "one-space/src/centre/Trying.tsx", renders: "export function Trying" },
   plans: { file: "design/src/rendered/console.tsx", renders: "export function Shelf" },
   entitlements: { file: "design/src/rendered/console.tsx", renders: "export function Shelf" },
-  whitelabel: { file: "design/src/tokens/theme.ts", renders: "export function brandCss" },
+  /* ⚠️ THE EDITOR, NOT A STYLESHEET WRITER. This named `brandCss` while a
+     workspace's colours were written onto `:root`; they are not, and what a
+     product's `whitelabel` declaration actually reaches is the screen where a
+     business sets its nameplate. */
+  whitelabel: { file: "one-space/src/centre/Brand.tsx", renders: "export function Editor" },
   /* ⚠️ ON THE ROSTER, BESIDE THE ROLE, because "what may they do" and "where do
      they do it" are two halves of one answer about one person (D45). A separate
      screen would be a second place to look for somebody's access. */

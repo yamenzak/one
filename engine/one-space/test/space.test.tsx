@@ -265,8 +265,8 @@ describe("the country list", () => {
 describe("a workspace's brand", () => {
   const commercial = {
     kind: "commercial" as const,
-    branding: { theme: { ground: "#101014", ink: "#f5f5f7", accent: "#7aa2f7", mark: "H" }, surfaces: ["shell"] },
-    surfaces: ["shell", "email"],
+    branding: { theme: { ground: "#101014", ink: "#f5f5f7", mark: "H" }, surfaces: ["documents"] },
+    surfaces: ["documents", "email"],
     /* ⚠️ No upload yet, which is the state every business starts in. */
     icon: null,
   };
@@ -282,7 +282,7 @@ describe("a workspace's brand", () => {
     const out = html(
       <Editor
         name="Harbourside" slug="harbourside"
-        answer={{ kind: "commercial", branding: null, surfaces: ["shell", "email"], icon: null }}
+        answer={{ kind: "commercial", branding: null, surfaces: ["documents", "email"], icon: null }}
         again={() => {}}
       />,
     );
@@ -296,18 +296,20 @@ describe("a workspace's brand", () => {
     );
     /* ⚠️ The tile is what is being decided, so it is on the screen. */
     expect(out).toContain("On a home screen");
-    /* ⚠️ Every colour reads as its value, not as a control — see `edit.tsx`. */
-    for (const hex of ["#101014", "#f5f5f7", "#7aa2f7"]) expect(out).toContain(hex);
+    /* ⚠️ BOTH COLOURS READ AS THEIR VALUE, not as a control — see `edit.tsx`.
+       There were three; the third was an accent, and it painted the INTERFACE.
+       What a workspace owns is the two the TILE is made of. */
+    for (const hex of ["#101014", "#f5f5f7"]) expect(out).toContain(hex);
     /* ⚠️ THE UPLOAD IS OFFERED, AND IT SAYS WHAT IT TAKES. A picker that
        accepted anything and refused most of it after the upload is the shape
        this control exists not to be. */
     expect(out).toContain("Add your own icon");
     expect(out).toContain("square PNG");
     /* ⚠️ And each is CHANGED rather than typed into: the row carries the way in. */
-    expect(out).toContain("Change behind everything");
-    expect(out).toContain("Change words and marks");
+    expect(out).toContain("Change tile colour");
+    expect(out).toContain("Change letter colour");
     /* ⚠️ Only what the apps here offer — never the platform's closed set. */
-    expect(out).toContain("The app itself");
+    expect(out).toContain("Documents");
     expect(out).not.toContain("Public pages");
   });
 
@@ -332,7 +334,7 @@ describe("a workspace's brand", () => {
     const on = html(
       <Editor
         name="Harbourside" slug="harbourside"
-        answer={{ ...commercial, branding: { ...commercial.branding, surfaces: ["shell", "email"] } }}
+        answer={{ ...commercial, branding: { ...commercial.branding, surfaces: ["documents", "email"] } }}
         again={() => {}}
       />,
     );

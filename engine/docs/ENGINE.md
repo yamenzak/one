@@ -423,13 +423,13 @@ and a manifest that does not compose refuses to boot.
 | `legal` | documents, purposes, sub-processors, the record of processing | 11 | — |
 | `guide` | help, onboarding, the milestones a workspace passes | 5 | — |
 | `job` | scheduled work, and the record that it ran | 7 | — |
-| `brand` | which surfaces a workspace may put its own mark on | 10 | — |
+| `brand` | which surfaces a workspace may put its own mark on | 9 | — |
 | `mark` | the logo as geometry, so the browser and the Worker draw one shape | 7 | — |
 | `ai` | a generating action: its lane, its prompt, its ceiling | 17 | — |
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**285 of them**, 284 reached by something today.
+**284 of them**, 283 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -661,7 +661,7 @@ its own header, cited by other files, and doing nothing.
 | `every-positioned-component-sits-inside-its-anchor` | D7 | a count that lands on top of the time beside it, because a positioned component written without its anchor still compiles, still renders, and still looks like a component |
 | `a-stored-secret-is-never-rendered-back` | D11 | a live credential handed to every script in the page and to whatever the browser saved |
 | `a-destination-nobody-can-reach-is-never-drawn` | D10 | a nav item that leads to a 403, which the person cannot tell from something simply broken |
-| `branding-is-tokens-and-never-a-stylesheet` | D7 | a workspace able to break its own customers' screens on our infrastructure, and to make a page look like something it is not |
+| `a-colour-is-one-variable-and-it-is-the-products` | D7 | the ground behind every page and the wash on every card being a colour somebody picked in a settings card, so no screen can be composed against anything |
 | `one-workspace-with-two-products-pays-one-membership` | D1 | a customer of two products becoming two customers - two cards, two renewal dates, two companies as far as they can tell |
 | `one-membership-resolves-every-products-keys` | D1 | a workspace paying for two products being told it holds neither, because each app's keys were resolved against a catalogue that only knew the other's |
 | `every-key-a-product-declares-is-priced-by-every-tier` | D1 | a feature built, shipped and sold to nobody - an unpriced key resolves to off for every workspace on every tier, and no screen anywhere says why |
@@ -917,7 +917,7 @@ its own header, cited by other files, and doing nothing.
 | `an-act-names-the-operation-it-calls` | D15 | one act with no `op`, which renders and works on every tier that happens to be allowed and gives the one that is not the old behaviour with nothing saying so |
 | `a-blocked-control-says-which-gate-stopped-it` | D7 | one sentence for all nine gates, which is a boolean wearing a name — "you cannot yet" and "your plan does not include this" are different controls |
 | `a-brand-reaches-only-the-surfaces-it-was-asked-to` | D22 | every switch on the branding screen saving and changing nothing — the tile painted from the entitlement alone, so a business that turned its icon off still installed as itself |
-| `the-screens-wear-the-brand-where-the-shell-was-picked` | D22 | a theme applied to every screen of a workspace that asked for it on none — or, the way it actually was, applied to none of them at all |
+| `no-workspace-colour-reaches-a-screen` | D22 | a workspace's brand painting the interface again — which is what it did, and what stopped any screen being designable |
 | `a-browser-suite-is-named-for-its-lane` | D49 | a geometry suite back in the lane a deploy waits for — the tests pass, the run is simply minutes longer, and CI gets slow again by a route nobody chose |
 | `a-slow-lane-has-a-command-that-runs-it` | D49 | a `.seen.` file excluded from `test` by name and reachable by no command — a deleted test wearing a filename, green for ever |
 | `the-fast-lane-does-not-pick-up-a-browser-suite` | D49 | the deploy paying for the browser AND `pnpm engine:seen` running it a second time, because a second config in the same package was never given the exclusion |

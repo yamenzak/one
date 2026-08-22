@@ -462,7 +462,14 @@ describe("a workspace making it theirs", () => {
   });
 
   it("refuses a colour a palette cannot be derived from", () => {
-    expect(refuseTheme({ accent: "blue" }).map((p) => p.why)).toEqual(["not_a_colour"]);
+    expect(refuseTheme({ ground: "blue" }).map((p) => p.why)).toEqual(["not_a_colour"]);
+  });
+
+  /* ⚠️ THE LETTER IS NOT A COLOUR, so it is not checked as one — a mark of "AB"
+     refused as "not a #rrggbb" is a workspace unable to put its initials on its
+     own tile. The loop names the two colours rather than walking the record. */
+  it("takes a letter that is plainly not a colour", () => {
+    expect(refuseTheme({ mark: "AB", ground: "#111113", ink: "#f4f4f5" })).toEqual([]);
   });
 
   it("computes contrast the published way", () => {
@@ -476,10 +483,10 @@ describe("a workspace making it theirs", () => {
     documents we are bound by keep our letterhead whatever anybody has bought.
   */
   it("refuses to hand over a surface that carries our voice", () => {
-    const def = { surfaces: ["shell", "email"] as const, entitlement: "whitelabel" };
+    const def = { surfaces: ["documents", "email"] as const };
     expect(refuseSurfaces(def, [...OURS]).map((p) => p.why)).toEqual(["ours_to_keep", "ours_to_keep", "ours_to_keep"]);
     expect(refuseSurfaces(def, ["public"]).map((p) => p.why)).toEqual(["surface_not_offered"]);
-    expect(refuseSurfaces(def, ["shell"])).toEqual([]);
+    expect(refuseSurfaces(def, ["email"])).toEqual([]);
   });
 });
 

@@ -30,7 +30,7 @@ import { SettledSwitch } from "../src/parts/settle.js";
 import { ModelLine } from "../src/rendered/ai.js";
 import { CONTROL_SHARE, WHOLE } from "../src/tokens/metrics.js";
 import { crownFor } from "../src/frame/crown.js";
-import { brandCss, brandCssFor, readable, colorFor } from "../src/tokens/theme.js";
+import { productCss, colorFor } from "../src/tokens/theme.js";
 import { ambienceStylesheet, skyWorld, worldCss } from "../src/tokens/ambience.js";
 import { SKIES } from "../src/scene/index.js";
 import { BEAT } from "../src/tokens/motion.js";
@@ -667,59 +667,37 @@ describe("the shell", () => {
 
 /* ----------------------------------------------------------------- theme --- */
 
-describe("a workspace's branding", () => {
+describe("what a colour is for", () => {
   /*
-    ⚠️ TOKENS, NOT STYLES (D7). The whole of a tenant's brand is a handful of
-    variable values; no component has a per-tenant variant and no screen knows
-    branding exists.
+    ⚠️ ONE VARIABLE, ON `:root`, AND IT IS THE PRODUCT'S. This block used to
+    check that a WORKSPACE's four tokens landed correctly — an accent, a ground,
+    an ink and a radius, written onto the document by whoever happened to be
+    editing a settings card. That is what stopped any screen being designable:
+    the ground behind every page, the wash on every card and the one coloured
+    thing on a screen were a value nobody who drew them had seen.
   */
-  it("is a handful of variables and nothing else", () => {
-    const css = brandCss({ accent: "#2563eb", ground: "#ffffff", ink: "#111111", radius: "lg" });
-    expect(css).toContain("--brand: #2563eb");
-    expect(css).toContain("--background: #ffffff");
-    expect(css).toContain("--radius: 0.875rem");
-    /* ⚠️ Nothing but a :root block — anything wider is a stylesheet they control. */
+  it("is one variable and nothing else", () => {
+    const css = productCss("oklch(0.79 0.16 68)");
+    expect(css).toContain("--brand: oklch(0.79 0.16 68)");
+    /* ⚠️ Nothing but a :root block — anything wider is a stylesheet edited at a
+       distance from the screens it paints. */
     expect(css.match(/\{/g)).toHaveLength(1);
     expect(css).not.toContain("class");
   });
 
   /*
-    ⚠️ A WORKSPACE CANNOT WRITE THE ACCENT, AND THAT IS THE MONOCHROME DECISION
-    ENFORCED AT THE ONE PLACE THEY COULD. `--accent` is what the library paints
-    every control with; their colour is `--brand`, which is the ground those
-    controls sit on. The moment a tenant can set the accent the interface is
-    coloured again, by somebody who has read none of this.
+    ⚠️ AND IT IS `--brand`, NEVER `--accent`, WHICH IS THE MONOCHROME DECISION AT
+    THE ONE PLACE A COLOUR ENTERS. `--accent` is what the library paints every
+    control with; a hue lands on the GROUND those controls sit on. The moment a
+    hue reaches the accent the interface is coloured again.
   */
-  it("never lets a workspace write the accent", () => {
-    const css = brandCss({ accent: "#2563eb" });
+  it("never writes the accent", () => {
+    const css = productCss("#2563eb");
     expect(css).toContain("--brand:");
     expect(css).not.toContain("--accent:");
-    /* ⚠️ And there is no foreground to derive any more — the pair is fixed in
+    /* ⚠️ And there is no foreground to derive — the pair is fixed in
        `ground.ts`, so it cannot be got wrong by anybody's choice. */
     expect(css).not.toContain("--accent-foreground");
-  });
-
-  /* ⚠️ Both themes, or the dark one inherits a light brand — which they will
-     never see, having set it on their own screen in daylight. */
-  it("carries a second theme when one was given", () => {
-    const css = brandCssFor({ ground: "#ffffff" }, { ground: "#0b0b0b" });
-    expect(css).toContain(`[data-theme="dark"]`);
-    expect(css).toContain("#0b0b0b");
-  });
-
-  /* ⚠️ AND THE DARK HALF IS NOT BOUND TO THE DOCUMENT ELEMENT, so one screen can
-     be a dark room inside a light app (`Page`'s `world`). Bound to `:root` the
-     tokens could only ever switch for the whole page, and the library's own are
-     already written the scopable way — ours were the half that could not
-     follow. */
-  it("scopes the second theme to any element, not only the root", () => {
-    const css = brandCssFor({ ground: "#ffffff" }, { ground: "#0b0b0b" });
-    expect(css).not.toContain(`:root[data-theme="dark"]`);
-  });
-
-  it("knows an unreadable pair from a readable one", () => {
-    expect(readable("#111111", "#ffffff")).toBe(true);
-    expect(readable("#eeeeee", "#ffffff")).toBe(false);
   });
 
   /*

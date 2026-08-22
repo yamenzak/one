@@ -44,7 +44,7 @@ import { build } from "vite";
 import type { Browser } from "playwright";
 import type { ReactNode } from "react";
 import { runtimeCss } from "../frame/runtime.js";
-import { brandCss } from "../tokens/theme.js";
+import { productCss } from "../tokens/theme.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SPA = join(HERE, "..", "..", "..", "one-space", "dist", "assets");
@@ -99,7 +99,7 @@ const deploymentBrand = (): string => {
       + `colour from that line — without it every measurement and every `
       + `photograph is of the framework's default brand.`);
   }
-  return brandCss({ accent: found[1] as string });
+  return productCss(found[1] as string);
 };
 
 /** ⚠️ Absent is a build that has not run — a harness measuring nothing must say so. */

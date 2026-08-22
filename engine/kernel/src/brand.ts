@@ -1,30 +1,31 @@
 /**
  * A WORKSPACE MAKING THE PRODUCT LOOK LIKE THEIRS.
  *
- * ⚠️ THE BRAND IS THE WORKSPACE'S AND NEVER ONE APP'S, and that is what makes it
- * worth having. A business running three of our products under one roof has ONE
- * identity — one logo on the sign-in page its staff use, one colour behind every
- * screen, one icon on the phone — and a brand declared per app would give it
- * three of everything and three places to change them, with two of them stale.
- * Every app under the workspace draws from the same theme; which SURFACES exist
- * is still the app's to say, because only the app knows whether it has emails or
- * documents at all.
+ * ⚠️ A WORKSPACE'S BRAND IS ITS NAMEPLATE, AND IT IS NOT THE INTERFACE. It was
+ * both, and being both is what stopped either working: a colour a workspace
+ * picked in ten seconds decided the light against the ground, the wash against
+ * the card and the one coloured thing on a screen — so no screen could be
+ * designed, because no screen knew what it would be made of. What a product is
+ * made of is `AppSpec.hue`, declared by whoever built it. What a workspace owns
+ * is where its own NAME appears: the tile its staff tap on a phone, and the
+ * letterhead on mail it sends. Nothing here reaches a component.
  *
  * ⚠️ AND ONLY A COMMERCIAL WORKSPACE HAS ONE (`mayBrand`). A personal workspace
  * is not trading under anybody's name, so it wears ours — that is the honest
  * default rather than a withheld feature, and it is why the PWA a person
  * installs from a personal workspace carries our mark and not a blank.
  *
- * ⚠️ A TENANT EDITS TOKENS, NEVER STYLES (D7). Every component takes its colour,
- * radius and type from the theme, so changing the theme changes everything and
- * changing nothing else has to happen. The alternative — letting a workspace
- * supply CSS — hands them the ability to break their own customers' screens on
- * our infrastructure, and to make a page look like something it is not.
+ * ⚠️ A TENANT EDITS TOKENS, NEVER STYLES (D7), AND THERE ARE THREE OF THEM. A
+ * ground, an ink and a letter — everything a tile needs and nothing else. The
+ * alternative, letting a workspace supply CSS, hands them the ability to break
+ * their own customers' screens on our infrastructure and to make a page look
+ * like something it is not; that argument still holds, and what shrank is how
+ * much there is to edit.
  *
- * ⚠️ AND AN UNREADABLE PAIR IS REFUSED RATHER THAN WARNED ABOUT. A workspace
- * picking a pale accent on a pale ground has not made a subtle choice, they have
- * made an application their own customers cannot read — and they will never see
- * it, because they have their own screen at their own brightness.
+ * ⚠️ AND AN UNREADABLE PAIR IS REFUSED RATHER THAN WARNED ABOUT. A tile whose
+ * letter cannot be read against its own ground is an icon nobody can find on a
+ * home screen full of them — and the person who chose it will never notice,
+ * because they have their own screen at their own brightness.
  *
  * ⚠️ SOME SURFACES ARE NEVER THEIRS. Anything that says who WE are — a message
  * about their bill, the operator console, a legal document — keeps our
@@ -41,11 +42,19 @@
  * they paid for and cannot use; an unbrandable one they can reach is a
  * misattribution. Both come from this list, which is why it is a closed set.
  */
+/*
+  ⚠️ `shell` IS GONE, AND IT IS THE ONLY ONE THAT WAS REMOVED RATHER THAN NOT YET
+  BUILT. The surface exists — it is every screen of every product — and what it
+  meant was a workspace's colours written onto `:root`, which is precisely the
+  thing that stopped a screen being designable. The other three below reach
+  nothing YET, which is a different state: a public page and a sign-in door are
+  real surfaces this deployment has and has not put a nameplate on.
+*/
 export type Surface =
-  | "shell" | "email" | "documents" | "sign-in" | "public" | "app-icons";
+  | "email" | "documents" | "sign-in" | "public" | "app-icons";
 
 export const SURFACES: readonly Surface[] = [
-  "shell", "email", "documents", "sign-in", "public", "app-icons",
+  "email", "documents", "sign-in", "public", "app-icons",
 ];
 
 /**
@@ -105,14 +114,21 @@ export interface Branding {
  * mapping them is a translation table that goes stale the first time the library
  * adds one — and a token that maps to nothing changes nothing, visibly.
  */
+/**
+ * ⚠️ THREE TOKENS, AND THEY ARE ALL THE TILE'S. This carried an accent, a radius,
+ * a font and two logos as well. The accent and the radius and the font painted
+ * the INTERFACE, which is now the product's (`AppSpec.hue`); the two logos were
+ * declared for a year and drawn by nothing anywhere, which is the state a field
+ * reaches when it is added for a surface somebody meant to build.
+ *
+ * ⚠️ AND WHAT IS LEFT IS EXACTLY WHAT `installableFor` READS. A ground, an ink
+ * and a letter — the home-screen tile, and the one place a workspace's own name
+ * is genuinely the subject rather than a decoration on somebody else's design.
+ */
 export interface Theme {
-  readonly accent?: string;
   readonly ground?: string;
   readonly ink?: string;
-  readonly radius?: "none" | "sm" | "md" | "lg" | "full";
-  readonly font?: string;
-  readonly logo?: string;
-  readonly logoDark?: string;
+  /** ⚠️ One or two characters. Their initial where they leave it. */
   readonly mark?: string;
 }
 
@@ -176,8 +192,6 @@ export function contrast(a: string, b: string): number | null {
 
 /** ⚠️ The published floor for body text. Not a number we invented. */
 export const CONTRAST_FLOOR = 4.5;
-/** Large text and non-text controls sit lower, and this is where. */
-export const CONTRAST_FLOOR_LARGE = 3;
 
 /* ------------------------------------------------------------------ rules --- */
 
@@ -199,22 +213,19 @@ export function refuseTheme(theme: Theme): readonly BrandProblem[] {
   const at = (of: string, why: BrandRefusal, detail: string) => out.push({ of, why, detail });
 
   for (const [name, value] of Object.entries(theme)) {
-    if (["accent", "ground", "ink"].includes(name) && typeof value === "string"
+    if (["ground", "ink"].includes(name) && typeof value === "string"
       && luminance(value) === null) {
       at(name, "not_a_colour", `"${value}" is not a #rrggbb, so a palette cannot be derived from it`);
     }
   }
 
-  const pairs: readonly [string, string, string, number][] = [
-    ["ink on ground", theme.ink ?? "", theme.ground ?? "", CONTRAST_FLOOR],
-    ["accent on ground", theme.accent ?? "", theme.ground ?? "", CONTRAST_FLOOR_LARGE],
-  ];
-  for (const [what, a, b, floor] of pairs) {
-    if (!a || !b) continue;
-    const ratio = contrast(a, b);
-    if (ratio !== null && ratio < floor) {
-      at(what, "unreadable", `${ratio.toFixed(1)}:1 against a floor of ${floor}:1`);
-    }
+  /* ⚠️ ONE PAIR NOW, AND IT IS THE TILE'S. The second was "accent on ground",
+     which stopped meaning anything the day a workspace stopped choosing what the
+     interface is made of. */
+  const ratio = theme.ink && theme.ground ? contrast(theme.ink, theme.ground) : null;
+  if (ratio !== null && ratio < CONTRAST_FLOOR) {
+    at("ink on ground", "unreadable",
+      `${ratio.toFixed(1)}:1 against a floor of ${CONTRAST_FLOOR}:1`);
   }
   return out;
 }

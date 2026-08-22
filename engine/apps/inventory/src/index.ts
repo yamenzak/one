@@ -5289,7 +5289,7 @@ export const INVENTORY: AppSpec = defineApp({
 
   /* ⚠️ WHICH SURFACES THIS APP HAS, AND NOT WHO MAY PAINT THEM. The brand is the
      WORKSPACE's and reaches every app under it (D22). */
-  whitelabel: { surfaces: ["shell"] },
+  whitelabel: { surfaces: ["email"] },
 
   /*
     ⚠️ THE CEILING THE RESERVE IS COMPUTED FROM, ONE PER ACTION. A meter with no

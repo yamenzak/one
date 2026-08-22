@@ -145,14 +145,13 @@ export function centreOps(app: AppSpec): Readonly<Record<string, Resolved>> {
            `BRANDING_SCHEMA`'s place in `DIRECTORY_MODULES`. */
         brandingOf(ctx.directory, ctx.tenantId as TenantId),
       ]);
-      /* ⚠️ ENTITLED TO ONE, AND ASKED FOR IT ON THIS SURFACE. `mayBrand` says a
-         business may have an identity at all; the surface list says where it
-         wanted it, and reading only the first is how a switch comes to save and
-         change nothing. */
-      const theirs = mayBrand(tenant?.kind ?? "personal")
-        && branding?.surfaces.includes("shell")
-        ? branding
-        : null;
+      /* ⚠️ ENTITLED TO ONE AT ALL, WHICH IS THE ONLY QUESTION LEFT HERE. It
+         used to be two — may they, and did they ask for it on THIS surface —
+         because a workspace's colours were written onto `:root`. They are not,
+         and there is no `shell` surface to ask about: a brand is a nameplate
+         and the only thing that travels from it to a screen is whether OUR mark
+         comes off the chrome. */
+      const theirs = mayBrand(tenant?.kind ?? "personal") ? branding : null;
 
       const apps = await Promise.all(ctx.enabledApps
         .map((id) => ctx.appOf(id))
@@ -180,17 +179,12 @@ export function centreOps(app: AppSpec): Readonly<Record<string, Resolved>> {
           slug: tenant?.slug ?? "",
           kind: tenant?.kind ?? "personal",
           /*
-            ⚠️ THE THEME ONLY WHERE THE WORKSPACE MAY BRAND AND ASKED TO, and the
-            intersection is resolved HERE rather than on the page. Sending the
-            theme with the picks beside it would make every surface in every
-            product decide for itself whether to wear it — which is how one
-            product ends up branded and the next one beside it is not, on the
-            same workspace, with nobody able to say why.
-
-            ⚠️ ABSENT MEANS OURS. A page handed nothing paints nothing, which is
-            what a personal workspace and an un-branded business both get.
+            ⚠️ NO THEME IS SENT, AND NOTHING ON A SCREEN WANTS ONE. A workspace's
+            ground, ink and letter are the TILE's — resolved where the tile and
+            the letterhead are served (`installableFor`), which is the only place
+            those three mean anything. Sending them here put a colour somebody
+            picked in a settings card underneath every component in the product.
           */
-          ...(theirs ? { theme: theirs.theme } : {}),
           /* ⚠️ WHETHER OUR MARK COMES OFF, which is a different transaction from
              putting theirs on — and ours to answer rather than a product's. */
           ...(theirs?.ourMark === false ? { ourMark: false } : {}),

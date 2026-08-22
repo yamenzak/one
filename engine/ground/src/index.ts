@@ -734,7 +734,7 @@ export const GROUND: AppSpec = defineApp({
   /* ⚠️ WHICH SURFACES THIS APP HAS, AND NOT WHO MAY PAINT THEM. The brand is
      the WORKSPACE's and it reaches every app under it; whether it may have one
      at all is `mayBrand(kind)`, which is the same answer in every product. */
-  whitelabel: { surfaces: ["shell", "email"] },
+  whitelabel: { surfaces: ["email"] },
 
   /* ⚠️ The ceiling the reserve is computed from — never "whatever it returns".
      A meter with no ceiling reserves nothing and settles at whatever arrived. */

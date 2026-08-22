@@ -175,7 +175,7 @@ describe("a new workspace", () => {
   it("cannot brand itself, and the refusal comes from the write rather than the screen", async () => {
     const cookie = await workspace();
     const no = await post(SLUG, "/api/brand.write",
-      { theme: READABLE, surfaces: ["shell"] }, cookie);
+      { theme: READABLE, surfaces: ["email"] }, cookie);
     expect(no.status).toBe(402);
     expect((await no.json() as { problem: { code: string } }).problem.code)
       .toBe("platform.commercial_required");
@@ -240,21 +240,21 @@ describe("becoming a business", () => {
 
     /* And the brand takes, on the workspace rather than on the app. */
     expect((await post(SLUG, "/api/brand.write",
-      { theme: READABLE, surfaces: ["shell", "email"] }, cookie)).status).toBe(200);
+      { theme: READABLE, surfaces: ["email"] }, cookie)).status).toBe(200);
     expect((await brandingOf(directory(), row.id))?.theme.ground).toBe("#101014");
 
     /*
-      ⚠️ AND THE SURFACE IT ASKED FOR IS THE ONE IT GETS. `shell` is picked, so
-      the boot read carries the theme and every screen under this workspace wears
-      it; `app-icons` is NOT, so the tile stays ours. A switch that saved and
-      changed nothing is what this pair exists to catch — and it was the state of
-      the whole feature until the picks were read. The TILE's half of the same
-      claim is beside its own test, below.
+      ⚠️ AND NO COLOUR OF THEIRS REACHES A SCREEN, WHICH IS THE OTHER HALF. A
+      workspace's brand is its NAMEPLATE — the tile, the letterhead — so the boot
+      read carries their name and their kind and no theme at all. It carried one
+      once, onto `:root`, which made the ground behind every page and the wash on
+      every card a value chosen in a settings card; nothing above them could then
+      be composed against anything.
     */
     const view = await (await get(SLUG, "/api/centre.view", cookie)).json() as
-      { tenant: { theme?: { ground?: string } } };
-    expect(view.tenant.theme?.ground).toBe("#101014");
-
+      { tenant: { name: string; theme?: unknown } };
+    expect(view.tenant.name).toBe("Harbourside");
+    expect(view.tenant.theme).toBeUndefined();
   });
 
   /* ⚠️ ONE WAY, AND THERE IS NO OPERATION FOR THE OTHER DIRECTION. Asserted by
@@ -320,20 +320,20 @@ describe("a business's own identity", () => {
   it("refuses a pair its own customers could not read", async () => {
     const cookie = await asBusiness();
     const no = await post(SLUG, "/api/brand.write",
-      { theme: { ground: "#ffffff", ink: "#f4f4f5" }, surfaces: ["shell"] }, cookie);
+      { theme: { ground: "#ffffff", ink: "#f4f4f5" }, surfaces: ["email"] }, cookie);
     expect(no.status).toBe(400);
   });
 
   /*
     ⚠️ AND `app-icons` IS PICKED, WHICH IS THE POINT OF THE PICK. This asked for
-    `shell` alone and expected the tile to be theirs — pinning the fault rather
-    than the rule, for as long as nothing read the surface list. Being entitled
-    to brand and asking to brand HERE are two questions.
+    another surface entirely and expected the tile to be theirs — pinning the
+    fault rather than the rule, for as long as nothing read the surface list.
+    Being entitled to brand and asking to brand HERE are two questions.
   */
   it("reaches the installed tile, which is where somebody looks for it", async () => {
     const cookie = await asBusiness();
     await post(SLUG, "/api/brand.write",
-      { theme: READABLE, surfaces: ["shell", "app-icons"] }, cookie);
+      { theme: READABLE, surfaces: ["email", "app-icons"] }, cookie);
 
     const manifest = await (await get(SLUG, "/manifest.webmanifest")).json() as
       { name: string; theme_color: string };
@@ -354,19 +354,26 @@ describe("a business's own identity", () => {
   */
   it("leaves the tile ours where the workspace did not ask for it", async () => {
     const cookie = await asBusiness();
-    await post(SLUG, "/api/brand.write", { theme: READABLE, surfaces: ["shell"] }, cookie);
+    await post(SLUG, "/api/brand.write", { theme: READABLE, surfaces: ["email"] }, cookie);
 
     const icon = await (await get(SLUG, "/icon.svg")).text();
     expect(icon).toContain("◇");
     expect(icon).not.toContain("#101014");
   });
 
-  /* ⚠️ AND THE SCREENS THE OTHER WAY ROUND. A workspace that branded its tile
-     and not its shell works in ours — same rule, same list, the other entry. */
-  it("leaves the screens ours where the workspace did not ask for them", async () => {
+  /*
+    ⚠️ AND NO PICK OF THEIRS PUTS A COLOUR ON A SCREEN, WHICH IS THE OTHER WAY
+    ROUND. This was the mirror of the tile test while `shell` was a surface — a
+    workspace that branded its tile and not its screens worked in ours. There is
+    no such pick now: a brand reaches a nameplate and nothing that draws a
+    component, so the strong claim is that branding EVERYTHING leaves the boot
+    read carrying no theme.
+  */
+  it("puts no colour of theirs on a screen, whatever they picked", async () => {
     const cookie = await asBusiness();
     await post(SLUG, "/api/brand.write",
-      { theme: READABLE, surfaces: ["app-icons"] }, cookie);
+      { theme: READABLE, surfaces: ["email", "app-icons", "documents", "sign-in", "public"] },
+      cookie);
 
     const view = await (await get(SLUG, "/api/centre.view", cookie)).json() as
       { tenant: { theme?: unknown } };
@@ -424,7 +431,7 @@ describe("a business's own identity", () => {
   it("takes one reply address for the whole workspace, or refuses it", async () => {
     const cookie = await asBusiness();
     expect((await post(SLUG, "/api/brand.write",
-      { theme: READABLE, surfaces: ["shell", "email"], replyTo: "hello@harbour.example" },
+      { theme: READABLE, surfaces: ["email"], replyTo: "hello@harbour.example" },
       cookie)).status).toBe(200);
 
     const read = await (await get(SLUG, "/api/brand.read", cookie)).json() as
@@ -434,7 +441,7 @@ describe("a business's own identity", () => {
     /* ⚠️ AGAINST THE FIELD, because "invalid" over a card of four controls does
        not say which one the server would not take. */
     const no = await post(SLUG, "/api/brand.write",
-      { theme: READABLE, surfaces: ["shell", "email"], replyTo: "ground at harbour" }, cookie);
+      { theme: READABLE, surfaces: ["email"], replyTo: "ground at harbour" }, cookie);
     expect(no.status).toBe(400);
     expect((await no.json() as { problem: { fields?: Record<string, string> } })
       .problem.fields?.replyTo).toBeTruthy();
@@ -474,13 +481,13 @@ describe("a workspace's own letters", () => {
     await post("setup", "/api/me.tenant.commercial", { slug: SLUG, legalName: "H GmbH" }, cookie);
     /* ⚠️ COMMERCIAL IS NOT ENOUGH — the workspace still has to ASK for the
        email surface, which is the half a check on the kind alone would miss. */
-    await post(SLUG, "/api/brand.write", { theme: READABLE, surfaces: ["shell"] }, cookie);
+    await post(SLUG, "/api/brand.write", { theme: READABLE, surfaces: ["documents"] }, cookie);
     const asked = await (await get(SLUG, "/api/notify.wording?app=ground", cookie)).json() as
       { used: boolean };
     expect(asked.used).toBe(false);
 
     await post(SLUG, "/api/brand.write",
-      { theme: READABLE, surfaces: ["shell", "email"] }, cookie);
+      { theme: READABLE, surfaces: ["email"] }, cookie);
     const now = await (await get(SLUG, "/api/notify.wording?app=ground", cookie)).json() as
       { used: boolean };
     expect(now.used).toBe(true);

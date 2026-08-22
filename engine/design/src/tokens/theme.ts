@@ -1,101 +1,48 @@
 /**
- * A TENANT'S BRANDING BECOMES TOKENS, AND EVERY COMPONENT ADAPTS (D7).
+ * WHAT A COLOUR IS FOR, IN THE ONE PRODUCT-SHAPED VARIABLE AND THE ONE INK ONE.
  *
- * ⚠️ THE COMPONENT LIBRARY IS NOT RESTYLED. HeroUI v3 reads its colours, radius
- * and type from CSS variables, so a workspace's brand is a handful of variable
- * values and nothing else changes — no screen knows a tenant has branding, and
- * no component has a per-tenant variant. The alternative, letting a workspace
- * supply CSS, hands them the ability to break their own customers' screens on
- * our infrastructure and to make a page look like something it is not.
+ * ⚠️ A COLOUR IS THE PRODUCT'S, NEVER THE WORKSPACE'S. It was the workspace's,
+ * and being the workspace's is what stopped any screen being designable: the
+ * ground behind every page, the wash on every card and the one coloured thing
+ * on a screen were all a value somebody picked in ten seconds in a settings
+ * card, so nothing above them could be composed against anything. `--brand` is
+ * written once, from `AppSpec.hue` where a page declares one and from the
+ * deployment's own colour where it does not — and a workspace's brand reaches
+ * its NAMEPLATE (the tile, the letterhead) and nothing that draws a component.
  *
- * ⚠️ AND THE SKY IS DERIVED FROM THE SAME TOKENS. A page declares its ambience
- * by NAME — `calm`, `focus`, `lift` — never by colour, so the gradient behind
- * every screen follows the brand automatically. A page that named a colour would
- * be a page that stops matching the moment somebody changes their accent.
+ * ⚠️ AND `--accent` IS NOT THIS, EVER. The library paints controls with the
+ * accent and the accent is MONOCHROME here (`ground.ts`); a hue lands on the
+ * ground those controls sit on. Write a hue into `--accent` and the interface is
+ * coloured again, which is the failure `ground.test.mjs` refuses in writing.
+ *
+ * ⚠️ AND THE SKY IS DERIVED FROM THE SAME TOKEN. A page declares its ambience by
+ * NAME — never by colour — so the world behind every screen follows the hue
+ * automatically. A page that named a colour would be a page that stops matching
+ * the moment the product's own changes.
  */
 
-import type { Theme, Tone } from "@engine/kernel";
-import { contrast, luminance } from "@engine/kernel";
-import { MOTION } from "./motion.js";
+import type { Tone } from "@engine/kernel";
 
-/* ------------------------------------------------------------------ tokens --- */
+/* ---------------------------------------------------------------- product --- */
 
 /**
- * ⚠️ THESE ARE HEROUI'S OWN VARIABLE NAMES, NOT NAMES OF OURS MAPPED ONTO THEM.
- * A translation table goes stale the first time the library adds a token, and a
- * token that maps to nothing changes nothing — visibly, on somebody's brand.
- */
-const TOKENS = {
-  /*
-    ⚠️ A WORKSPACE'S COLOUR IS `--brand`, NOT `--accent`, AND THAT IS THE WHOLE
-    SPLIT. `--accent` is what the library paints controls with and it is
-    MONOCHROME now — see `ground.ts`. A brand lands on the ground those controls
-    sit on: the page, the surfaces, the ambience. The tenant still recognises
-    their product; the interface stays a set of values, so the only colour on a
-    screen is one that means something.
-
-    ⚠️ AND IT REMOVES A WHOLE CLASS OF FAILURE. While a tenant chose the accent,
-    every primary button in the product was a colour we had never seen, so
-    contrast on the one control people press was a thing we clamped and hoped
-    for. A ground tint at five percent cannot be unreadable.
-  */
-  brand: "--brand",
-  ground: "--background",
-  ink: "--foreground",
-  radius: "--radius",
-  font: "--font-sans",
-} as const;
-
-const RADIUS: Readonly<Record<NonNullable<Theme["radius"]>, string>> = {
-  none: "0rem", sm: "0.25rem", md: "0.5rem", lg: "0.875rem", full: "9999px",
-};
-
-/**
- * The CSS a workspace's branding amounts to.
+ * A PRODUCT'S OWN COLOUR, AS THE ONE DECLARATION THAT CARRIES IT.
  *
- * ⚠️ ONE DECLARATION BLOCK, ON `:root`, AND NOTHING ELSE. Anything wider is a
- * stylesheet a tenant controls; anything narrower and half the components miss
- * it. Returned as text rather than applied, because who applies it — a server
- * rendering the page, a preview updating on every keystroke — is not this
+ * ⚠️ ONE BLOCK, ON `:root`, AND ONE VARIABLE IN IT. Anything wider is a
+ * stylesheet somebody edits at a distance from the screens it paints; anything
+ * narrower and half the ambience misses it. Returned as TEXT rather than
+ * applied, because who applies it — a boot writing one style element, a
+ * harness measuring the same product a browser would draw — is not this
  * module's business.
+ *
+ * ⚠️ AND IT IS A FUNCTION RATHER THAN A CONSTANT SO THAT SOURCE ORDER DOES THE
+ * WORK. This is appended to `<head>` AFTER the built stylesheet, so it wins on
+ * order at equal specificity; a rule written into the stylesheet instead loses
+ * to the framework default and changes nothing, visibly, with every check green.
+ * A page's own `hue` is narrower still — an inline `--brand` on the page
+ * element, which beats both.
  */
-export function brandCss(theme: Theme): string {
-  const lines: string[] = [];
-  const put = (name: string, value: string) => lines.push(`  ${name}: ${value};`);
-
-  if (theme.accent) put(TOKENS.brand, theme.accent);
-  if (theme.ground) put(TOKENS.ground, theme.ground);
-  if (theme.ink) put(TOKENS.ink, theme.ink);
-  if (theme.radius) put(TOKENS.radius, RADIUS[theme.radius]);
-  if (theme.font) put(TOKENS.font, theme.font);
-
-  /*
-    ⚠️ THERE IS NO `--accent-foreground` TO DERIVE ANY MORE, and its absence is
-    the point. It existed because a workspace's colour was the fill of every
-    primary button, so the text on it had to be computed from a hue nobody had
-    seen. The accent is monochrome and ours now; the pair is fixed in
-    `ground.ts` and cannot be got wrong by anybody's choice.
-  */
-  return lines.length ? `:root {\n${lines.join("\n")}\n}` : "";
-}
-
-/**
- * ⚠️ BOTH THEMES, OR THE DARK ONE INHERITS A LIGHT BRAND. A workspace that set a
- * pale ground and left dark alone would have their customers reading dark text
- * on a dark background — which they will never see, because they set it on their
- * own screen in daylight.
- */
-export function brandCssFor(light: Theme, dark?: Theme): string {
-  const one = brandCss(light);
-  if (!dark) return one;
-  /* ⚠️ `[data-theme="dark"]` WITHOUT `:root`, SO THE THEME IS SCOPABLE. Bound to
-     the document element these tokens could only ever switch for the whole page
-     — and one screen legitimately wants to be a dark room inside a light app
-     (`Page`'s `world`). The library's own tokens are already written this way
-     (`.dark, [data-theme=dark]`); ours were the half that could not follow. */
-  const other = brandCss(dark).replace(/^:root/, `[data-theme="dark"]`);
-  return `${one}\n${other}`;
-}
+export const productCss = (hue: string): string => `:root {\n  --brand: ${hue};\n}`;
 
 /* ------------------------------------------------------------------- tone --- */
 
@@ -175,14 +122,3 @@ export const colorFor = (tone: Tone): "accent" | "default" | "success" | "warnin
     case "danger": return "danger";
   }
 };
-
-/* ------------------------------------------------------------------ rules --- */
-
-/**
- * ⚠️ REFUSED, NOT WARNED ABOUT — and the kernel is where the rule lives, because
- * an unreadable pair is refused at the API too. This is the same check, at the
- * moment somebody is choosing, so the answer arrives while they can still act
- * on it.
- */
-export const readable = (ink: string, ground: string): boolean =>
-  (contrast(ink, ground) ?? 0) >= 4.5;
