@@ -155,12 +155,23 @@ depth.
   Two bounds replace it — the fade is never shorter than the hold, and nowhere
   does the veil lose more than **2% of its strength per pixel**. The shape that
   was refused (76px solid, 56px fade) fails both, at a peak slope of 2.7%/px.
-- **Both ends are one geometry, measured from the SCREEN'S edge rather than the
-  layer's.** The head overshoots upward because the crown is `sticky top-0`
-  inside a scroller and sits at its flow position; the foot must not, because the
-  nav already reaches the edge and an overshoot there moves the gradient's origin
-  off-screen — which makes the solid part measure longer than the fade while
-  looking identical.
+- **Both ends are one geometry, and both overshoot the edge they hem.** A hem
+  rides a `sticky` row, and a sticky row does not always end up flush with the
+  screen: at the head it sits at its FLOW position, below whatever the page
+  reserves above it; at the foot it pins to the SCROLLPORT, which on a phone is
+  not the same box as the visible area while the browser's own toolbar is up.
+  Either way a strip of undissolved page shows along the very edge — both were
+  reported, and the foot's was photographed. Overshooting is invisible, because
+  the overshot part is the solid end of the gradient.
+  - The foot had none for a while, and the argument for that was **about a
+    test**: an overshoot makes the solid part MEASURE longer than the fade. True,
+    and a fact about a guard reading raw gradient stops rather than about the
+    screen. Every guard quotes stops from the SCREEN's edge now, which is what a
+    person is looking at.
+  - ⚠️ **No harness here can see either gap.** Headless Chromium has no dynamic
+    toolbar and no sub-pixel viewport, so the layer reaches the edge exactly in
+    every measurement this repository can take. What is structural, and what
+    `scene.test.mjs` asks, is that both edges overshoot at all.
 - **A hem answers on arrival and on every change of shape, not on the first
   scroll.** "Is anything behind the crown" and "is anything still below the fold"
   are readings, and a reading taken only in a scroll handler does not exist until

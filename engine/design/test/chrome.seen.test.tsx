@@ -183,10 +183,15 @@ describe("the bar, at the addresses a deployment uses", () => {
     const stops = await page.evaluate(() => {
       const el = document.querySelector('[data-hem="bottom"]');
       if (!el) return null;
-      const image = getComputedStyle(el, "::before").backgroundImage;
-      return (image.match(/oklab\([^)]*\)\s+[\d.]+px/g) ?? []).map((one) => ({
+      const style = getComputedStyle(el, "::before");
+      /* ⚠️ QUOTED FROM THE SCREEN'S EDGE, NOT THE LAYER'S. The layer overshoots
+         the edge it hems — a stop out there paints nothing, and counting it
+         makes the solid part measure longer than it looks by exactly the
+         overshoot. Every number below is what a person is looking at. */
+      const out = Math.abs(parseFloat(style.bottom) || 0);
+      return (style.backgroundImage.match(/oklab\([^)]*\)\s+[\d.]+px/g) ?? []).map((one) => ({
         alpha: /\/\s*([\d.]+)\)/.exec(one) ? Number(/\/\s*([\d.]+)\)/.exec(one)![1]) : 1,
-        at: Number(/([\d.]+)px/.exec(one)![1]),
+        at: Math.max(0, Number(/([\d.]+)px/.exec(one)![1]) - out),
       }));
     });
     await page.close();

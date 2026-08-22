@@ -673,11 +673,16 @@ const DRAWN = [...filesIn("design/src"), ...filesIn("one-space/src")];
   const hold = /^export const HEM_HOLD = ([\d.]+);/m.exec(src);
   const uses = /^\s*const hold = HEM_HOLD;/m.test(src);
   const fade = /^\s*const fade = ([\d.]+);/m.exec(src);
-  const over = /^\s*const over = edge === "top" \? ([\d.]+) : 0;/m.exec(src);
+  /* ⚠️ BOTH EDGES, and that is the check. The foot had none — the argument for
+     that was about a guard reading raw gradient stops, not about the screen, and
+     a strip of undissolved page along the bottom edge was photographed on a
+     phone. Nothing headless can see it; that both ends overshoot is structural. */
+  const over = /^\s*const over = ([\d.]+);/m.exec(src);
 
   if (!hold || !uses || !fade || !over) {
     fail("design/src/tokens/ambience.ts: the hem's `hold`, `fade` or `over` is gone.\n" +
-         "       Without the overshoot the vignette starts at the element rather than at the\n" +
+         "       Without the overshoot at BOTH ends the vignette starts at the layer rather\n" +
+       "       than at the screen, and a band of world shows along the edge it is hemming.\n" +
          "       screen, and a band of world shows along the edge it is hemming.");
   } else if (Number(over[1]) <= 0) {
     fail("design/src/tokens/ambience.ts: the hem overshoots its edge by nothing.\n" +

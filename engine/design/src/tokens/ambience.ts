@@ -377,20 +377,30 @@ const hem = (edge: "top" | "bottom") => {
   const hold = HEM_HOLD;
   const fade = 5.5;
   /*
-    ⚠️ AND THE TOP OVERSHOOTS THE EDGE IT HEMS, WHICH IS NOT PADDING — IT IS THE
-    FIX FOR A GAP. The top hem rides the crown, and the crown is `sticky top-0`
-    inside a scroller: at rest it sits at its FLOW position, below whatever the
-    page reserves above it, so the vignette began a few pixels down and the world
-    showed through in a strip along the very top of the screen. Overshooting is
-    invisible, because the overshot part is the SOLID end of the gradient.
+    ⚠️ AND IT OVERSHOOTS THE EDGE IT HEMS, WHICH IS NOT PADDING — IT IS THE FIX
+    FOR A GAP. A hem rides a `sticky` row, and a sticky row does not always end
+    up flush with the screen: at the head it sits at its FLOW position, below
+    whatever the page reserves above it; at the foot it pins to the SCROLLPORT,
+    which on a phone is not the same box as the visible area while the browser's
+    own toolbar is up. Either way the vignette starts a few pixels in and a strip
+    of undissolved page shows along the very edge. Overshooting is invisible,
+    because the overshot part is the SOLID end of the gradient — it costs nothing
+    and it cannot be got wrong.
 
-    ⚠️ THE FOOT NEEDS NONE, AND GIVING IT ONE WOULD BE WORSE THAN USELESS. The
-    nav is pinned to the bottom and reaches the screen's own edge, so there is no
-    gap to cover — and an overshoot there moves the gradient's origin off-screen,
-    which makes the solid part MEASURE longer than the fade while looking
-    identical. That is the shape the ratio test exists to refuse.
+    ⚠️ THE FOOT HAD NONE, AND THE ARGUMENT FOR THAT WAS ABOUT A TEST. It said an
+    overshoot would make the solid part MEASURE longer than the fade — true, and
+    a fact about a guard reading raw gradient stops rather than about the screen.
+    A stop beyond the edge paints nothing; the guards quote every stop from the
+    SCREEN's edge now, which is what a person is looking at, and the two ends are
+    one geometry again.
+
+    ⚠️ AND NO HARNESS HERE CAN SEE THIS ONE. Headless Chromium has no dynamic
+    toolbar and no sub-pixel viewport, so the layer reaches the edge exactly in
+    every measurement this repository can take — the gap was photographed on a
+    phone. What is structural, and what `scene.test.mjs` asks, is that both edges
+    overshoot at all.
   */
-  const over = edge === "top" ? 4 : 0;
+  const over = 4;
   const run = over + hold + fade;
   return [
     `[data-hem="${edge}"]::before {`,
