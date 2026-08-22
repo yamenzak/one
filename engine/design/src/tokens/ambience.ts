@@ -844,22 +844,40 @@ export function ambienceStylesheet(): string {
       card must still read as raised against the page and a chip as raised
       against a card; washing them by the same amount from a common colour
       collapses the three into one flat field. So the share rises with the tier —
-      the page barely, a card some, a control most — which is also what really
+      a surface barely, a card some, a control most — which is also what really
       happens to a lit room.
+
+      ⚠️ AND IT WASHES THE TOKENS, NOT A LIST OF SELECTORS, WHICH IS THE WHOLE
+      MECHANISM. Naming `.card` and two attributes reached three things and left
+      every other painted surface in the library grey on a lit page — a quick
+      action's circle, a progress track, a switch, a field, a chip, a segmented
+      control. The library builds all of them out of SIX tokens, and measured
+      across the built stylesheet every control token in it —
+      `--switch-control-bg`, `--input-bg`, `--chip-bg`, `--select-trigger-bg`,
+      `--checkbox-control-bg`, `--badge-bg`, `--textarea-bg`, the progress track,
+      `.button--tertiary` — resolves to `--default` and to nothing else. So the
+      wash is six declarations and it is complete by construction: a component
+      the library adds next year is lit the day it ships, and one that paints a
+      colour of its own is the only thing that can miss (`ground.test.mjs`).
+
+      ⚠️ THE SOURCE IS `--tier-*`, NEVER THE TOKEN BEING WRITTEN. A custom
+      property defined in terms of itself is a cycle at any depth, so
+      `--surface-secondary: color-mix(…, var(--surface-secondary))` computes to
+      nothing at all — silently, with the page still rendering. `ground.ts`
+      states each tier's unwashed value once under a `--tier-` name and aliases
+      the library's token to it; this mixes from the alias.
+
+      ⚠️ AND THE PAGE ITSELF IS NOT WASHED. `--background` is what the scene is
+      painted ON, so tinting it would be washing the light with its own colour.
     */
-    `[data-wash="true"] .card { background-color: color-mix(in oklab,`,
-    `  var(--scene-wash) 15%, var(--surface-secondary)); }`,
-    `[data-wash="true"] [data-chrome="true"] { background-color: color-mix(in oklab,`,
-    `  var(--scene-wash) 24%, var(--surface-tertiary)) !important; }`,
-    `[data-wash="true"] [data-chrome="true"]:hover { background-color: color-mix(in oklab,`,
-    `  var(--scene-wash) 32%, var(--surface-tertiary)) !important; }`,
-    /*
-      ⚠️ AND THE ISLAND TOO, because it is the one surface a person looks at on
-      every screen. Left out, the bar is the one grey object on a washed page —
-      which reads as the chrome belonging to a different app.
-    */
-    `[data-wash="true"] [data-island="true"] { background-color: color-mix(in oklab,`,
-    `  var(--scene-wash) 18%, var(--surface-tertiary)); }`,
+    `[data-wash="true"] {`,
+    `  --surface: color-mix(in oklab, var(--scene-wash) 8%, var(--tier-base));`,
+    `  --surface-secondary: color-mix(in oklab, var(--scene-wash) 15%, var(--tier-card));`,
+    `  --surface-tertiary: color-mix(in oklab, var(--scene-wash) 22%, var(--tier-raised));`,
+    `  --overlay: color-mix(in oklab, var(--scene-wash) 22%, var(--tier-raised));`,
+    `  --field-background: color-mix(in oklab, var(--scene-wash) 26%, var(--tier-field));`,
+    `  --default: color-mix(in oklab, var(--scene-wash) 26%, var(--tier-control));`,
+    `}`,
     /*
       ⚠️ `data-capsule` HAD NO RULE AT ALL, WHICH IS WHY THE NAV WAS A RECTANGLE.
       Two elements carried the attribute and both were `Card`s, which bring their

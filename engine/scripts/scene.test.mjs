@@ -468,6 +468,133 @@ const DRAWN = [...filesIn("design/src"), ...filesIn("one-space/src")];
   }
 }
 
+/* ------------------- the wash reaches every tier, through its own alias --- */
+{
+  /*
+    ⚠️ A WASH THAT NAMES SELECTORS IS A WASH THAT IS ALWAYS INCOMPLETE. It named
+    `.card` and two attributes, and everything else the library paints stayed
+    grey on a lit page — the circle behind a quick action, a progress track, a
+    switch, a field, a chip. What is finite is not the list of components, it is
+    the list of TOKENS they are made of, and washing those is complete by
+    construction: a component the library adds next year is lit the day it ships.
+
+    ⚠️ AND THE SOURCE IS NEVER THE TOKEN BEING WRITTEN. A custom property defined
+    in terms of itself is a cycle at any depth, so
+    `--surface-secondary: color-mix(…, var(--surface-secondary))` computes to
+    NOTHING — no error, no fallback, the page still renders and the surface is
+    simply unpainted. `--tier-*` in `ground.ts` is the unwashed value the mix has
+    to come from.
+
+    ⚠️ AND THE SHARE RISES WITH THE TIER. A card must still read as raised
+    against a surface and a control against a card; washing them all by the same
+    amount from one colour collapses the stack into a flat field, which is the
+    failure that looks most like success.
+  */
+  const gsrc = readFileSync(join(ENGINE, "design/src/tokens/ground.ts"), "utf8");
+  const asrc = readFileSync(join(ENGINE, "design/src/tokens/ambience.ts"), "utf8");
+
+  /* ⚠️ IN TIER ORDER, and the order is what the share is checked against. */
+  const WASHED = [
+    "--surface", "--surface-secondary", "--surface-tertiary",
+    "--overlay", "--field-background", "--default",
+  ];
+
+  const block = /\[data-wash="true"\] \{`,([\s\S]*?)`\}`,/.exec(asrc)?.[1];
+  let broke = 0;
+  if (!block) {
+    broke++;
+    fail("design/src/tokens/ambience.ts: no `[data-wash]` token block — the wash reaches nothing.\n" +
+         "       A family publishing `wash` would then set an attribute that styles nothing at all.");
+  } else {
+    const shares = [];
+    for (const token of WASHED) {
+      const alias = new RegExp(`\`${token}: var\\(--tier-(\\w+)\\);\``).exec(gsrc)?.[1];
+      if (!alias) {
+        broke++;
+        fail(`design/src/tokens/ground.ts: \`${token}\` is not aliased to a \`--tier-*\`.\n` +
+             `       The wash has nothing to mix FROM, and mixing from the token itself is a\n` +
+             `       cycle that computes to nothing with the page still rendering.`);
+        continue;
+      }
+      const mix = new RegExp(
+        `${token}: color-mix\\(in oklab, var\\(--scene-wash\\) (\\d+)%, var\\(--tier-(\\w+)\\)\\)`,
+      ).exec(block);
+      if (!mix) {
+        broke++;
+        fail(`design/src/tokens/ambience.ts: \`${token}\` is not washed.\n` +
+             `       Every control in the library resolves to \`--default\` and every surface to\n` +
+             `       one of the tiers, so a token left out is a whole class of component that\n` +
+             `       stays grey in a lit room.`);
+        continue;
+      }
+      if (mix[2] !== alias) {
+        broke++;
+        fail(`design/src/tokens/ambience.ts: \`${token}\` is washed from \`--tier-${mix[2]}\`\n` +
+             `       while \`ground.ts\` says it is \`--tier-${alias}\`. The washed value would be\n` +
+             `       a different tier's colour, so the stack reorders under a lit page only.`);
+        continue;
+      }
+      shares.push([token, Number(mix[1])]);
+    }
+    for (let i = 1; i < shares.length; i++) {
+      if (shares[i][1] < shares[i - 1][1]) {
+        broke++;
+        fail(`design/src/tokens/ambience.ts: \`${shares[i][0]}\` takes ${shares[i][1]}% of the wash\n` +
+             `       against \`${shares[i - 1][0]}\`'s ${shares[i - 1][1]}%, so the higher tier is the\n` +
+             `       flatter one. A control has to read as raised against the card under it.`);
+      }
+    }
+    /* ⚠️ AND THE PAGE IS NOT ONE OF THEM. The scene is painted ON `--background`,
+       so washing it is washing the light with its own colour. */
+    if (/--background: color-mix/.test(block)) {
+      broke++;
+      fail("design/src/tokens/ambience.ts: the wash paints `--background`.\n" +
+           "       That is the ground the scene itself is drawn on — tinting it washes the\n" +
+           "       light with its own colour and the world loses its depth.");
+    }
+    if (!broke) ok(`wash: ${WASHED.length} token(s), each mixed from its own tier, share rising`);
+  }
+}
+
+/* ------------------------------ what is pinned to an edge wears no plate --- */
+{
+  /*
+    ⚠️ THE HEM IS THE CONTRAST, SO THE CHROME NEEDS NO FILL — and a fill is not a
+    harmless belt-and-braces, it is the thing that ends the effect. A vignette
+    works because the ground thickens continuously into the edge; a plate with a
+    hard border laid on top of it is a slab, and the page underneath stops
+    reading as one surface. The nav rail wore one for exactly as long as the wash
+    named `[data-island]` in a rule of its own.
+
+    ⚠️ AND THE RULE IS ABOUT THE ATTRIBUTE, NOT THE COMPONENT. The bar and the
+    rail are different elements in different files that ask for one treatment by
+    carrying one attribute — so the only place a plate can come back is a rule
+    naming that attribute, which is the one place worth guarding.
+  */
+  const asrc = readFileSync(join(ENGINE, "design/src/tokens/ambience.ts"), "utf8");
+  const EDGES = ["data-island", "data-hem", "data-crown"];
+  let plated = 0;
+  for (const attr of EDGES) {
+    /* ⚠️ THE RULE'S OWN BODY, never a descendant's — `[data-island] button { … }`
+       is styling what STANDS on the chrome and is none of this check's business.
+       The hem's own `::before` IS the vignette and is the mechanism. */
+    const rules = [...asrc.matchAll(
+      new RegExp(`\\[${attr}[^\\]]*\\]("?,?\\s*)?\\{([^}]*)`, "g"),
+    )];
+    for (const r of rules) {
+      const head = asrc.slice(Math.max(0, r.index - 40), r.index + r[0].length);
+      if (/::before|::after|\s[a-z]+\s*\{/.test(head.slice(40, 40 + r[0].indexOf("{")))) continue;
+      if (/background(-color)?:/.test(r[2])) {
+        plated++;
+        fail(`design/src/tokens/ambience.ts: \`[${attr}]\` is given a fill of its own.\n` +
+             `       The hem already thickens the ground into that edge. A plate over a\n` +
+             `       vignette is a slab, and the page stops reading as one surface.`);
+      }
+    }
+  }
+  if (!plated) ok(`plate: ${EDGES.length} pinned surface(s), all of them the ground itself`);
+}
+
 console.log(bad
   ? `\nscene: ${bad} finding(s) — a world that is not the same world twice.`
   : `\nscene: seeded, compositor-only, masked rather than washed, sized by area, bound not built.`);

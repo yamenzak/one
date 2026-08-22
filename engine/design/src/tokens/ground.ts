@@ -169,15 +169,35 @@ function tier(mode: "light" | "dark"): string {
   const g = GROUND[mode];
   const t = TINT[mode];
   return [
-    `--background: ${tinted(g.background, GROUND_TINT[mode])};`,
-    `--surface: ${tinted(g.surface, t)};`,
+    /*
+      ⚠️ EACH TIER IS NAMED ONCE AND THEN ALIASED, AND THE ALIAS IS WHAT MAKES A
+      WASH POSSIBLE AT ALL. A scene tints the surfaces standing in it by
+      redefining the library's tokens further down the tree — and a custom
+      property cannot be defined in terms of itself at any depth, so
+      `--surface-secondary: color-mix(…, var(--surface-secondary))` is a cycle
+      and computes to nothing. `--tier-*` is the UNWASHED value, stated here and
+      never overridden, so the ambience has something to mix FROM.
+
+      ⚠️ AND THE ALIASES ARE THE ONLY PLACE A TIER'S VALUE IS WRITTEN. Restating
+      a literal in the wash block would be two answers to what a card is made of,
+      and they would agree until somebody edited one.
+    */
+    `--tier-page: ${tinted(g.background, GROUND_TINT[mode])};`,
+    `--tier-base: ${tinted(g.surface, t)};`,
+    `--tier-card: ${tinted((g.surface + g.raised) / 2, t)};`,
+    `--tier-raised: ${tinted(g.raised, t)};`,
+    `--tier-field: ${tinted(g.control, t)};`,
+    `--tier-control: ${tinted(g.control, CONTROL_TINT[mode])};`,
+
+    `--background: var(--tier-page);`,
+    `--surface: var(--tier-base);`,
     /* ⚠️ The library derives `--surface-secondary`/`-tertiary` as literals rather
        than from `--surface`, so leaving them would give one tinted tier and two
        neutral ones — a card and its own panel in different colour families. */
-    `--surface-secondary: ${tinted((g.surface + g.raised) / 2, t)};`,
-    `--surface-tertiary: ${tinted(g.raised, t)};`,
+    `--surface-secondary: var(--tier-card);`,
+    `--surface-tertiary: var(--tier-raised);`,
     /* An overlay is a surface that floats; it is the raised tier, not a shadow. */
-    `--overlay: ${tinted(g.raised, t)};`,
+    `--overlay: var(--tier-raised);`,
     /*
       ⚠️ A FIELD IS A CONTROL, NOT A SURFACE, AND IT WAS ON THE WRONG TIER. At
       `surface` it is EXACTLY a card's own colour — measured on a real screen,
@@ -193,8 +213,18 @@ function tier(mode: "light" | "dark"): string {
       takes exactly that value, and `--default` beside it now means a filled
       control and a field read as the same kind of thing.
     */
-    `--field-background: ${tinted(g.control, t)};`,
-    `--default: ${tinted(g.control, CONTROL_TINT[mode])};`,
+    `--field-background: var(--tier-field);`,
+    /*
+      ⚠️ `--default` IS THE ONE TOKEN EVERY CONTROL IN THE LIBRARY IS MADE OF,
+      which is worth knowing before touching it. Measured across the built
+      stylesheet: `--switch-control-bg`, `--input-bg`, `--chip-bg`,
+      `--toggle-button-bg`, `--select-trigger-bg`, `--radio-control-bg`,
+      `--checkbox-control-bg`, `--badge-bg`, `--textarea-bg`,
+      `--input-otp-slot-bg`, `--autocomplete-trigger-bg`, the progress track and
+      `.button--tertiary` all resolve to it and to nothing else. So a change here
+      is a change to every control at once — and so is a wash over it.
+    */
+    `--default: var(--tier-control);`,
     /* ⚠️ NO EDGES. Both are ways of saying "separate", and a design needs one. */
     `--surface-shadow: none;`,
     `--overlay-shadow: none;`,

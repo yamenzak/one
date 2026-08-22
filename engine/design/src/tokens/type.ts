@@ -37,7 +37,15 @@ export const TYPE = {
    * a heading, and never twice on a screen. If two things want this, neither is
    * the answer to what the screen is for.
    */
-  display: "font-mark text-[2.5rem] md:text-5xl font-bold tabular-nums tracking-[-0.035em] leading-[1.05]",
+  /*
+    ⚠️ AND IT HAS TO WIN AGAINST A SECTION HEADING THAT IS LEFT-ALIGNED AT THE
+    GUTTER, which is a harder fight than the ratio suggests. A hero is CENTRED
+    and captioned above and below in the quiet ink; a section name is bold, full
+    contrast, and sits where the eye starts a line. At 2.5rem against `section`'s
+    1.25rem the number was twice the size and still lost the screen — the first
+    thing anybody's eye landed on was "What needs you". Mass, not multiple.
+  */
+  display: "font-mark text-[3.25rem] md:text-6xl font-bold tabular-nums tracking-[-0.035em] leading-[1.05]",
   /**
    * ⚠️ A NAME THAT IS ACTING AS A MARK, AND THE TRACKING IS THE WHOLE ROLE. A
    * workspace's name over its own planet is not a heading somebody reads on the

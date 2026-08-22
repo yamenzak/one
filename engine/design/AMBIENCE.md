@@ -94,10 +94,35 @@ all, and what a person sees is a working interface with a picture behind it.
 ### The wash — the world reaching the things standing in it
 
 **`Family.wash` is a second, louder colour that surfaces are MADE of**, published
-as `--scene-wash` and mixed into the tiers by one rule in `ambienceStylesheet`.
-`veil` cannot do this job: it is deliberately near the page so a halo is
-invisible and a hem reads as the ground thickening, and a control made of it is a
-control nobody can find.
+as `--scene-wash` and mixed into the library's TIER TOKENS by one block in
+`ambienceStylesheet`. `veil` cannot do this job: it is deliberately near the page
+so a halo is invisible and a hem reads as the ground thickening, and a control
+made of it is a control nobody can find.
+
+⚠️ **IT WASHES SIX TOKENS, NOT A LIST OF SELECTORS, AND THAT IS THE WHOLE
+MECHANISM.** Naming `.card` and two attributes reached three things and left every
+other painted surface grey on a lit page — a quick action's circle, a progress
+track, a switch, a field, a chip, a segmented control. What is finite is not the
+list of components, it is the list of tokens they are made of. Measured across
+the built stylesheet, **every control token in the library resolves to
+`--default`** — `--switch-control-bg`, `--input-bg`, `--chip-bg`,
+`--select-trigger-bg`, `--checkbox-control-bg`, `--radio-control-bg`,
+`--badge-bg`, `--textarea-bg`, `--input-otp-slot-bg`,
+`--autocomplete-trigger-bg`, the progress track and `.button--tertiary` — and
+every surface to one of four tiers. So the wash is six declarations and it is
+complete by construction: a component the library adds next year is lit the day
+it ships.
+
+⚠️ **THE SOURCE IS `--tier-*`, NEVER THE TOKEN BEING WRITTEN.** A custom property
+defined in terms of itself is a cycle at any depth, so
+`--surface-secondary: color-mix(…, var(--surface-secondary))` computes to nothing
+at all — no error, no fallback, the page still renders and the surface is simply
+unpainted. `ground.ts` states each tier's unwashed value once under a `--tier-`
+name and aliases the library's token to it; the ambience mixes from the alias.
+
+⚠️ **AND THE PAGE IS NOT WASHED.** `--background` is what the scene is painted ON.
+Tinting it is washing the light with its own colour, and the world loses its
+depth.
 
 - **The family decides, and seven of the eight decline.** The rules select on
   `[data-wash="true"]`, set only where a family published one, so a page can
@@ -107,8 +132,13 @@ control nobody can find.
   mixed into the tier the palette already chose, so the mono rule holds.
 - **The tiers keep their order**, and that is the part that is easy to break: a
   card must still read as raised against the page and a chip against a card, so
-  the share RISES with the tier rather than being one number everywhere. Wash
-  them all equally and the three collapse into one flat field.
+  the share RISES with the tier rather than being one number everywhere — 8, 15,
+  22, 26. Wash them all equally and the stack collapses into one flat field.
+
+- **What is pinned to an edge takes no fill, washed or not.** The hem is the
+  contrast: the ground thickens continuously into the edge, and a plate laid on
+  top of that is a slab with a hard border where a vignette was. The nav rail wore
+  one for exactly as long as the wash named `[data-island]` in a rule of its own.
 - **Mix the hue whole — not pre-darkened, and not pre-lightened either.** Amber
   toward black is BROWN, and a card washed in brown reads as dirty rather than as
   lit; amber toward white arrives at a rule that takes fifteen percent of it and

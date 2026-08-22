@@ -849,6 +849,14 @@ design system starts with and every distinctive one leaves.
   itself at a slightly different weight; a heading in whatever the device serves
   is a face nobody chose, at the largest size on the screen.
 
+⚠️ **A HERO HAS TO WIN AGAINST A SECTION NAME AT THE GUTTER, WHICH IS A HARDER
+FIGHT THAN THE RATIO SUGGESTS.** `display` is centred and captioned above and
+below in the quiet ink; `section` is bold, full contrast, and sits where the eye
+starts a line. At twice the size the number still lost the screen — the first
+thing anybody's eye landed on was the heading below it. `display` is 3.25rem on a
+phone and 3.75 on a desktop, and the rule that got it there is **mass, not
+multiple**.
+
 **A break between two runs is a second CARD.** That is how the workspace screen
 separates what you come back to from what you set up once, and how the account
 screen separates the two places that are yours from the way out. Two cards read

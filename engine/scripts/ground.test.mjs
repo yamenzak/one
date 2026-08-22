@@ -192,9 +192,24 @@ const CLAIMED = {
   "--default": "control",
   "--overlay": "raised",
 };
+
+/*
+  ⚠️ AND THE WALK IS TWO HOPS NOW, BECAUSE A TIER IS NAMED BEFORE IT IS USED.
+  Each tier's real value is stated once as `--tier-<name>` and the library's
+  token is an alias of it, so the ambience has an unwashed value to mix from —
+  a token defined in terms of itself is a cycle that computes to nothing.
+  Following the alias is what keeps this guard asking about the TIER rather
+  than about whichever spelling the indirection happens to have.
+*/
+const aliasOf = (name) =>
+  new RegExp(`\`${name}: var\\(--tier-(\\w+)\\);\``).exec(GROUND_SRC)?.[1] ?? null;
+const tierOf = (alias) =>
+  new RegExp(`\`--tier-${alias}: \\$\\{tinted\\(g\\.(\\w+)`).exec(GROUND_SRC)?.[1] ?? null;
+
 let wrong = 0;
 for (const [name, tier] of Object.entries(CLAIMED)) {
-  const line = new RegExp(`\`${name}: \\$\\{tinted\\(g\\.(\\w+)`).exec(GROUND_SRC)?.[1];
+  const alias = aliasOf(name);
+  const line = alias && tierOf(alias);
   if (!line) {
     wrong++;
     fail(`ground.ts: ${name} is not painted from a tier at all — the guard cannot see what it is.`);
