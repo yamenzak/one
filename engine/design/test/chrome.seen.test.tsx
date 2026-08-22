@@ -148,13 +148,15 @@ describe("the bar, at the addresses a deployment uses", () => {
   });
 
   /*
-    ⚠️ THE HEM IS A VIGNETTE, WHICH MEANS IT HAS NO FLAT PART. It used to run the
-    veil at full opacity as far as the controls reached — 76 measured pixels at
-    the foot — and start the falloff after that. A soft edge on a slab is still a
-    slab, and on a dark ground it reads as exactly what it was reported as: a
-    black bar across the bottom of the screen.
+    ⚠️ THE FOOT IS SOLID WHERE THE CONTROLS ARE, AND THE FALLOFF IS TWICE THAT
+    AGAIN. Two shapes were shipped and both were wrong, in opposite directions:
+    a 76px flat part with a 56px fade read as a slab with a soft lip, because the
+    fade's own top was findable; removing the flat part cured the edge and left
+    the veil at 80% behind the nav, so a card's text read through the glyphs
+    sitting on it. What stops a vignette reading as a panel is the RATIO, not the
+    absence of a solid part — a photographic one is solid at the frame's edge too.
   */
-  it("hems with a gradient that starts falling at once", async () => {
+  it("hems solid behind the controls, and fades far longer than it holds", async () => {
     const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
     await page.setContent(
       `<!doctype html><html data-theme="dark"><head><style>${css}</style></head><body>`
@@ -167,7 +169,6 @@ describe("the bar, at the addresses a deployment uses", () => {
       const el = document.querySelector('[data-hem="bottom"]');
       if (!el) return null;
       const image = getComputedStyle(el, "::before").backgroundImage;
-      /* Each stop as [alpha, distance] — the browser resolves them to px. */
       return (image.match(/oklab\([^)]*\)\s+[\d.]+px/g) ?? []).map((one) => ({
         alpha: /\/\s*([\d.]+)\)/.exec(one) ? Number(/\/\s*([\d.]+)\)/.exec(one)![1]) : 1,
         at: Number(/([\d.]+)px/.exec(one)![1]),
@@ -175,20 +176,27 @@ describe("the bar, at the addresses a deployment uses", () => {
     });
     await page.close();
     expect(stops, "no bottom hem is painted at all").not.toBeNull();
-    expect(stops!.length, "a hem with two stops shows its own join").toBeGreaterThanOrEqual(5);
 
-    /* ⚠️ FULL ONLY AT THE EDGE ITSELF. Anything past a hair of the screen's own
-       edge that is still opaque is the plateau coming back. */
-    const flat = stops!.filter((s) => s.alpha > 0.985 && s.at > 8);
-    expect(flat, `the veil is still flat ${flat[0]?.at}px from the edge — that is a bar`)
-      .toEqual([]);
+    /* ⚠️ THE NAV'S OWN CONTROLS TOP OUT 64px FROM THE FOOT — measured. Anything
+       less than solid there is content read through a glyph. */
+    const behind = stops!.filter((s) => s.at <= 64);
+    expect(behind.every((s) => s.alpha > 0.99),
+      "the veil is not solid where the nav's controls sit").toBe(true);
 
-    /* ⚠️ AND IT IS STILL DOING ITS JOB. A hem that thinned instantly would stop
-       dissolving the content passing under the bar, which is what it is for:
-       at the height of the nav's own controls it is most of the way up. */
-    const atNav = stops!.filter((s) => s.at > 0 && s.at <= 48);
-    expect(atNav.every((s) => s.alpha >= 0.6),
-      "the veil is too thin where the nav's own controls sit").toBe(true);
+    /* ⚠️ AND THE FADE IS LONGER THAN THE SOLID PART, WHICH IS WHAT STOPS IT
+       READING AS A PANEL WITH A SOFT EDGE. */
+    const held = Math.max(...stops!.filter((s) => s.alpha > 0.99).map((s) => s.at));
+    const run = Math.max(...stops!.map((s) => s.at));
+    expect(run - held, `holds ${held}px and fades ${run - held} — a fade no longer `
+      + "than the hold is a slab with a lip").toBeGreaterThanOrEqual(held * 1.8);
+
+    /* ⚠️ AND NO STEP BIG ENOUGH TO SHOW ITS OWN JOIN. The eye finds a break in a
+       gradient's SLOPE long before it finds one in its value. */
+    const steps = stops!.slice(1).map((s, i) => Math.abs(s.alpha - stops![i]!.alpha));
+    expect(Math.round(Math.max(...steps) * 100),
+      "one stop jumps far enough from its neighbour to draw a line").toBeLessThanOrEqual(20);
+
+    expect(stops!.at(-1)!.alpha, "the veil never reaches nothing").toBe(0);
   });
 });
 

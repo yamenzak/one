@@ -237,38 +237,62 @@ const hemStop = (pct: number): string =>
   `color-mix(in oklab, var(--scene-veil, var(--background)) ${pct}%, transparent)`;
 
 /**
+ * THE FALLOFF, AS STOPS AN EYE CANNOT FIND THE JOINS IN.
+ *
+ * ⚠️ SMOOTHSTEP, AND THE REASON IS WHICH END IT IS FLAT AT. A straight ramp
+ * changes at one rate and so shows BOTH its ends as faint lines. `1 - t²` was
+ * tried and is worse in the way that matters: its slope is steepest at t=1, so
+ * the fade's far end is where it changes fastest — putting a visible edge in
+ * exactly the place this whole shape exists to remove one. `1 - (3t² - 2t³)` is
+ * flat at both ends and steepest in the middle: it leaves the solid part without
+ * a seam and arrives at nothing without one either.
+ *
+ * ⚠️ AND THE STEP SIZE IS THE POINT, NOT THE COUNT. Eight stops over a long fade
+ * and three over a short one are the same curve at different resolutions; what
+ * shows a join is a big jump between neighbours. Measured across this curve the
+ * widest is 18 points, in the middle, where the eye is least able to find it.
+ */
+const hemStops = (hold: number, fade: number): string => {
+  const steps = 8;
+  return Array.from({ length: steps + 1 }, (_, i) => {
+    const t = i / steps;
+    return `${hemStop(+(100 * (1 - t * t * (3 - 2 * t))).toFixed(1))} `
+      + `${+(hold + fade * t).toFixed(2)}rem`;
+  }).join(", ");
+};
+
+/**
  * THE HEM, IN ONE DIRECTION OR THE OTHER.
  *
  * ⚠️ ONE FUNCTION FOR BOTH EDGES, BECAUSE THEY ARE ONE IDEA AND WOULD DRIFT AS
  * TWO. Written out twice, the top and the bottom are five numbers each that have
  * to stay equal, and the first thing anybody tunes is one of them.
  *
- * ⚠️ THERE IS NO OPAQUE PART, AND THAT IS THE WHOLE DIFFERENCE BETWEEN A
- * VIGNETTE AND A BAR. `hold` used to run the veil at FULL opacity as far as the
- * controls reached — 76px at the foot — and then start the falloff. Measured in
- * a browser, that is a 76-pixel slab of flat background across the bottom of
- * every scrollable screen, with the world's pattern stopping dead at its top
- * edge. A soft edge on a slab is still a slab: the reading it produces is "a
- * black bar", which is exactly what it produced.
+ * ⚠️ WHAT MAKES IT A BAR IS THE RATIO, NOT THE FLAT PART. Two attempts got this
+ * wrong in opposite directions and both were measured in a browser. The first
+ * held the veil FULL for 76px — as far as the controls reach — and then fell to
+ * nothing in 56: the flat part was longer than the fade, so the eye found the
+ * fade's own top as an edge and read the whole thing as a slab with a soft lip.
+ * The second removed the flat part altogether, which cured the edge and broke
+ * the job: at the height of the nav's own controls the veil was 80%, so a card's
+ * text read straight through the glyphs sitting on it.
  *
- * ⚠️ SO IT FALLS AWAY FROM THE FIRST PIXEL. Full only at the screen's own edge,
- * where there is nothing to have a boundary against, and thinning from there —
- * so the ground runs continuously under the chrome and the chrome has no shape
- * of its own. What keeps a control legible is that the content passing under it
- * is dissolved WHERE THE CONTROL IS, and at the control's own height the veil is
- * still most of the way up.
+ * ⚠️ SO IT IS FULL WHERE THE CONTROLS ARE AND THE FALLOFF IS TWICE THAT AGAIN.
+ * A photographic vignette is solid at the frame's edge too; what stops it
+ * reading as a panel is that the transition out of it is longer than the solid
+ * part and has no discernible end. Content is properly gone behind the chrome —
+ * which is the whole job — and there is no distance at which the veil visibly
+ * stops.
  *
- * ⚠️ AND THE CURVE IS EASED RATHER THAN LINEAR. A straight ramp between two
- * stops shows its own ends as faint lines — the border coming back in the one
- * place this design cannot afford one — so the stops thin quickly near the edge
- * and slowly at the far end, which is what an unbroken gradation looks like.
+ * ⚠️ AND THE STEPS ARE SMALL ENOUGH THAT NO JOIN SHOWS. The eye finds a break in
+ * the SLOPE of a gradient long before it finds one in the value, and this is the
+ * largest soft shape in the product; a ramp described by three stops shows all
+ * three. `hemStops` walks an ease-out with no step wider than 18 points.
  *
- * ⚠️ THE FALLOFF IS SHARED AND IT IS THE NUMBER WITH THE TENSION IN IT. Too
- * short and the fade's own top edge becomes a visible line, which is the border
- * being removed; too long and content dies halfway up a screen nobody has
- * scrolled. An earlier version ran 12rem at both ends on the theory that a page
- * is read downwards — shot both ways, no visible difference, and both were too
- * much.
+ * ⚠️ `hold` IS MEASURED TO THE CONTROL'S OWN EDGE, PER EDGE, and the two are not
+ * the same: the crown's controls end 3.375rem from the top and the nav's bar
+ * begins 4rem from the bottom. Rounded up a notch so the solid part reaches the
+ * control and stops.
  *
  * ⚠️ AND THE TOP ONE IS NOT THERE UNTIL SOMETHING IS BEHIND IT, WHICH IS THE
  * DIFFERENCE BETWEEN A VIGNETTE AND A BAR. The hem is OPAQUE — it has to be, or
@@ -302,13 +326,9 @@ const hemStop = (pct: number): string =>
  */
 const hem = (edge: "top" | "bottom") => {
   const far = edge === "top" ? "bottom" : "top";
-  /*
-    ⚠️ HOW FAR THE VEIL REACHES, AND NOTHING INSIDE IT IS FLAT — see above. The
-    foot reaches further than the head because the nav's own bar is taller than
-    the crown's row and a fade that ends inside a control is a line across it.
-  */
-  const run = edge === "top" ? 7 : 9;
-  const at = (part: number) => +(run * part).toFixed(2);
+  /* ⚠️ Solid to the control's edge, then twice that again in falloff — above. */
+  const [hold, fade] = edge === "top" ? [3.5, 7] : [4.25, 8.5];
+  const run = hold + fade;
   return [
     `[data-hem="${edge}"]::before {`,
     `  content: ""; position: absolute; left: 0; right: 0;`,
@@ -317,14 +337,9 @@ const hem = (edge: "top" | "bottom") => {
     /* ⚠️ The gradient runs AWAY from the edge it is hemming, so `to top` at the
        bottom and `to bottom` at the top — the opaque end is always the screen's
        own edge, where there is nothing to have a boundary against. */
-    /* ⚠️ SIX STOPS, BECAUSE THREE SHOW THEIR OWN JOINS. The eye finds a
-       discontinuity in the SLOPE of a gradient long before it finds one in the
-       value, and a hem is the largest soft shape in the product. */
     `  background: linear-gradient(to ${far},`,
     `    var(--scene-veil, var(--background)) 0,`,
-    `    ${hemStop(94)} ${at(0.14)}rem, ${hemStop(80)} ${at(0.3)}rem,`,
-    `    ${hemStop(55)} ${at(0.5)}rem, ${hemStop(26)} ${at(0.72)}rem,`,
-    `    ${hemStop(0)} ${run}rem);`,
+    `    ${hemStops(hold, fade)});`,
     /*
       ⚠️ THE STRENGTH IS A PROPERTY AND THE TRANSITION IS ON `opacity`, WHICH IS
       THE ONLY SHAPE THAT ANIMATES. A custom property inside a gradient is not
