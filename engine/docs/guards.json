@@ -3167,6 +3167,42 @@
       "impl": "kernel/src/manifest.ts",
       "proves": "home is the app's own root",
       "fails": "a product whose bar opens on its second screen — two answers to where it starts, and the one somebody lands on is unmarked"
+    },
+    {
+      "id": "nothing-outside-the-frame-pins-to-an-edge",
+      "protects": "D53",
+      "stage": "81",
+      "status": "live",
+      "impl": "scripts/chrome.test.mjs",
+      "proves": "pinned to a viewport edge outside",
+      "fails": "a second chrome — a screen's own bar stuck to an edge, wearing no hem, so the page is sliced by it and the product has two answers to where its controls live"
+    },
+    {
+      "id": "the-head-is-the-crown-and-there-is-one",
+      "protects": "D53",
+      "stage": "81",
+      "status": "live",
+      "impl": "scripts/chrome.test.mjs",
+      "proves": "header in the product, and it is the crown",
+      "fails": "a hand-rolled header beside the one that has slots — which is what the Shell's own was for months, and why it scrolled away, wore a separator and drew its controls at three heights"
+    },
+    {
+      "id": "the-foot-is-a-navigation-or-an-act",
+      "protects": "D53",
+      "stage": "81",
+      "status": "live",
+      "impl": "scripts/chrome.test.mjs",
+      "proves": "drawn only where nothing above it has taken the act",
+      "fails": "180px of an 844px phone in two objects with a gap between them, and a content column reserving room for one — so the last row sits under the other at every scroll position"
+    },
+    {
+      "id": "a-screens-actions-are-capped-where-the-row-is",
+      "protects": "D53",
+      "stage": "81",
+      "status": "live",
+      "impl": "scripts/chrome.test.mjs",
+      "proves": "capped where the crown's row is, once",
+      "fails": "a third action dropped by whichever component runs out of room first — a control somebody put there on purpose, gone with nothing said"
     }
   ]
 }

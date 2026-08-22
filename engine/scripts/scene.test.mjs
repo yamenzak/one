@@ -14,6 +14,7 @@
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { appDirs } from "./lib/trees.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ENGINE = join(HERE, "..");
@@ -271,9 +272,18 @@ const DRAWN = [...filesIn("design/src"), ...filesIn("one-space/src")];
     matches nothing and fails silently, which is exactly what a `true` left over
     from the bottom-only version would do at the top.
   */
+  /* ⚠️ AND THE CORPUS IS EVERYWHERE A SURFACE IS DRAWN, NOT THE DESIGN PACKAGE
+     ALONE. `chrome.test.mjs` refuses a pinned surface outside the frame, so in
+     a healthy tree this finds them all in one place — but a check whose corpus
+     is narrower than the rule it enforces reports green over whatever moved out
+     of it, which is the failure `lib/trees.mjs` exists for. */
   const EDGE = /sticky\s+(?:[\w:-]+\s+)*?(top|bottom)-0/;
   let pinned = 0;
-  for (const file of filesIn("design/src", /\.tsx$/)) {
+  for (const file of [
+    ...filesIn("design/src", /\.tsx$/),
+    ...filesIn("one-space/src", /\.tsx$/),
+    ...appDirs().flatMap((d) => filesIn(d, /\.tsx$/)),
+  ]) {
     for (const tag of readFileSync(file, "utf8").matchAll(/<[a-zA-Z][^<>]*?>/gs)) {
       const at = EDGE.exec(tag[0]);
       if (!at) continue;

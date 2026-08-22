@@ -936,6 +936,10 @@ its own header, cited by other files, and doing nothing.
 | `a-screen-off-the-bar-is-reached-from-its-subject` | D53 | a screen nothing in the product leads to — declared, mounted, rendering perfectly at an address only a person who types it can open, with every other lane green |
 | `the-chrome-slot-and-the-bar-seat-are-exclusive` | D53 | one screen offered twice in one row of chrome, and a scarce bar slot spent on a door the crown is already holding open |
 | `the-first-destination-is-the-app-s-own-root` | D53 | a product whose bar opens on its second screen — two answers to where it starts, and the one somebody lands on is unmarked |
+| `nothing-outside-the-frame-pins-to-an-edge` | D53 | a second chrome — a screen's own bar stuck to an edge, wearing no hem, so the page is sliced by it and the product has two answers to where its controls live |
+| `the-head-is-the-crown-and-there-is-one` | D53 | a hand-rolled header beside the one that has slots — which is what the Shell's own was for months, and why it scrolled away, wore a separator and drew its controls at three heights |
+| `the-foot-is-a-navigation-or-an-act` | D53 | 180px of an 844px phone in two objects with a gap between them, and a content column reserving room for one — so the last row sits under the other at every scroll position |
+| `a-screens-actions-are-capped-where-the-row-is` | D53 | a third action dropped by whichever component runs out of room first — a control somebody put there on purpose, gone with nothing said |
 <!-- /generated -->
 
 ### And how well each decision is defended
@@ -995,7 +999,7 @@ its own header, cited by other files, and doing nothing.
 | D50 | Ambient motion is earned; essential motion is assumed | 2 |
 | D51 | A workspace is founded with the products somebody chose | 7 |
 | D52 | The proving ground is a fixture, and the deployment serves no fixture | 0 |
-| D53 | The navigation is five destinations, and the chrome carries the rest | 4 |
+| D53 | The navigation is five destinations, and the chrome carries the rest | 8 |
 <!-- /generated -->
 
 ---
