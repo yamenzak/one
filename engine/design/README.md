@@ -76,7 +76,7 @@ None of that is visible in a diff. All of it is visible in one screenshot.
 hem, the island.** It did not at first, and that alone hid two more, both of
 which ship in the product:
 
-- **The crown's hem washed the page's own title.** It is a 176px gradient
+- **The crown's hem washed the page's own title.** It is a 156px gradient
   reaching past the sticky header, driven by `--hem-top`, which `Page` sets from
   the scroll position. Outside a `Page` nobody sets it, so it stayed at its
   default and every screen wore a dark scrim across its heading — a vignette for

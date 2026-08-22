@@ -281,6 +281,19 @@ is what they did: `Crown`, `AppCrown`, `PageCrown`'s row and a hand-rolled
 `<header>` inside the Shell were one shape written four times, at four heights,
 with four answers to what a secondary action looks like.
 
+⚠️ **AND THE MECHANISM IS SEALED, not merely shared.** The chrome has two homes
+— `design/src/frame` composes it, `design/src/tokens` holds the numbers and emits
+the CSS — and `chrome.test.mjs` refuses five things to everything else: the safe
+area, the hem's strength property, the hem's marker, the scroll reading, and the
+veil's own depth. Nothing there stops a product looking different; what it stops
+is a product ANSWERING those questions again. Each is one line, each looks local,
+and each produces two chromes that agree until the day the shared one is retuned
+— which is the whole risk, because the geometry is a set of RELATIONSHIPS: the
+veil's solid part is the height of the controls standing on that edge, the
+hand-off is the heading's box against that same depth, and what a page reserves
+for a pinned bar grows by the same `env()` the bar pads by. Every one of those
+was got wrong at least once by changing one of the two numbers.
+
 ⚠️ **`PageCrown` RETURNS A FRAGMENT, AND THAT IS LOAD-BEARING.** A `sticky`
 element travels only within its parent, so a wrapper `div` around the crown and
 the title card pinned the row for exactly as long as the card it introduced was

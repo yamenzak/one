@@ -636,12 +636,13 @@ strip of one colour with a pattern under it, which is a bar whatever the softnes
 of its edge. Measured: hide the hem and the pattern runs through the crown.
 
 The fault was not how strong it is, it is that it was on with no work to do — at
-scroll zero nothing is passing under the chrome. `--hem-top` goes 0 → 1 on the
-first few pixels, `Page` writes it (a style write, not a render, and only when
-the answer changes), and the rule drives `opacity` so the transition lands on a
-property that can actually animate. It defaults to **1**, so a page that mounts
-no listener gets the hem rather than nothing: the safe state is the one that
-cannot let a card read through a title.
+scroll zero nothing is passing under the chrome. `--hem-top` is the amount of
+page behind the hem: 0 at rest at the top, 1 once a veil's own opaque depth has
+gone under, and every value between on the way. `Page` writes it (a style write,
+not a render, and only when the value actually moves), and the rule drives
+`opacity`, which is a property a compositor can carry. It defaults to **1**, so a
+page that mounts no listener gets the hem rather than nothing: the safe state is
+the one that cannot let a card read through a title.
 
 ⚠️ **The bottom one is always on, and that is not an inconsistency.** "Is
 anything behind the crown" is exactly `scrollY > 0`. "Is anything behind the nav"

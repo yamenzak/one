@@ -62,6 +62,105 @@ const OUTSIDE = [
   ...appDirs().flatMap((d) => filesIn(d)),
 ];
 
+/**
+ * ⚠️ AND EVERY FILE, NOT ONLY THE ONES THAT DRAW. The seal below is about
+ * numbers and readings as much as markup, and those live in `.ts` as happily as
+ * in `.tsx`.
+ */
+const OUTSIDE_ALL = [
+  ...filesIn("design/src", /\.tsx?$/).filter((f) => !rel(f).startsWith(FRAME)
+    && !rel(f).startsWith("design/src/tokens")),
+  ...filesIn("one-space/src", /\.tsx?$/),
+  ...appDirs().flatMap((d) => filesIn(d, /\.tsx?$/)),
+];
+
+/* ------------------------------------------------- the chrome is sealed --- */
+
+/**
+ * THE MECHANISM HAS TWO HOMES AND NOWHERE ELSE MAY REACH INTO IT.
+ *
+ * ⚠️ THE GEOMETRY COST MORE TO FIND THAN IT LOOKS LIKE IT DID, WHICH IS WHY IT
+ * IS SEALED RATHER THAN DOCUMENTED. How far the veil is solid is set by the
+ * height of the controls standing on that edge; how far it fades is bounded by
+ * the rate a gradient becomes findable at; where a page's name hands over to the
+ * crown is the heading's box against that same solid depth; what the page
+ * reserves for a pinned bar has to grow with the safe area the bar pads by.
+ * Every one of those is a relationship between two numbers in two files, and
+ * every one of them was got wrong at least once by changing one of the two.
+ *
+ * ⚠️ A SECOND COPY IS THE FAILURE, NOT A SECOND VALUE. Nothing here forbids a
+ * product from looking different; what it forbids is a product ANSWERING these
+ * questions again — reading the scroll to fade its own header, padding its own
+ * edge by the safe area, writing the hem's own property. Each of those is one
+ * line, each looks local, and each produces two chromes that agree until the day
+ * the shared one is retuned.
+ *
+ * ⚠️ THE FRAME AND THE TOKENS ARE THE TWO HOMES. `design/src/frame` composes it,
+ * `design/src/tokens` holds the numbers and emits the CSS. Everything else —
+ * this design system's own parts, the deployment's screens, and every app
+ * including the one added tomorrow — is a consumer.
+ */
+{
+  const SEALED = [
+    {
+      what: "the safe area",
+      of: /env\(safe-area-inset-/,
+      why: "`SAFE_TOP` and `SAFE_BOTTOM` are the frame's, and what a page reserves\n"
+        + "       for a pinned bar (`NAV_SPACE`, `ACTION_SPACE`) grows by the same env().\n"
+        + "       Padding an edge locally is a second answer that does not.",
+    },
+    {
+      what: "the hem's strength",
+      of: /--hem-(?:top|bottom)\b/,
+      why: "It is the amount of page behind the hem, written by `Page` from one\n"
+        + "       scroll reading. A second writer is two answers on one property.",
+    },
+    {
+      what: "the hem's marker",
+      of: /\bdata-hem\b/,
+      why: "It is what makes a surface wear the vignette. On anything the frame did\n"
+        + "       not pin, it draws a veil for a chrome that is not there.",
+      /* ⚠️ THE HARNESS READS IT TO FIND THE CHROME, which is the opposite of
+         declaring one — and it is the only file that may. */
+      but: "design/src/measure/index.tsx",
+    },
+    {
+      what: "the scroll reading",
+      of: /\buseScrolling\b/,
+      why: "Both hems and the crown's hand-off are driven by it, from whatever is\n"
+        + "       actually scrolling. A screen reading the scroll itself is a second\n"
+        + "       collapsing header, tuned against nothing.",
+    },
+    {
+      what: "the veil's own depth",
+      of: /\bHEM_HOLD\b/,
+      why: "It is how far the veil is opaque, so it is also where a page's name stops\n"
+        + "       being legible — which is why the crown's hand-off measures against it.\n"
+        + "       A copy is a hand-off tuned against a hem that has since moved.",
+    },
+  ];
+
+  const broke = [];
+  for (const rule of SEALED) {
+    for (const file of OUTSIDE_ALL) {
+      if (rule.but && rel(file) === rule.but) continue;
+      const src = readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+      if (rule.of.test(src)) broke.push({ rule, at: rel(file) });
+    }
+  }
+
+  if (!OUTSIDE_ALL.length) {
+    fail("chrome: no files outside the frame — this seal is reading nothing.");
+  } else if (broke.length) {
+    for (const { rule, at } of broke) {
+      fail(`${at}: reaches into ${rule.what}, which is the frame's.\n       ${rule.why}`);
+    }
+  } else {
+    ok(`sealed: ${OUTSIDE_ALL.length} file(s) outside the frame, none holding a `
+      + `second copy of its ${SEALED.length} mechanisms`);
+  }
+}
+
 /* --------------------------------------------------------- one chrome, one --- */
 
 /**

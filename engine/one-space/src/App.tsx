@@ -216,7 +216,7 @@ export function App() {
     and none of the frame, which is exactly the part a product cannot opt out of.
 
     ⚠️ AND THE SYMPTOM WAS VISIBLE BEFORE THE CAUSE WAS. The crown's hem is a
-    176px wash that reaches past the sticky header, driven by `--hem-top`, which
+    156px wash that reaches past the sticky header, driven by `--hem-top`, which
     `Page` sets from the scroll position — so with no `Page` the property stayed
     at its default and every ground screen wore a permanent dark scrim across its
     own heading. It reads as a vignette for a chrome that is not there, which is
