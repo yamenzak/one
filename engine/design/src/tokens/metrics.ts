@@ -202,6 +202,17 @@ export type Inset = keyof typeof INSET;
 export const CROWN = "min-h-16" as const;
 
 /**
+ * WHERE THE DESKTOP RAIL PINS ITSELF: directly under the crown.
+ *
+ * ⚠️ IT IS `CROWN`'S HEIGHT PLUS THE INSET THE CROWN WEARS, and both halves are
+ * load-bearing. Pinned at zero the rail slides under a crown that is also pinned
+ * at zero, so the first destination in the product is the one nobody can read;
+ * without the inset it starts under a notch on the one class of device that has
+ * both a notch and a wide window.
+ */
+export const RAIL_TOP = "top-[calc(4rem+env(safe-area-inset-top))]" as const;
+
+/**
  * ⚠️ EVERY CONTROL IN THE CROWN IS THE SAME SIZE, AND THAT SIZE IS `lg`. Measured
  * against a product that reads well, the top row is a 40px band of equal
  * elements — avatar, field, actions — at around 17px type. The library's default

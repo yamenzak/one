@@ -341,6 +341,10 @@ const SCREENS = [
     permission: "note:read", flag: "note-search" },
   { id: "shared", route: "/shared", label: "Shared", nav: "primary" as const,
     permission: "note:read", commercial: true as const },
+  /* ⚠️ NOT A DESTINATION, AND A PRODUCT IS MOSTLY THESE. A screen reached from
+     what it is about rather than from the bar — so the fixture can answer what
+     the chrome does on one, which is a different shape at both ends. */
+  { id: "thing", route: "/thing", label: "One note", nav: "none" as const, permission: "note:read" },
 ];
 
 /**
@@ -428,7 +432,7 @@ describe("the shell", () => {
   */
   it("draws only what this person can reach", () => {
     expect(reachable(SCREENS, new Set(["note:read"]), { "note-search": true }).map((s) => s.id))
-      .toEqual(["notes", "search"]);
+      .toEqual(["notes", "search", "thing"]);
     const out = html(
       <Shell screens={SCREENS} here="/" held={new Set(["note:read"])} crown={crown} onGo={() => {}} />,
     );
@@ -438,7 +442,7 @@ describe("the shell", () => {
 
   /* ⚠️ And a screen behind one of our switches is not drawn while it is off. */
   it("hides a screen behind a flag we have not turned on", () => {
-    expect(reachable(SCREENS, new Set(["note:read"]), {}).map((s) => s.id)).toEqual(["notes"]);
+    expect(reachable(SCREENS, new Set(["note:read"]), {}).map((s) => s.id)).toEqual(["notes", "thing"]);
   });
 
   /*
@@ -451,11 +455,11 @@ describe("the shell", () => {
   it("hides a business-only screen from a personal workspace", () => {
     const held = new Set(["note:read"]);
     expect(reachable(SCREENS, held, {}, "commercial").map((s) => s.id))
-      .toEqual(["notes", "shared"]);
-    expect(reachable(SCREENS, held, {}, "personal").map((s) => s.id)).toEqual(["notes"]);
+      .toEqual(["notes", "shared", "thing"]);
+    expect(reachable(SCREENS, held, {}, "personal").map((s) => s.id)).toEqual(["notes", "thing"]);
     /* ⚠️ Absent is `personal` — a shell wired without the kind withholds rather
        than promises, which is the direction the gate fails in too. */
-    expect(reachable(SCREENS, held, {}).map((s) => s.id)).toEqual(["notes"]);
+    expect(reachable(SCREENS, held, {}).map((s) => s.id)).toEqual(["notes", "thing"]);
 
     const out = html(
       <Shell screens={SCREENS} here="/" held={held} crown={crown} onGo={() => {}} />,
@@ -477,6 +481,58 @@ describe("the shell", () => {
     /* Twice each — the sidebar and the island — so five destinations is ten. */
     expect([...out.matchAll(/Dest\d/g)]).toHaveLength(10);
     expect(out).not.toContain("Dest5");
+  });
+
+  /*
+    ⚠️ ONE NAVIGATION, TWO WIDTHS, AND THE SAME MATERIAL AT BOTH. The rail drew
+    `variant="primary"` on wherever you were — a filled plate — while the phone
+    bar carried no surface at all and let the world through. So the product had
+    a vignette on a phone and a slab on a desktop, which is the same screen
+    reading as two designs depending on the window.
+
+    ⚠️ `data-island` IS THE ASSERTION BECAUSE IT IS THE MECHANISM. The two rules
+    that make the bar work — every destination muted, the one you are on full
+    ink — are keyed on that attribute, so the rail wearing it is the rail asking
+    for the bar's treatment rather than restating it somewhere it can drift.
+  */
+  it("draws the rail in the bar's material, with no plate on where you are", () => {
+    const out = html(
+      <Shell screens={SCREENS} here="/" held={new Set(["note:read"])} crown={crown} onGo={() => {}} />,
+    );
+    /* Two: the phone bar and the desktop rail, both asking for the same rules. */
+    expect([...out.matchAll(/data-island="true"/g)]).toHaveLength(2);
+    expect(out).not.toContain("button--primary");
+    /* ⚠️ AND WHERE YOU ARE IS STILL SAID — ink is not the same as silence, and
+       an assertion that only removed the plate would pass over a rail that
+       marks nothing. */
+    expect([...out.matchAll(/data-here="true"/g)].length).toBeGreaterThanOrEqual(2);
+  });
+
+  /*
+    ⚠️ AND THE RAIL STANDS ON A SCREEN THE PHONE BAR LEAVES. The bar is AT the
+    foot, so a specialized screen's one act replaces it; the rail is BESIDE the
+    page and competes with nothing. A wide window that hid its navigation to
+    make room for one button would be spending the cheapest space in the layout.
+  */
+  it("keeps the rail on a screen whose foot is its action", () => {
+    const navs = (out: string) => [...out.matchAll(/<nav [^>]*aria-label="Sections"[^>]*>/g)].map((m) => m[0]);
+
+    const there = html(
+      <Shell screens={SCREENS} here="/thing" held={new Set(["note:read"])} crown={crown} onGo={() => {}} />,
+    );
+    /* ⚠️ THE PHONE BAR IS GONE AND THE RAIL IS NOT. One nav left, and it is the
+       one that appears at the breakpoint — a rail rendered and then hidden in
+       CSS is markup that satisfies a count and shows nobody anything, which is
+       what the first version of this assertion allowed. */
+    expect(navs(there)).toHaveLength(1);
+    expect(navs(there)[0]).toContain("md:flex");
+    expect(there).toContain("Notes");
+
+    /* ⚠️ AND BOTH STAND ON A DESTINATION, or the assertion above is satisfied by
+       a shell that never draws a bar at all. */
+    expect(navs(html(
+      <Shell screens={SCREENS} here="/" held={new Set(["note:read"])} crown={crown} onGo={() => {}} />,
+    ))).toHaveLength(2);
   });
 
   /*

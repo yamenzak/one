@@ -22,7 +22,7 @@
 
 import * as React from "react";
 import type { Kind, ScreenSpec } from "@engine/kernel";
-import { PRIMARY_MAX, isBusiness, primaryOf, screenFor } from "@engine/kernel";
+import { PRIMARY_MAX, isBusiness, isUnder, primaryOf, screenFor } from "@engine/kernel";
 import { Button } from "@heroui/react";
 import {
   Banknote, Bell, Building2, Calendar, CheckCheck, Circle, ClipboardList, Clock, Cog, Coins, Database,
@@ -42,7 +42,7 @@ import {
   Crown, CrownSocketProvider, crownFor, type CrownClaim, type Foot, type Slot,
 } from "./crown.js";
 import { type Sky } from "../tokens/ambience.js";
-import { PAD, SPACE } from "../tokens/metrics.js";
+import { ICON, PAD, RAIL_TOP, ROW, SPACE } from "../tokens/metrics.js";
 import { Face, appFace, worldFor, type FaceOf } from "../parts/face.js";
 
 /**
@@ -536,18 +536,70 @@ export function Shell(props: ShellProps) {
 
       {/* ------------------------------------------------------- the middle --- */}
       <div className="flex flex-1 min-h-0">
-        {/* ⚠️ The same five, plus room for more. A desktop sidebar that showed a
-            different set would make the two layouts two products. */}
-        <nav className={`hidden md:flex flex-col gap-1 w-56 shrink-0 ${PAD}`} aria-label="Sections">
-          {inBar.map((s) => (
-            <Button
-              key={s.id}
-              variant={s.route === at?.route ? "primary" : "ghost"}
-              onPress={() => onGo(s.route)}
-            >
-              {s.label}
-            </Button>
-          ))}
+        {/*
+          ⚠️ THE SAME FIVE, AND NOW IN THE SAME GRAMMAR. A desktop sidebar that
+          showed a different set would make the two layouts two products; one
+          that shows the same set in a different MATERIAL makes them two
+          products to look at, which is the half that survived the first fix.
+          The phone bar is ink on the world and the rail was a column of filled
+          plates — `variant="primary"` on wherever you were — so the same
+          product had a vignette at one width and a slab at the other.
+
+          ⚠️ `data-island` IS WHAT CARRIES THAT OVER, rather than a second set of
+          colours here. The two rules that make the bar work — every destination
+          muted, the one you are on full ink — are keyed on that attribute, so
+          the rail asks for the bar's own treatment instead of restating it. A
+          colour named at this call site is a colour a workspace's branding never
+          reaches (D7).
+
+          ⚠️ AND IT PINS UNDER THE CROWN. It did not pin at all: on any page
+          longer than a window the navigation scrolled away on a desktop while
+          staying at the thumb on a phone — the same asymmetry one level up.
+
+          ⚠️ IT STANDS ON A SPECIALIZED SCREEN, WHERE THE PHONE BAR DOES NOT, and
+          that is not an inconsistency. The bar is AT the foot, so an act there
+          replaces it; the rail is BESIDE the page and competes with nothing, and
+          a wide window that hid its navigation to make room for one button would
+          be spending the cheapest space in the layout.
+        */}
+        <nav
+          aria-label="Sections"
+          className={`hidden md:flex sticky ${RAIL_TOP} h-fit w-56 shrink-0 flex-col ${PAD}`}
+        >
+          <div data-island="true" className={`flex flex-col ${SPACE.hair}`}>
+            {inBar.map((s) => {
+              /* ⚠️ THE SCREEN THE ADDRESS IS UNDER, NOT THE ONE IT EQUALS — the
+                 rail asked `route === at?.route`, so opening one record left the
+                 whole rail unmarked. `Island` had already been fixed; this is the
+                 same question asked in the second place. */
+              const isHere = isUnder(s.route, here);
+              return (
+                <Button
+                  key={s.id}
+                  /* ⚠️ ALWAYS `ghost` — see the note above and `Island`. */
+                  variant="ghost"
+                  aria-current={isHere ? "page" : undefined}
+                  data-here={isHere ? "true" : undefined}
+                  className={`w-full justify-start ${SPACE.tight} ${ROW.free}`}
+                  onPress={() => onGo(s.route)}
+                >
+                  {/* ⚠️ THE GLYPH THE BAR ALREADY DRAWS. The rail was words only,
+                      so a destination was a mark on a phone and a word on a
+                      desktop and nothing taught you which was which. `--icon`
+                      rather than the button's own sizing, for the crown's
+                      reason: `.button` sizes its SVGs by breakpoint, which is a
+                      control that changes size with the window. */}
+                  <span
+                    className="flex items-center"
+                    style={{ ["--icon" as string]: `${ICON.row}px` }}
+                  >
+                    {glyphOf(s.icon ?? s.id)}
+                  </span>
+                  <span className="truncate">{s.label}</span>
+                </Button>
+              );
+            })}
+          </div>
         </nav>
 
         {/* ⚠️ NO `NAV_SPACE` HERE ANY MORE — `Page` adds it, because `Page` is
