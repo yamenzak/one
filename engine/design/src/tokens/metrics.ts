@@ -535,12 +535,23 @@ export const NUDGE = {
  * INTO the bar (`Island.act`) rather than onto a second one above it — see
  * `Docked`, whose "never both" rule this is the other half of. This number was
  * briefly the whole stack, which is what a page reserves when there is a stack.
+ *
+ * ⚠️ AND IT CARRIES THE SAME SAFE AREA THE BAR DOES, OR IT IS SHORT BY EXACTLY
+ * THAT MUCH. The bar's own bottom padding is `SAFE_BOTTOM`, which GROWS on a
+ * phone with a gesture handle — so a reserve written as a flat number is correct
+ * on a desktop, correct in every headless test (where the inset resolves to
+ * zero), and too small on the devices the whole rule exists for. Measured: the
+ * foot is 84px with no inset, and on a handset reporting 30 it is 102 against a
+ * 96px reserve — the last row of the last card sitting under a pinned control at
+ * the very bottom of the page, which is precisely the fault this token was
+ * written to prevent. Two numbers that have to move together, so they name the
+ * same thing.
  */
-export const NAV_SPACE = "pb-28" as const;
+export const NAV_SPACE = "pb-[calc(7rem_+_env(safe-area-inset-bottom))]" as const;
 
 
-/** The same problem, for a screen whose one action is pinned instead. */
-export const ACTION_SPACE = "pb-24" as const;
+/** The same problem, and the same safe area, for a pinned single action. */
+export const ACTION_SPACE = "pb-[calc(6rem_+_env(safe-area-inset-bottom))]" as const;
 
 /**
  * ⚠️ THE SAFE AREA IS NOT OPTIONAL AND NOT A DETAIL. Without it a pinned control

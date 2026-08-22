@@ -690,10 +690,14 @@ const DRAWN = [...filesIn("design/src"), ...filesIn("one-space/src")];
 /* -------------------------- what collapses hands over its subject, late --- */
 {
   /*
-    ⚠️ A TITLE CARD IS AS TALL AS WHAT IT DRAWS, SO ITS THRESHOLD CANNOT BE A
-    NUMBER. It was 56px — most of a title and almost none of a title card — so a
-    planet at the size of the page vanished after a thumb's width of scroll while
-    the row replacing it arrived with the picture still filling the screen.
+    ⚠️ THE CROSSING IS A POSITION, AND EVERY DISTANCE TRIED FOR IT WAS WRONG.
+    56px flat (most of a title, almost none of a title CARD — a planet vanished
+    after a thumb's width of scroll), 62% of the block, then 85% of the card:
+    the last is the clearest, because a hero's name is CENTRED in its card, so it
+    leaves the screen at the halfway mark and the crown then sat empty for
+    another third of the card. Any fraction of a HEIGHT is a proxy for the one
+    question that matters — has the name reached the row that will carry it —
+    which is a rect against a rect and has no number in it at all.
 
     ⚠️ AND WHAT HANDS OVER IS THE SUBJECT, NOT ONLY ITS NAME. Scrolled past, the
     name appeared in the crown on its own and the face simply stopped existing,
@@ -707,18 +711,31 @@ const DRAWN = [...filesIn("design/src"), ...filesIn("one-space/src")];
     way to refuse it is that the crown must be TOLD.
   */
   const src = readFileSync(join(ENGINE, "design/src/frame/crown.tsx"), "utf8");
-  const measures = /ref\.current\?\.offsetHeight/.test(src);
-  const fixed = /useScrolledPast\([^)]*,\s*\d+/.test(src);
+  /* ⚠️ A rect against the crown's measured height — not a scroll offset, and
+     not a share of anything. */
+  const placed = /name\.current\?\.getBoundingClientRect\(\)/.test(src)
+    && /crown\.current\?\.offsetHeight/.test(src)
+    && /box\.bottom < line/.test(src);
+  /* ⚠️ NO FRACTION SURVIVES ANYWHERE IN THE HAND-OFF. `tall * 0.85` is exactly
+     what this replaced, and it typechecks. */
+  const shared = /\b(tall|height|offsetHeight)[^;\n]*\*\s*0?\.\d/.test(src);
   const travels = /subject\?:\s*FaceOf/.test(src) && /subject:\s*face/.test(src);
   /* ⚠️ ONE CALLER, and it is the one that draws the thing that has to leave. A
-     second `useScrolledPast` anywhere in this file is a second threshold. */
-  const asked = (src.match(/useScrolledPast\(/g) ?? []).length;
+     second `useHandedOver` anywhere in this file is a second threshold. */
+  const asked = (src.match(/useHandedOver\(/g) ?? []).length;
   const told = /carried=\{past\}/.test(src) && /const showName = !collapses \|\| !!carried/.test(src);
+  /* ⚠️ AND THE NAME IS WHAT DISSOLVES, NOT THE CARD AROUND IT. Fading the block
+     takes the picture out in front of somebody still looking at it, which is
+     the complaint this whole crossing exists to answer — so the element the
+     hand-off WATCHES is the element it fades. */
+  const watched = /ref=\{named\}[\s\S]{0,900}?opacity: past \? 0 : 1/.test(src);
 
-  if (!measures || fixed) {
-    fail("design/src/frame/crown.tsx: a collapsing heading swaps at a fixed distance.\n" +
-         "       What `gone` means is a property of what went — a title card is as tall as\n" +
-         "       the picture it draws, and a constant is right for exactly one of them.");
+  if (!placed || shared) {
+    fail("design/src/frame/crown.tsx: the hand-off is a distance rather than a position.\n" +
+         "       Every fraction tried here was a share of something that is not the thing\n" +
+         "       being handed over — a card is as tall as the planet in it, and a hero's\n" +
+         "       name sits in the middle of that. Ask where the name IS, against the row\n" +
+         "       that will carry it.");
   } else if (!travels) {
     fail("design/src/frame/crown.tsx: a title card hands over its name and not its face.\n" +
          "       The row that replaces a subject has to BE that subject, or the swap reads\n" +
@@ -728,8 +745,12 @@ const DRAWN = [...filesIn("design/src"), ...filesIn("one-space/src")];
          "       Two thresholds off two heights put the small name in the header while the\n" +
          "       picture it replaces is still filling the page. The block measures itself\n" +
          "       and passes `carried`; the crown reads it and nothing else.");
+  } else if (!watched) {
+    fail("design/src/frame/crown.tsx: the hand-off fades something other than the name.\n" +
+         "       Fading the whole card takes the subject's picture out in front of somebody\n" +
+         "       still looking at it. What dissolves is the element the crossing watches.");
   } else {
-    ok("collapse: one crossing, off the card's own height, and the subject goes with it");
+    ok("collapse: the name hands over where it meets the crown, and only the name goes");
   }
 }
 

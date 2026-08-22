@@ -78,62 +78,60 @@ export function LeaveChip({
 }
 
 /**
+ * ⚠️ THE CROSSING IS WHERE THE NAME MEETS THE CROWN, AND IT IS A POSITION RATHER
+ * THAN A DISTANCE. Three distances were tried and every one of them was a
+ * fraction of something that is not the thing being handed over: 56px flat (most
+ * of a title, almost none of a title CARD — a planet vanished after a thumb's
+ * width of scroll), then 62% of the block, then 85% of the card. The last one is
+ * the clearest illustration of why a fraction cannot work here: a hero's name is
+ * CENTRED in its card, so it leaves the screen around the halfway mark and the
+ * crown then sat empty for another third of the card — the name nowhere, on a
+ * screen whose name is the reason somebody is looking at the crown.
+ *
+ * ⚠️ SO IT ASKS THE ONLY QUESTION THAT MATTERS: has the name reached the row
+ * that is going to carry it? The name's own box against the crown's own height,
+ * both measured at the reading. There is no fraction to tune, it is exact on
+ * every composition — a centred hero name and a heading at the top of its block
+ * hand over at the moment each disappears — and it stays right when either one
+ * changes size.
+ *
+ * ⚠️ AND WHAT SCROLLS AWAY IS NOT WHAT HANDS OVER. Only the NAME dissolves at
+ * the crossing; the subject's picture simply leaves the top of the screen the
+ * way any content does, and the hem dissolves it on the way past. Fading the
+ * whole card is what made a planet disappear in front of somebody still looking
+ * at it — a hand-off is one element replacing another, not a block going out.
+ *
  * ⚠️ ONE THRESHOLD, NOT A SCROLL-LINKED FRACTION. Driving the swap off a
  * continuous offset means a state update per frame and a title that is half
  * faded for as long as somebody's finger is still — which reads as a rendering
  * fault rather than as a transition. A boolean crossed once, animated by CSS, is
  * the same effect with none of that.
  *
- * ⚠️ THE HYSTERESIS IS THE POINT. Coming back UP has a lower threshold than
- * going down, so a page resting exactly on the boundary cannot oscillate — which
- * a single value does, visibly, on any list whose last item is near the fold.
+ * ⚠️ AND THE HYSTERESIS IS THE POINT. Coming back UP releases a little lower
+ * than going down releases, so a page resting exactly on the boundary cannot
+ * oscillate — which a single value does, visibly, on any list whose last item is
+ * near the fold.
  */
-/* ⚠️ AND IT READS WHATEVER IS SCROLLING, NOT THE WINDOW — see `scrolling.ts`.
-   Inside a presented surface the window never moves, so a collapsing title
-   stayed at full size for ever on every screen in the account centre. */
-/**
- * ⚠️ AND THE THRESHOLD IS THE TITLE CARD'S OWN HEIGHT, NOT A NUMBER. It was
- * 56px, and 56px is most of a title but almost none of a title CARD — so a
- * planet at the size of the page vanished after a thumb's width of scroll, while
- * the row that replaces it arrived with the picture it replaces still filling
- * the screen. What "gone" means is a property of what went, so the card
- * measures itself.
- *
- * ⚠️ THE CARD, AND NOT THE BLOCK IT SITS IN. Measured across the crown as well,
- * the fraction means two different things at two sizes: the crown is a fixed
- * ~72px of a total that is 130px under a plain heading and 500 under a hero, so
- * one number lands late on the first and early on the second. The card's own
- * height is the distance it has to travel, because the crown above it is sticky
- * and covers everything the card still has left once it passes underneath.
- *
- * ⚠️ NEARLY ALL OF IT, NOT MOST OF IT. The hand-off at 62% left a third of a
- * planet on the screen while its name was already up in the header — the same
- * word twice, and a subject dissolving in front of somebody still looking at it.
- * The card is all but gone at 85%, and what remains is behind the crown a moment
- * later.
- *
- * ⚠️ A FLOOR, BECAUSE A HEADING IS SHORTER THAN THE ROW THAT REPLACES IT. A
- * one-line title measures ~40px; swapping at that is a name crossfading into
- * the same name a few pixels higher, which reads as a flicker rather than as a
- * hand-off.
- *
- * ⚠️ AND THE HYSTERESIS IS A SHARE OF IT RATHER THAN A SECOND CONSTANT, so the
- * gap between going and coming back scales with what is going. Two fixed numbers
- * are two things to keep in step, and the first thing anybody tunes is one.
- */
+/** ⚠️ A crown's height, for the frame where its own box is not measurable yet. */
 const LEAST = 72;
-const GONE = 0.85;
+/** ⚠️ The overlap that stops a page resting on the crossing from flickering. */
+const SLACK = 24;
 
-function useScrolledPast(ref: React.RefObject<HTMLElement | null>): boolean {
+function useHandedOver(
+  name: React.RefObject<HTMLElement | null>,
+  crown: React.RefObject<HTMLElement | null>,
+): boolean {
   const [past, setPast] = React.useState(false);
-  useScrolling(ref, ({ y }) => {
-    /* ⚠️ MEASURED AT THE READING, not once — a title card is as tall as a baked
-       planet that arrives after mount, and a height read before it would be the
-       fixed number this replaced. */
-    const tall = Math.max(LEAST, ref.current?.offsetHeight ?? 0);
-    const down = tall * GONE;
-    const up = down * 0.55;
-    setPast((was) => (was ? y > up : y > down));
+  /* ⚠️ AND IT READS WHATEVER IS SCROLLING, NOT THE WINDOW — see `scrolling.ts`.
+     Inside a presented surface the window never moves, so a collapsing title
+     stayed at full size for ever on every screen in the account centre. */
+  useScrolling(name, () => {
+    const box = name.current?.getBoundingClientRect();
+    if (!box) return;
+    /* ⚠️ MEASURED AT THE READING, not once — a crown is as tall as the safe area
+       under a notch, and a name is as tall as the words in it. */
+    const line = crown.current?.offsetHeight ?? LEAST;
+    setPast((was) => (was ? box.bottom < line + SLACK : box.bottom < line));
   });
   return past;
 }
@@ -334,6 +332,15 @@ export interface CrownProps {
 
   readonly bleed?: Bleed;
   readonly width?: Width;
+  /**
+   * ⚠️ THE ROW'S OWN BOX, HANDED OUT, BECAUSE THE HAND-OFF NEEDS ITS HEIGHT AND
+   * IT CANNOT BE ASSUMED. A crown is 64px plus whatever the safe area under a
+   * notch adds, so the line a name has to reach is a measurement rather than a
+   * constant — and it cannot be taken by wrapping this in a div, because the
+   * row is `sticky` and a tight wrapper bounds its travel to its own height,
+   * which un-sticks it silently.
+   */
+  readonly ref?: React.Ref<HTMLElement>;
   /** ⚠️ Gone, kept as a no-op so callers still compile — see the hem. */
   readonly ruled?: boolean;
 }
@@ -380,9 +387,8 @@ export function Crown({
   does,
   bleed = "hold",
   width = "read",
+  ref,
 }: CrownProps) {
-  /* ⚠️ THE CROWN'S OWN NODE, for its hem — the crossing is `carried`. */
-  const at = React.useRef<HTMLElement>(null);
   /* ⚠️ A collapsing name is HIDDEN until it is needed, and it is `aria-hidden`
      because the display heading in the content is the page's real name. Two
      elements carrying the same words is a duplicate to anybody navigating by
@@ -405,7 +411,7 @@ export function Crown({
 
   return (
     <header
-      ref={at}
+      ref={ref}
       data-hem="top"
       className={`sticky top-0 z-10 w-full ${SAFE_TOP}`}
     >
@@ -870,16 +876,17 @@ export function PageCrown({
    */
   readonly under?: React.ReactNode;
 }) {
-  /* ⚠️ THE CARD, NOT THE BLOCK — the ref is on the heading below, because what
-     has to travel is the heading and the crown above it never moves. It has no
-     sticky node of its own, so it asks from where it renders; the same ancestor
-     walk lands on the same scroller. */
-  const at = React.useRef<HTMLDivElement>(null);
-  const past = useScrolledPast(at);
+  /* ⚠️ THE NAME AND THE ROW THAT WILL CARRY IT, because the crossing is where
+     those two meet — see `useHandedOver`. Neither is the block: the block is as
+     tall as a planet, and a planet is not the thing being handed over. */
+  const named = React.useRef<HTMLElement>(null);
+  const row = React.useRef<HTMLElement>(null);
+  const past = useHandedOver(named, row);
 
   return (
     <div>
       <Crown
+        ref={row}
         bleed={bleed}
         width={width}
         back={back}
@@ -898,10 +905,9 @@ export function PageCrown({
       {/* ⚠️ THE PADDING IS BELOW THE HEADING, NOT AROUND IT. The crown above
           already sets the top; `BAND_PAD` here would double it and push the
           title down the screen. What was missing is air UNDER the block. */}
-      <div ref={at}>
-        <Band bleed={bleed} width={width}>
-          {face ? (
-            /*
+      <Band bleed={bleed} width={width}>
+        {face ? (
+          /*
               ⚠️ THE SUBJECT IS THE SCREEN, AND THE NAME SITS ON IT. A page about
               one named thing that has a picture of itself does not need a
               heading ABOVE a thumbnail — that is a caption over an icon. The
@@ -912,60 +918,63 @@ export function PageCrown({
               share one cell, so the block is as tall as the orb and the content
               under it never has to know a hero happened.
             */
-            <div
-              className={`grid ${TITLE_PAD}`}
-              style={{
-                opacity: past ? 0 : 1,
-                transition: past ? MOTION.exit : MOTION.enter,
-              }}
+          <div className={`grid ${TITLE_PAD}`}>
+            <span
+              className="col-start-1 row-start-1 justify-self-center"
+              style={{ gridArea: "1 / 1" }}
             >
-              <span
-                className="col-start-1 row-start-1 justify-self-center"
-                style={{ gridArea: "1 / 1" }}
-              >
-                <Face of={face} hero />
-              </span>
-              {/* ⚠️ NO SCRIM, AND THAT WAS TRIED FIRST. A wash under the name to
+              <Face of={face} hero />
+            </span>
+            {/* ⚠️ NO SCRIM, AND THAT WAS TRIED FIRST. A wash under the name to
                   hold its contrast over a lit sphere is the obvious move and it
                   is visible: the plate is wider than the planet, so its edges sit
                   on plain sky as two dark patches either side of the world. What
                   holds the type is WEIGHT, the mask, and `ON_SCENE` — a halo in
                   the ground's OWN colour, which has no shape and dims nothing. */}
-              <span
-                /* ⚠️ `relative` IS NOT COSMETIC HERE. The orb carries a
+            <span
+              /* ⚠️ AND THIS IS WHAT THE HAND-OFF WATCHES — the NAME, not the
+                   card around it. The picture keeps its own opacity and simply
+                   scrolls away under the hem. */
+              ref={named}
+              /* ⚠️ `relative` IS NOT COSMETIC HERE. The orb carries a
                    `mask-image`, and a mask CREATES A STACKING CONTEXT — so the
                    picture paints after in-flow content and the name vanished
                    behind a planet with nothing in the DOM to show for it. */
-                className={`relative col-start-1 row-start-1 self-center justify-self-center w-full
+              className={`relative col-start-1 row-start-1 self-center justify-self-center w-full
                   flex flex-col items-center text-center ${SPACE.tight} ${CROWN_HERO_PAD}`}
-                /* ⚠️ ON THE WRAPPER, BECAUSE `text-shadow` INHERITS. */
-                style={{ gridArea: "1 / 1", textShadow: ON_SCENE }}
-              >
-                {/* ⚠️ THE INK IS THE ROLE'S, NOT THIS CALLER'S — see `TYPE`. A
+              /* ⚠️ ON THE WRAPPER, BECAUSE `text-shadow` INHERITS. */
+              style={{
+                gridArea: "1 / 1",
+                textShadow: ON_SCENE,
+                opacity: past ? 0 : 1,
+                transition: past ? MOTION.exit : MOTION.enter,
+              }}
+            >
+              {/* ⚠️ THE INK IS THE ROLE'S, NOT THIS CALLER'S — see `TYPE`. A
                     name at the size of the screen is the loudest thing on it,
                     and it used to inherit, so it came out a dusty grey wherever
                     something up the tree was quiet. Fixed here it would have
                     been fixed for one of the callers. */}
-                <h1 className={TYPE.wordmark}>{title}</h1>
-                {under}
-              </span>
-            </div>
-          ) : (
-            <div className={`flex flex-col ${HEAD_GAP} ${TITLE_PAD}`}>
-              <h1
-                className={TYPE.display}
-                style={{
-                  opacity: past ? 0 : 1,
-                  transition: past ? MOTION.exit : MOTION.enter,
-                }}
-              >
-                {title}
-              </h1>
+              <h1 className={TYPE.wordmark}>{title}</h1>
               {under}
-            </div>
-          )}
-        </Band>
-      </div>
+            </span>
+          </div>
+        ) : (
+          <div className={`flex flex-col ${HEAD_GAP} ${TITLE_PAD}`}>
+            <h1
+              ref={named as React.RefObject<HTMLHeadingElement>}
+              className={TYPE.display}
+              style={{
+                opacity: past ? 0 : 1,
+                transition: past ? MOTION.exit : MOTION.enter,
+              }}
+            >
+              {title}
+            </h1>
+            {under}
+          </div>
+        )}
+      </Band>
     </div>
   );
 }

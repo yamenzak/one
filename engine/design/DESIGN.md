@@ -203,6 +203,16 @@ under the other permanently, at the top of the scroll and still at the bottom of
 it. What the rule had been missing was not an exception; it was somewhere for the
 act to go.
 
+⚠️ **AND WHAT A PAGE RESERVES FOR A PINNED BAR GROWS WITH THE BAR.** The bar pads
+its own bottom by `env(safe-area-inset-bottom)`, so on a phone with a gesture
+handle it is taller than it is anywhere a test can see it — headless Chromium
+reports a zero inset, and so does every desktop. A reserve written as a flat
+number is therefore correct in every measurement this repository can take and
+short by exactly the inset on the devices the safe area exists for, which puts
+the last row of the last card under a pinned control at the very bottom of the
+page. `NAV_SPACE` and `ACTION_SPACE` name the same `env()` the bar does; two
+numbers that have to move together should not be two numbers.
+
 **There is one `Crown`, and its shape is its slots.** Three slots, one height:
 
 ```
@@ -278,15 +288,20 @@ both the biggest thing on it and something you still need four screens down, and
 one element cannot be both, so the big one lives in the content and the crown
 carries the compact copy that replaces it once it has scrolled away.
 
-⚠️ **The hand-off is ONE crossing, and the block is what decides it.** The
-threshold is the title card's OWN height — a card is as tall as the picture it
-draws, so a constant is right for exactly one screen and the crown's own height
-is right for none. The card measures itself, hands the answer to the crown as
-`carried`, and the crown reads it and nothing else: with both of them answering
-separately the small name arrived in the header at 45px while the planet it
-replaces was still filling the page. It crosses at **85%** of the card, not most
-of it — what is left after that is behind the sticky crown a moment later — and
-what travels is the SUBJECT, face and all, not just the name.
+⚠️ **The hand-off is ONE crossing, it is a POSITION rather than a distance, and
+what dissolves is the name alone.** Three distances were tried and every one was
+a fraction of something that is not the thing being handed over: 56px flat, 62%
+of the block, 85% of the card. The last is the clearest — a hero's name is
+*centred* in its card, so it leaves the screen at the halfway mark and the crown
+then sat empty for another third of the card. What is actually being asked is
+whether the name has reached the row that will carry it, which is one rect
+against another and has no number in it: the name's own box against the crown's
+measured height. The block asks it once and hands the answer to the crown as
+`carried`; the crown reads that and nothing else, because with both of them
+answering separately the small name arrived at 45px while the planet was still
+filling the page. What travels is the SUBJECT, face and all — and only the name
+fades, because fading the whole card takes the picture out in front of somebody
+still looking at it.
 
 ⚠️ **`find` is a typed declaration, not children**, for the reason `who` is: the
 widest, most-seen element in the product is exactly the one that otherwise

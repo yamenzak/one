@@ -332,6 +332,41 @@ if (!rows.length) {
   }
 }
 
+/* --------------------------- a reserve carries the bar's own safe area --- */
+
+/**
+ * ⚠️ A RESERVE FOR A PINNED BAR MUST GROW WITH THE BAR, AND THE BAR GROWS. Its
+ * bottom padding is `SAFE_BOTTOM`, which resolves to the gesture handle's height
+ * on a modern phone and to nothing everywhere else — so a reserve written as a
+ * flat number is right on a desktop, right in every headless test, and short by
+ * exactly the inset on the devices the rule exists for. The symptom is the one
+ * `NAV_SPACE` was written to prevent: the last row of the last card under a
+ * pinned control at the very bottom of the page.
+ *
+ * ⚠️ AND NO BROWSER HERE CAN SEE IT. Headless Chromium reports a zero inset, so
+ * the geometry is correct in every measurement this repository can take — which
+ * is what let it ship. The check is that the two numbers name the same thing.
+ */
+{
+  const METRICS = readFileSync(join(ENGINE, "design/src/tokens/metrics.ts"), "utf8");
+  const INSET = "env(safe-area-inset-bottom)";
+  const value = (name) => new RegExp(`${name} = "([^"]+)"`).exec(METRICS)?.[1];
+  const bar = value("SAFE_BOTTOM");
+  const reserves = ["NAV_SPACE", "ACTION_SPACE"];
+  const flat = reserves.filter((name) => !(value(name) ?? "").includes(INSET));
+
+  if (!bar || !bar.includes(INSET)) {
+    fail("metrics.ts: `SAFE_BOTTOM` no longer names the inset — this guard is blind.");
+  } else if (flat.length) {
+    fail(`metrics.ts: ${flat.join(", ")} reserve a flat number for a bar that grows.\n` +
+         "       The bar pads itself by `env(safe-area-inset-bottom)`; a reserve that does\n" +
+         "       not is short by exactly that on a phone with a gesture handle, and correct\n" +
+         "       in every test here, because headless reports zero.");
+  } else {
+    ok(`safe: all ${reserves.length} reserve(s) grow by the same inset the bar pads by`);
+  }
+}
+
 /* ----------------------------------------- the loud roles state their ink --- */
 
 /**
