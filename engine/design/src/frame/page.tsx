@@ -365,12 +365,13 @@ export function Page(
  *
  * ⚠️ AND A HEM ARRIVES AT ONCE BUT LEAVES ONLY ONCE THE PAGE HAS STOPPED. The
  * threshold above is 8px, which is enough slack for a settling image and nothing
- * like enough for a phone: a fling overshoots and bounces at both ends, and the
- * browser's own toolbar collapsing mid-scroll changes the viewport height
- * underneath the subtraction — so both answers flip several times while a thumb
- * is still moving, and the two ends of the screen blink. Widening the threshold
- * does not fix it, because the readings genuinely cross it; what is wrong is
- * that the chrome ANSWERS EVERY ONE.
+ * like enough for a phone. `under` is `scrollHeight - (y + innerHeight)`, and a
+ * mobile browser's toolbar collapsing mid-scroll grows `innerHeight` by about
+ * 56px — so near the end of a page the subtraction crosses 8 with nothing about
+ * the scroll itself having changed, and a fling that overshoots and bounces
+ * crosses it again on the way back. Widening the threshold does not fix that,
+ * because the readings genuinely cross it; what is wrong is that the chrome
+ * ANSWERS EVERY ONE.
  *
  * ⚠️ WEIGHT IN ONE DIRECTION ONLY, WHICH IS WHY IT COSTS NOTHING. Arriving stays
  * instant — a hem that waited would let a card's text read through a title,

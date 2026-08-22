@@ -171,11 +171,12 @@ depth.
   `ResizeObserver` as well.
 - **It arrives at once and leaves only once the page has stopped**, and the
   asymmetry is the whole of it. Those two readings are not a smooth ramp on a
-  real phone: a fling overshoots and bounces at either end, and the browser's own
-  toolbar collapsing mid-scroll changes the viewport height underneath the
-  subtraction — so the honest answer flips several times while a thumb is still
-  moving, and answering every one makes both ends of the screen blink. Widening
-  the 8px threshold does not help, because the readings genuinely cross it.
+  real phone: the foot's is `scrollHeight - (y + innerHeight)`, and a mobile
+  browser's toolbar collapsing mid-scroll grows `innerHeight` by about 56px — so
+  near the end of a page the subtraction crosses the 8px threshold with nothing
+  about the scroll itself having changed, and a fling that overshoots and bounces
+  crosses it again coming back. Widening the threshold does not help, because the
+  readings genuinely cross it.
   Arriving stays instant, because a hem that waited would let a card's text read
   through a title; leaving waits `SETTLE` (200ms of stillness, re-armed by every
   reading), because nothing is harmed by a vignette lingering over nothing. The

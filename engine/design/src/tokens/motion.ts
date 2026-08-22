@@ -117,10 +117,12 @@ export type Duration = keyof typeof DURATION;
  * ⚠️ CHROME THAT CHASES A FINGER IS WHAT MAKES A PRODUCT FEEL CHEAP. The hems
  * are driven by two readings — "is anything behind the crown", "is anything
  * still below the fold" — and both are answered from a scroll position that, on
- * a real phone, is not a smooth ramp: a fling overshoots and bounces, and the
- * browser's own toolbar collapsing mid-scroll changes the viewport height under
- * the arithmetic. Answered honestly every frame, the two ends of the screen
- * blink while a thumb is still moving.
+ * a real phone, is not a smooth ramp. The foot's is the sharper case and it is
+ * arithmetic rather than a guess: it reads `scrollHeight - (y + innerHeight)`,
+ * and a mobile browser's toolbar collapsing mid-scroll grows `innerHeight` by
+ * about 56px with nothing about the scroll itself changing — so near the end of
+ * a page that value crosses the 8px threshold on its own. Answered every frame,
+ * the two ends of the screen change while a thumb is still moving.
  *
  * ⚠️ SO THE RULE IS ASYMMETRIC, AND THAT IS THE WHOLE OF IT. A hem ARRIVES the
  * instant it has work to do — waiting there would let a card's text read through
