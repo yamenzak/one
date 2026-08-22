@@ -595,6 +595,53 @@ const DRAWN = [...filesIn("design/src"), ...filesIn("one-space/src")];
   if (!plated) ok(`plate: ${EDGES.length} pinned surface(s), all of them the ground itself`);
 }
 
+/* ------------------- a source is placed where its mask keeps it --- */
+{
+  /*
+    ⚠️ THE FLARE WEARS A STEEP MASK AND A BAND CAN BE PLACED PAST IT. `LIGHT`
+    holds to 26% of the viewport and is transparent by 78%, so a beam angled
+    downward with its source at 85% of its own axis is drawn in full and removed
+    in full — the gradient real, the element boxed, the background-image set,
+    every token reading correctly, and the screen black. It shipped exactly that
+    way, and the only thing that changed was the seed.
+  *
+    ⚠️ PINNED AS A NUMBER RATHER THAN AS A PHOTOGRAPH, and that split is the
+    finding. Whether a band lands where the mask keeps it is trigonometry over an
+    angle, a stop and a viewport; the browser sweep
+    (`design/test/sky.seen.test.tsx`) proves a source reaches the screen at all,
+    and measured across 24 seeds in both states it does NOT separate a good band
+    from a mostly-masked one — a masked band still tints a fifth of the page. So
+    the rule lives where it is decidable: the range a family may place a band in.
+
+    ⚠️ AND IT IS THE UPPER BOUND THAT MATTERS. The lower one is free — a band at
+    8% is at the top of the ramp, which is where a light belongs.
+  */
+  const CEILING = 42;
+  const src = readFileSync(join(ENGINE, "design/src/scene/neon.ts"), "utf8");
+
+  /* ⚠️ THE NUMBER AND THE SHAPE, and the shape is the half that bit. What
+     shipped invisible was a TERNARY offering a second range past the mask, so a
+     check reading one bound walked straight past it and reported the good half.
+     The band's placement has to be the named constant and nothing else. */
+  const named = /const SOURCE_AT = \{ lo: ([\d.]+), hi: ([\d.]+) \}/.exec(src);
+  const used = /band\(p, of, between\(r, SOURCE_AT\.lo, SOURCE_AT\.hi\)/.test(src);
+
+  if (!named) {
+    fail("design/src/scene/neon.ts: no `SOURCE_AT` — the placement rule has no name,\n" +
+         "       so nothing can check it. A band past the flare's mask is a light nobody sees.");
+  } else if (!used) {
+    fail("design/src/scene/neon.ts: `beam` does not place its band at `SOURCE_AT` alone.\n" +
+         "       A second range — a ternary, a branch, another `between` — is how the source\n" +
+         "       came to sit past the mask on half its seeds, with every token still correct.");
+  } else if (Number(named[2]) > CEILING) {
+    fail(`design/src/scene/neon.ts: \`SOURCE_AT.hi\` is ${named[2]}%, past the ${CEILING}% the\n` +
+         `       flare's mask keeps. A band past the ramp is drawn in full and masked away in\n` +
+         `       full — every token correct, and no light on the screen.`);
+  } else {
+    ok(`source: a beam is placed at ${named[1]}–${named[2]}% of its axis, inside the mask's ramp`);
+  }
+}
+
 console.log(bad
   ? `\nscene: ${bad} finding(s) — a world that is not the same world twice.`
   : `\nscene: seeded, compositor-only, masked rather than washed, sized by area, bound not built.`);

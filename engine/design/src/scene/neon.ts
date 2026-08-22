@@ -143,15 +143,33 @@ const ring = (r: () => number, p: Palette, of: Lit): string =>
  * lands is always a curve near an edge; a beam has no such geometry, and the
  * middle of its axis is the middle of the screen — which is where a home screen
  * puts the one figure it exists to show. Measured: a beam at 48% ran its white
- * core straight through the eyebrow, the number and the line under it. Both
- * outer thirds are still available, so nothing about the family narrows except
- * the one band that was never usable.
+ * core straight through the eyebrow, the number and the line under it.
+ *
+ * ⚠️ AND THE FAR END IS NOT AVAILABLE EITHER, WHICH IS THE HALF THAT SHIPPED
+ * INVISIBLE. The flare wears `LIGHT`, a steep vertical mask that holds to 26% of
+ * the viewport and is gone by 78% — so a beam angled downward with its source at
+ * 85% of its axis is drawn in full and then masked away entirely. Every token
+ * resolved, the element had a box, the gradient was real, and the screen was
+ * black: a seed picking that half produced a family with no light in it.
+ *
+ * ⚠️ SO THE SOURCE LIVES WHERE THE MASK KEEPS IT, AND THE VARIETY COMES FROM THE
+ * ANGLE'S SIGN. A negative angle runs the axis from the opposite corner, so one
+ * stop range still gives a band entering from either side — which is the
+ * variation that was ever visible.
  */
+/**
+ * ⚠️ WHERE A SOURCE MAY SIT ON ITS OWN AXIS, AS A NUMBER WITH A NAME. Buried in
+ * the call it was a range somebody could widen back without reading any of the
+ * above; named, it is the rule, and `scripts/scene.test.mjs` reads it — both the
+ * ceiling AND the shape, because the version that shipped invisible was a
+ * TERNARY offering a second range, which a check on one number walks straight
+ * past.
+ */
+const SOURCE_AT = { lo: 8, hi: 30 } as const;
+
 const beam = (r: () => number, p: Palette, of: Lit): string =>
   `linear-gradient(${(between(r, 24, 66) * (r() < 0.5 ? 1 : -1) + 90).toFixed(1)}deg,`
-  + ` ${band(p, of,
-    r() < 0.5 ? between(r, 8, 30) : between(r, 70, 92),
-    between(r, 1.4, 2.8))})`;
+  + ` ${band(p, of, between(r, SOURCE_AT.lo, SOURCE_AT.hi), between(r, 1.4, 2.8))})`;
 
 /**
  * ⚠️ THE BLOOM IS WHAT THE LIGHT DOES TO THE AIR, AND WITHOUT IT THE BAND IS A

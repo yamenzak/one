@@ -153,6 +153,33 @@ depth.
   same fault a beam's placement rule prevents, one variant over. One scalar over
   every stop of the band, so the two stay one world seen twice.
 
+### A light has to reach an eye, and three things can stop it
+
+⚠️ **A SOURCE PLACED PAST ITS OWN MASK IS DRAWN IN FULL AND REMOVED IN FULL.** The
+flare wears `LIGHT`, held to 26% of the viewport and gone by 78%. A band placed
+at 85% of its own axis resolves to a real gradient, lands on an element with a
+real box, sets a real `background-image` — and the screen is black. It shipped:
+a product's home screen lost its light because the SEED changed, with every
+property still reading correctly and nothing anywhere disagreeing. `SOURCE_AT` in
+`neon.ts` is the rule now, and `scripts/scene.test.mjs` pins both the number and
+the SHAPE — what shipped was a ternary offering a second range, which a check
+reading one bound walks straight past.
+
+⚠️ **AND A WORLD IS SEEDED ON THE SCREEN'S `id`, NEVER ITS ROUTE.** A route is an
+address, and an address belongs to whoever mounted the product: the deployment
+rewrites every screen into `/<app>/…`, so seeding on one meant that correcting
+the addressing re-rolled every world in every product — silently, with no
+declaration changed. A world is a property of the screen, so it is seeded on the
+thing about the screen no host can move.
+
+⚠️ **WHAT PROVES IT, AND WHAT DOES NOT.** `worldOf` photographs the page twice,
+once with `--world-flare` suppressed, and a picture that does not change is a
+light nobody sees — which catches a source that resolved to nothing, one whose
+layer has no box, and one behind an opaque parent. Measured across 24 seeds in
+both states, it does NOT separate a well-placed band from a mostly-masked one: a
+masked band still tints a fifth of the page. That is why the placement rule is a
+number at the source rather than a threshold on a photograph.
+
 ### The colour is the APP's, and no longer a workspace's
 
 `AppSpec.hue` is one OKLCH value a product declares once. `Page` sets it as

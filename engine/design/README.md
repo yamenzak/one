@@ -171,9 +171,9 @@ part that is not. Refresh with `node engine/scripts/docs.test.mjs --write`.
 | `parts/` | rows, cards, lists, controls, the four outcomes | 161 |
 | `rendered/` | whole surfaces drawn from a kernel declaration | 53 |
 | `chart/` | the data vocabulary — a number as a shape | 39 |
-| `measure/` | what a screen actually lays out, in a real browser — the harness every app sweeps its own screens with | internal |
+| `measure/` | what a screen actually lays out, in a real browser — the harness every app sweeps its own screens with | 1 |
 
-**392 exports.** Every one is reachable as `import { … } from "@engine/design"`;
+**393 exports.** Every one is reachable as `import { … } from "@engine/design"`;
 there is no deep import, and a guard says so.
 
 ### `tokens/`
@@ -247,6 +247,10 @@ there is no deep import, and a guard says so.
 - `chart/figures.tsx` — `ChartPanel`, `Delta`, `Hero`, `Meter`, `Stat`, `StatRow`
 - `chart/palette.ts` — `assign`, `AXIS`, `DATA`, `emphasis`, `GRID`, `magnitude`, `polarity`, `pole`, `QUIET`, `SEPARATOR`, `seriesColour`, `SLOTS`
 - `chart/scale.ts` — `Point`, `Span`
+
+### `measure/`
+
+- `measure/index.tsx` — `World`
 <!-- /generated -->
 
 ## What is guarded

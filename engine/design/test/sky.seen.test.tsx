@@ -26,8 +26,14 @@
 
 import { chromium, type Browser } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { FAMILIES } from "../src/scene/index.js";
+import { FAMILIES, render, type Family, type Palette } from "../src/scene/index.js";
 import { ambienceStylesheet, worldCss } from "../src/tokens/ambience.js";
+import { GROUND_CSS } from "../src/tokens/ground.js";
+import { Page } from "../src/frame/page.js";
+import { worldOf } from "../src/measure/index.js";
+
+/** ⚠️ Any palette — the sweep is about PLACEMENT, which no colour changes. */
+const SWEEP: Palette = { deep: "#101014", lit: "oklch(0.79 0.16 68)" } as unknown as Palette;
 
 let browser: Browser;
 beforeAll(async () => { browser = await chromium.launch(); }, 120_000);
@@ -103,4 +109,60 @@ describe("a world that declares motion", () => {
     const { moved } = await shot(family, true);
     expect(moved, `${family} keeps moving for somebody who asked it not to`).toBe(false);
   }, 60_000);
+});
+
+/**
+ * A SOURCE THAT REACHES THE SCREEN AT ALL — ON EVERY SEED.
+ *
+ * ⚠️ WHAT THIS PROVES, AND WHAT IT DOES NOT. Suppressing `--world-flare` must
+ * change the picture, which catches a source that resolved to nothing, one whose
+ * layer has no box, and one sitting behind an opaque parent — three ways a
+ * family's light reaches no eye with every property still reading correctly.
+ * It does NOT separate a well-placed band from one the mask has mostly removed:
+ * measured across 24 seeds in both states, the worst case is a fifth of the
+ * image either way, because a masked band still tints the top of the page. The
+ * PLACEMENT rule is pinned at the source instead (`scripts/scene.test.mjs`),
+ * where it is a number rather than a photograph.
+ *
+ * ⚠️ AND THE SEEDS ARE SWEPT because that is where the variation lives. One seed
+ * proves one world; a family is every world it can make, and it was a seed
+ * changing that took a product's light away.
+ */
+describe("a family that declares a source", () => {
+  /* ⚠️ ENOUGH TO REACH BOTH FORMS — `forms` picks a ring over a beam about five
+     times in eight, so a handful of seeds can be all rings and say nothing about
+     the half that broke. Measured: beams appear from the fourth. */
+  const SEEDS = Array.from({ length: 10 }, (_, i) => `sweep-${i}`);
+
+  const skies = Object.entries(FAMILIES)
+    .filter(([, family]) => {
+      const one = (family as { night?: Family }).night ?? (family as { day?: Family }).day;
+      return !!one && !!render({ family: one, seed: SEEDS[0] as string, palette: SWEEP, density: 1.8 }).flare;
+    })
+    .map(([name]) => name);
+
+  it("finds a family with a source to sweep", () => {
+    expect(skies.length, "no family declares a source, so this sweep checks nothing")
+      .toBeGreaterThan(0);
+  });
+
+  for (const sky of skies) {
+    for (const seed of SEEDS) {
+      it(`gets ${sky}'s light onto the screen: ${seed}`, async () => {
+        const world = await worldOf(
+          browser,
+          <Page sky={sky as "neon"} seedling={seed} hue="oklch(0.79 0.16 68)">
+            <div style={{ minHeight: "150vh" }} />
+          </Page>,
+          `${GROUND_CSS}\n${ambienceStylesheet()}`,
+          { width: 390, height: 844 },
+        );
+        expect(world.flare, `${sky}/${seed}: the source resolved to nothing`).not.toBe("none");
+        expect(world.lit.on, `${sky}/${seed}: no element carries the source`).toBe(true);
+        expect(world.visible,
+          `${sky}/${seed}: suppressing the source changes nothing on the screen — it is `
+          + `declared, resolved, and reaches no eye`).toBeGreaterThan(0.02);
+      }, 60_000);
+    }
+  }
 });

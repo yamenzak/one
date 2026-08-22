@@ -450,11 +450,20 @@ export function Shell(props: ShellProps) {
   const foot: Foot = at?.nav === "primary" ? "nav" : "act";
 
   const named = at?.sky as Sky | undefined;
-  /* ⚠️ SEEDED ON THE SCREEN'S OWN ROUTE, which is the whole gain over a name.
-     Two screens of one product naming `glow` are two grounds of one material
-     rather than the same picture twice, and nobody chose either of them. */
+  /*
+    ⚠️ SEEDED ON THE SCREEN'S OWN IDENTITY, which is the whole gain over a name.
+    Two screens of one product naming `glow` are two grounds of one material
+    rather than the same picture twice, and nobody chose either of them.
+
+    ⚠️ AND ON ITS `id`, NEVER ITS ROUTE. A route is an ADDRESS, and an address
+    belongs to whoever mounted the product: the deployment rewrites every screen
+    into `/<app>/…`, so seeding on one meant that correcting the addressing
+    re-rolled every world in every product — silently, with no declaration
+    changed and nothing failing. A world is a property of the screen, so it is
+    seeded on the thing about the screen that no host can move.
+  */
   const lit = named && named !== "plain"
-    ? { sky: named, seedling: `${crown.appId}|${at?.route ?? ""}` }
+    ? { sky: named, seedling: `${crown.appId}|${at?.id ?? ""}` }
     : { world: worldFor(appFace(crown.appId)) ?? undefined };
 
   return (

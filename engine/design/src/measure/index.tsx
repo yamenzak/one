@@ -393,6 +393,105 @@ export async function geometryOf(
 
 /* ---------------------------------------------------------- what it looks --- */
 
+/* ------------------------------------------------------------- the world --- */
+
+/** What a scene actually resolved to, on a page that really rendered. */
+export interface World {
+  /** The family the shell chose, or null where no element carries one. */
+  readonly sky: string | null;
+  /** ⚠️ Whether the shell FOUND the screen. Null is the fault this exists for. */
+  readonly named: boolean;
+  readonly wash: boolean;
+  /** The resolved custom properties, so a `none` is distinguishable from a miss. */
+  readonly ground: string;
+  readonly flare: string;
+  readonly brand: string;
+  /** The flare's own element: whether it is there, and whether it PAINTS. */
+  readonly lit: { readonly on: boolean; readonly area: number; readonly paints: boolean };
+  /**
+   * ⚠️ WHETHER THE SOURCE CHANGES WHAT IS ON THE SCREEN, which is the only
+   * question worth asking about a light. The share of bytes that differ between
+   * the page as drawn and the same page with `--world-flare` suppressed — zero
+   * means the family declared a source, resolved it, gave it an element with a
+   * box, and painted something no eye can find.
+   */
+  readonly visible: number;
+}
+
+/**
+ * WHAT THE WORLD BEHIND A SCREEN ACTUALLY CAME OUT AS.
+ *
+ * ⚠️ EVERY OTHER CHECK IN THIS PACKAGE ASKS WHETHER SOMETHING IS DECLARED, AND
+ * THIS ASKS WHETHER IT IS PAINTED. An ambience is the one part of the interface
+ * with no text to assert, no box to measure and no control to press — so a world
+ * that resolved to `none` looks exactly like a world that is quiet, and a screen
+ * whose sky was never chosen looks exactly like a screen that chose `plain`. All
+ * three shipped at once, and what was on the page was the fallback ground.
+ *
+ * ⚠️ IT READS THE PIXELS, NOT ONLY THE PROPERTIES. A `--world-flare` holding a
+ * real gradient still paints nothing if the layer is behind an opaque parent or
+ * has no box, and a token check would pass through all of it — which is what a
+ * property-only version of this test would have done to the very bug it was
+ * written for.
+ */
+export async function worldOf(
+  browser: Browser, what: ReactNode | Live, css: string,
+  viewport: { width: number; height: number }, theme: "dark" | "light" = "dark",
+): Promise<World> {
+  const page = await browser.newPage({ viewport });
+  try {
+    await show(page, what, css, theme);
+    await page.evaluate(() => new Promise((go) => requestAnimationFrame(() => go(null))));
+
+    const seen = await page.evaluate(() => {
+      const sky = document.querySelector("[data-sky]");
+      const flare = document.querySelector("[data-flare]");
+      const of = sky ? getComputedStyle(sky) : null;
+      const box = flare?.getBoundingClientRect();
+      const paint = flare ? getComputedStyle(flare).backgroundImage : "none";
+      return {
+        sky: sky?.getAttribute("data-sky") ?? null,
+        named: !!sky?.getAttribute("data-sky"),
+        wash: sky?.getAttribute("data-wash") === "true",
+        ground: (of?.getPropertyValue("--world-ground") ?? "").trim(),
+        flare: (of?.getPropertyValue("--world-flare") ?? "").trim(),
+        brand: (of?.getPropertyValue("--brand") ?? "").trim(),
+        lit: {
+          on: !!flare,
+          area: Math.round((box?.width ?? 0) * (box?.height ?? 0)),
+          paints: paint !== "none" && paint !== "",
+        },
+      };
+    });
+    /*
+      ⚠️ THE LIGHT IS MEASURED BY TAKING IT AWAY, because nothing else can see
+      it. A gradient resolves, an element has a box, a background-image is set —
+      and the flare wears a steep mask, so a source the seed placed past the
+      ramp is drawn in full and removed in full, with every property reading
+      correctly. Two photographs, one with the source suppressed: if they are
+      the same picture, there is no light on the screen.
+
+      ⚠️ ANIMATIONS OFF FOR BOTH, or the two differ by whatever moved between
+      them and every world passes.
+    */
+    const lit = await page.screenshot({ animations: "disabled" });
+    await page.evaluate(() => {
+      const el = document.querySelector("[data-sky]") as HTMLElement | null;
+      el?.style.setProperty("--world-flare", "none");
+    });
+    await page.evaluate(() => new Promise((go) => requestAnimationFrame(() => go(null))));
+    const dark = await page.screenshot({ animations: "disabled" });
+    const n = Math.min(lit.length, dark.length);
+    let off = lit.length === dark.length ? 0 : Math.abs(lit.length - dark.length);
+    for (let i = 0; i < n; i++) if (lit[i] !== dark[i]) off++;
+    const visible = off / Math.max(1, Math.max(lit.length, dark.length));
+
+    return { ...seen, visible };
+  } finally {
+    await page.close();
+  }
+}
+
 /**
  * ONE PHOTOGRAPH OF ONE SCREEN, AT ONE WIDTH, IN ONE THEME.
  *
