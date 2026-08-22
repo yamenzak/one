@@ -109,9 +109,19 @@ control nobody can find.
   card must still read as raised against the page and a chip against a card, so
   the share RISES with the tier rather than being one number everywhere. Wash
   them all equally and the three collapse into one flat field.
-- **Mix the hue whole, not pre-darkened.** Amber toward black is BROWN, and a
-  card washed in brown reads as dirty rather than as lit. The mix belongs at the
-  surface, where a small share of a bright colour is a tint.
+- **Mix the hue whole — not pre-darkened, and not pre-lightened either.** Amber
+  toward black is BROWN, and a card washed in brown reads as dirty rather than as
+  lit; amber toward white arrives at a rule that takes fifteen percent of it and
+  amounts to nothing, so every card on a lit page reads neutral. Both mistakes
+  are the same one: the surface rules take a SHARE, so a colour diluted before
+  they see it has already spent what it had. The mix belongs at the surface.
+
+- **A sky's day half inverts the core AND comes down in strength.** The hue at an
+  alpha over near-black is a soft bloom; the same alpha over paper is a saturated
+  stroke. A band tuned for a dark room and drawn on a white one keeps its full
+  weight half way down the page and runs through whatever is written there — the
+  same fault a beam's placement rule prevents, one variant over. One scalar over
+  every stop of the band, so the two stay one world seen twice.
 
 ### The colour is the APP's, and no longer a workspace's
 

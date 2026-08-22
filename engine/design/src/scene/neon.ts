@@ -86,17 +86,33 @@ type Hot = (p: Palette) => string;
  */
 const PEAK = 62;
 
-const band = (p: Palette, hot: Hot, at: number, w: number): string => [
-  `${halo(p, 0)} 0%`,
-  `${halo(p, 0)} ${+(at - w * 2.4).toFixed(1)}%`,
-  `${halo(p, 26)} ${+(at - w * 0.9).toFixed(1)}%`,
-  `${halo(p, 62)} ${+(at - w * 0.3).toFixed(1)}%`,
-  `color-mix(in oklab, ${hot(p)} ${PEAK}%, transparent) ${+at.toFixed(1)}%`,
-  `${halo(p, 70)} ${+(at + w * 0.35).toFixed(1)}%`,
-  `${halo(p, 30)} ${+(at + w * 1.1).toFixed(1)}%`,
-  `${halo(p, 9)} ${+(at + w * 2.6).toFixed(1)}%`,
-  `${halo(p, 0)} ${+(at + w * 5).toFixed(1)}%`,
-].join(", ");
+/**
+ * ⚠️ AND THE WHOLE BAND IS SCALED PER SKY, NOT ONLY ITS CORE. Inverting the hot
+ * point is what makes a light read as a light on either ground; it is not what
+ * makes it read as the SAME light. The shoulders are the hue at an alpha, and
+ * the hue at an alpha over near-black is a soft bloom while the same alpha over
+ * paper is a saturated stroke — so a band tuned for a dark room, drawn on a
+ * white one, keeps its full strength half way down the page and passes through
+ * whatever is written there. One scalar over every stop is what keeps the two
+ * one world seen twice rather than two families with a shared geometry.
+ */
+type Lit = { readonly hot: Hot; readonly strength: number };
+
+const band = (p: Palette, of: Lit, at: number, w: number): string => {
+  const a = (pct: number) => halo(p, +(pct * of.strength).toFixed(1));
+  return [
+    `${halo(p, 0)} 0%`,
+    `${halo(p, 0)} ${+(at - w * 2.4).toFixed(1)}%`,
+    `${a(26)} ${+(at - w * 0.9).toFixed(1)}%`,
+    `${a(62)} ${+(at - w * 0.3).toFixed(1)}%`,
+    `color-mix(in oklab, ${of.hot(p)} ${+(PEAK * of.strength).toFixed(1)}%, transparent)`
+      + ` ${+at.toFixed(1)}%`,
+    `${a(70)} ${+(at + w * 0.35).toFixed(1)}%`,
+    `${a(30)} ${+(at + w * 1.1).toFixed(1)}%`,
+    `${a(9)} ${+(at + w * 2.6).toFixed(1)}%`,
+    `${halo(p, 0)} ${+(at + w * 5).toFixed(1)}%`,
+  ].join(", ");
+};
 
 /**
  * A RING FAR BIGGER THAN THE FRAME, SO WHAT LANDS IS AN ARC.
@@ -110,10 +126,10 @@ const band = (p: Palette, hot: Hot, at: number, w: number): string => [
  * arc down one side; a wide flat one gives the long shallow sweep across the
  * whole width. One declaration, two worlds anybody would describe differently.
  */
-const ring = (r: () => number, p: Palette, hot: Hot): string =>
+const ring = (r: () => number, p: Palette, of: Lit): string =>
   `radial-gradient(${between(r, 78, 190)}% ${between(r, 46, 132)}%`
   + ` at ${between(r, 4, 96)}% ${between(r, -34, 18)}%,`
-  + ` ${band(p, hot, between(r, 44, 70), between(r, 1.1, 2.2))})`;
+  + ` ${band(p, of, between(r, 44, 70), between(r, 1.1, 2.2))})`;
 
 /**
  * ⚠️ A BEAM IS THE SAME BAND WITHOUT THE CURVE, and it exists because a ring
@@ -131,9 +147,9 @@ const ring = (r: () => number, p: Palette, hot: Hot): string =>
  * outer thirds are still available, so nothing about the family narrows except
  * the one band that was never usable.
  */
-const beam = (r: () => number, p: Palette, hot: Hot): string =>
+const beam = (r: () => number, p: Palette, of: Lit): string =>
   `linear-gradient(${(between(r, 24, 66) * (r() < 0.5 ? 1 : -1) + 90).toFixed(1)}deg,`
-  + ` ${band(p, hot,
+  + ` ${band(p, of,
     r() < 0.5 ? between(r, 8, 30) : between(r, 70, 92),
     between(r, 1.4, 2.8))})`;
 
@@ -152,9 +168,9 @@ const bloom = (r: () => number, p: Palette): string =>
  * room with a window in it. The second, when the seed gives one, is what lets
  * the first fall off TO something.
  */
-const forms = (r: () => number, p: Palette, hot: Hot): readonly string[] => {
-  const first = r() < 0.62 ? ring(r, p, hot) : beam(r, p, hot);
-  const second = r() < 0.26 ? [r() < 0.5 ? ring(r, p, hot) : beam(r, p, hot)] : [];
+const forms = (r: () => number, p: Palette, of: Lit): readonly string[] => {
+  const first = r() < 0.62 ? ring(r, p, of) : beam(r, p, of);
+  const second = r() < 0.26 ? [r() < 0.5 ? ring(r, p, of) : beam(r, p, of)] : [];
   return [first, ...second];
 };
 
@@ -198,7 +214,8 @@ const NIGHT: Family = {
     can reach it.
   */
   ground: (p, r): Ground => ({
-    flare: forms(r, p, (q) => `color-mix(in oklab, ${q.lit} 22%, #fff)`),
+    /* ⚠️ FULL STRENGTH: this is the ground the family was tuned against. */
+    flare: forms(r, p, { hot: (q) => `color-mix(in oklab, ${q.lit} 22%, #fff)`, strength: 1 }),
     layers: [
       bloom(r, p),
       /* ⚠️ THE CRUSH, so the corners are not as bright as the source. Without one
@@ -212,9 +229,12 @@ const NIGHT: Family = {
 
 /**
  * ⚠️ ON PAPER A LIGHT IS THE HUE AND THE ROOM IS THE WHITE. Same geometry, same
- * bloom, same wash — only the core inverts, which is the one thing that cannot
- * be shared. The ground stays paper, so the band is a saturated stroke of the
- * app's colour across a white page rather than a grey smear.
+ * bloom, same wash — the core inverts and the whole band comes down, which are
+ * the two things that cannot be shared. The ground stays paper, so the band is a
+ * saturated stroke of the app's colour across a white page rather than a grey
+ * smear; at full strength that stroke keeps its weight half way down the page
+ * and runs through whatever is written there, which is the same fault the beam's
+ * placement rule exists to prevent, one variant over.
  */
 const DAY: Family = {
   id: "neon.day",
@@ -222,9 +242,15 @@ const DAY: Family = {
   ink: "fixed",
   tile: { w: 1400, h: 1000 },
   veil: (p) => `color-mix(in oklab, ${p.lit} 6%, #fff)`,
-  wash: (p) => `color-mix(in oklab, ${p.lit} 46%, #fff)`,
+  /* ⚠️ THE HUE WHOLE HERE TOO, and for the mirror of the reason it is at night.
+     Pre-mixing toward white is the same mistake as pre-mixing toward black: the
+     surface rules take a small SHARE of what this hands them, so a colour already
+     diluted arrives as nothing and every card reads neutral on a lit page. The
+     mix belongs at the surface, where a small share of a bright colour is a tint
+     on paper and a light in the dark. */
+  wash: (p) => `${p.lit}`,
   ground: (p, r): Ground => ({
-    flare: forms(r, p, (q) => `${q.lit}`),
+    flare: forms(r, p, { hot: (q) => `${q.lit}`, strength: 0.52 }),
     layers: [
       bloom(r, p),
       `radial-gradient(${between(r, 110, 165)}% 120% at ${between(r, 20, 80)}% ${between(r, 4, 34)}%,`
