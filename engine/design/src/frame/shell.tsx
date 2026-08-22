@@ -292,6 +292,13 @@ export interface CrownInfo {
 
 export interface ShellProps {
   readonly screens: readonly ScreenSpec[];
+  /**
+   * ⚠️ THE PRODUCT'S OWN COLOUR — see `PageProps.hue`. It reaches the ground, the
+   * light and the wash from one declaration, and it is the app's rather than the
+   * workspace's: a design is a set of relationships somebody chose, and a colour
+   * picker is not a party to them.
+   */
+  readonly hue?: string;
   readonly here: string;
   readonly held: ReadonlySet<string>;
   /** Our own switches. A screen behind an unset one is not drawn. */
@@ -369,7 +376,8 @@ export function phoneNav(mine: readonly ScreenSpec[]): readonly ScreenSpec[] {
 
 export function Shell(props: ShellProps) {
   const {
-    screens, here, held, flags, kind, crown, onGo, onSwitchApp, onOpenInbox, onOpenSpace, children,
+    screens, hue, here, held, flags, kind, crown,
+    onGo, onSwitchApp, onOpenInbox, onOpenSpace, children,
   } = props;
 
   const mine = reachable(screens, held, flags, kind);
@@ -452,6 +460,7 @@ export function Shell(props: ShellProps) {
   return (
     <Page
       {...lit}
+      hue={hue}
       density="quiet"
       /* ⚠️ THE NAV IS THE PAGE'S — see `PageProps.nav`. A sticky island floats
          over whatever precedes it, and only the page can reserve the room. */

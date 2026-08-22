@@ -4457,6 +4457,23 @@ export const INVENTORY: AppSpec = defineApp({
     beak is the one place this product carries a hue.
   */
   mark: "▥",
+  /*
+    ⚠️ AMBER, AND IT IS THE COLOUR OF THE THING ITSELF. An inventory is cardboard
+    under a warehouse light: sodium, kraft, the sticker on the box. Reaching for
+    a blue would have been reaching for the colour every business product picks
+    when nobody has decided anything.
+
+    ⚠️ AND IT IS NAMED ONCE, HERE — see `AppSpec.hue`. The ground, the source in
+    it, the wash on every card and the halo under a heading are all this value
+    through the scene engine's `lit` slot, so the product's colour is one line
+    rather than a decision repeated per screen and drifting.
+
+    ⚠️ HIGH LIGHTNESS AND REAL CHROMA, BECAUSE IT IS A LIGHT BEFORE IT IS A
+    PAINT. `neon` mixes it most of the way to white for the core of its band and
+    keeps it whole for the bloom; an amber tuned as a surface colour — darker,
+    duller — gives a band that reads as brown and a wash with nothing in it.
+  */
+  hue: "oklch(0.79 0.16 68)",
 
   access: {
     permissions: [
@@ -4657,8 +4674,15 @@ export const INVENTORY: AppSpec = defineApp({
       shelf summarised; a root anybody could open would be a root that shows
       most people an empty screen.
     */
+    /*
+      ⚠️ AND IT IS THE ONE SCREEN IN THE PRODUCT THAT WEARS THE LIGHT. `neon` is
+      a hard bright source on black that washes the surfaces standing in it —
+      which is exactly right for the screen somebody opens the app onto and wrong
+      for every screen they then work on. Ambience everywhere is ambience
+      nowhere; a home that is lit is only lit because a shelf list is not.
+    */
     { id: "home", route: "/", label: "Home", nav: "primary", icon: "star",
-      permission: "stock:read" },
+      permission: "stock:read", sky: "neon" },
     { id: "stock", route: "/stock", label: "Stock", nav: "primary", icon: "box",
       permission: "stock:read" },
     /* ⚠️ A PRIMARY DESTINATION, BECAUSE IT IS THE GESTURE THE PRODUCT IS FOR.

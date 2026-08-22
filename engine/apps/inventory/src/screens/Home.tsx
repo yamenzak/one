@@ -159,33 +159,45 @@ export function Home({
   ].filter((one) => one !== null);
 
   return (
-    <Screen shape="board" title={title} under={said}>
+    /*
+      ⚠️ NO TITLE AND NO STRAPLINE, AND THAT IS THE DECISION THE REST OF THE
+      SCREEN HANGS ON. Every other screen in the product leads with its name
+      because somebody navigated to it; nobody navigates to home, they arrive
+      there — the crown already says where they are, and a heading plus two lines
+      of explanation is the width of the screen spent telling somebody something
+      they knew before they unlocked the phone. What goes in that space instead
+      is the number they opened the app for.
+    */
+    <Screen shape="board">
       <Stack space="roomy">
         {/*
-          ⚠️ THE FIGURE AND THE WAYS IN, IN ONE CARD. They are one gesture — look
-          at the number, then do something about it — and a section heading
-          between them would make the second block read as a menu rather than as
-          the first one's consequence.
+          ⚠️ THE FIGURE FLOATS. It is not in a card, and the card is what every
+          version of this had: a lit ground, and then an opaque grey rectangle
+          laid over the lit part of it with the number inside. What a card buys is
+          separation from what is around it, and nothing is around this — it is
+          the top of the screen, on the world, which is the one place in a product
+          where the ambience is the container.
+
+          ⚠️ AND THE ACTS RIDE UNDER IT RATHER THAN BESIDE IT. Look at the number,
+          then do something about it: one gesture, so no heading between them and
+          no second surface under them.
         */}
-        <Group>
-          <Await
-            of={of}
-            waiting={<FigureWaiting />}
-            again={again}
-            then={(shelf) => (
-              <>
-                <Hero eyebrow="On the shelf" value={shelf.lines} />
-                <NoteRow>
-                  {figures.grouped(shelf.products)}
-                  {shelf.products === 1 ? " product in " : " products in "}
-                  {figures.grouped(shelf.places)}
-                  {shelf.places === 1 ? " place" : " places"}
-                </NoteRow>
-              </>
-            )}
-          />
-          {acts.length ? <QuickActions actions={acts} /> : null}
-        </Group>
+        <Await
+          of={of}
+          waiting={<FigureWaiting />}
+          again={again}
+          then={(shelf) => (
+            <Hero
+              eyebrow="On the shelf"
+              value={shelf.lines}
+              identifier={`${figures.grouped(shelf.products)}`
+                + `${shelf.products === 1 ? " product in " : " products in "}`
+                + `${figures.grouped(shelf.places)}`
+                + `${shelf.places === 1 ? " place" : " places"}`}
+              under={acts.length ? <QuickActions actions={acts} /> : null}
+            />
+          )}
+        />
 
         {/*
           ⚠️ THE ONE BLOCK SOMEBODY OPENS THIS PRODUCT FOR, AND IT IS ABOVE

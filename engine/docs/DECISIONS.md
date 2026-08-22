@@ -1695,3 +1695,43 @@ both hold `stock:write` still have their own first count to record.
 there for; a newcomer asked to repeat what the workspace has already done; a
 per-person tally of how often a member does a thing; or a personal row written
 for an event no step asks about.
+
+## D55 — A product's colour is the product's, and one family commits
+
+**A design is a set of relationships somebody chose.** The light against the
+ground, the wash against the card, the one coloured thing on a screen — all of it
+was decided by whoever spent ten seconds in a workspace's colour picker, which
+meant no screen could be designed because no screen knew what it would be made
+of. `AppSpec.hue` is one value a PRODUCT declares; `Page` sets it as `--brand` on
+the element the ground is painted on, and every family reads its `lit` slot from
+there. A workspace keeps its name and its mark.
+
+**Every world was quiet, and that is why none of them could open an app.** A
+ground is behind the page; the controls on top of it stay the grey the palette
+made them, so what somebody sees is a working interface with a picture behind it.
+`neon` is a hard bright SOURCE on black — a ring far larger than the frame, so
+what lands is an arc, or a beam — with an almost-white core and the hue living in
+the falloff, because turning a hue up gives more of that hue and turning a real
+source up goes toward white.
+
+**And `Family.wash` is the half the others leave out.** A second, louder colour
+that SURFACES are made of, published once and mixed into the tiers by one rule —
+never a prop, so nothing writes a colour and the mono rule holds. Seven of the
+eight families decline; the share rises with the tier, because washing a page, a
+card and a control equally collapses three tiers into one flat field; and the hue
+goes in whole, because amber mixed toward black is brown and a card washed in
+brown reads as dirty rather than as lit.
+
+**The motion rule was "not under the blend", not "nothing moves".** The grain is
+`mix-blend-mode`, and a blended layer cannot be composited apart from what it
+blends with — so the ground's old drift dragged a viewport-sized stack onto the
+main thread sixty times a second. That is a property of WHERE A LAYER SITS.
+`Ground.flare` splits a family's own result: the shallow bloom stays under the
+dither, which is what stops it banding, and the steep band goes above it on its
+own layer, where a rotation of a degree and a half over ninety seconds is
+compositor-only and costs one promoted layer. Earned, and off both ways.
+
+**Therefore never:** a workspace's colour deciding what a product is made of; a
+world that reaches the page and not the things standing on it; a wash that treats
+every tier the same; a hue pre-mixed toward black before it reaches a surface; a
+band at full alpha where a heading is; or an animated layer under the dither.

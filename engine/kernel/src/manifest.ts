@@ -147,6 +147,28 @@ export interface AppSpec {
   readonly id: AppId;
   readonly name: string;
   readonly mark: string;
+  /**
+   * THE PRODUCT'S OWN COLOUR, AND THE PRODUCT IS THE ONE THING THAT MAY DECLARE
+   * IT.
+   *
+   * ⚠️ THIS USED TO BE A WORKSPACE'S. Every relationship a designer had chosen —
+   * the light against the ground, the wash against the card, the one coloured
+   * thing on a screen — was then decided by whoever spent ten seconds in a
+   * colour picker, and no screen could be designed because no screen knew what
+   * it would be made of. A workspace keeps its NAME and its MARK; what a product
+   * is made of belongs to whoever built it.
+   *
+   * ⚠️ ONE VALUE, NOT A PALETTE. It reaches the ground, the light, the wash and
+   * the halo through the scene engine's `lit` slot, so an app that names a hue
+   * once wears it everywhere with nothing else edited — and an app that names
+   * none is monochrome, which is the right default and what most screens want.
+   *
+   * ⚠️ OKLCH, SO IT IS THE SAME APPARENT BRIGHTNESS IN BOTH THEMES. An sRGB hex
+   * tuned against the night ground is a different lightness against paper, which
+   * is how one product comes to look confident in the dark and washed out in the
+   * light.
+   */
+  readonly hue?: string;
 
   readonly access: AccessSpec;
   /**

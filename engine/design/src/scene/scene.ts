@@ -117,6 +117,32 @@ export function pick<T extends { readonly weight: number }>(r: () => number, fro
  */
 export type Palette = Readonly<Record<string, string>>;
 
+/**
+ * A GROUND, AND THE PART OF IT THAT IS THE SOURCE.
+ *
+ * ⚠️ MOST FAMILIES RETURN AN ARRAY AND ARE DONE — the whole world is one stack
+ * of gradients under the dither, which is where a world belongs: the grain is
+ * what stops a large smooth ramp banding on an 8-bit display, and every family
+ * whose light is a haze needs it.
+ *
+ * ⚠️ A HARD SOURCE IS THE EXCEPTION, AND IT IS THE ONLY THING IN A SCENE THAT
+ * MAY MOVE. It is steep — a thin bright band with no shallow ramp in it — so it
+ * has nothing to band and does not need the dither; and being out from under a
+ * `mix-blend-mode` layer is what lets it animate on its own compositor layer
+ * instead of dragging the whole viewport-sized stack onto the main thread every
+ * frame, which is what killed the ground's old drift.
+ *
+ * ⚠️ SO THE SPLIT IS THE FAMILY'S, NOT A RULE'S. Nothing downstream can tell a
+ * band from a bloom by looking at a gradient string, and a stylesheet that
+ * guessed would lift the wrong layer on the next family somebody writes.
+ */
+export interface Ground {
+  /** Behind everything, under the dither. */
+  readonly layers: readonly string[];
+  /** ⚠️ The source itself, above the dither — see the header. */
+  readonly flare?: readonly string[];
+}
+
 export interface Variant {
   /** ⚠️ Relative, never a percentage. A family's ratios stay readable. */
   readonly weight: number;
@@ -180,7 +206,7 @@ export interface Family {
    * background — it is a whole environment, and its own field is the part that
    * makes it one. CSS layers, topmost first, exactly as `background-image` reads.
    */
-  readonly ground: (p: Palette, r: () => number) => readonly string[];
+  readonly ground: (p: Palette, r: () => number) => readonly string[] | Ground;
   readonly specks?: readonly Speck[];
   /** ⚠️ Marks that must MEET — see `Tiles`. A family has these or specks. */
   readonly tiles?: readonly Tiles[];
@@ -252,6 +278,28 @@ export interface Family {
    * one of them. That is exactly the decision a family variant exists to hold.
    */
   readonly veil?: (p: Palette) => string;
+  /**
+   * WHAT THE LIGHT LANDS ON, WHICH IS NOT THE SAME QUESTION AS WHAT TYPE SITS
+   * AGAINST.
+   *
+   * ⚠️ A GROUND IS BEHIND THE PAGE AND THE CONTROLS ARE ON TOP OF IT, so a world
+   * with no answer here is wallpaper hung behind a working screen: the pill, the
+   * card and the bar stay the grey the palette made them whatever is going on
+   * two layers down. `veil` cannot do this job — it is the ground's own colour,
+   * deliberately near the page so a halo is invisible and a hem reads as the
+   * page thickening, and a control made of it is a control nobody can find.
+   *
+   * ⚠️ SO IT IS A SECOND, LOUDER COLOUR, AND THE FAMILY IS THE ONLY THING THAT
+   * KNOWS IT. `ground` is a list of gradients and nothing downstream can read a
+   * value out of one. Published as `--scene-wash`, mixed into the surface tiers
+   * by ONE rule in `ambienceStylesheet` — never by a component, which is what
+   * keeps "an app writes no colour" true while the world still reaches the
+   * things standing in it.
+   *
+   * ⚠️ AND A FAMILY WITH NO WASH IS THE DEFAULT. Most worlds are quiet on
+   * purpose; the surfaces stay the palette's, and the token falls back.
+   */
+  readonly wash?: (p: Palette) => string;
 }
 
 export interface Scene {
@@ -351,6 +399,10 @@ export interface Rendered {
   readonly ground: string;
   /** ⚠️ Empty where the family declares none — see `Family.veil`. */
   readonly veil: string;
+  /** ⚠️ Empty where the family declares none — see `Family.wash`. */
+  readonly wash: string;
+  /** ⚠️ Empty for every family whose light is a haze — see `Ground`. */
+  readonly flare: string;
 }
 
 export function render(scene: Scene): Rendered {
@@ -516,7 +568,19 @@ export function render(scene: Scene): Rendered {
         + ` patternUnits="userSpaceOnUse">${body}</pattern></defs>`
         + `<rect width="100%" height="100%" fill="url(#${ns}-tile)"/>`
       : "",
-    ground: family.ground(palette, prng(hash(`${family.id}|ground|${scene.seed}`))).join(", "),
+    ...(() => {
+      /* ⚠️ ONE STREAM FOR THE WHOLE GROUND, and the family splits its own result
+         — see `Ground`. Two prngs would mean the band and the bloom it belongs
+         to were placed independently, which is a light in one corner and its
+         glow in another. */
+      const made = family.ground(palette, prng(hash(`${family.id}|ground|${scene.seed}`)));
+      const parts = Array.isArray(made) ? { layers: made, flare: [] } : made as Ground;
+      return {
+        ground: parts.layers.join(", "),
+        flare: (parts.flare ?? []).join(", "),
+      };
+    })(),
     veil: family.veil?.(palette) ?? "",
+    wash: family.wash?.(palette) ?? "",
   };
 }

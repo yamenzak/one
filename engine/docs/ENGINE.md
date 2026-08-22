@@ -1002,6 +1002,7 @@ its own header, cited by other files, and doing nothing.
 | D52 | The proving ground is a fixture, and the deployment serves no fixture | 0 |
 | D53 | The navigation is five destinations, and the chrome carries the rest | 8 |
 | D54 | Half a getting-started list is the workspace's and half is the person's | 0 |
+| D55 | A product's colour is the product's, and one family commits | 0 |
 <!-- /generated -->
 
 ---
@@ -1112,8 +1113,9 @@ that names no stage, so this list cannot grow by forgetting.
 | 80 | The ground is a fixture, and the deployment serves no fixture | shipped |
 | 81 | The navigation is five destinations, and the chrome carries the rest | shipped |
 | 82 | A home screen, and a checklist that knows whose step it is | shipped |
+| 83 | A product's colour is the product's, and one family commits | shipped |
 
-**72 shipped, 10 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**73 shipped, 10 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---

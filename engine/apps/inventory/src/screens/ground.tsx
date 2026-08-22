@@ -48,6 +48,9 @@ export function InventoryGround({ route, onGo }: {
   return (
     <Shell
       screens={screens}
+      /* ⚠️ THE MANIFEST'S, NOT A LITERAL. A specimen board that named its own
+         colour would photograph a product nobody ships. */
+      hue={INVENTORY.hue}
       here={route}
       held={EVERYTHING}
       kind="commercial"

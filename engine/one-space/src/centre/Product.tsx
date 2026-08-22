@@ -100,6 +100,11 @@ export function Product({ path, onGo, onOpenSpace, onOpenInbox }: {
         return (
           <Shell
             screens={screens}
+            /* ⚠️ THE PRODUCT'S OWN COLOUR — see `AppSpec.hue`. It travels with
+               the manifest, so switching products changes the world as well as
+               the nav; a colour resolved anywhere else would be one more thing
+               that has to agree. */
+            hue={app.hue}
             here={path}
             held={new Set(app.permissions)}
             /* ⚠️ WHAT THE WORKSPACE IS, so a business-only screen is not offered

@@ -33,6 +33,11 @@ const publicFace = (
   id: a.id,
   name: a.name,
   mark: a.mark,
+  /* ⚠️ THE PRODUCT'S OWN COLOUR, AND IT TRAVELS WITH THE PRODUCT — see
+     `AppSpec.hue`. Resolved anywhere else it would be one more thing that has to
+     agree with the manifest, and the day it stops agreeing the ground is one
+     colour and the mark over it is another. */
+  hue: a.hue,
   /*
     ⚠️ A SCREEN BEHIND A SWITCH THAT IS OFF DOES NOT TRAVEL. It used to travel
     whole: a manifest could put a screen behind a flag, the declaration refused

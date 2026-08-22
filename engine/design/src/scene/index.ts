@@ -12,6 +12,7 @@ export * from "./glow.js";
 export * from "./cloth.js";
 export * from "./etch.js";
 export * from "./tint.js";
+export * from "./neon.js";
 
 import { SPACE } from "./space.js";
 import { AURA } from "./aura.js";
@@ -21,6 +22,7 @@ import { GLOW } from "./glow.js";
 import { CLOTH } from "./cloth.js";
 import { ETCH } from "./etch.js";
 import { TINT } from "./tint.js";
+import { NEON } from "./neon.js";
 
 /**
  * EVERY WORLD THIS PRODUCT HAS, IN ONE PLACE.
@@ -49,6 +51,10 @@ export const FAMILIES = {
      in the theme's colours, which on a monochrome product means no colour at
      all; there is no seed of a mono palette that produces a tint. */
   tint: TINT,
+  /* ⚠️ THE ONE A PRODUCT WEARS — a hard bright source on black, and the only
+     family that reaches the CONTROLS standing on it (`Family.wash`). Every other
+     world here is quiet by design; an arrival screen is not. */
+  neon: NEON,
 } as const;
 
 /** ⚠️ Named, never handed over — a family composed at a call site is exactly
@@ -79,4 +85,5 @@ export const SKIES: readonly SceneFamily[] = (Object.keys(FAMILIES) as SceneFami
  * somebody ARRIVES at — a balance, a home, a result — never a form and never a
  * list.
  */
-export type Sky = "plain" | "glow" | "cloth" | "etch" | "loops" | "blobs" | "tint";
+export type Sky =
+  | "plain" | "glow" | "cloth" | "etch" | "loops" | "blobs" | "tint" | "neon";

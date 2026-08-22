@@ -44,6 +44,17 @@ const ok = (m) => console.log(`ok   ${m}`);
  */
 const SURFACES = {
   screens: { file: "design/src/frame/shell.tsx", renders: "export function Shell" },
+  /*
+    ⚠️ THE PRODUCT'S OWN COLOUR, AND WHAT RENDERS IT IS THE FRAME RATHER THAN A
+    SCREEN. `Page` sets it as `--brand` on the element the ground is painted on,
+    which is what every family reads its `lit` slot from — so one declaration
+    reaches the ground, the source in it, the wash on every surface and the halo
+    under a heading, with no screen naming a colour anywhere. Naming the setter
+    here is what stops the field becoming a value nothing resolves: a manifest
+    could carry a hue for a year and every screen stay monochrome, with nothing
+    failing.
+  */
+  hue: { file: "design/src/frame/page.tsx", renders: `["--brand" as string]: hue` },
   settings: { file: "design/src/rendered/settings.tsx", renders: "export function Settings" },
   /* ⚠️ The PAGES its settings live on. Rendered by the same surface, as the list
      it descends from — see `Settings`. */

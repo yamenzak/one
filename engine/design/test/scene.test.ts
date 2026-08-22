@@ -221,24 +221,50 @@ describe("the ambience engine's own motion", () => {
   const css = ambienceStylesheet();
 
   /*
-    ⚠️ THE STYLESHEET ANIMATES NOTHING, AND THAT IS THE RULE NOW. It carried two
-    full-viewport animations — a drift on the ground and a float on the field —
-    and both were faults of a different kind each. The float resampled a field of
-    HAIRLINES at sub-pixel offsets every frame: measured off a recording of a
-    screen with nothing happening, the background strobed between four discrete
-    brightness levels, eleven levels frame to frame, which is what "the ambience
-    flickers" was. The drift was cheaper to look at and dearer to run: the grain
-    over it uses `mix-blend-mode`, and a blended layer cannot be composited apart
-    from what it blends with, so a wash sliding two percent over twenty-four
-    seconds dragged a viewport-sized stack onto the main thread at 60fps.
+    ⚠️ EXACTLY ONE ANIMATION, AND IT IS THE SOURCE. The sheet carried two
+    full-viewport ones once and both were faults of a different kind: a float on
+    the FIELD resampled a screen of hairlines at sub-pixel offsets every frame —
+    measured off a recording, the background strobed between four brightness
+    levels — and a drift on the GROUND sat under the grain, which is
+    `mix-blend-mode`, so a wash sliding two percent over twenty-four seconds
+    dragged a viewport-sized stack onto the main thread at 60fps.
 
-    ⚠️ SO THE ONLY THING THAT MOVES IN A SCENE IS A MARK, INSIDE ITS OWN TILE.
-    That is SMIL — the only thing that repaints inside a `<pattern>` — and it
-    redraws the pattern rather than resampling a picture of it.
+    ⚠️ THE RULE THAT CAME OUT OF THAT IS "NOT UNDER THE BLEND", NOT "NOTHING
+    MOVES", and the difference is the whole of `neon`. A hard bright band on its
+    own layer ABOVE the dither composites alone: nothing re-blends, nothing
+    resamples a hairline, and the cost is one promoted layer moving by a degree
+    and a half over ninety seconds. What is still refused is a second one.
   */
-  it("animates nothing at all, because a scene's motion is in its drawing", () => {
-    expect(css).not.toMatch(/@keyframes/);
-    expect(css).not.toMatch(/\banimation\s*:/);
+  it("moves one layer, and it is the one above the dither", () => {
+    const frames = [...css.matchAll(/@keyframes\s+([\w-]+)/g)].map((m) => m[1]);
+    expect(frames, "one keyframe, and it is the source's").toEqual(["scene-flare"]);
+    /* ⚠️ THE GROUND AND THE FIELD STAY STILL — the two that were faults. */
+    expect(css).not.toMatch(/\[data-field\][^{]*\{[^}]*animation\s*:/);
+    expect(css).not.toMatch(/::before[^{]*\{[^}]*animation\s*:/);
+  });
+
+  /*
+    ⚠️ COMPOSITOR-ONLY, WHICH IS THE PROPERTY THAT MAKES IT AFFORDABLE. Opacity
+    and transform are the only two a compositor can animate without touching
+    layout or paint; anything else on a full-viewport layer repaints the whole
+    screen every frame, for ever, on a phone — and looks identical on the laptop
+    it was written on.
+  */
+  it("animates nothing a compositor cannot do on its own", () => {
+    const block = /@keyframes scene-flare \{([\s\S]*?)\n\}/.exec(css)?.[1] ?? "";
+    expect(block, "the keyframe moved and this reads nothing").toContain("transform");
+    const props = [...block.matchAll(/([a-z-]+)\s*:/g)].map((m) => m[1]);
+    expect(new Set(props)).toEqual(new Set(["transform", "opacity"]));
+  });
+
+  /*
+    ⚠️ AND OFF BOTH WAYS, WHICH IS THE HALF EITHER ALONE LEAVES OPEN. The media
+    query is the operating system's answer; the ancestor is the switch a person
+    can reach inside the app. For some people this is not a preference.
+  */
+  it("stops for both of the two people who can ask it to", () => {
+    expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?data-flare/);
+    expect(css).toMatch(/\[data-reduce-motion="true"\] \[data-flare\]/);
   });
 
   /*

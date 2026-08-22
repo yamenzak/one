@@ -59,10 +59,10 @@ The world falls out of what the subject IS — nothing picks it per screen
 | the beat | a twinkle — most of the way out, in 3–5s | a breath — a fifth of a stop, over 13–19s | a shallow fade, in 47–71s | a breath |
 | the colours | read from its planet | read from its mood | the theme | the theme |
 
-### Four a SCREEN may name
+### Five a SCREEN may name
 
-`glow`, `cloth`, `etch` and `tint` — plus `loops` and `blobs`, which a screen may
-name too.
+`glow`, `cloth`, `etch`, `tint` and `neon` — plus `loops` and `blobs`, which a
+screen may name too.
 
 | family | what it is | reach for it when |
 |---|---|---|
@@ -70,6 +70,61 @@ name too.
 | **cloth** | a swept field of fine lines, drawn whole, tiling by construction | a premium dark ground; a screen somebody works on for a while |
 | **etch** | ruled geometry — a lattice whose tile draws some subset of its own edges and diagonals | technical: a console, a deployment, monitoring, planning |
 | **tint** | glass: an edge-lit ground carrying a green of its own, under a near-transparent veil | the one card on a screen that is a destination rather than a control |
+| **neon** | a hard bright SOURCE on black, in the app's own colour, washing the surfaces standing in it | the one screen a product opens onto. Nothing else |
+
+⚠️ **`neon` IS THE ONLY FAMILY THAT COMMITS, AND THE ONLY ONE THAT REACHES THE
+CONTROLS.** Every other world here is quiet by design — which is right, and is
+why a product's rich screens land at all. What none of them could do is make a
+screen somebody opens the app onto feel like anything: the gradient is behind the
+page, the card on top of it is the same grey it is on a screen with no world at
+all, and what a person sees is a working interface with a picture behind it.
+
+- **The light is a GEOMETRY.** A **ring** far larger than the frame, so what
+  lands is an arc that curves around whatever the screen leads with; or a
+  **beam**, the same band without the curve. Seeded, one or occasionally two.
+- **The core is almost white and the hue lives in the falloff** — the same law
+  `glow` states, and it matters more here because the band is thin and hard.
+- **The peak is not opaque** (`PEAK`), because a band at full alpha erases
+  whatever it passes over, and on a phone that is a heading.
+- **A beam's hot point keeps out of the middle**, which is the one placement rule
+  the family does not leave to the seed: the middle of a beam's axis is the
+  middle of the screen, and that is where a home screen puts its one figure.
+- **`wash` is the half every other family leaves out** — see below.
+
+### The wash — the world reaching the things standing in it
+
+**`Family.wash` is a second, louder colour that surfaces are MADE of**, published
+as `--scene-wash` and mixed into the tiers by one rule in `ambienceStylesheet`.
+`veil` cannot do this job: it is deliberately near the page so a halo is
+invisible and a hem reads as the ground thickening, and a control made of it is a
+control nobody can find.
+
+- **The family decides, and seven of the eight decline.** The rules select on
+  `[data-wash="true"]`, set only where a family published one, so a page can
+  never be half-washed by a fallback.
+- **One rule, never a prop.** A component that took a tint is a component every
+  screen tints differently. Nothing writes a colour — the value is the world's,
+  mixed into the tier the palette already chose, so the mono rule holds.
+- **The tiers keep their order**, and that is the part that is easy to break: a
+  card must still read as raised against the page and a chip against a card, so
+  the share RISES with the tier rather than being one number everywhere. Wash
+  them all equally and the three collapse into one flat field.
+- **Mix the hue whole, not pre-darkened.** Amber toward black is BROWN, and a
+  card washed in brown reads as dirty rather than as lit. The mix belongs at the
+  surface, where a small share of a bright colour is a tint.
+
+### The colour is the APP's, and no longer a workspace's
+
+`AppSpec.hue` is one OKLCH value a product declares once. `Page` sets it as
+`--brand` on the element the ground is painted on, and every family reads its
+`lit` slot from that — so the ground, the source in it, the wash on every surface
+and the halo under a heading are one line.
+
+⚠️ **A DESIGN IS A SET OF RELATIONSHIPS SOMEBODY CHOSE.** The light against the
+ground, the wash against the card, the one coloured thing on a screen — all of it
+used to be decided by whoever spent ten seconds in a workspace's colour picker,
+which meant no screen could be designed because no screen knew what it would be
+made of. A workspace keeps its NAME and its MARK.
 
 ⚠️ **`tint` IS THE ONE FAMILY THAT BRINGS A COLOUR, AND THAT IS WHY IT IS A
 FAMILY.** This product is MONOCHROME, so `glow` on it is light with no colour in
@@ -271,8 +326,47 @@ ones and each was a fault of a different kind.
   dither: the grain is what stops a large gradient banding, and `overlay` is what
   makes noise dither rather than wash.
 
-So **the only thing that moves in a scene is a mark, inside its own tile** —
-which redraws the pattern rather than resampling a picture of it.
+So **a mark moves inside its own tile** — which redraws the pattern rather than
+resampling a picture of it — **and one layer moves above the dither.**
+
+### The one layer that moves, and why it is above the grain
+
+⚠️ **THE RULE IS "NOT UNDER THE BLEND", NOT "NOTHING MOVES", and the difference
+is the whole of `neon`.** The grain is `mix-blend-mode: overlay`, and a blended
+layer cannot be composited apart from what it blends with — so anything animating
+UNDER it drags a viewport-sized stack onto the main thread and re-blends it sixty
+times a second. That is what killed the ground's old drift, and it is a property
+of where the layer sits rather than of movement itself.
+
+**`Ground.flare` is the family's own split.** A family returning an array is
+done: the whole world is one stack under the dither, which is where a world
+belongs, because the grain is what stops a large smooth ramp banding. A family
+with a hard SOURCE returns it separately — it is steep, so it has nothing to
+band, and out from under the blend a transform and an opacity are compositor-only
+and cost one layer.
+
+Four layers, stacked explicitly: **ground (−4), field (−3), dither (−2), source
+(−1)**. All negative, so all of them are under the page's content whatever an
+ancestor does.
+
+- **A rotation and a breath, and nothing else.** A degree and a half around the
+  element's own centre moves a band whose source is far off the page by a long
+  way — a light that travels rather than a picture that spins.
+- **The overscan is what there is to rotate.** A layer that exactly covers its box
+  uncovers a corner the moment it turns.
+- **`DURATION.ambient` is ninety seconds, `alternate`**, and it is paced so that
+  nobody catches it. Under about a minute it becomes a movement, and a ground
+  that draws the eye is a ground that has failed.
+- **Earned, and off both ways.** `data-lively` comes from the same budget the
+  beats answer to, so a device that has not earned ambient motion gets a STILL
+  light rather than no light; the media query and the `data-reduce-motion`
+  ancestor both switch it off.
+- **`LIGHT`, not `MATTE`.** The matte hollows an ellipse down the reading column
+  so a world does not run under a paragraph; a band is a few percent of the width
+  and is what a screen leading with one figure wants passing behind it. What it
+  does take is a much steeper vertical fade than a ground — held to 26% and gone
+  by 78% — because a hard bright band held to the fold is a diagonal through the
+  middle of a list.
 
 - ⚠️ **A light is not a hue.** Turn a hue up and you get more of that hue; turn a
   real source up and it goes toward WHITE. `moods` picks faces from twelve

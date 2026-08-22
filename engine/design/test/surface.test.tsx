@@ -769,25 +769,23 @@ describe("a workspace's branding", () => {
     const css = ambienceStylesheet();
 
     /*
-      ⚠️ AND NOW NOTHING IN IT MOVES AT ALL. This asserted a drift keyframe, its
-      overscan and its opt-out; all three are gone, and for two different
-      reasons. The BEATS left because a mark lives inside a `<pattern>` and
-      Chromium rasterises a pattern's tile once — a CSS animation in there is
-      created, is reported by `getAnimations()`, and repaints nothing. The DRIFT
-      left because the grain above it uses `mix-blend-mode`, and a blended layer
-      cannot be composited apart from what it blends with: animating underneath
-      it re-blends a viewport-sized stack on the main thread sixty times a
-      second, for a wash sliding two percent over twenty-four seconds.
+      ⚠️ ONE ANIMATION, AND IT IS THE SOURCE'S. Two full-viewport ones shipped
+      once and both were faults of a different kind: the FIELD's float resampled
+      a screen of hairlines at sub-pixel offsets every frame, and the GROUND's
+      drift sat under the grain, which is `mix-blend-mode` — a blended layer
+      cannot be composited apart from what it blends with, so a wash sliding two
+      percent over twenty-four seconds re-blended a viewport-sized stack on the
+      main thread sixty times a second.
 
-      ⚠️ THE SCENE STILL MOVES — in SMIL, inside the tile, where it redraws the
-      pattern rather than resampling the picture of it. `test/sky.seen.test.tsx`
-      photographs that; this is what stops the stylesheet growing a second answer
-      beside it.
+      ⚠️ WHAT CAME OUT OF THAT IS "NOT UNDER THE BLEND" RATHER THAN "NOTHING
+      MOVES". A hard bright band on its own layer ABOVE the dither composites
+      alone. The exact-list assertion is what stops a second answer growing
+      beside it — the shape every motion vocabulary takes on its way to one
+      keyframe per screen. `test/scene.test.ts` holds what that one may animate.
     */
     expect(css).toContain("[data-sky]:not([data-sky=\"plain\"])::before {");
-    expect(css, "the ambience stylesheet declares a keyframe again").not.toMatch(/@keyframes/);
-    expect(css, "the ambience stylesheet animates something again")
-      .not.toMatch(/\banimation\s*:/);
+    expect([...css.matchAll(/@keyframes\s+([\w-]+)/g)].map((m) => m[1]),
+      "the ambience stylesheet grew a second animation").toEqual(["scene-flare"]);
 
     /*
       ⚠️ AND THE HOST CLIPS THAT OVERSCAN, WHICH NOTHING DID. A `scale(1.14)`
@@ -819,24 +817,21 @@ describe("a workspace's branding", () => {
     expect(css).not.toContain("[data-sky] { position: relative; isolation: isolate; overflow-x: clip");
 
     /*
-      ⚠️ AND NOW NOTHING IN IT MOVES AT ALL. This asserted a drift keyframe and a
-      beat rule per entry in the table; both are gone, and each for its own
-      reason. The BEATS left because a mark lives inside a `<pattern>` and
-      Chromium rasterises a pattern's tile once — a CSS animation in there is
-      created, reported by `getAnimations()`, and repaints nothing. The DRIFT
-      left because the grain above it uses `mix-blend-mode`, and a blended layer
-      cannot be composited apart from what it blends with, so animating
-      underneath it re-blends a viewport-sized stack on the main thread sixty
-      times a second for a wash sliding two percent.
+      ⚠️ AND EXACTLY ONE THING IN IT MOVES. Two full-viewport animations shipped
+      here once and each was a fault of its own kind: the FIELD's float resampled
+      a screen of hairlines at sub-pixel offsets every frame, and the GROUND's
+      drift sat under the grain — `mix-blend-mode`, so a blended layer that
+      cannot be composited apart from what it blends with, re-blending a
+      viewport-sized stack on the main thread sixty times a second for a wash
+      sliding two percent.
 
-      ⚠️ THE SCENE STILL MOVES — in SMIL, inside the tile, where it redraws the
-      pattern rather than resampling the picture of it. `test/sky.seen.test.tsx`
-      photographs that; this is what keeps the stylesheet from growing a second
-      answer beside it.
+      ⚠️ THE RULE THAT SURVIVED IS "NOT UNDER THE BLEND", NOT "NOTHING MOVES".
+      The source has its own layer above the dither and composites alone; the
+      list is exact so a second answer cannot grow beside it, which is the shape
+      every motion vocabulary takes on its way to one keyframe per screen.
     */
-    expect(css, "the ambience stylesheet declares a keyframe again").not.toMatch(/@keyframes/);
-    expect(css, "the ambience stylesheet animates something again")
-      .not.toMatch(/\banimation\s*:/);
+    expect([...css.matchAll(/@keyframes\s+([\w-]+)/g)].map((m) => m[1]),
+      "the ambience stylesheet grew a second animation").toEqual(["scene-flare"]);
   });
 
   /**

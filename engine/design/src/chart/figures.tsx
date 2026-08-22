@@ -19,6 +19,7 @@ import { Sparkline } from "./charts.js";
 import { type Point, compactLike } from "./scale.js";
 import { useFigures, useShown } from "../parts/said.js";
 import { Group } from "../parts/surfaces.js";
+import { Balance } from "../parts/heads.js";
 
 /* ------------------------------------------------------------------ delta --- */
 
@@ -122,7 +123,10 @@ export function StatRow({ children }: { readonly children: React.ReactNode }) {
  * decision anybody designed. It takes `display` from the type scale, which is
  * where the ≥ 48px rule already lives.
  */
-export function Hero({ eyebrow, value, unit = "", suffix = "", delta, upIsGood = true, count = true }: {
+export function Hero({
+  eyebrow, value, unit = "", suffix = "", delta, upIsGood = true, count = true,
+  identifier, under,
+}: {
   readonly eyebrow?: string;
   readonly value: number | string;
   /** ⚠️ Before the number — a currency. See `Stat` for why there are two. */
@@ -138,20 +142,55 @@ export function Hero({ eyebrow, value, unit = "", suffix = "", delta, upIsGood =
    * quantity: a version, a year, an account number that happens to be digits.
    */
   readonly count?: boolean;
+  /**
+   * ⚠️ WHAT THE FIGURE IS OF, IN ONE LINE, AND IT BELONGS TIGHT TO THE NUMBER.
+   * "214 products in 11 places" under a count, an account number under a
+   * balance — the thing somebody would quote, which is a different rank from
+   * the eyebrow above it and from whatever comes after.
+   */
+  readonly identifier?: React.ReactNode;
+  /**
+   * ⚠️ WHAT THE FIGURE LEADS TO — a row of quick actions, most often — AND IT
+   * NEEDS AIR THAT THE THREE LINES ABOVE IT DO NOT. Spacing all four the same
+   * is what makes a button row read as a fourth line of the caption; `Balance`
+   * holds that decision, which is why this delegates rather than laying itself
+   * out again.
+   */
+  readonly under?: React.ReactNode;
 }) {
   const shown = useShown();
+  /*
+    ⚠️ THROUGH `Balance`, NOT BESIDE IT. Both are "the one number a screen is
+    about" and they had two layouts: this one a tight column, that one a
+    two-group stack with the identifier bound to the figure. A screen leading
+    with a figure and a row of acts wanted the second and could only reach the
+    first, so every home screen assembled its own — which is three answers to
+    where the gap goes.
+  */
   return (
-    <div className={`flex flex-col items-center ${SPACE.tight} text-center`}>
-      {eyebrow ? <span className={TYPE.note}>{eyebrow}</span> : null}
-      <span className={TYPE.display}>
-        {unit}
-        {typeof value === "number"
-          ? <Tally value={value} format={compactLike(shown, value)} count={count} />
-          : value}
-        {suffix}
-      </span>
-      {delta ? <Delta value={delta.value} of={delta.of} upIsGood={upIsGood} unit={unit} /> : null}
-    </div>
+    <Balance
+      eyebrow={eyebrow}
+      figure={(
+        <span className={TYPE.display}>
+          {unit}
+          {typeof value === "number"
+            ? <Tally value={value} format={compactLike(shown, value)} count={count} />
+            : value}
+          {suffix}
+        </span>
+      )}
+      identifier={identifier}
+      under={delta || under
+        ? (
+          <div className={`flex flex-col items-center ${SPACE.roomy}`}>
+            {delta
+              ? <Delta value={delta.value} of={delta.of} upIsGood={upIsGood} unit={unit} />
+              : null}
+            {under}
+          </div>
+        )
+        : undefined}
+    />
   );
 }
 

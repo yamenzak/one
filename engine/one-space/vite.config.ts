@@ -30,8 +30,15 @@ export default defineConfig({
     person, the same question — and the alternative was a lazy boundary inside a
     sheet that is already open, which trades 600 bytes for a spinner in the
     middle of a form.
+
+    ⚠️ AND TO 394 FOR `neon` — a whole ambience family, and the one a product
+    wears on the screen it opens onto. A family is a declaration rather than a
+    drawing, so what it costs is one file of gradient math for every world in its
+    space; splitting it out is not available, because the scene engine resolves a
+    family by name from one registry and a dynamic import there would mean the
+    first paint of a lit screen has no ground.
   */
-  plugins: [react(), tailwindcss(), design({ entryUnder: 392 })],
+  plugins: [react(), tailwindcss(), design({ entryUnder: 394 })],
   server: {
     /*
       ⚠️ EVERY DOOR IS A SUBDOMAIN, SO THE DEV SERVER HAS TO ANSWER TO ALL OF

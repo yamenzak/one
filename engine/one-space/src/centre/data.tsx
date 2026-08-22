@@ -23,6 +23,8 @@ export interface CentreApp {
   readonly id: string;
   readonly name: string;
   readonly mark: string;
+  /** ⚠️ The product's own colour, and the product's alone — see `AppSpec.hue`. */
+  readonly hue?: string;
   readonly screens: readonly ScreenSpec[];
   readonly settings: SettingBook;
   /** ⚠️ The pages those rows live on — see `AreaDef`. */

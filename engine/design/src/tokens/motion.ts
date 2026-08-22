@@ -91,6 +91,16 @@ export const DURATION = {
    */
   turn: "2200ms",
   ambient: "24s",
+  /**
+   * ⚠️ AND ONE THAT IS NOT PACED FOR ANYBODY — it is paced so that NOBODY
+   * catches it. Every duration above is the length of a thing somebody is
+   * waiting on or watching; this is the length of a thing nobody is meant to see
+   * happen. A scene's source turns a degree and a half over it, `alternate`, so
+   * a screen looked at twice a minute apart is subtly different and a screen
+   * watched is still. Under about a minute it becomes a movement, and a ground
+   * that draws the eye is a ground that has failed.
+   */
+  breath: "90s",
 } as const;
 
 export type Duration = keyof typeof DURATION;

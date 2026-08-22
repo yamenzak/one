@@ -47,6 +47,22 @@ export interface PageProps {
    */
   readonly sky?: Sky;
   /**
+   * THE APP'S OWN COLOUR, AND IT IS THE APP'S RATHER THAN A WORKSPACE'S.
+   *
+   * ⚠️ A PRODUCT IS DESIGNED; A WORKSPACE IS NOT. This used to arrive from a
+   * tenant's branding, which meant every relationship a designer had chosen —
+   * the light against the ground, the wash against the card, the one coloured
+   * thing on a screen — was decided by a colour picker somebody spent ten
+   * seconds in. What survives of a workspace's identity is its NAME and its
+   * MARK; what a screen is made of belongs to whoever built the screen.
+   *
+   * ⚠️ AND IT LANDS AS `--brand`, ON THIS ELEMENT, so the scene resolves it
+   * against the page it is painting. Every family reads its `lit` slot from the
+   * same variable, so an app that sets this once wears its colour in its
+   * ground, its light and its wash with nothing else edited.
+   */
+  readonly hue?: string;
+  /**
    * ⚠️ WHICH ONE OF THE FAMILY, AND IT WANTS THE SCREEN'S OWN IDENTITY. A route
    * is ideal: every screen in a product then has a ground of its own inside the
    * product's material, for free, with nobody choosing anything. Absent, every
@@ -174,7 +190,14 @@ export function useScenery(
       router has to know the families and no family has to be registered
       anywhere to be covered.
     */
-    attrs: { "data-sky": scene.family, ...(reach ? { "data-reach": reach } : {}) },
+    attrs: {
+      "data-sky": scene.family,
+      ...(reach ? { "data-reach": reach } : {}),
+      /* ⚠️ ONLY WHERE A FAMILY PUBLISHED ONE. The wash rules select on this
+         rather than on a fallback, so a page can never be half-washed by a
+         family that never asked to reach its surfaces — see `Family.wash`. */
+      ...(own.wash ? { "data-wash": "true" } : {}),
+    },
     css: own.css as React.CSSProperties,
     /*
       ⚠️ THE FIELD IS AN ELEMENT, AND IT HAS TO BE. It was a `background-image`
@@ -189,18 +212,47 @@ export function useScenery(
       typed reaches this string, and there is no other way to hand a browser a
       subtree of SVG built as text.
     */
-    field: own.field
+    /*
+      ⚠️ THE SOURCE IS ITS OWN ELEMENT, ABOVE THE DITHER, AND IT TRAVELS WITH THE
+      FIELD SO NO MOUNTER CHANGES. `Page`, `Band`, `Group` and `Place` all render
+      whatever this hands back; making it two props would be four call sites that
+      each have to remember the second one, and the one that forgets loses the
+      only lit thing on the screen with nothing failing anywhere.
+
+      ⚠️ AND `data-lively` IS THE SAME BUDGET THE BEATS ANSWER TO. A device that
+      has not earned ambient motion gets a still light rather than no light —
+      which is the right answer for a decoration and the reason this is a flag
+      rather than an absence.
+    */
+    field: (own.flare || own.field)
       ? (
-        <svg
-          aria-hidden="true"
-          data-field="true"
-          {...(reach ? { "data-reach": reach } : {})}
-          dangerouslySetInnerHTML={{ __html: own.field }}
-        />
+        <>
+          {own.flare
+            ? (
+              <div
+                aria-hidden="true"
+                data-flare="true"
+                data-lively={still ? undefined : "true"}
+                {...(reach ? { "data-reach": reach } : {})}
+              />
+            )
+            : null}
+          {own.field ? field(own.field, reach) : null}
+        </>
       )
       : null,
   };
 }
+
+/** ⚠️ Engine-generated markup — see `render`. Nothing a person typed reaches it. */
+const field = (html: string, reach?: "card") => (
+  <svg
+    aria-hidden="true"
+    data-field="true"
+    {...(reach ? { "data-reach": reach } : {})}
+    dangerouslySetInnerHTML={{ __html: html }}
+  />
+);
 
 /**
  * The frame every screen sits in.
@@ -211,7 +263,7 @@ export function useScenery(
  * which reads as a broken layout rather than as a unit bug.
  */
 export function Page(
-  { sky = "plain", seedling, world, density = "even", nav, children }: PageProps,
+  { sky = "plain", hue, seedling, world, density = "even", nav, children }: PageProps,
 ) {
   /*
     ⚠️ THE THEME PICKS A SKY, AND THIS REPLACES A RULE THAT SHOULD NEVER HAVE
@@ -248,7 +300,11 @@ export function Page(
          here, where "this is a page" is the claim being made. */
       className={`min-h-dvh flex flex-col ${TYPE.body}`}
       {...own.attrs}
-      style={own.css}
+      /* ⚠️ THE APP'S COLOUR AND THE WORLD'S PROPERTIES, ON ONE ELEMENT AND IN
+         THIS ORDER. The scene's `lit` slot is `var(--brand)`, so it has to
+         resolve against the element the ground is painted on — set on an
+         ancestor it still works, set on a descendant it never does. */
+      style={{ ...(hue ? { ["--brand" as string]: hue } : {}), ...own.css }}
     >
       {/*
         ⚠️ THE FIELD IS AN ELEMENT, AND IT HAS TO BE. It was a `background-image`

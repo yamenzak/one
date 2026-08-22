@@ -117,6 +117,26 @@ export const FADE = (() => {
  * `-webkit-mask-image` on different rules is how one of them silently stops
  * applying.
  */
+/**
+ * THE SOURCE'S OWN FALLOFF, AND IT IS MUCH STEEPER THAN THE GROUND'S.
+ *
+ * ⚠️ A LIGHT BELONGS TO THE TOP OF A SCREEN, WHICH A GROUND ONLY HALF DOES.
+ * `FADE` holds a world to 62% and lets it die by the fold, which is right for a
+ * wash — content lands ON it rather than after it. A hard bright band held that
+ * far down is a bright diagonal running through the middle of a list, and
+ * measured on a tall page it crossed six cards and two headings. What reads as a
+ * lamp over a screen is a band that is gone before the second block.
+ *
+ * ⚠️ AND IT IS THE VERTICAL RAMP ALONE. The matte's ellipse exists so a WORLD
+ * does not run under a paragraph; a band is a few percent of the width and is
+ * exactly what a screen leading with one figure wants passing behind it.
+ */
+export const LIGHT = (() => {
+  const ramp = "linear-gradient(180deg, black 0%, black 26%, "
+    + "color-mix(in oklab, black 46%, transparent) 52%, transparent 78%)";
+  return `mask-image: ${ramp}; -webkit-mask-image: ${ramp}`;
+})();
+
 export const MATTE = (() => {
   const ramp = "linear-gradient(180deg, black 0%, black 62%, "
     + "color-mix(in oklab, black 60%, transparent) 84%, transparent 100%)";
@@ -390,7 +410,14 @@ const halo = (colour: string): string => {
 export function worldCss(
   world: World,
   at: { readonly night: boolean; readonly density: Density; readonly still?: boolean },
-): { readonly css: Readonly<Record<string, string>>; readonly field: string } {
+): {
+  readonly css: Readonly<Record<string, string>>;
+  readonly field: string;
+  /** ⚠️ Whether the family reaches the SURFACES — see `Family.wash`. */
+  readonly wash: boolean;
+  /** ⚠️ Whether there is a source to put on its own layer — see `Ground`. */
+  readonly flare: boolean;
+} {
   /* ⚠️ `still` IS IN THE KEY, because it changes the DRAWING rather than a rule.
      A beat is SMIL and SMIL cannot be switched off by CSS, so a world rendered
      for somebody who wants less motion is a different string — and a cache that
@@ -408,7 +435,7 @@ export function worldCss(
     });
     skies.set(key, made);
   }
-  return { field: made.field, css: {
+  return { field: made.field, wash: !!made.wash, flare: !!made.flare, css: {
     "--world-ground": made.ground,
     /*
       ⚠️ THE GROUND'S OWN COLOUR, PUBLISHED, SO CHROME CAN BE MADE OF IT. A chip
@@ -423,6 +450,21 @@ export function worldCss(
        PARENT scene's halo on a nested page. A world that says nothing about its
        type must say `none` rather than say nothing. */
     "--on-scene": made.veil ? halo(made.veil) : "none",
+    /*
+      ⚠️ WHAT THE LIGHT LANDS ON — see `Family.wash`. The surfaces standing in a
+      world are the half a ground cannot reach on its own: a pill and a card keep
+      the grey the palette gave them however bright it is two layers down, and
+      the result reads as wallpaper hung behind a working screen.
+
+      ⚠️ AND `none` RATHER THAN ABSENT, for the reason the halo is: the token is
+      read with a fallback, so an absent property inherits the PARENT scene's
+      wash on a nested page — a card in a quiet world coming out the colour of
+      the loud one two levels up.
+    */
+    "--scene-wash": made.wash || "none",
+    /* ⚠️ THE SOURCE, ON ITS OWN LAYER — empty for every family whose light is a
+       haze. See `Ground` and the `[data-flare]` rule. */
+    "--world-flare": made.flare || "none",
   } };
 }
 
@@ -461,7 +503,7 @@ export function ambienceStylesheet(): string {
   const field = [
     `[data-field] {`,
     `  position: absolute; top: 0; left: 0; right: 0; width: 100%;`,
-    `  height: ${REACH}; z-index: -1; pointer-events: none;`,
+    `  height: ${REACH}; z-index: -3; pointer-events: none;`,
     /* ⚠️ THE HOST'S OWN RADIUS — see the ground layers below for what this fixes. */
     `  border-radius: inherit;`,
     `  ${MATTE};`,
@@ -489,6 +531,75 @@ export function ambienceStylesheet(): string {
     /* ⚠️ AND NO `will-change` HERE. Nothing animates this element any more, and a
        promotion hint on a viewport-sized masked layer is a permanent compositing
        layer held in memory for a movement that does not happen. */
+
+    /*
+      THE SOURCE, AND IT IS THE ONE THING IN A SCENE THAT MOVES.
+      ⚠️ ABOVE THE DITHER, WHICH IS THE WHOLE REASON IT IS A LAYER OF ITS OWN.
+      The grain is `mix-blend-mode: overlay`, and a blended layer cannot be
+      composited apart from what it blends with — so anything animating UNDER it
+      drags a viewport-sized stack onto the main thread and re-blends it sixty
+      times a second, which is what killed the ground's old drift. Out from under
+      it, a transform and an opacity are compositor-only and cost one layer.
+
+      ⚠️ AND IT DOES NOT NEED THE DITHER. What bands on an 8-bit display is a
+      SHALLOW ramp over a large area; a family only puts its band here, which is
+      steep by construction (`Ground`). The bloom around it — which is shallow,
+      and would band — stays in the ground where the grain can reach it.
+
+      ⚠️ `FADE` RATHER THAN `MATTE`, AND THAT IS A DESIGN DECISION RATHER THAN AN
+      OMISSION. The matte hollows an ellipse down the reading column so a WORLD
+      does not run under a paragraph; a band is a few percent of the width and is
+      exactly what a screen leading with one figure wants passing behind it. The
+      vertical ramp still applies, so it is gone by the time anybody has scrolled
+      a screen, like everything else.
+    */
+    `[data-flare] {`,
+    `  position: absolute; top: 0; left: 0; right: 0; width: 100%;`,
+    `  height: ${REACH}; z-index: -1; pointer-events: none;`,
+    `  background-image: var(--world-flare, none);`,
+    `  background-size: cover; background-repeat: no-repeat;`,
+    `  border-radius: inherit;`,
+    `  ${LIGHT};`,
+    `}`,
+    /*
+      ⚠️ EARNED, NOT DEFAULT — `data-lively` is set by `useScenery` from the same
+      budget the field's beats answer to (`motionFor`), so a device that has not
+      earned ambient motion gets a still light rather than no light.
+
+      ⚠️ A ROTATION AND A BREATH, AND NOTHING ELSE. Both are compositor-only. The
+      rotation is a degree and a half around the element's own centre, which
+      moves a band whose source is far off the page by a long way — a light that
+      travels rather than a picture that spins.
+
+      ⚠️ THE OVERSCAN IS WHAT THERE IS TO ROTATE. A layer that exactly covers its
+      box uncovers a corner the moment it turns, and an uncovered corner on a
+      black ground is a visible wedge.
+
+      ⚠️ AND IT IS SLOW ENOUGH TO BE UNCATCHABLE. Ninety seconds end to end,
+      `alternate`, so there is no jump back — a ground that draws the eye is a
+      ground that has failed, and the whole value of this is that somebody
+      notices the screen is alive without ever seeing it move.
+    */
+    `[data-flare][data-lively="true"] {`,
+    `  will-change: transform, opacity;`,
+    `  animation: scene-flare ${DURATION.breath} ${EASE.settle} infinite alternate;`,
+    `}`,
+    `@keyframes scene-flare {`,
+    `  from { transform: rotate(-0.9deg) scale(1.06); opacity: 0.72; }`,
+    `  to { transform: rotate(1.5deg) scale(1.12); opacity: 1; }`,
+    `}`,
+    /*
+      ⚠️ OFF BOTH WAYS, AND EITHER ALONE LEAVES HALF THE PEOPLE WHO ASKED STILL
+      WATCHING IT. The media query is the operating system's answer; the ancestor
+      is the switch a person can reach inside the app. For some people this is not
+      a preference.
+    */
+    `@media (prefers-reduced-motion: reduce) {`,
+    `  [data-flare][data-lively="true"] { animation: none; will-change: auto; }`,
+    `}`,
+    `[data-reduce-motion="true"] [data-flare][data-lively="true"] {`,
+    `  animation: none; will-change: auto;`,
+    `}`,
   ];
 
   return [
@@ -579,7 +690,16 @@ export function ambienceStylesheet(): string {
     `[data-sky]:not([data-sky="plain"])::before,`,
     `[data-sky]:not([data-sky="plain"])::after {`,
     `  content: ""; position: absolute; top: 0; left: 0; right: 0;`,
-    `  height: ${REACH}; bottom: auto; z-index: -1;`,
+    /*
+      ⚠️ FOUR LAYERS, STACKED EXPLICITLY, AND THE ORDER IS THE PERFORMANCE
+      DECISION. Ground, field, dither, source — all negative, so all of them are
+      under the page's content whatever an ancestor does. What matters is that
+      the SOURCE is above the dither: the grain is `mix-blend-mode`, and anything
+      animating below a blend re-blends the whole viewport-sized stack every
+      frame. Everything under it is dithered and still; the one thing above it is
+      steep enough not to need dithering and is the only thing that moves.
+    */
+    `  height: ${REACH}; bottom: auto; z-index: -4;`,
     `  pointer-events: none;`,
     /*
       ⚠️ THE HOST'S OWN RADIUS, AND WITHOUT IT A CARD IS ROUNDED AND SHARP AT
@@ -597,6 +717,7 @@ export function ambienceStylesheet(): string {
     `}`,
     /* ⚠️ The dither, over everything, at a rounding error — see `GRAIN`. */
     `[data-sky]:not([data-sky="plain"])::after {`,
+    `  z-index: -2;`,
     `  background-image: ${GRAIN};`,
     `  background-repeat: repeat;`,
     `  opacity: ${GRAIN_OPACITY};`,
@@ -698,6 +819,47 @@ export function ambienceStylesheet(): string {
     `  background-color: color-mix(in oklab,`,
     `    var(--surface-tertiary) 90%, var(--scene-veil, var(--surface-tertiary))) !important;`,
     `}`,
+    /*
+      THE LIGHT LANDS ON THE THINGS STANDING IN IT.
+      ⚠️ A GROUND REACHES THE PAGE AND STOPS THERE, WHICH IS WHY EVERY WORLD
+      BEFORE THIS ONE READ AS WALLPAPER. The gradient is beautiful and the card
+      on top of it is the same grey it is on a screen with no world at all, so
+      what somebody sees is a working interface with a picture behind it rather
+      than an interface in a room. A phone's home screen is mostly surfaces; if
+      the surfaces do not take the light, almost nothing does.
+
+      ⚠️ THE FAMILY DECIDES, AND MOST FAMILIES DECLINE. `Family.wash` is absent
+      on seven of the eight — a quiet world is quiet on purpose, and washing a
+      settings screen in a hue is the "ambience everywhere is ambience nowhere"
+      failure with a bigger brush. The attribute is set only where a family
+      published one, so a page can never be half-washed by a fallback.
+
+      ⚠️ AND IT IS ONE RULE HERE RATHER THAN A PROP ON A CARD. A component that
+      took a tint would be a component every screen could tint differently, which
+      is the thing the whole token system exists to prevent — and the mono rule
+      (`ground.test.mjs`) stays true, because nothing is writing a colour: the
+      value is the world's, mixed into the tier the palette already chose.
+
+      ⚠️ THE TIERS KEEP THEIR ORDER, WHICH IS THE PART THAT IS EASY TO BREAK. A
+      card must still read as raised against the page and a chip as raised
+      against a card; washing them by the same amount from a common colour
+      collapses the three into one flat field. So the share rises with the tier —
+      the page barely, a card some, a control most — which is also what really
+      happens to a lit room.
+    */
+    `[data-wash="true"] .card { background-color: color-mix(in oklab,`,
+    `  var(--scene-wash) 15%, var(--surface-secondary)); }`,
+    `[data-wash="true"] [data-chrome="true"] { background-color: color-mix(in oklab,`,
+    `  var(--scene-wash) 24%, var(--surface-tertiary)) !important; }`,
+    `[data-wash="true"] [data-chrome="true"]:hover { background-color: color-mix(in oklab,`,
+    `  var(--scene-wash) 32%, var(--surface-tertiary)) !important; }`,
+    /*
+      ⚠️ AND THE ISLAND TOO, because it is the one surface a person looks at on
+      every screen. Left out, the bar is the one grey object on a washed page —
+      which reads as the chrome belonging to a different app.
+    */
+    `[data-wash="true"] [data-island="true"] { background-color: color-mix(in oklab,`,
+    `  var(--scene-wash) 18%, var(--surface-tertiary)); }`,
     /*
       ⚠️ `data-capsule` HAD NO RULE AT ALL, WHICH IS WHY THE NAV WAS A RECTANGLE.
       Two elements carried the attribute and both were `Card`s, which bring their

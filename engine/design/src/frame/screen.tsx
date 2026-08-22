@@ -511,7 +511,12 @@ export function Screen<T = unknown>({
      standing there is nothing to collapse into, so the name belongs in the
      content where a heading belongs — which is where it was going to end up the
      first time somebody looked at a screen with no crown of its own. */
-  const heading = socketed && !out;
+  /* ⚠️ AND A SCREEN WITH NO NAME DRAWS NO HEADING BLOCK, which it did: an empty
+     `<h1>` and its padding, at the top of the one screen that deliberately has
+     no title. The root of a product is named by the crown and by the bar item a
+     thumb is already on; a heading there is the width of the screen spent
+     telling somebody where they are after they arrived. */
+  const heading = socketed && !out && !!name;
 
   return (
     <>

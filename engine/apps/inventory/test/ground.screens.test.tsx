@@ -67,6 +67,18 @@ describe("OneInventory draws every screen it declares", () => {
     "/case": "Bay 1 service",
   };
 
+  /*
+    ⚠️ ONE SCREEN IN A PRODUCT MAY BE NAMELESS, AND IT IS THE ROOT. Everywhere
+    else somebody navigated, so the name is how they know they arrived where they
+    meant to; nobody navigates to home, and the crown and the bar item a thumb is
+    already on both say where they are. A heading there is the width of the
+    screen spent on something they knew before they unlocked the phone.
+
+    ⚠️ AND IT IS A RULE RATHER THAN A WAIVER, which is why it is `route === "/"`
+    and not a list. A second nameless screen is a screen whose title somebody
+    forgot, and the difference between the two has to be structural or the
+    exemption grows.
+  */
   it("renders something for every declared route", () => {
     for (const route of INVENTORY_ROUTES) {
       /* ⚠️ NOT `length > 0` — an empty `<div>` passes that. A heading is what
@@ -74,7 +86,7 @@ describe("OneInventory draws every screen it declares", () => {
       const label = SUBJECT[route]
         ?? (INVENTORY.screens ?? []).find((s) => s.route === route)?.label
         ?? "";
-      expect(html(route), route).toContain(label);
+      expect(html(route), route).toContain(route === "/" ? "On the shelf" : label);
     }
   });
 
