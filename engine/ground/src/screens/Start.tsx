@@ -24,13 +24,17 @@ import {
   Faq, Grid, Guide, Help, Milestones, OfferRow, QuickActions,
   Screen, Section, SeeAll, Stack, StepRow, TileGrid, glyphOf,
 } from "@engine/design";
+import type { Raised } from "@engine/kernel";
 import { GROUND } from "../index.js";
 import { ASKED } from "./sample.js";
 
-export function Start({ title, done, counts, held, onGo }: {
+export function Start({ title, raised, counts, held, onGo }: {
   readonly title?: string;
-  /** The events this workspace has raised — what ticks a step. */
-  readonly done: readonly string[];
+  /**
+   * What has been raised, on both axes — the workspace's for a step done once
+   * for everybody, this person's for a step each pair of hands takes.
+   */
+  readonly raised: Raised;
   /** How many times each, for a milestone that waits for ten. */
   readonly counts: Readonly<Record<string, number>>;
   readonly held: ReadonlySet<string>;
@@ -57,7 +61,7 @@ export function Start({ title, done, counts, held, onGo }: {
             two forms, an inch apart. The checklist already carries its own
             progress; a second picture of it is not emphasis. */}
         <Section label="Your first three things">
-          <Guide book={GROUND.guide ?? {}} events={done} held={held} onGo={onGo} />
+          <Guide book={GROUND.guide ?? {}} raised={raised} held={held} onGo={onGo} />
         </Section>
 
         <Section label="What you have reached">

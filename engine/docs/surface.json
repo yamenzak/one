@@ -1389,6 +1389,15 @@
         "onClose": "tenant_id: delete"
       },
       {
+        "table": "person_event",
+        "export": "Which of the first steps in each product you have taken yourself",
+        "why": null,
+        "onForget": [
+          "account_id: delete"
+        ],
+        "onClose": "tenant_id: delete"
+      },
+      {
         "table": "media",
         "export": "The files you uploaded",
         "why": null,

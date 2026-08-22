@@ -1660,3 +1660,38 @@ been unwired.
 is a destination and a chrome slot at once; a product whose first bar item is not
 its root; an act drawn twice at both ends of one screen; a chrome plate that
 stops the world at its edge; or a screen off the bar that nothing leads to.
+
+## D54 — Half a getting-started list is the workspace's and half is the person's
+
+**A checklist ticked from one tally is wrong for whoever arrives second.** The
+guide was derived entirely from `tenant_event` — what this workspace has ever
+done — which is right for setup and wrong for everything a pair of hands has to
+learn. Somebody invited into a workspace that has been running opens a checklist
+already complete: every box crossed off by their employer, nothing taught, and
+no test anywhere failing, because the list simply renders empty and reads as
+success. Ticked the other way round it fails in the mirror image — whoever
+arrives second is told to name a place that was named a year ago.
+
+**So a step declares which it is, and the default is the meaning it already
+had.** `who: "workspace"` (absent) is done once, by anybody, for everybody;
+`who: "person"` is done by each pair of hands and ticks only for the one that
+did it. `Raised` carries both lists and a step is looked up on the axis it
+declares — never a union, which is the merge that ticks the wrong box.
+
+**The personal record is a yes, not a tally.** `tenant_event` counts, because a
+milestone needs to know how many; `person_event` holds one row per person per
+event, written the first time and never again. The distinction is the whole
+disclosure: what is kept about a member is which of their own first steps they
+have taken, never how often they do anything or how they are getting on. It is
+narrowed at the write to the events some step actually names, derived from the
+book, so a product that declares no person step keeps no personal row at all.
+
+**And `needs` was already the other half of the answer.** Setup steps are mostly
+gated on a permission an invited counter does not hold, so they were never that
+person's to see. The axis is what the permission cannot say: that two people who
+both hold `stock:write` still have their own first count to record.
+
+**Therefore never:** a checklist that credits somebody with work they were not
+there for; a newcomer asked to repeat what the workspace has already done; a
+per-person tally of how often a member does a thing; or a personal row written
+for an event no step asks about.

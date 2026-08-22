@@ -20,7 +20,7 @@
  */
 
 import type {
-  AnyOperation, AppSpec, Ask, Caller, CollectionSpec, DeploymentLegal, DocumentBook, DocumentDef,
+  AccountId, AnyOperation, AppSpec, Ask, Caller, CollectionSpec, DeploymentLegal, DocumentBook, DocumentDef,
   Door, Kind, PackDef, PlanSpec, Problem, ReachBook, Resolved as _Resolved, Roots, Standing,
   TenantId,
 } from "@engine/kernel";
@@ -51,7 +51,7 @@ const declaresAFlag = (wiring: Wiring): boolean =>
     return !!book && Object.keys(book).length > 0;
   });
 import { tell } from "./dispatch.js";
-import { noteEvents } from "./progress.js";
+import { noteEvents, notePersonEvents, personalEvents } from "./progress.js";
 import { answerMcp } from "./mcp.js";
 import type { PlatformCtx } from "./member-ops.js";
 import { keyFor, record, remember, seen, entryFor } from "./audit.js";
@@ -1223,7 +1223,7 @@ export async function performOperation(
       Recorded here rather than inside `told` so the two cannot be confused
       again.
     */
-    await happened(located, composed.app, op, now);
+    await happened(located, composed.app, who, op, now);
     await told(wiring, located, composed.app, who, op, input, answer, now, at);
     return { kind: "ok", answer };
   } catch (thrown) {
@@ -1333,13 +1333,33 @@ async function answerPersonal(
  * ⚠️ AND THE CATCH SAYS SO, because the symptom of a swallowed failure is a
  * checklist that never ticks — which is the exact state this path exists to end.
  */
+/**
+ * ⚠️ AND THE WORKSPACE'S TALLY IS NOT THE PERSON'S. A step somebody takes on
+ * their first morning is theirs; a workspace-wide count cannot answer for it,
+ * because everything in a running workspace was done before they arrived.
+ * `personalEvents` narrows the personal record to the events some step actually
+ * asks about — so what is kept about a member is which of their own first steps
+ * they have taken, and nothing else about what they do all day.
+ */
 const happened = async (
-  located: Located, app: AppSpec, op: _Op, now: Date,
+  located: Located, app: AppSpec, who: Who, op: _Op, now: Date,
 ): Promise<void> => {
   const events = op.spec.emits ?? [];
   if (!events.length) return;
+  /* ⚠️ NOT EVERY CALLER IS A PERSON. A device or a key raises the workspace's
+     tally and nobody's checklist. */
+  const mine = who.accountId
+    ? events.filter((e) => personalEvents(app).has(e))
+    : [];
   try {
-    await noteEvents(located.db, located.tenantId as TenantId, app.id, events, now);
+    await Promise.all([
+      noteEvents(located.db, located.tenantId as TenantId, app.id, events, now),
+      mine.length
+        ? notePersonEvents(
+          located.db, located.tenantId as TenantId, app.id,
+          who.accountId as AccountId, mine, now)
+        : undefined,
+    ]);
   } catch (why) {
     console.error(`[progress] ${op.id} raised ${events.join(", ")} and nothing counted it`, why);
   }

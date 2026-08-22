@@ -65,7 +65,9 @@ export const INVENTORY_ROUTES: readonly string[] =
   (INVENTORY.screens ?? []).map((s) => s.route);
 
 /** What ticks the guide, and how many times. Sample, like everything else here. */
-const DONE = ["location.created", "product.created"];
+/* ⚠️ TWO AXES: what the workspace has ever done, and what THIS person has —
+   the specimen shows somebody invited into a shelf that was already set up. */
+const RAISED = { workspace: ["location.created", "product.created"], person: [] };
 const COUNTS = { "product.created": 12, "stock.received": 40 };
 const HELD = new Set([
   "product:read", "product:write", "location:read", "location:write",
@@ -768,7 +770,7 @@ export function InventoryScreen({ route, onGo }: {
           said={WORDS.clinic.said}
           /* ⚠️ NOTHING SAID YET, so the ground shows the recognition rather
              than the absence of it — the state worth photographing. */
-          done={DONE} counts={COUNTS} already={[]} held={HELD} onGo={go}
+          raised={RAISED} counts={COUNTS} already={[]} held={HELD} onGo={go}
         />
       );
     /* ⚠️ THE DEFAULT IS THE APP'S FIRST DECLARED SCREEN, not a blank. An

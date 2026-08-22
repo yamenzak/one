@@ -11,6 +11,15 @@
  * ticked, and the onboarding it belongs to never reaches the end — so the whole
  * checklist reads as broken because of one line nobody can satisfy.
  *
+ * ⚠️ SOME STEPS ARE THE WORKSPACE'S AND SOME ARE THE PERSON'S, AND ONE LIST
+ * CANNOT BE BOTH. Naming a place is done once for everybody; learning to scan is
+ * done by each pair of hands. Ticked only from the workspace, somebody invited
+ * on their first morning opens a checklist already complete and is taught
+ * nothing. Ticked only per person, whoever arrives second is told to set up a
+ * workspace that has been running for a year. `who` is which of the two a step
+ * is, and `workspace` is the default so a book that never thinks about it keeps
+ * the meaning it had.
+ *
  * Layer 2. Imports primitives.
  */
 
@@ -45,6 +54,16 @@ export interface StepDef {
   readonly link: string;
   /** ⚠️ Only shown to somebody who could actually do it. */
   readonly needs?: string;
+  /**
+   * ⚠️ WHOSE STEP IT IS. `workspace` (the default) is done once, by anybody, for
+   * everybody — naming a place, importing the catalogue. `person` is done by
+   * each pair of hands and ticks only for the one that did it.
+   *
+   * ⚠️ AND THE DEFAULT IS NOT A SHRUG. Most of a getting-started list is setup,
+   * setup happens once, and a book written before this axis existed meant
+   * exactly that — so the absent value has to keep meaning it.
+   */
+  readonly who?: "workspace" | "person";
   readonly order: number;
 }
 
@@ -56,28 +75,46 @@ export interface Progress {
 }
 
 /**
+ * WHAT HAS BEEN RAISED, ON BOTH AXES.
+ *
+ * ⚠️ TWO LISTS RATHER THAN ONE UNION, BECAUSE A UNION TICKS THE WRONG BOX. Merge
+ * them and a person invited today opens a checklist where "record your first
+ * count" is already crossed off — by their employer, last year. The step is
+ * looked up on the axis it declares, so each list only ever answers for itself.
+ */
+export interface Raised {
+  /** What anybody in this workspace has ever done. */
+  readonly workspace: readonly string[];
+  /** What THIS person has done. Empty for a caller who is not one. */
+  readonly person: readonly string[];
+}
+
+const ticked = (step: StepDef, raised: Raised): boolean =>
+  (step.who === "person" ? raised.person : raised.workspace).includes(step.done);
+
+/**
  * ⚠️ WHAT IS LEFT, FOR THIS PERSON. Steps they could not do are not counted
  * against them — a checklist that is permanently 3/5 because two items need a
  * permission they do not hold is a checklist they learn to ignore.
  */
 export function remaining(
   book: GuideBook,
-  events: readonly string[],
+  raised: Raised,
   held: ReadonlySet<string>,
 ): readonly StepDef[] {
   return Object.values(book)
     .filter((s) => !s.needs || held.has(s.needs))
-    .filter((s) => !events.includes(s.done))
+    .filter((s) => !ticked(s, raised))
     .sort((a, b) => a.order - b.order);
 }
 
 export function progressOf(
   book: GuideBook,
-  events: readonly string[],
+  raised: Raised,
   held: ReadonlySet<string>,
 ): Progress {
   const mine = Object.values(book).filter((s) => !s.needs || held.has(s.needs));
-  return { done: mine.filter((s) => events.includes(s.done)).map((s) => s.id), total: mine.length };
+  return { done: mine.filter((s) => ticked(s, raised)).map((s) => s.id), total: mine.length };
 }
 
 /* ------------------------------------------------------------- milestones --- */

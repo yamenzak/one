@@ -16,9 +16,16 @@
  * ⚠️ AND A RAISE IS RECORDED WHETHER OR NOT ANYBODY IS TOLD. The notification
  * path returns early when an event has no audience, which is the correct answer
  * for an inbox and the wrong one for a tally — the step is done either way.
+ *
+ * ⚠️ A WORKSPACE'S TALLY IS A COUNT AND A PERSON'S IS A YES. `tenant_event`
+ * answers "how many times has this workspace", which is what a milestone needs;
+ * `person_event` answers "has this one person, ever", which is all a checklist
+ * asks and the least that can be held to answer it. A per-person COUNT would
+ * turn getting started into a record of which member is slow, and nothing here
+ * needs one.
  */
 
-import type { AppSpec, MilestoneDef, TenantId } from "@engine/kernel";
+import type { AccountId, AppSpec, MilestoneDef, TenantId } from "@engine/kernel";
 import { PUBLIC, progressOf, reached, remaining } from "@engine/kernel";
 import type { PlatformCtx } from "./member-ops.js";
 import type { Resolved } from "./compose.js";
@@ -38,6 +45,10 @@ export const PROGRESS_SCHEMA: SchemaModule = {
     /* ⚠️ AND A MILESTONE IS RECORDED AS SAID, WHICH IS WHAT STOPS IT REPEATING.
        A congratulation on every load is not recognition, it is noise. */
     `CREATE TABLE IF NOT EXISTS tenant_milestone (tenant_id TEXT NOT NULL, app TEXT NOT NULL, milestone TEXT NOT NULL, at TEXT NOT NULL, PRIMARY KEY (tenant_id, app, milestone));`,
+    /* ⚠️ ONE ROW PER PERSON PER EVENT, WITH NO COUNT — see the header. It exists
+       because an invited member's own checklist cannot be answered from the
+       workspace's: everything on it was done before they arrived. */
+    `CREATE TABLE IF NOT EXISTS person_event (tenant_id TEXT NOT NULL, app TEXT NOT NULL, account_id TEXT NOT NULL, event TEXT NOT NULL, at TEXT NOT NULL, PRIMARY KEY (tenant_id, app, account_id, event));`,
   ],
 };
 
@@ -60,6 +71,48 @@ export async function noteEvents(
      ON CONFLICT (tenant_id, app, event)
      DO UPDATE SET n = n + 1, last_at = excluded.last_at`,
   ).bind(tenantId, app, event, at, at).run()));
+}
+
+/**
+ * ⚠️ THE EVENTS SOME STEP OF THIS APP COMPLETES FOR ONE PERSON, DERIVED FROM THE
+ * BOOK. A hand-kept list is a list that stops matching the manifest the day a
+ * step's axis changes — and the symptom is a step that renders for ever and can
+ * never be ticked, which is the exact fault the guide is built to prevent.
+ *
+ * ⚠️ AND IT IS PER MANIFEST, WHICH DOES NOT CHANGE WHILE THE WORKER RUNS, so the
+ * derivation is done once rather than on every write.
+ */
+const personal = new WeakMap<AppSpec, ReadonlySet<string>>();
+export function personalEvents(app: AppSpec): ReadonlySet<string> {
+  let mine = personal.get(app);
+  if (!mine) {
+    mine = new Set(Object.values(app.guide ?? {})
+      .filter((s) => s.who === "person").map((s) => s.done));
+    personal.set(app, mine);
+  }
+  return mine;
+}
+
+/** ⚠️ `OR IGNORE`: the row says they have, not how often. Doing it again is not news. */
+export async function notePersonEvents(
+  db: Db, tenantId: TenantId, app: string, accountId: AccountId,
+  events: readonly string[], now: Date,
+): Promise<void> {
+  if (!events.length) return;
+  const at = now.toISOString();
+  await Promise.all(events.map((event) => db.prepare(
+    `INSERT OR IGNORE INTO person_event (tenant_id, app, account_id, event, at)
+     VALUES (?, ?, ?, ?, ?)`,
+  ).bind(tenantId, app, accountId, event, at).run()));
+}
+
+export async function personEvents(
+  db: Db, tenantId: TenantId, app: string, accountId: AccountId,
+): Promise<readonly string[]> {
+  const rows = await db.prepare(
+    `SELECT event FROM person_event WHERE tenant_id = ? AND app = ? AND account_id = ?`)
+    .bind(tenantId, app, accountId).all<{ event: string }>();
+  return rows.results.map((r) => r.event);
 }
 
 export async function eventCounts(
@@ -131,11 +184,16 @@ export function progressOps(app: AppSpec): Readonly<Record<string, Resolved>> {
         is drawn on arrival — where two serial round trips is the difference
         somebody feels (D36).
       */
-      const [counts, said] = await Promise.all([
+      const [counts, said, mine] = await Promise.all([
         eventCounts(ctx.db, tenantId, app.id),
         saidAlready(ctx.db, tenantId, app.id),
+        personEvents(ctx.db, tenantId, app.id, ctx.accountId as AccountId),
       ]);
-      const raised = Object.keys(counts);
+      /* ⚠️ TWO AXES, NOT ONE UNION. What the workspace has ever done ticks a
+         setup step; what THIS person has done ticks theirs. Merged, somebody
+         invited this morning is congratulated for a year of somebody else's
+         work and taught nothing — see `Raised`. */
+      const raised = { workspace: Object.keys(counts), person: mine };
       /* ⚠️ WHAT THIS PERSON COULD ACTUALLY DO. A checklist permanently at 3/5
          because two steps need a permission they do not hold is a checklist they
          learn to ignore — see `remaining`. */
@@ -149,6 +207,11 @@ export function progressOps(app: AppSpec): Readonly<Record<string, Resolved>> {
            still waiting the next time somebody is. */
         fresh,
         counts,
+        /* ⚠️ AND WHAT THIS PERSON HAS DONE, so a screen drawing the book itself
+           can tick the same boxes this read did. Without it the only axis a
+           client can reconstruct is the workspace's, and every person step
+           renders unticked wherever the list is drawn a second time. */
+        mine,
         /* ⚠️ AND WHAT HAS ALREADY BEEN SAID, so a page drawing the book itself
            can tell "nothing reached" from "reached and acknowledged". Without it
            a screen that renders the whole milestone book has to treat an empty

@@ -694,15 +694,21 @@ export const GROUND: AppSpec = defineApp({
   /* ⚠️ MORE THAN ONE OF EACH, BECAUSE ONE OF ANYTHING IS NOT A LIST. A checklist
      of a single step renders as a sentence, a trail of one moment renders as a
      date, and neither shows what the component does with the second one. */
+  /* ⚠️ BOTH AXES, BECAUSE A CHECKLIST WITH ONLY ONE IS WRONG FOR HALF THE
+     WORKSPACE. Writing and drafting are things a pair of hands learns, so each
+     person gets their own; publishing is the workspace discovering it has a
+     public face, which happens once. Merged, somebody invited on a Tuesday opens
+     a finished checklist and is taught nothing. */
   guide: {
     "first-note": { id: "first-note", label: "Write your first note",
-      why: "It is the whole product.", done: "note.created", link: "/", order: 1 },
+      why: "It is the whole product.", done: "note.created", link: "/",
+      who: "person", order: 1 },
     /* ⚠️ EVERY STEP IS TICKED BY AN EVENT THIS APP ACTUALLY RAISES. A step whose
        `done` nothing emits is a box that can never be crossed off, and the
        manifest refuses one at composition rather than letting it sit there. */
     "draft-one": { id: "draft-one", label: "Let it draft one for you",
       why: "It is the fastest way to see what a note is.", done: "note.drafted",
-      link: "/write", order: 2 },
+      link: "/write", who: "person", order: 2 },
     "publish-one": { id: "publish-one", label: "Publish a note",
       why: "Publishing is what everybody else sees.", done: "note.published",
       link: "/", order: 3 },

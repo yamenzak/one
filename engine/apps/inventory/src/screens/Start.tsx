@@ -16,7 +16,7 @@
 import {
   Faq, Grid, Guide, Help, Milestones, Screen, Section, Stack, StepRow, glyphOf,
 } from "@engine/design";
-import { reached } from "@engine/kernel";
+import { reached, type Raised } from "@engine/kernel";
 import { INVENTORY } from "../index.js";
 import { LADDER, type Tracking } from "../ledger.js";
 
@@ -64,7 +64,7 @@ const SAID: Readonly<Record<Tracking, {
     under: "A kit made of itemised things, checked against the list it was built to" },
 };
 
-export function Start({ title, said, done, counts, already, held, onGo }: {
+export function Start({ title, said, raised, counts, already, held, onGo }: {
   readonly title?: string;
   /**
    * ⚠️ WHAT THIS WORKSPACE IS FOR, IN ITS OWN WORDS — the profile, made visible.
@@ -73,8 +73,11 @@ export function Start({ title, said, done, counts, already, held, onGo }: {
    * rather than somebody else's, and it is the first thing on the first screen.
    */
   readonly said: string;
-  /** What this workspace has actually done — the events that tick a step. */
-  readonly done: readonly string[];
+  /**
+   * What has actually been done — the events that tick a step, on both axes.
+   * A setup step is the workspace's; learning to scan is each person's.
+   */
+  readonly raised: Raised;
   /** How many times each, for a milestone that waits for fifty. */
   readonly counts: Readonly<Record<string, number>>;
   /**
@@ -100,7 +103,7 @@ export function Start({ title, said, done, counts, already, held, onGo }: {
             went to the workspace's settings, which is OneSpace's and reached
             from the crown on every screen. */}
         <Section label="Your first three things">
-          <Guide book={INVENTORY.guide ?? {}} events={done} held={held} onGo={onGo} />
+          <Guide book={INVENTORY.guide ?? {}} raised={raised} held={held} onGo={onGo} />
         </Section>
 
         {/* ⚠️ THE ONE DECISION THE PRODUCT CANNOT MAKE FOR ANYBODY, said before

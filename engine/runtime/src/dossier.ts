@@ -316,6 +316,22 @@ export const HOLDINGS: readonly HeldBy[] = [
   { table: "tenant_milestone", person: [], why: "which congratulations a workspace has already been shown", workspace: its() },
 
   /*
+    ⚠️ AND THIS ONE DOES NAME SOMEBODY, DELIBERATELY AND AT THE SMALLEST SIZE
+    THAT ANSWERS THE QUESTION. Half of getting started is done once for the whole
+    workspace and half is done by each pair of hands, and the second half cannot
+    be answered from the tally above — everything in it was done before an
+    invited member arrived, so their checklist would open already complete.
+
+    ⚠️ IT IS A YES, NOT A COUNT AND NOT A HISTORY. One row per person per step,
+    written the first time and never again: it says they have scanned something,
+    never how often or how they are getting on. A per-person tally would make
+    getting started into a record of which member is slow, which is why the row
+    above has none.
+  */
+  { table: "person_event", person: [theirs("account_id")], workspace: its(),
+    label: "Which of the first steps in each product you have taken yourself" },
+
+  /*
     ⚠️ A POINTER, NOT A COPY. The row names which record of which collection is
     in the index and what state it is in; the text itself is re-read from the
     record at flush time and never kept here. So there is nothing of anybody's

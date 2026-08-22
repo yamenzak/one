@@ -9,9 +9,15 @@
  * ⚠️ AND A STEP SOMEBODY IS NOT ALLOWED TO TAKE IS NOT COUNTED AGAINST THEM. A
  * checklist permanently at 3/5 because two items need a permission they do not
  * hold is a checklist they learn to ignore.
+ *
+ * ⚠️ HALF THE LIST IS THE WORKSPACE'S AND HALF IS THE PERSON'S, so `raised`
+ * carries both and each step is looked up on the axis it declares. One merged
+ * list would open already complete for anybody invited into a workspace that has
+ * been running — a welcome that congratulates somebody for a year of work they
+ * were not there for.
  */
 
-import type { GuideBook, HelpBook, MilestoneBook } from "@engine/kernel";
+import type { GuideBook, HelpBook, MilestoneBook, Raised } from "@engine/kernel";
 import { progressOf, reached, remaining } from "@engine/kernel";
 import { Card, Chip, ProgressBar } from "@heroui/react";
 import { colorFor } from "../tokens/theme.js";
@@ -21,14 +27,15 @@ import { Group, NavRow, NoteRow } from "../parts/surfaces.js";
 
 export interface GuideProps {
   readonly book: GuideBook;
-  readonly events: readonly string[];
+  /** What the workspace has ever done, and what this person has. */
+  readonly raised: Raised;
   readonly held: ReadonlySet<string>;
   readonly onGo: (route: string) => void;
 }
 
-export function Guide({ book, events, held, onGo }: GuideProps) {
-  const left = remaining(book, events, held);
-  const done = progressOf(book, events, held);
+export function Guide({ book, raised, held, onGo }: GuideProps) {
+  const left = remaining(book, raised, held);
+  const done = progressOf(book, raised, held);
 
   /* ⚠️ Finished is gone, not a page of ticks. A checklist that stays after it is
      complete is a permanent reminder of something already handled. */

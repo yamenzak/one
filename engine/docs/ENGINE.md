@@ -377,6 +377,7 @@ before an app is resolved draws on them.
 | `vault_look` | Who looked, and when | `subject_id: delete`<br>`grantee: anonymise` | `tenant_id: delete` |
 | `tenant_event` | — *how many times a workspace has done a thing, with nobody named* | — | `tenant_id: delete` |
 | `tenant_milestone` | — *which congratulations a workspace has already been shown* | — | `tenant_id: delete` |
+| `person_event` | Which of the first steps in each product you have taken yourself | `account_id: delete` | `tenant_id: delete` |
 | `media` | The files you uploaded | `subject_id: delete` | `tenant_id: delete` |
 | `search_item` | — *which records are in the index, and never what they say* | — | kept |
 
@@ -490,7 +491,7 @@ env or a binding.
 | `member-ops` | the roster's own operations | 1 | — |
 | `money-ops` | the bill and the balance, as a read | 1 | — |
 | `centre-ops` | the one bootstrap read the tenant door stands on | 1 | — |
-| `progress` | what a workspace has done, counted — and the checklist ticked from it | 6 | — |
+| `progress` | what a workspace has done, counted — and the checklist ticked from it | 9 | — |
 | `personal` | the operations about yourself, on every door | 2 | — |
 | `installable` | the manifest and the icon a workspace is installed as | 6 | — |
 | `platform-schema` | the platform's own tables, in dependency order, listed once | 2 | — |
@@ -505,7 +506,7 @@ env or a binding.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 9 | — |
 
-**449 of them**, 448 reached by something today.
+**452 of them**, 451 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 
@@ -1000,6 +1001,7 @@ its own header, cited by other files, and doing nothing.
 | D51 | A workspace is founded with the products somebody chose | 7 |
 | D52 | The proving ground is a fixture, and the deployment serves no fixture | 0 |
 | D53 | The navigation is five destinations, and the chrome carries the rest | 8 |
+| D54 | Half a getting-started list is the workspace's and half is the person's | 0 |
 <!-- /generated -->
 
 ---

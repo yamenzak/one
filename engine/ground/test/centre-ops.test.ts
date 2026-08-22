@@ -50,7 +50,15 @@ const app = () => serve({
     return tenant
       ? {
         tenantId: tenant.id, db: shard(), apps: ["ground"],
-        entitlements: [{ key: "seats", value: 10, source: "plan" as const, plan: 10 }],
+        entitlements: [
+          { key: "seats", value: 10, source: "plan" as const, plan: 10 },
+          /* ⚠️ `publishing` TOO, so a workspace step can actually be taken here.
+             Without it `note.publish` is refused by the gate and the assertion
+             that a newcomer is not asked to repeat it would pass for the wrong
+             reason — the step is undone for everybody. */
+          { key: "publishing", value: 1, source: "plan" as const, plan: 1 },
+          { key: "notes", value: 100, source: "plan" as const, plan: 100 },
+        ],
       }
       : null;
   }),
@@ -227,5 +235,66 @@ describe("the centre's bootstrap", () => {
     /* ⚠️ Absent for an operation that declared nothing, because silence is what
        that means. */
     expect(ground.outcomes?.["note.start"]).toBeUndefined();
+  });
+});
+
+/* ------------------------------------------------------- whose step it is --- */
+
+/**
+ * ⚠️ HALF A CHECKLIST IS THE WORKSPACE'S AND HALF IS THE PERSON'S, AND ONLY THE
+ * SECOND HALF CAN BE GOT WRONG QUIETLY. Ticked from the workspace alone,
+ * somebody invited into a notebook that has been running opens a finished
+ * checklist: every box crossed off by their employer, nothing taught, and
+ * nothing failing anywhere — the list simply renders empty and looks right.
+ */
+describe("a checklist", () => {
+  const guide = (cookie: string) =>
+    get("westgate", "/api/guide.view", cookie).then((r) => r.json()) as Promise<{
+      counts: Record<string, number>; mine: string[]; steps: { id: string }[];
+    }>;
+
+  async function joined(email: string, owner: string): Promise<string> {
+    expect((await post("westgate", "/api/member.invite",
+      { email, platformRole: "customer", appRoles: { ground: "writer" } }, owner)).status)
+      .toBe(200);
+    return signIn(email);
+  }
+
+  it("ticks a person's own step from their own work, and nobody else's", async () => {
+    const { owner } = await studio();
+    const made = await post("westgate", "/api/note.create", { title: "The first" }, owner);
+    expect(made.status, await made.clone().text()).toBe(200);
+
+    const mine = await guide(owner);
+    expect(mine.counts["note.created"]).toBeGreaterThan(0);
+    expect(mine.mine).toContain("note.created");
+    expect(mine.steps.map((s) => s.id)).not.toContain("first-note");
+
+    /* ⚠️ AND NOW SOMEBODY WHO WAS NOT THERE. The workspace's tally says a note
+       has been written; theirs says nothing, so their own first note is still
+       in front of them. */
+    const theirs = await guide(await joined("later@example.com", owner));
+    expect(theirs.counts["note.created"], "the workspace's history is everybody's")
+      .toBeGreaterThan(0);
+    expect(theirs.mine).toEqual([]);
+    expect(theirs.steps.map((s) => s.id), "their own first note is still theirs to write")
+      .toContain("first-note");
+  });
+
+  /*
+    ⚠️ AND A WORKSPACE STEP STAYS THE WORKSPACE'S, which is the same fault
+    pointing the other way. Publishing is the notebook discovering it has a
+    public face — done once, for everybody. Made per person, the newcomer above
+    would be told to publish something that has been public for a year.
+  */
+  it("does not ask a newcomer to repeat what the workspace has already done", async () => {
+    const { owner } = await studio();
+    const { id } = await post("westgate", "/api/note.create", { title: "The first" }, owner)
+      .then((r) => r.json()) as { id: string };
+    expect((await post("westgate", "/api/note.publish", { id }, owner)).status).toBe(200);
+
+    const theirs = await guide(await joined("after@example.com", owner));
+    expect(theirs.mine).toEqual([]);
+    expect(theirs.steps.map((s) => s.id)).not.toContain("publish-one");
   });
 });

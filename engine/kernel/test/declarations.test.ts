@@ -394,8 +394,45 @@ describe("the checklist", () => {
   */
   it("ticks itself off the event rather than off a visit", () => {
     const held = new Set(["member:manage"]);
-    expect(remaining(steps, ["member.invited"], held).map((s) => s.id)).toEqual(["brand"]);
-    expect(progressOf(steps, ["member.invited"], held)).toEqual({ done: ["invite"], total: 2 });
+    const raised = { workspace: ["member.invited"], person: [] };
+    expect(remaining(steps, raised, held).map((s) => s.id)).toEqual(["brand"]);
+    expect(progressOf(steps, raised, held)).toEqual({ done: ["invite"], total: 2 });
+  });
+
+  /*
+    ⚠️ AND A WORKSPACE'S HISTORY DOES NOT TICK A STEP THAT IS THE PERSON'S. This
+    is the whole reason the two axes exist: merged into one list, somebody
+    invited into a workspace that has been running for a year opens a checklist
+    already complete — congratulated for work they were not there for, and
+    taught none of it.
+  */
+  it("does not credit a person with what the workspace did before they arrived", () => {
+    const mine = {
+      ...steps,
+      learn: { id: "learn", label: "Send your first invitation", why: "Yours to send.",
+        done: "member.invited", link: "/people", who: "person" as const, order: 3 },
+    };
+    const held = new Set(["member:manage"]);
+    const raised = { workspace: ["member.invited"], person: [] };
+    expect(remaining(mine, raised, held).map((s) => s.id)).toEqual(["brand", "learn"]);
+    expect(progressOf(mine, raised, held).done).toEqual(["invite"]);
+    /* ⚠️ AND THEIR OWN DOES, WITHOUT TOUCHING THE WORKSPACE'S. */
+    const after = { workspace: ["member.invited"], person: ["member.invited"] };
+    expect(remaining(mine, after, held).map((s) => s.id)).toEqual(["brand"]);
+    expect(progressOf(mine, after, held).done).toEqual(["invite", "learn"]);
+  });
+
+  /*
+    ⚠️ AND A BOOK WRITTEN BEFORE THE AXIS EXISTED KEEPS THE MEANING IT HAD. An
+    absent `who` is "the workspace's", so nothing declared before this reads
+    differently after it.
+  */
+  it("treats a step that never named an axis as the workspace's", () => {
+    const held = new Set(["member:manage"]);
+    expect(progressOf(steps, { workspace: ["brand.set"], person: [] }, held).done)
+      .toEqual(["brand"]);
+    expect(progressOf(steps, { workspace: [], person: ["brand.set"] }, held).done)
+      .toEqual([]);
   });
 
   /*
@@ -404,7 +441,8 @@ describe("the checklist", () => {
     checklist they learn to ignore.
   */
   it("does not hold somebody to a step they are not allowed to take", () => {
-    expect(progressOf(steps, [], new Set())).toEqual({ done: [], total: 1 });
+    expect(progressOf(steps, { workspace: [], person: [] }, new Set()))
+      .toEqual({ done: [], total: 1 });
   });
 
   /* ⚠️ A step nothing can raise is stuck for ever, and the whole checklist then

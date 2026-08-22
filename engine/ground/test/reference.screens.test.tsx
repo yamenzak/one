@@ -136,7 +136,8 @@ describe("everything ground declares reaches a screen", () => {
     const steps = Object.values(GROUND.guide ?? {});
     expect(steps.length).toBeGreaterThan(0);
     const out = html(
-      <Guide book={GROUND.guide ?? {}} events={[]} held={OWNER} onGo={() => {}} />,
+      <Guide book={GROUND.guide ?? {}} raised={{ workspace: [], person: [] }}
+        held={OWNER} onGo={() => {}} />,
     );
     for (const step of steps) expect(out).toContain(step.label);
   });

@@ -51,7 +51,10 @@ export const GROUND_ROUTES: readonly string[] =
   (GROUND.screens ?? []).map((s) => s.route);
 
 /** What ticks the guide, and how many times. Sample, like everything else here. */
-const DONE = ["note.created", "note.drafted"];
+/* ⚠️ TWO AXES: what the workspace has done, and what THIS person has. The
+   specimen board shows a member who arrived after the notebook was
+   started — the workspace has drafted, they have not. */
+const RAISED = { workspace: ["note.created", "note.drafted"], person: ["note.created"] };
 const COUNTS = { "note.created": 6, "note.published": 3, "note.drafted": 2 };
 const HELD = new Set(["tenant:manage", "note:read", "note:write", "member:read"]);
 
@@ -147,7 +150,7 @@ export function GroundScreen({ route, onGo }: {
       <Shared title={title} of={ready(NOTES.slice(0, 3))} onOpen={() => go("/note")} />
     );
     case "/start": return (
-      <Start title={title} done={DONE} counts={COUNTS} held={HELD} onGo={go} />
+      <Start title={title} raised={RAISED} counts={COUNTS} held={HELD} onGo={go} />
     );
     /* ⚠️ THE DEFAULT IS THE APP'S FIRST DECLARED SCREEN, not a blank. An
        unrecognised route rendering nothing is the same picture as a page that

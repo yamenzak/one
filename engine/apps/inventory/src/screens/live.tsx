@@ -1904,6 +1904,8 @@ const SUPPLIERS = (api: Door) => function SuppliersHere() {
  */
 interface Far {
   readonly counts: Readonly<Record<string, number>>;
+  /** ⚠️ What THIS person has done. Half a checklist is theirs, not the workspace's. */
+  readonly mine: readonly string[];
   readonly fresh: readonly { readonly id: string }[];
   readonly said: readonly string[];
 }
@@ -1940,8 +1942,10 @@ const START = (api: Door) => function StartHere({ app, go }: Mounted) {
       title={nameOf("/start")}
       said={starts.of.status === "ready" ? starts.of.data.words.said : ""}
       /* ⚠️ THE EVENTS, NOT THE STEPS. `Guide` ticks a step whose `done` is in
-         this list, so handing it step ids would tick nothing and look correct. */
-      done={Object.keys(got?.counts ?? {})}
+         these lists, so handing it step ids would tick nothing and look correct.
+         ⚠️ AND BOTH AXES SEPARATELY — a workspace step is anybody's to have
+         done, a person step is only this person's. */
+      raised={{ workspace: Object.keys(got?.counts ?? {}), person: got?.mine ?? [] }}
       counts={got?.counts ?? {}}
       /*
         ⚠️ WHILE IT IS LOADING, EVERYTHING IS "ALREADY SAID". `[]` would draw
