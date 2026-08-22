@@ -320,30 +320,31 @@ generated ones) — plus every platform guard in `pnpm engine:gate`.
 
 ## Part III — the screen index
 
-**Eighteen screens.** Each is a pure component in `src/screens/`, mounted by a
+**Nineteen screens.** Each is a pure component in `src/screens/`, mounted by a
 container in `src/screens/live.tsx`, and rendered over a sample world by
 `src/screens/index.tsx`.
 
 | Route | Name | Nav | Needs | Component | Container |
 |---|---|---|---|---|---|
-| `/` | Stock | primary | `stock:read` | `screens/Stock.tsx:108` | `screens/live.tsx:358` |
-| `/scan` | Scan | primary | `product:read` | `screens/Scan.tsx:125` | `screens/live.tsx:582` |
-| `/receive` | Receive | primary | `stock:move` | `screens/Receive.tsx:100` | `screens/live.tsx:582` |
-| `/count` | Count | primary | `stock:move` | `screens/Count.tsx:80` | `screens/live.tsx:752` |
-| `/work` | Work | primary | `process:read` | `screens/Work.tsx:65` | `screens/live.tsx:1265` |
-| `/thing` | A product | none | `product:read` | `screens/Thing.tsx:129` | `screens/live.tsx:358` |
-| `/where` | A location | none | `location:read` | `screens/Where.tsx:34` | `screens/live.tsx:431` |
-| `/item` | An item | none | `stock:read` | `screens/Item.tsx:84` | `screens/live.tsx:905` |
-| `/kit` | A kit | none | `stock:read` | `screens/Kit.tsx:66` | `screens/live.tsx:1065` |
-| `/run` | A run | none | `process:read` | `screens/Run.tsx:73` | `screens/live.tsx:1265` |
-| `/case` | A job | none | `process:read` | `screens/Case.tsx:58` | `screens/live.tsx:1318` |
-| `/due` | Running out | secondary | `stock:read` | `screens/Due.tsx:79` | `screens/live.tsx:1375` |
-| `/labels` | Labels | secondary | `location:read` | `screens/Labels.tsx:248` | `screens/live.tsx:1458` |
-| `/reports` | Reports | secondary | `ledger:read` | `screens/Reports.tsx:84` | `screens/live.tsx:1458` |
-| `/ask` | Ask | secondary | `stock:read` | `screens/Ask.tsx:54` | `screens/live.tsx:1173` |
-| `/import` | Import | secondary | `product:write` | `screens/Import.tsx:131` | `screens/live.tsx:1591` |
-| `/suppliers` | Suppliers | secondary | `product:write` | `screens/Suppliers.tsx:77` | `screens/live.tsx:1758` |
-| `/start` | Getting started | secondary | `product:read` | `screens/Start.tsx:67` | `screens/live.tsx:1758` |
+| `/` | Home | primary | `stock:read` | `screens/Home.tsx:112` | `screens/live.tsx:359` |
+| `/stock` | Stock | primary | `stock:read` | `screens/Stock.tsx:92` | `screens/live.tsx:359` |
+| `/scan` | Scan | primary | `product:read` | `screens/Scan.tsx:125` | `screens/live.tsx:561` |
+| `/receive` | Receive | primary | `stock:move` | `screens/Receive.tsx:100` | `screens/live.tsx:561` |
+| `/count` | Count | primary | `stock:move` | `screens/Count.tsx:80` | `screens/live.tsx:731` |
+| `/work` | Work | primary | `process:read` | `screens/Work.tsx:65` | `screens/live.tsx:1244` |
+| `/thing` | A product | none | `product:read` | `screens/Thing.tsx:129` | `screens/live.tsx:359` |
+| `/where` | A location | none | `location:read` | `screens/Where.tsx:34` | `screens/live.tsx:413` |
+| `/item` | An item | none | `stock:read` | `screens/Item.tsx:84` | `screens/live.tsx:884` |
+| `/kit` | A kit | none | `stock:read` | `screens/Kit.tsx:66` | `screens/live.tsx:1044` |
+| `/run` | A run | none | `process:read` | `screens/Run.tsx:73` | `screens/live.tsx:1244` |
+| `/case` | A job | none | `process:read` | `screens/Case.tsx:58` | `screens/live.tsx:1297` |
+| `/due` | Running out | secondary | `stock:read` | `screens/Due.tsx:79` | `screens/live.tsx:1354` |
+| `/labels` | Labels | secondary | `location:read` | `screens/Labels.tsx:248` | `screens/live.tsx:1437` |
+| `/reports` | Reports | none | `ledger:read` | `screens/Reports.tsx:84` | `screens/live.tsx:1437` |
+| `/ask` | Ask | secondary | `stock:read` | `screens/Ask.tsx:54` | `screens/live.tsx:1152` |
+| `/import` | Import | secondary | `product:write` | `screens/Import.tsx:131` | `screens/live.tsx:1610` |
+| `/suppliers` | Suppliers | secondary | `product:write` | `screens/Suppliers.tsx:77` | `screens/live.tsx:1737` |
+| `/start` | Getting started | secondary | `product:read` | `screens/Start.tsx:67` | `screens/live.tsx:1737` |
 
 ### The surfaces that are not routes
 
@@ -367,14 +368,41 @@ that is out because it was opened**.
 
 ### Five nav slots, and the fifth is the one a basement never opens
 
-Stock, Scan, Receive, Count, Work. Runs and jobs are the regulated half of this
-product — a workshop tracking work orders, a clinic releasing sterilisation loads
-— and nobody storing paint in a garage. The `alone` preset holds no `process:*`
-key at all, so the destination is not drawn for somebody on it, which is the
-difference between a screen that is hidden and a screen that is not reachable.
-And the plan gates it too (engine 67): on a tier with neither runs nor work
-orders the screen never leaves the server, so the fifth slot goes back to the
-four a garage actually uses.
+**Home, Stock, Scan, Count, Work.** The root answers "is everything all right" —
+what is on the shelf, what is running out, what count is half done, what run is
+waiting — and everything under it is one tap away with its own name on it. Stock
+was the root for as long as this product had four screens, which made the first
+thing anybody saw a page of rows they had to read to find out whether there was
+anything to do.
+
+**Reports gave up its seat to it**, because most of its figures are on Home
+already, cut down to what a first screen holds: the recorded share, what left,
+what was found short, and how many lines run out before a delivery lands. A bar
+seat for a screen that is largely another screen's summary is the bar answering
+"where am I" with two places that are the same place.
+
+**Receiving is not a seat either, and never was** — it is Stock's own act. What
+Home offers in its quick row is exactly what the bar does not: receiving,
+labels, the spreadsheet and the people it is bought from. A shortcut to something
+a thumb already reaches from every screen is a second answer to one question.
+
+Runs and jobs are the regulated half of this product — a workshop tracking work
+orders, a clinic releasing sterilisation loads — and nobody storing paint in a
+garage. The `alone` preset holds no `process:*` key at all, so the destination is
+not drawn for somebody on it, which is the difference between a screen that is
+hidden and a screen that is not reachable. And the plan gates it too (engine 67):
+on a tier with neither runs nor work orders the screen never leaves the server,
+so the fifth slot goes back to the four a garage actually uses.
+
+### The checklist knows whose step it is
+
+Naming a place and building the catalogue happen once, for everybody; putting
+something on a shelf is the gesture this product IS, and somebody who has not
+done it has not learnt the product whatever their colleagues did last year. So
+`first-count` is `who: "person"` and the other two are the workspace's — see
+[DECISIONS.md](../../docs/DECISIONS.md) D54. An invited counter opening Home on
+their first morning is shown their own first delivery and is not congratulated
+for a year of somebody else's work.
 
 ---
 

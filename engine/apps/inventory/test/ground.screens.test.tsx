@@ -93,7 +93,7 @@ describe("OneInventory draws every screen it declares", () => {
  * wrong with anything.
  */
 describe("a line that is out or low says so", () => {
-  const out = renderToStaticMarkup(<InventoryScreen route="/" />);
+  const out = renderToStaticMarkup(<InventoryScreen route="/stock" />);
 
   it("marks the line that ran out as danger", () => {
     expect(LINES.some((l) => l.quantity === 0)).toBe(true);
@@ -127,7 +127,7 @@ describe("a line that is out or low says so", () => {
  */
 describe("the location tree", () => {
   it("shows the top of the tree, not every place in it", () => {
-    const out = renderToStaticMarkup(<InventoryScreen route="/" />);
+    const out = renderToStaticMarkup(<InventoryScreen route="/stock" />);
     const site = PLACES.find((p) => p.of === null);
     expect(site).toBeDefined();
     expect(out).toContain(site?.name ?? "");
@@ -1538,10 +1538,7 @@ describe("a list that is a page", () => {
         more={more}
         onMore={() => undefined}
         again={() => undefined}
-        onDue={() => undefined}
         onImport={() => undefined}
-        onSuppliers={() => undefined}
-        onStart={null}
         held={new Set(["product:write"])}
         onGo={() => undefined}
         onOpen={() => undefined}

@@ -44,7 +44,7 @@ const OUT = join(HERE, "..", "shots-out");
 
 /** ⚠️ A route is a path; a filename is not. `/` is the one that needs a name. */
 const idOf = (route: string): string =>
-  route === "/" ? "stock" : route.replace(/^\//, "").replace(/\//g, "-");
+  route === "/" ? "home" : route.replace(/^\//, "").replace(/\//g, "-");
 
 /**
  * ⚠️ A TALLER PHONE THAN THE MEASURING USES. 844 is the real device and the

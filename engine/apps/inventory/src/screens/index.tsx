@@ -38,6 +38,7 @@ import { Receive, keyOf, type Noted } from "./Receive.js";
 import { Scan, type Guess, type Seen } from "./Scan.js";
 import { Start } from "./Start.js";
 import { Stock } from "./Stock.js";
+import { Home } from "./Home.js";
 import { Thing, type Batch, type Movement } from "./Thing.js";
 import { Where } from "./Where.js";
 import { Import, MAPPABLE, type Seen as Seeing } from "./Import.js";
@@ -460,6 +461,45 @@ export function InventoryScreen({ route, onGo }: {
     here ? LINES.filter((l) => reach.has(l.where)) : LINES);
 
   switch (route) {
+    /*
+      ⚠️ A WORKSPACE WITH SOMETHING WRONG WITH IT, WHICH IS THE ONLY HOME WORTH
+      PHOTOGRAPHING. A ground where nothing is running out, no count is open and
+      no run is waiting draws the one state this screen was not built for — and
+      the empty case is a single note, which is not a picture of the screen.
+
+      ⚠️ AND THE CHECKLIST IS STILL UNFINISHED, from the same `RAISED` every
+      other specimen uses: somebody invited into a shelf that was already set up,
+      whose own first delivery is still in front of them.
+    */
+    case "/":
+      return (
+        <Home
+          title={title}
+          said={WORDS.clinic.said}
+          of={ready({ lines: LINES.length, products: 214, places: PLACES.length })}
+          again={nothing}
+          needs={{ due: 6, counts: 1, runs: 2 }}
+          moving={ready({
+            share: REPORTED.told.share,
+            out: REPORTED.told.recorded,
+            short: REPORTED.losses.reduce((n, one) => n + one.lost, 0),
+            buy: REPORTED.buy.length,
+            daily: REPORTED.daily,
+          })}
+          raised={RAISED}
+          held={HELD}
+          onGo={go}
+          onReceive={() => go("/receive")}
+          onLabels={() => go("/labels")}
+          onImport={() => go("/import")}
+          onSuppliers={() => go("/suppliers")}
+          onDue={() => go("/due")}
+          onCounts={() => go("/count")}
+          onRuns={() => go("/work")}
+          onReports={() => go("/reports")}
+          onStart={() => go("/start")}
+        />
+      );
     /* ⚠️ THE SHELF NOBODY HAS FILLED, WHICH IS THE SECOND SCREEN ANYBODY SEES.
        A place with a name and nothing on it is a real state rather than an
        omission, and the ground would never reach it by accident. */
@@ -802,14 +842,7 @@ export function InventoryScreen({ route, onGo }: {
           onGo={setHere}
           onOpen={() => go("/thing")}
           onAdd={() => go("/receive")}
-          onDue={() => go("/due")}
           onImport={() => go("/import")}
-          onSuppliers={() => go("/suppliers")}
-          /* ⚠️ THE GROUND SHOWS THE ROW, because the state worth photographing
-             is the one a new workspace actually lands on. A specimen board that
-             only ever draws the finished case is a board that cannot say what
-             the first morning looks like. */
-          onStart={() => go("/start")}
           held={HELD}
         />
       );

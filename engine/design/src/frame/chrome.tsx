@@ -330,9 +330,18 @@ export function Island({ items, here, onGo, act, only }: {
                 icons around it. The word that is showing is the whole point of
                 the bar; it takes full ink.
               */}
+              {/*
+                ⚠️ THE ELLIPSIS BELONGS TO THE OPEN LABEL AND TO NOTHING ELSE. A
+                closed item is a word held at zero width on purpose, and an
+                ellipsis on it says the layout ran out of room for something
+                somebody was meant to read — which is what the geometry sweep
+                looks for, and it found four of them in every bar in the product.
+                The trim is for a destination whose name is longer than the pill;
+                a name that is not showing has not been trimmed.
+              */}
               <span
                 className={`${TYPE.note} ${isHere ? "text-foreground" : ""}`
-                  + " overflow-hidden text-ellipsis whitespace-nowrap leading-none"}
+                  + ` overflow-hidden whitespace-nowrap leading-none${open ? " text-ellipsis" : ""}`}
                 style={{
                   maxWidth: open ? "10rem" : 0,
                   opacity: open ? 1 : 0,

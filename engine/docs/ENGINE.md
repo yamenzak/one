@@ -1111,8 +1111,9 @@ that names no stage, so this list cannot grow by forgetting.
 | 79 | A workspace is founded with the products somebody chose | shipped |
 | 80 | The ground is a fixture, and the deployment serves no fixture | shipped |
 | 81 | The navigation is five destinations, and the chrome carries the rest | shipped |
+| 82 | A home screen, and a checklist that knows whose step it is | shipped |
 
-**71 shipped, 10 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**72 shipped, 10 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---

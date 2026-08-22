@@ -4646,7 +4646,20 @@ export const INVENTORY: AppSpec = defineApp({
     once, which is a product that looks broken rather than unfinished.
   */
   screens: [
-    { id: "stock", route: "/", label: "Stock", nav: "primary", icon: "box",
+    /*
+      ⚠️ THE ROOT IS WHAT SOMEBODY IS HERE TO FIND OUT, AND IT IS NOT A LIST.
+      Stock was the first destination for as long as this product had four
+      screens, which made the answer to "is everything all right" a page of rows
+      somebody has to read. Home answers it in a figure and three counts, and
+      the list it replaced is one tap away with its own name on it.
+
+      ⚠️ AND IT IS `stock:read`, THE SAME GRANT THE SHELF ASKS FOR. Home is the
+      shelf summarised; a root anybody could open would be a root that shows
+      most people an empty screen.
+    */
+    { id: "home", route: "/", label: "Home", nav: "primary", icon: "star",
+      permission: "stock:read" },
+    { id: "stock", route: "/stock", label: "Stock", nav: "primary", icon: "box",
       permission: "stock:read" },
     /* ⚠️ A PRIMARY DESTINATION, BECAUSE IT IS THE GESTURE THE PRODUCT IS FOR.
        Filed under Stock as a button it would be one press further away than
@@ -4770,7 +4783,13 @@ export const INVENTORY: AppSpec = defineApp({
       reads the record of who took what — a person who may see a balance has not
       necessarily been given the history behind it, and the nav is what says so.
     */
-    { id: "reports", route: "/reports", label: "Reports", nav: "primary", icon: "chart",
+    /*
+      ⚠️ AND NOT A DESTINATION, since Home carries the same numbers cut down to
+      what a first screen holds. A bar seat for a screen most of whose figures
+      are already on the root is the bar answering "where am I" with two places
+      that are the same place — and the seat it gave up went to the root itself.
+    */
+    { id: "reports", route: "/reports", label: "Reports", nav: "none", icon: "chart",
       permission: "ledger:read", sky: "etch" },
     /* ⚠️ NOT A DESTINATION — THE CHROME'S OWN BUTTON, beside the notifications.
        Asking is something somebody does FROM wherever they are, about whatever
@@ -5215,13 +5234,17 @@ export const INVENTORY: AppSpec = defineApp({
   guide: {
     "first-place": { id: "first-place", label: "Name a place to keep things",
       why: "Everything sits somewhere, and the shelf is what a scan finds first.",
-      done: "location.created", link: "/", order: 1 },
+      done: "location.created", link: "/stock", order: 1 },
     "first-thing": { id: "first-thing", label: "Add your first product",
       why: "A product is the type; how many there are comes next.",
-      done: "product.created", link: "/", order: 2 },
+      done: "product.created", link: "/stock", order: 2 },
+    /* ⚠️ THE ONE STEP THAT IS EACH PERSON'S. Naming a place and building the
+       catalogue happen once for the whole workspace; putting something on a
+       shelf is the gesture this product IS, and somebody who has not done it has
+       not learnt the product whatever their colleagues did last year. */
     "first-count": { id: "first-count", label: "Put some on a shelf",
       why: "It is the whole product: what is where, and how many.",
-      done: "stock.received", link: "/", order: 3 },
+      done: "stock.received", link: "/receive", who: "person", order: 3 },
   },
 
   milestones: {

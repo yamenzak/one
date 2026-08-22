@@ -46,34 +46,18 @@ export interface StockProps {
   readonly onAdd: () => void;
   readonly onMore: () => void;
   /**
-   * WHAT STOCK IS ABOUT, ASKED FOUR OTHER WAYS.
+   * ⚠️ THE SPREADSHEET, AND IT STAYS HERE WHEN THE REST WENT TO THE ROOT.
+   * Everything else this screen once offered — what is running out, who it is
+   * bought from, the checklist — answers a question about the WORKSPACE, which
+   * is what a home screen is; an import is the only one that is a way of filling
+   * THIS list, and on the first morning it is the only way anybody fills it at
+   * all. Nobody types in eight hundred products.
    *
-   * ⚠️ THESE ARE NOT A MENU, THEY ARE THIS SCREEN'S OWN SUBJECT FROM A DIFFERENT
-   * ANGLE. What is running out is the shelf narrowed to one question; a
-   * spreadsheet and a supplier list are the catalogue BEHIND the rows. Each was
-   * a destination in a bar of thirteen and none of them is somewhere anybody
-   * navigates BETWEEN — a slot in the bar answers "where am I", and none of
-   * these is a place you are.
-   *
-   * ⚠️ AND THE PLACEMENT SAYS WHICH IS WHICH. "Running out" is above the tree,
-   * where the shelf's own state is read; the catalogue's two sit under the last
-   * row, where somebody who has finished reading the list already is.
-   */
-  readonly onDue: () => void;
-  readonly onImport: () => void;
-  readonly onSuppliers: () => void;
-  /**
-   * ⚠️ THE GUIDE, WHILE THERE IS ANY OF IT LEFT. It is reached from what is not
-   * done yet and it stops being wanted the week it is finished — so this is
-   * `null` on an established workspace rather than a permanent row every
-   * experienced person carries for ever.
-   */
-  readonly onStart: (() => void) | null;
-  /**
    * ⚠️ WHAT THIS PERSON HOLDS, BECAUSE A ROW THAT LEADS TO A 403 IS A PROMISE
    * THE PRODUCT DOES NOT KEEP. The nav filters itself on the same question; a
    * row inside a screen has nothing filtering it, so it asks here.
    */
+  readonly onImport: () => void;
   readonly held: ReadonlySet<string>;
 }
 
@@ -107,7 +91,7 @@ const toneOf = (line: Line): Tone => {
 
 export function Stock({
   title, of, places, here, total, more, again, onGo, onOpen, onAdd, onMore,
-  onDue, onImport, onSuppliers, onStart, held,
+  onImport, held,
 }: StockProps) {
   const now = Date.now();
   /*
@@ -160,35 +144,11 @@ export function Stock({
             {mayImport
               ? <Button variant="ghost" onPress={onImport}>Import a spreadsheet</Button>
               : null}
-            {onStart
-              ? <Button variant="ghost" onPress={onStart}>Getting started</Button>
-              : null}
           </div>
         ),
       }}
       then={(lines) => (
         <>
-          {/*
-            ⚠️ THE SHELF'S OWN STATE, ABOVE THE SHELF. What is running out is
-            the first thing anybody opens this product to find out, and it is
-            these same records under one question — a destination beside Stock
-            would be Stock twice, and a row at the bottom would be the answer
-            filed under the list it is about.
-
-            ⚠️ NO COUNT ON IT, AND THAT IS NOT AN OMISSION. What is loaded here
-            is a PAGE; counting the low lines in it would put a confident number
-            on the screen that is wrong by however much of the list has not
-            arrived — and the number gets smaller the less you have loaded,
-            which is the direction nobody checks.
-          */}
-          <Group>
-            <NavRow icon={glyphOf("alert")} label="Running out" onOpen={onDue} />
-            {/* ⚠️ WHILE THERE IS ANY OF IT LEFT — see `onStart`. */}
-            {onStart
-              ? <NavRow icon={glyphOf("star")} label="Getting started" onOpen={onStart} />
-              : null}
-          </Group>
-
           {/*
             ⚠️ THE TREE IS ABOVE THE LIST RATHER THAN BESIDE IT, because on a
             phone there is no beside. Descending narrows what is below it, which
@@ -257,30 +217,20 @@ export function Stock({
           </Group>
 
           {/*
-            ⚠️ THE CATALOGUE BEHIND THE ROWS, UNDER THE LAST ROW. A line is a
-            product somewhere; the spreadsheet that put the products there and
-            the people they are bought from are facts about the catalogue rather
-            than about the shelf — so they sit where somebody who has finished
-            reading the list already is, rather than competing with the numbers
-            at the top of it.
-
-            ⚠️ AND ONLY WHERE THE CATALOGUE IS THIS PERSON'S. Both are
-            `product:write`; a row leading to a refusal is a promise the product
-            does not keep, which is the same rule the nav applies one level up.
+            ⚠️ THE WAY THIS LIST IS FILLED IN BULK, UNDER THE LAST ROW. It sits
+            where somebody who has finished reading already is, rather than
+            competing with the numbers at the top — and only where the catalogue
+            is this person's, because a row leading to a refusal is a promise the
+            product does not keep.
           */}
-          {held.has("product:write")
+          {mayImport
             ? (
               <Group>
-                {mayImport
-                  ? (
-                    <NavRow
-                      icon={glyphOf("file")}
-                      label="Import a spreadsheet"
-                      onOpen={onImport}
-                    />
-                  )
-                  : null}
-                <NavRow icon={glyphOf("people")} label="Suppliers" onOpen={onSuppliers} />
+                <NavRow
+                  icon={glyphOf("file")}
+                  label="Import a spreadsheet"
+                  onOpen={onImport}
+                />
               </Group>
             )
             : null}

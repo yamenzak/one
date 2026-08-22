@@ -34,6 +34,7 @@ import { Run, type Covered } from "./Run.js";
 import { Work, type Jobs, type Runs } from "./Work.js";
 import { Scan, type Guess, type Seen } from "./Scan.js";
 import { Stock } from "./Stock.js";
+import { Home, type Moving, type Needs, type Shelf } from "./Home.js";
 import { Due, type Dated } from "./Due.js";
 import { Labels, type Labelled, type Subject, type Template } from "./Labels.js";
 import { Reports, type Reported, type Span } from "./Reports.js";
@@ -364,22 +365,6 @@ const STOCK = (api: Door) => function StockHere({ app, go }: Mounted) {
     () => new Set((app as { readonly permissions?: readonly string[] }).permissions ?? []),
     [app],
   );
-  /*
-    ⚠️ THE GUIDE IS ASKED FOR HERE BECAUSE THIS IS WHERE IT IS OFFERED, and it
-    is the only read on this screen whose ANSWER may be nothing at all. A
-    workspace that has finished the checklist gets no row; while the answer is
-    still coming it gets no row either, because a "Getting started" that appears
-    a beat after the list and then leaves again is a row that moved under
-    somebody's thumb.
-  */
-  const far = useAsked<Far>(() => api.get("guide.view"));
-  const got = far.of.status === "ready" ? far.of.data : null;
-  /* ⚠️ THE EVENTS, NOT THE STEPS — `guide.view` counts what HAPPENED, and a
-     step is done when its `done` event is among them. Comparing step ids
-     against those keys would find no overlap and hold the row open for ever. */
-  const left = got
-    ? Object.values(INVENTORY.guide ?? {}).filter((s) => !(s.done in got.counts)).length
-    : 0;
   /* ⚠️ WHERE THE READER IS IN THE TREE, HELD HERE. It is not in the address on
      purpose: narrowing a list is a filter rather than a destination, and putting
      it in the path would make the back button undo a filter one step at a time
@@ -398,7 +383,7 @@ const STOCK = (api: Door) => function StockHere({ app, go }: Mounted) {
 
   return (
     <Stock
-      title={nameOf("/")}
+      title={nameOf("/stock")}
       of={rows}
       places={places}
       here={here}
@@ -419,10 +404,7 @@ const STOCK = (api: Door) => function StockHere({ app, go }: Mounted) {
          it stopped being honest the moment `/receive` existed, and it was the
          only thing standing between the screen and the session it names. */
       onAdd={() => go("/receive")}
-      onDue={() => go("/due")}
       onImport={() => go("/import")}
-      onSuppliers={() => go("/suppliers")}
-      onStart={left > 0 ? () => go("/start") : null}
       held={held}
     />
   );
@@ -469,7 +451,7 @@ const THING = (api: Door) => function ThingHere({ go, at }: Mounted) {
   if (line.status === "ready" && !line.data) {
     return (
       <Stock
-        title={nameOf("/")}
+        title={nameOf("/stock")}
         of={ready([])}
         places={places}
         here={null}
@@ -483,10 +465,7 @@ const THING = (api: Door) => function ThingHere({ go, at }: Mounted) {
         /* ⚠️ NOTHING LEADS ANYWHERE FROM A RECORD THAT IS NOT THERE. This is
            the empty shelf drawn over a wrong address, so its rows would be
            offers made by a screen that is reporting a mistake. */
-        onDue={() => undefined}
         onImport={() => undefined}
-        onSuppliers={() => undefined}
-        onStart={null}
         held={new Set()}
       />
     );
@@ -1961,6 +1940,148 @@ const START = (api: Door) => function StartHere({ app, go }: Mounted) {
 };
 
 /**
+ * ⚠️ WHAT A REPORT LOOKS LIKE WHEN NOBODY ASKED FOR ONE. `useAsked` needs an
+ * answer of the right shape whether or not the read was made, and the block it
+ * feeds is not drawn at all without `ledger:read` — so this is never rendered.
+ * It exists so the hook has one branch rather than two.
+ */
+const EMPTY_REPORT: Reported = {
+  told: { recorded: 0, inferred: 0, share: 0 },
+  used: [], losses: [], buy: [], daily: [],
+};
+
+/**
+ * HOME — the first screen, and the one read that is really seven.
+ *
+ * ⚠️ EVERY BLOCK ASKS FOR ITSELF, AND THAT IS WHY THEY ARE SEPARATE READS. One
+ * operation answering the whole screen would be a read that fails whole: a
+ * workspace whose production runs are unreachable would lose the shelf figure
+ * and the checklist with them, on the screen somebody opens first. Seven
+ * requests in parallel cost one round trip and fail one block at a time.
+ *
+ * ⚠️ AND WHAT A PERSON MAY NOT SEE IS NOT ASKED FOR. The history, the counts and
+ * the runs are three separate grants; asking anyway would put a refusal behind
+ * the first screen of the product, and the block would then have to tell a
+ * warehouse hand that something went wrong when nothing did. `null` travels
+ * instead, and the screen leaves the row out.
+ *
+ * ⚠️ THE TOTALS ARE ASKED FOR WITH `limit: 1`. A list read answers its
+ * collection's whole count whatever page it hands back (`records.ts`), so the
+ * cheapest way to learn how many products there are is to ask for one of them.
+ */
+const HOME = (api: Door) => function HomeHere({ app, go }: Mounted) {
+  const today = dayHere();
+  const held = React.useMemo(
+    () => new Set((app as { readonly permissions?: readonly string[] }).permissions ?? []),
+    [app],
+  );
+  const may = React.useCallback((one: string) => held.has(one), [held]);
+
+  const lines = useAsked<Page>(() => api.get("stock.list", { limit: "1" }));
+  const kinds = useAsked<Page>(() => api.get("product.list", { limit: "1" }));
+  const places = useAsked<Page>(() => api.get("location.list", { limit: "1" }));
+
+  const shelf: Loaded<Shelf> = both(
+    both(lines.of, kinds.of, (a, b) => ({ lines: a.total, products: b.total })),
+    places.of,
+    (a, b) => ({ ...a, places: b.total }),
+  );
+
+  /* ⚠️ THE SAME TWO ASKS THE EXPIRY SWEEP MAKES, so the number on this screen
+     and the number in the notification cannot disagree. How many days counts as
+     "soon" is a setting a person on the floor cannot read, which is why the
+     arithmetic is the operation's rather than this file's. */
+  const dated = useAsked<{ items: readonly Row[] }>(
+    () => api.get("batch.due", { today }), [today]);
+  const serviced = useAsked<{ items: readonly Row[] }>(
+    () => api.get("unit.due", { today }), [today]);
+  const sessions = useAsked<{ items: readonly Row[] }>(
+    () => (may("count:write")
+      ? api.get("count.list")
+      : Promise.resolve({ ok: true as const, value: { items: [] } })));
+  const runs = useAsked<{ items: readonly Row[] }>(
+    () => (may("process:read")
+      ? api.get("process.list")
+      : Promise.resolve({ ok: true as const, value: { items: [] } })));
+
+  /*
+    ⚠️ WAITING IS NOT ZERO, AND NEITHER IS FORBIDDEN. A count still in flight
+    draws no number rather than a confident nought — the screen would be telling
+    somebody nothing needs them and then changing its mind — and a lane this
+    person may not read is left out of the list entirely rather than shown as
+    clear. Both are `null`; the screen distinguishes them by whether the row is
+    there at all.
+  */
+  const many = (
+    of: Loaded<{ items: readonly Row[] }>, pick: (rows: readonly Row[]) => number,
+  ): number | null => (of.status === "ready" ? pick(of.data.items) : null);
+
+  const needs: Needs = {
+    due: dated.of.status === "ready" && serviced.of.status === "ready"
+      ? dated.of.data.items.length + serviced.of.data.items.length
+      : null,
+    counts: may("count:write")
+      ? many(sessions.of, (rows) => rows.filter((r) => !text(r.closed)).length)
+      : null,
+    runs: may("process:read")
+      ? many(runs.of, (rows) => rows.filter((r) => text(r.state) === "ended").length)
+      : null,
+  };
+
+  /* ⚠️ THIRTY DAYS, THROUGH THE KERNEL'S CALENDAR. A subtraction on an instant
+     is 29 or 31 days across a clock change, and a home screen quietly covering
+     the wrong period is one nobody can catch by looking. */
+  const from = React.useMemo(() => dayPlus(today as Day, -29), [today]);
+  const report = useAsked<Reported>(
+    () => (may("ledger:read")
+      ? api.get("stock.report", { from, to: today })
+      : Promise.resolve({ ok: true as const, value: EMPTY_REPORT })), [from, today]);
+
+  const moving: Loaded<Moving> | null = may("ledger:read")
+    ? (report.of.status === "ready"
+      ? ready({
+        share: report.of.data.told.share,
+        out: report.of.data.told.recorded,
+        short: report.of.data.losses.reduce((n, one) => n + one.lost, 0),
+        buy: report.of.data.buy.length,
+        daily: report.of.data.daily,
+      })
+      : report.of as Loaded<Moving>)
+    : null;
+
+  const starts = useAsked<{ words: { said: string } }>(() => api.get("product.start"));
+  const far = useAsked<Far>(() => api.get("guide.view"));
+  const got = far.of.status === "ready" ? far.of.data : null;
+
+  return (
+    <Home
+      title={nameOf("/")}
+      said={starts.of.status === "ready" ? starts.of.data.words.said : ""}
+      of={shelf}
+      again={() => { lines.again(); kinds.again(); places.again(); }}
+      needs={needs}
+      moving={moving}
+      /* ⚠️ BOTH AXES, AND WHILE THE ANSWER IS STILL COMING NEITHER IS RAISED.
+         Empty lists mean "nothing done yet", which draws the whole checklist for
+         a beat and then takes most of it away — so the section is held back
+         until `guide.view` lands, which is what `left` above already decides. */
+      raised={{ workspace: Object.keys(got?.counts ?? {}), person: got?.mine ?? [] }}
+      held={held}
+      onGo={go}
+      onReceive={() => go("/receive")}
+      onLabels={() => go("/labels")}
+      onImport={() => go("/import")}
+      onSuppliers={() => go("/suppliers")}
+      onDue={() => go("/due")}
+      onCounts={() => go("/count")}
+      onRuns={() => go("/work")}
+      onReports={() => go("/reports")}
+      onStart={() => go("/start")}
+    />
+  );
+};
+
+/**
  * ⚠️ THE ROUTES COME FROM THE MANIFEST, NOT FROM A LIST HERE. A second list is a
  * second answer to what screens this app has, and they drift in the direction
  * nobody notices — a screen declared and never drawn renders a notice, which
@@ -1969,7 +2090,8 @@ const START = (api: Door) => function StartHere({ app, go }: Mounted) {
 export function mount({ register, api }: Mounting): void {
   const declared = new Set((INVENTORY.screens ?? []).map((s) => s.route));
   const screens: readonly [string, React.ComponentType<Mounted>][] = [
-    ["/", STOCK(api)],
+    ["/", HOME(api)],
+    ["/stock", STOCK(api)],
     ["/thing", THING(api)],
     ["/where", WHERE(api)],
     ["/scan", SCAN(api)],
