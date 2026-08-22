@@ -23,7 +23,7 @@
 import * as React from "react";
 import type { Kind, ScreenSpec } from "@engine/kernel";
 import { PRIMARY_MAX, isBusiness, primaryOf, screenFor } from "@engine/kernel";
-import { Button, Separator } from "@heroui/react";
+import { Button } from "@heroui/react";
 import {
   Banknote, Bell, Building2, Calendar, CheckCheck, Circle, ClipboardList, Clock, Cog, Coins, Database,
   Boxes, ChartColumn, FileText, House, Inbox as InboxGlyph, Mail, MapPin, NotebookPen, Package, Plus, Search,
@@ -38,8 +38,6 @@ import {
 } from "../parts/marks.js";
 import { Page } from "./page.js";
 import { Island } from "./chrome.js";
-import { Tray } from "./overlay.js";
-import { Group, NavRow } from "../parts/surfaces.js";
 import {
   Crown, CrownSocketProvider, crownFor, type CrownClaim, type Slot,
 } from "./crown.js";
@@ -351,26 +349,22 @@ export const reachable = (
     && (!s.flag || flags[s.flag] === true));
 
 /**
- * WHAT THE PHONE'S BAR HOLDS, AND WHAT THE SHEET BEHIND IT HOLDS.
+ * WHAT THE BAR HOLDS, AND IT HOLDS EVERYTHING THERE IS.
  *
- * ⚠️ A FUNCTION RATHER THAN TWO LINES INSIDE THE SHELL, because the invariant is
- * the whole point and an invariant inside a render is one nothing can ask about.
- * Every screen with a nav tier is in exactly one of the two lists — which is
- * what stopped being true when `secondary` was drawn in the desktop rail alone,
- * and an app with twelve destinations offered five of them to a phone.
+ * ⚠️ THIS USED TO RETURN TWO LISTS, AND THE SECOND ONE WAS A MENU. Five at the
+ * thumb, everything else behind an item that opened a sheet — so the fifth slot
+ * was spent on a door rather than a destination, and the bar could not say where
+ * you were from any screen behind it. What replaced it is not a bigger bar: a
+ * screen is a destination or it belongs to a subject and is reached from there
+ * (`ScreenSpec.nav`), so there is no overflow to hold.
  *
- * ⚠️ THE BAR KEEPS ALL FIVE WHERE THERE IS NOTHING TO HOLD. The fifth slot is
- * spent on the way to everywhere else only when there IS an everywhere else, so
- * an app of four destinations is untouched by any of this.
+ * ⚠️ A FUNCTION RATHER THAN A LINE INSIDE THE SHELL, because the ceiling is the
+ * whole point and a ceiling inside a render is one nothing can ask about. It is
+ * enforced at composition too; this is the second of the two, for a deployment
+ * reading a manifest it did not compose.
  */
-export function phoneNav(mine: readonly ScreenSpec[]): {
-  readonly bar: readonly ScreenSpec[];
-  readonly rest: readonly ScreenSpec[];
-} {
-  const primary = primaryOf(mine).slice(0, PRIMARY_MAX);
-  const secondary = mine.filter((s) => s.nav === "secondary");
-  const bar = primary.slice(0, PRIMARY_MAX - (secondary.length ? 1 : 0));
-  return { bar, rest: [...primary.slice(bar.length), ...secondary] };
+export function phoneNav(mine: readonly ScreenSpec[]): readonly ScreenSpec[] {
+  return primaryOf(mine).slice(0, PRIMARY_MAX);
 }
 
 export function Shell(props: ShellProps) {
@@ -379,24 +373,20 @@ export function Shell(props: ShellProps) {
   } = props;
 
   const mine = reachable(screens, held, flags, kind);
-  /* ⚠️ Sliced as well as refused at composition: a deployment reading a manifest
-     it did not compose must not draw a sixth either. */
-  const primary = primaryOf(mine).slice(0, PRIMARY_MAX);
-  const secondary = mine.filter((s) => s.nav === "secondary");
-
   /*
-    ⚠️ WHAT THE BAR CANNOT HOLD, AND UNTIL THIS EXISTED IT WAS NOWHERE ON A
-    PHONE. `secondary` was drawn in the rail below and by nothing above it, so
-    an app declaring twelve destinations offered five to anybody holding one —
-    and the other seven had no gesture at all. It rendered correctly, tested
-    green, and read as a design decision rather than as an omission.
-
-    ⚠️ THE FIFTH NAV SLOT HOLDS THEM, so the last primary is in here too — see
-    `Island.more`. The order is the rail's: what did not fit, then the second
-    tier, which is how the same product reads on both halves of the breakpoint.
+    ⚠️ ONE LIST, AND BOTH HALVES OF THE BREAKPOINT DRAW IT. The rail and the bar
+    used to differ — the rail carried a second tier the bar did not — so the same
+    product was two products either side of `md`, and which screens existed
+    depended on the window. There is one tier now, so there is nothing to
+    disagree about.
   */
-  const [elsewhere, setElsewhere] = React.useState(false);
-  const { bar: inBar, rest } = phoneNav(mine);
+  const inBar = phoneNav(mine);
+  /* ⚠️ THE CHROME'S OWN TWO, DECLARED RATHER THAN NAMED HERE — see
+     `ScreenSpec.chrome`. A shell that knew which screen was the search would be
+     a shell that knows one product; every app answers for itself and an app that
+     answers for neither gets a shorter crown. */
+  const search = mine.find((s) => s.chrome === "search");
+  const assistant = mine.find((s) => s.chrome === "assistant");
   /* ⚠️ THE SCREEN THE ADDRESS BELONGS TO, NOT THE ONE IT EQUALS. A detail screen
      carries what it is about (`/thing/t-glove`), so an exact match left the nav
      with nothing selected and the page with no title the moment anybody opened a
@@ -406,9 +396,9 @@ export function Shell(props: ShellProps) {
   /*
     ⚠️ THE PRODUCT'S OWN GROUND, WHERE A SCREEN HAS NOT NAMED ONE — and from the
     SAME face already in the crown, so the mark over the door and the world under
-    the page are one subject. A product is a SYSTEM, so its family is a lattice:
-    structure, adjacency, a pattern that re-routes itself rather than a place you
-    visit or a room you stand in.
+    the page are one subject. The family is `cloth` — woven line, which has no
+    figure for the eye to keep finding behind a table somebody is reading numbers
+    off. Which family that is belongs to `face.tsx` and not here; see it.
 
     ⚠️ A SCREEN THAT NAMES AN AMBIENCE STILL WINS. The per-screen table is a real
     design decision — a report wants `tide`, a paywall wants `spotlight` — and
@@ -475,24 +465,6 @@ export function Shell(props: ShellProps) {
         items={inBar.map((s) => ({
           id: s.id, label: s.label, route: s.route, icon: glyphOf(s.icon ?? s.id),
         }))}
-        /*
-          ⚠️ NAMED BY WHERE YOU ARE WHEN YOU ARE IN IT, and by the app when you
-          are not. A person on Reports reads "Reports" in the bar rather than a
-          bar with nothing marked — which is what "where am I" costs if the
-          fifth item is a button called More.
-        */
-        {...(rest.length
-          ? {
-            more: {
-              label: at && rest.some((s) => s.id === at.id) ? at.label : crown.appName,
-              icon: glyphOf(at && rest.some((s) => s.id === at.id)
-                ? (at.icon ?? at.id)
-                : "apps"),
-              onOpen: () => { setElsewhere(true); },
-              here: Boolean(at && rest.some((s) => s.id === at.id)),
-            },
-          }
-          : {})}
       />}
     >
       {/*
@@ -505,9 +477,13 @@ export function Shell(props: ShellProps) {
         one that scrolled away, the one with a `Separator` under it, and the one
         whose controls were three different heights.
 
-        ⚠️ AND ITS SLOTS MAP WITHOUT INVENTING ANYTHING. The account leads (it
-        opens OneSpace), the product's mark and the two names are the middle, and
-        the trail is the switcher and the inbox.
+        ⚠️ AND THE WORKSPACE'S NAME IS GONE FROM IT. This drew a face, a product
+        mark and a workspace name stacked over a product name — two circles and a
+        paragraph in a 64px row, answering a question nobody was asking. The door
+        says which workspace, the brand says it in colour, and the person chose it
+        a moment ago; what a working screen wants in its widest slot is somewhere
+        to TYPE. The middle is the app's search now (`ScreenSpec.chrome`), and an
+        app with none leaves the row shorter rather than filled.
 
         ⚠️ THE PER-APP SWITCHER BUTTONS ARE GONE AND THAT IS A FIX. There was one
         button per other product, gated on `apps.length > 1` — but `apps` is
@@ -515,12 +491,10 @@ export function Shell(props: ShellProps) {
         `1 > 1` was false, and the switcher never appeared at all. It is one
         control to OneSpace now, which is the surface that lists them.
 
-        ⚠️ AND THE MARK AND THE SECOND LINE ARE GONE WITH THEM. This drew a face,
-        then a product mark, then a workspace name stacked over a product name —
-        two circles and a paragraph in a 64px row, which is the clutter that made
-        it the crown nobody wanted. What a crown owes here is WHOSE data this is;
-        which product is the nav underneath, and choosing between them is the
-        OneSpace. One face, one name.
+        ⚠️ AND THE ASSISTANT SITS BESIDE THE NOTIFICATIONS RATHER THAN IN THE BAR.
+        Asking is something somebody does FROM a screen, about what is on it — a
+        destination for it means going somewhere first and saying what you wanted
+        second, from every screen in the product.
       */}
       <Crown
         bleed="edge"
@@ -531,8 +505,12 @@ export function Shell(props: ShellProps) {
             face: crown.personFace,
             onOpen: onOpenSpace,
           },
-          name: crown.tenantName,
+          ...(search ? { find: { label: `Search ${crown.appName}`, onOpen: () => onGo(search.route) } } : {}),
           also: [
+            ...(assistant
+              ? [{ id: "ask", label: assistant.label, icon: glyphOf(assistant.icon ?? assistant.id),
+                  onDo: () => onGo(assistant.route) }]
+              : []),
             ...((crown.apps ?? []).length && onSwitchApp && onOpenSpace
               ? [{ id: "apps", label: "Your products", icon: <Boxes />, onDo: onOpenSpace }]
               : []),
@@ -549,7 +527,7 @@ export function Shell(props: ShellProps) {
         {/* ⚠️ The same five, plus room for more. A desktop sidebar that showed a
             different set would make the two layouts two products. */}
         <nav className={`hidden md:flex flex-col gap-1 w-56 shrink-0 ${PAD}`} aria-label="Sections">
-          {primary.map((s) => (
+          {inBar.map((s) => (
             <Button
               key={s.id}
               variant={s.route === at?.route ? "primary" : "ghost"}
@@ -558,47 +536,7 @@ export function Shell(props: ShellProps) {
               {s.label}
             </Button>
           ))}
-          {secondary.length ? <Separator /> : null}
-          {secondary.map((s) => (
-            <Button
-              key={s.id}
-              variant={s.route === at?.route ? "secondary" : "ghost"}
-              onPress={() => onGo(s.route)}
-            >
-              {s.label}
-            </Button>
-          ))}
         </nav>
-
-        {/*
-          ⚠️ THE PHONE'S OTHER HALF OF THAT RAIL, AND IT IS THE SAME LIST IN THE
-          SAME ORDER. A sheet whose contents were chosen separately would be a
-          second navigation model, and the two would drift the first time
-          somebody added a screen.
-
-          ⚠️ IT IS MOUNTED AT ANY WIDTH BECAUSE NOTHING OPENS IT ABOVE `md` —
-          the trigger is inside the nav, which is `md:hidden` already. A second
-          `md:hidden` here would be a breakpoint asserted in two places, which
-          is how the two come to disagree.
-
-          ⚠️ AND EVERY ROW SAYS WHERE IT GOES RATHER THAN WHAT IT IS FOR. These
-          are the app's own screen labels, unedited — the sheet is a map, and a
-          map that renames places is a worse map.
-        */}
-        {rest.length ? (
-          <Tray title={crown.appName} isOpen={elsewhere} onOpenChange={setElsewhere}>
-            <Group>
-              {rest.map((s) => (
-                <NavRow
-                  key={s.id}
-                  icon={glyphOf(s.icon ?? s.id)}
-                  label={s.label}
-                  onOpen={() => { setElsewhere(false); onGo(s.route); }}
-                />
-              ))}
-            </Group>
-          </Tray>
-        ) : null}
 
         {/* ⚠️ NO `NAV_SPACE` HERE ANY MORE — `Page` adds it, because `Page` is
             what was handed the nav and therefore what knows there is one to

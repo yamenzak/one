@@ -293,7 +293,20 @@ const SKY: Record<FaceKind, {
 }> = {
   workspace: { family: "space", of: "workspace", lit: "planet" },
   person: { family: "aura", of: "person", lit: "face" },
-  app: { family: "loops" },
+  /*
+    ⚠️ `cloth` — FINE WOVEN LINES, AND THE ARGUMENT IS THE SCREEN RATHER THAN
+    THE METAPHOR. This was `loops`: a lattice, chosen because a product is a
+    system and a lattice is structure and adjacency. What a lattice actually is
+    on a working screen is a PATTERN — a repeating figure the eye keeps finding,
+    behind a table somebody is reading numbers off. It is also the heaviest
+    family measured: at list density, 2,820 placements against `cloth`'s few
+    hundred.
+
+    ⚠️ A GROUND IS FOR DEPTH, NOT FOR DECORATION. Woven line has no figure to
+    find — it reads as a material the page is resting on, which is what makes a
+    screen feel like a place rather than a document with wallpaper behind it.
+  */
+  app: { family: "cloth" },
   one: { family: "blobs" },
 };
 

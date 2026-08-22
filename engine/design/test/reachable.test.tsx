@@ -1,19 +1,17 @@
 /**
- * EVERY DESTINATION AN APP DECLARES IS REACHABLE ON A PHONE.
+ * THE NAVIGATION IS THE BAR, AND THE BAR IS THE NAVIGATION.
  *
- * ⚠️ THIS IS THE FAILURE THE TEST EXISTS FOR, AND IT SHIPPED. `Shell` drew
- * `nav: "secondary"` in the desktop rail and nowhere else, so an app declaring
- * five primaries and seven secondaries offered five of its twelve screens to
- * anybody holding a phone — and the other seven had no gesture at all. Every
- * suite was green, because nothing had ever asked the question in one place: the
- * rail was correct, the bar was correct, and between them a third of the product
- * was unreachable on the half of the breakpoint it is used on.
+ * ⚠️ THERE USED TO BE A SECOND TIER AND IT WAS A MEGA MENU. `Shell` drew
+ * `nav: "secondary"` in the desktop rail; the phone's bar spent its fifth slot
+ * on an item that opened a sheet of the rest. So a product with twelve screens
+ * had twelve places to look, the bar could not answer "where am I" from seven of
+ * them, and the same product read differently either side of the breakpoint.
  *
- * ⚠️ SO THE INVARIANT IS THE WHOLE THING, NOT EITHER HALF. Every screen with a
- * nav tier is in exactly one of the two lists — the bar, or what the bar's fifth
- * item opens. Checking that the bar has five, or that the sheet has seven, is
- * what was already being checked implicitly; what was never checked is that the
- * two ADD UP.
+ * ⚠️ THE CEILING WAS NEVER THE PROBLEM; THE OVERFLOW WAS. A second tier is what
+ * an app reaches for instead of deciding, so the tier is gone from the kernel —
+ * a screen is a destination or it belongs to a subject and is reached from
+ * there. This file is what stops the overflow coming back: there is one list,
+ * everything in the navigation is in it, and it fits.
  */
 
 import { describe, expect, it } from "vitest";
@@ -24,71 +22,42 @@ import { phoneNav } from "../src/index.js";
 const screen = (id: string, nav: ScreenSpec["nav"]): ScreenSpec =>
   ({ id, route: `/${id}`, label: id, nav, permission: "any:read" });
 
-/** ⚠️ OneInventory's own shape, which is what found this. */
-const TWELVE: readonly ScreenSpec[] = [
-  ...["stock", "scan", "receive", "count", "work"].map((id) => screen(id, "primary")),
-  ...["due", "labels", "reports", "ask", "import", "suppliers", "start"]
-    .map((id) => screen(id, "secondary")),
-  /* ⚠️ A DETAIL SCREEN IS IN NEITHER, and that is correct — it is reached from a
-     row rather than from the chrome. It is here so the count below cannot pass
-     by accident. */
-  screen("thing", "none"),
+/** ⚠️ OneInventory's own shape: five destinations and the rest under subjects. */
+const AN_APP: readonly ScreenSpec[] = [
+  ...["stock", "scan", "count", "work", "reports"].map((id) => screen(id, "primary")),
+  /* ⚠️ NOT UNREACHABLE — REACHED FROM WHAT THEY ARE ABOUT. Receive from Stock,
+     Labels from a location, Suppliers from the catalogue. They are here so the
+     assertions below cannot pass by counting an empty list. */
+  ...["receive", "due", "labels", "ask", "import", "suppliers", "start", "thing"]
+    .map((id) => screen(id, "none")),
 ];
 
-describe("what a phone can reach", () => {
-  it("puts every declared destination in exactly one of the two", () => {
-    const { bar, rest } = phoneNav(TWELVE);
-    const reached = [...bar, ...rest].map((s) => s.id);
-    expect(new Set(reached).size).toBe(reached.length);
-    expect([...reached].sort()).toEqual(
-      TWELVE.filter((s) => s.nav !== "none").map((s) => s.id).sort(),
-    );
-  });
-
-  /* ⚠️ THE BAR STILL FITS, which is the constraint the sheet exists to serve.
-     Five is what a phone holds; the fifth is the way to the rest. */
-  it("never asks the bar to hold more than it can", () => {
-    expect(phoneNav(TWELVE).bar.length).toBe(PRIMARY_MAX - 1);
+describe("what the navigation holds", () => {
+  it("holds every destination and nothing else", () => {
+    expect(phoneNav(AN_APP).map((s) => s.id))
+      .toEqual(["stock", "scan", "count", "work", "reports"]);
   });
 
   /*
-    ⚠️ AND AN APP WITH NOTHING TO HOLD KEEPS ALL FIVE. The slot is spent on the
-    way to everywhere else only when there IS an everywhere else — otherwise
-    this change would have cost every small app a destination to solve a problem
-    it does not have.
+    ⚠️ AND THE CEILING IS ENFORCED HERE AS WELL AS AT COMPOSITION. A deployment
+    reading a manifest it did not compose must not draw a sixth — which is not a
+    hypothetical: the surface is composed from a declaration that travels.
   */
+  it("never draws more than the bar can hold", () => {
+    const seven = ["a", "b", "c", "d", "e", "f", "g"].map((id) => screen(id, "primary"));
+    expect(phoneNav(seven)).toHaveLength(PRIMARY_MAX);
+  });
+
   it("leaves an app that fits entirely alone", () => {
     const four = ["a", "b", "c", "d"].map((id) => screen(id, "primary"));
-    const { bar, rest } = phoneNav(four);
-    expect(bar.map((s) => s.id)).toEqual(["a", "b", "c", "d"]);
-    expect(rest).toEqual([]);
+    expect(phoneNav(four).map((s) => s.id)).toEqual(["a", "b", "c", "d"]);
   });
 
-  it("holds all five where there are five and no second tier", () => {
-    const five = ["a", "b", "c", "d", "e"].map((id) => screen(id, "primary"));
-    expect(phoneNav(five).bar.length).toBe(PRIMARY_MAX);
-    expect(phoneNav(five).rest).toEqual([]);
-  });
-
-  /*
-    ⚠️ THE ONE THE RAIL DROPS IS IN THE SHEET, NOT GONE. An app may declare more
-    primaries than the bar holds; the sixth was already sliced away at the top of
-    this walk, so what the fifth slot gives up is the FIFTH primary and it has to
-    land somewhere. Ordered before the second tier, because that is the rail's
-    order and one product must not read as two.
-  */
-  it("puts the primary it displaced at the head of the rest", () => {
-    expect(phoneNav(TWELVE).rest.map((s) => s.id)).toEqual([
-      "work", "due", "labels", "reports", "ask", "import", "suppliers", "start",
-    ]);
-  });
-
-  /* ⚠️ AND A SCREEN NOBODY MAY SEE IS IN NEITHER. `phoneNav` is handed what the
-     gate already allowed, so this is about the FILTER being upstream rather than
+  /* ⚠️ A SCREEN NOBODY MAY SEE IS ALREADY GONE. `phoneNav` is handed what the
+     gate allowed, so this is about the FILTER being upstream rather than
      duplicated — a second opinion here is how a nav comes to advertise a
      destination the server refuses. */
   it("takes what it is given and filters nothing itself", () => {
-    const { bar, rest } = phoneNav([screen("only", "primary")]);
-    expect([...bar, ...rest].map((s) => s.id)).toEqual(["only"]);
+    expect(phoneNav([screen("only", "primary")]).map((s) => s.id)).toEqual(["only"]);
   });
 });

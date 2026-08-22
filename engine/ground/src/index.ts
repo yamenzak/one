@@ -467,10 +467,10 @@ export const GROUND: AppSpec = defineApp({
       the screen rather than the half of it that needed guarding: a member with no
       `tenant:manage` could not reach their OWN preferences.
     */
-    { id: "settings", route: "/settings", label: "Settings", nav: "secondary", icon: "cog",
+    { id: "settings", route: "/settings", label: "Settings", nav: "none", icon: "cog",
       permission: "tenant:manage" },
     { id: "preferences", route: "/preferences", label: "Your preferences",
-      nav: "secondary", icon: "person", permission: "note:read" },
+      nav: "none", icon: "person", permission: "note:read" },
     /* ⚠️ DECLARED `commercial`, AND IT IS THE APP'S OWN. Sharing a note puts the
        workspace's brand on a page people outside it read, so the list of what is
        out there exists only for a business — and `reachable` does not offer it
@@ -483,19 +483,22 @@ export const GROUND: AppSpec = defineApp({
     /* ⚠️ ITS OWN MARK. This wore `star`, which is Getting started's and is in
        the same nav; the registry had no share mark at all, so one was added
        rather than a second screen borrowing a neighbour's. */
-    { id: "shared", route: "/shared", label: "Shared", nav: "secondary", icon: "share",
+    { id: "shared", route: "/shared", label: "Shared", nav: "none", icon: "share",
       permission: "note:read", commercial: true },
     /* ⚠️ Behind one of our switches, which is what makes the flag mean anything:
        a flag no screen and no operation is behind changes nothing when pressed. */
-    { id: "search", route: "/search", label: "Search", nav: "secondary", icon: "search",
-      permission: "note:read", flag: "note-search" },
+    /* ⚠️ THE CROWN'S MIDDLE, NOT A DESTINATION — see `ScreenSpec.chrome`.
+       Searching is something somebody does from wherever they are; a slot in the
+       bar makes it a place to go first and say what you wanted second. */
+    { id: "search", route: "/search", label: "Search", nav: "none", chrome: "search",
+      icon: "search", permission: "note:read", flag: "note-search" },
     /* ⚠️ DECLARED SO THE CHART VOCABULARY HAS A HOME IN A REAL APP. A figure is
        the one part of the design system that cannot be judged from a catalogue —
        it needs a series with a gap in it, an axis, a period to filter by and a
        number beside it — and a screen is where those meet. */
     /* ⚠️ `etch` — ruled geometry, which AMBIENCE.md points at monitoring and
        planning. A sheet of measures is the screen that ground was described for. */
-    { id: "reports", route: "/reports", label: "Reports", nav: "secondary", icon: "chart",
+    { id: "reports", route: "/reports", label: "Reports", nav: "primary", icon: "chart",
       permission: "note:read", sky: "etch" },
     /* ⚠️ REACHED FROM A SCREEN RATHER THAN FROM THE NAV, WHICH IS WHAT `none`
        MEANS. A note is opened from the list and written from the list's one
@@ -512,7 +515,7 @@ export const GROUND: AppSpec = defineApp({
        open is a checklist nobody completes, and the manifest cannot tell. */
     /* ⚠️ `glow` — pure light, no marks, which is what a page wants behind it when
        it wants anything. An arrival is the case the family exists for. */
-    { id: "start", route: "/start", label: "Getting started", nav: "secondary", icon: "star",
+    { id: "start", route: "/start", label: "Getting started", nav: "none", icon: "star",
       permission: "note:read", sky: "glow" },
   ],
 

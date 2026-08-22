@@ -337,9 +337,9 @@ describe("the plan shelf", () => {
 const SCREENS = [
   { id: "notes", route: "/", label: "Notes", nav: "primary" as const, permission: "note:read" },
   { id: "people", route: "/people", label: "People", nav: "primary" as const, permission: "member:read" },
-  { id: "search", route: "/search", label: "Search", nav: "secondary" as const,
+  { id: "search", route: "/search", label: "Search", nav: "primary" as const,
     permission: "note:read", flag: "note-search" },
-  { id: "shared", route: "/shared", label: "Shared", nav: "secondary" as const,
+  { id: "shared", route: "/shared", label: "Shared", nav: "primary" as const,
     permission: "note:read", commercial: true as const },
 ];
 
@@ -506,7 +506,10 @@ describe("the shell", () => {
   const act = (id: string) => ({ id, label: id, icon: null, onDo: () => {} });
   const product = {
     who: { name: "you@example.com" },
-    name: "Northwind Strength",
+    /* ⚠️ THE MIDDLE IS A SEARCH, NOT A NAME. The workspace's name left the crown
+       — the door already says which workspace and the brand says it in colour;
+       what a working screen wants in its widest slot is somewhere to type. */
+    find: { label: "Search Notes", onOpen: () => {} },
     also: [act("apps"), act("inbox")],
   };
 
@@ -534,7 +537,11 @@ describe("the shell", () => {
 
   it("keeps the product's crown for a destination, and takes its actions", () => {
     const out = crownFor({ title: "Clients", also: [act("filter")], does: undefined }, product);
-    expect(out.name).toBe("Northwind Strength");
+    /* ⚠️ A DESTINATION'S CROWN CARRIES NO NAME AT ALL — the nav says which one
+       it is and the content heads itself. What the middle carries is the app's
+       search, where it has one. */
+    expect(out.name).toBeUndefined();
+    expect(out.find?.label).toBe("Search Notes");
     expect(out.who).toBeTruthy();
     expect(out.back).toBeUndefined();
     /* ⚠️ THE SCREEN'S OWN ACTS COME FIRST. The inbox is always there and can

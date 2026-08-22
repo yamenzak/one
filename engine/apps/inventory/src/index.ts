@@ -4657,11 +4657,20 @@ export const INVENTORY: AppSpec = defineApp({
        somebody is looking at. */
     { id: "scan", route: "/scan", label: "Scan", nav: "primary", icon: "search",
       permission: "product:read" },
-    /* ⚠️ ITS OWN DESTINATION RATHER THAN A MODE OF THE SCAN SCREEN. Receiving is
-       a job somebody does for twenty minutes with a trolley beside them; asking
-       is a thing they do once. Two jobs, two doors — and the nav is what tells
-       somebody which one they are in, which matters because one of them writes. */
-    { id: "receive", route: "/receive", label: "Receive", nav: "primary", icon: "add",
+    /*
+      ⚠️ STOCK'S OWN ACTION, NOT A DESTINATION — and the two are not the same
+      claim. Receiving is a job somebody does for twenty minutes with a trolley
+      beside them, and it is a job about the shelf they are looking at: it starts
+      from Stock, it ends in Stock, and it is what the button in Stock's chrome
+      says. A slot in the bar would put it beside the four things somebody
+      navigates BETWEEN, which is a different question from what they are here to
+      do.
+
+      ⚠️ IT KEEPS ITS OWN ADDRESS, because it is a session rather than a sheet.
+      Somebody scanning forty boxes must be able to come back to where they were,
+      and a modal has no address to come back to.
+    */
+    { id: "receive", route: "/receive", label: "Receive", nav: "none", icon: "add",
       permission: "stock:move" },
     /* ⚠️ A COUNT IS A JOB SOMEBODY SPENDS AN AFTERNOON ON, so it is a
        destination rather than a mode. `stock:move` because counting is open to
@@ -4670,7 +4679,7 @@ export const INVENTORY: AppSpec = defineApp({
     { id: "count", route: "/count", label: "Count", nav: "primary", icon: "check",
       permission: "stock:move" },
     /*
-      ⚠️ THE FIFTH AND LAST PRIMARY, AND IT IS THE ONE A BASEMENT NEVER OPENS.
+      ⚠️ THE ONE DESTINATION A BASEMENT NEVER OPENS.
       Runs and jobs are the regulated half of this product — a workshop tracking
       work orders, a clinic releasing sterilisation loads — and nobody storing
       paint in a garage.
@@ -4678,10 +4687,10 @@ export const INVENTORY: AppSpec = defineApp({
       ⚠️ SO IT IS GATED ON THE PLAN AND NOT ONLY ON THE ROLE. `process:read` says
       this person may see runs in a workspace that does them; `processes` says
       the workspace does them at all. On the role alone an owner was offered a
-      fifth primary destination wherever they were — including on a tier that
-      never bought runs — and the screen's only answer was to report the refusal
-      its own operations raised. A nav slot is the scarcest thing this product
-      has (five, D10), and spending one on an apology is the worst use of it.
+      destination wherever they were — including on a tier that never bought runs
+      — and the screen's only answer was to report the refusal its own operations
+      raised. A nav slot is the scarcest thing this product has (five, D10), and
+      spending one on an apology is the worst use of it.
 
       ⚠️ AND IT NAMES BOTH KEYS, BECAUSE IT IS ABOUT BOTH. A run is a batch
       passing through a machine and a job is a context consuming one; the tier
@@ -4730,7 +4739,10 @@ export const INVENTORY: AppSpec = defineApp({
       a sixth primary would take a thumb-reachable slot from a gesture somebody
       performs fifty times a day and give it to a list they open twice a week.
     */
-    { id: "due", route: "/due", label: "Running out", nav: "secondary", icon: "alert",
+    /* ⚠️ WHAT STOCK IS ABOUT, NARROWED — so it is reached from Stock and from
+       the note that raised it, never from a menu. It is the same records under
+       one question, and a destination beside Stock would be Stock twice. */
+    { id: "due", route: "/due", label: "Running out", nav: "none", icon: "alert",
       permission: "stock:read" },
     /*
       ⚠️ SECONDARY, AND IT IS A DESTINATION RATHER THAN A BUTTON ON FOUR OTHER
@@ -4743,7 +4755,10 @@ export const INVENTORY: AppSpec = defineApp({
       a screen gated on the stronger grant would hide the item tags — which need
       no minting at all — from everybody who cannot edit the catalogue.
     */
-    { id: "labels", route: "/labels", label: "Labels", nav: "secondary", icon: "tag",
+    /* ⚠️ REACHED FROM WHAT IS BEING LABELLED — a location, a product, an item —
+       because that is where somebody is standing when they want one. The session
+       is still a session: forty labels at a printer, on one address. */
+    { id: "labels", route: "/labels", label: "Labels", nav: "none", icon: "tag",
       permission: "location:read" },
     /*
       ⚠️ `etch` — RULED GEOMETRY, WHICH IS WHAT A SHELF IS. The ambience families
@@ -4755,9 +4770,14 @@ export const INVENTORY: AppSpec = defineApp({
       reads the record of who took what — a person who may see a balance has not
       necessarily been given the history behind it, and the nav is what says so.
     */
-    { id: "reports", route: "/reports", label: "Reports", nav: "secondary", icon: "chart",
+    { id: "reports", route: "/reports", label: "Reports", nav: "primary", icon: "chart",
       permission: "ledger:read", sky: "etch" },
-    { id: "ask", route: "/ask", label: "Ask", nav: "secondary", icon: "sparkle",
+    /* ⚠️ NOT A DESTINATION — THE CHROME'S OWN BUTTON, beside the notifications.
+       Asking is something somebody does FROM wherever they are, about whatever
+       they are looking at; a slot in the bar would make it a place to go first
+       and then say what you wanted, which is one step longer from every screen
+       in the product. */
+    { id: "ask", route: "/ask", label: "Ask", nav: "none", chrome: "assistant", icon: "sparkle",
       permission: "stock:read", sky: "glow" },
     /*
       ⚠️ A DESTINATION RATHER THAN A STEP IN A WIZARD, and it is the screen that
@@ -4775,16 +4795,27 @@ export const INVENTORY: AppSpec = defineApp({
     /* ⚠️ `file` RATHER THAN `add`, WHICH RECEIVE ALREADY HAS. Two nav-visible
        screens of one app wearing one mark is a bar that cannot answer where you
        are — and this is a spreadsheet, not a plus. */
-    { id: "import", route: "/import", label: "Import", nav: "secondary", icon: "file",
+    /* ⚠️ THE CATALOGUE'S OWN ACT, so it is reached from the catalogue and from
+       the guide that asks for it. Somebody imports a spreadsheet once, in their
+       first hour; a permanent slot for it is a slot spent on a day nobody
+       repeats. */
+    { id: "import", route: "/import", label: "Import", nav: "none", icon: "file",
       permission: "product:write", features: ["imports"] },
     /* ⚠️ THE LAST STEP OF THE REORDER REPORT'S OWN WORKFLOW. That screen can say
        what to buy and how long the shelf lasts; without this it cannot say who
        to ring, and the decision it worked out is finished somewhere else. */
-    { id: "supplier", route: "/suppliers", label: "Suppliers", nav: "secondary",
+    /* ⚠️ REACHED FROM THE PRODUCT IT SUPPLIES, and from the reorder report that
+       worked out who to ring. A supplier is a fact about something on a shelf
+       rather than a place in the product. */
+    { id: "supplier", route: "/suppliers", label: "Suppliers", nav: "none",
       /* ⚠️ NOT `box` — that is Stock's, and both are in the nav. A supplier is
          somebody you ring rather than something on a shelf. */
       icon: "people", permission: "product:write" },
-    { id: "start", route: "/start", label: "Getting started", nav: "secondary", icon: "star",
+    /* ⚠️ THE GUIDE IS ABOUT THE WORKSPACE, NOT ABOUT A SHELF — and it stops
+       being wanted the week it is finished. It is reached from what is not done
+       yet; a permanent slot for it is a slot every experienced person carries
+       for ever. */
+    { id: "start", route: "/start", label: "Getting started", nav: "none", icon: "star",
       permission: "product:read", sky: "glow" },
   ],
 

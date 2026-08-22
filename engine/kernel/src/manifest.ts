@@ -67,8 +67,44 @@ export interface ScreenSpec {
   readonly id: string;
   readonly route: string;
   readonly label: string;
-  /** ⚠️ Only five may be primary — see `PRIMARY_MAX` and D10. */
-  readonly nav?: "primary" | "secondary" | "none";
+  /**
+   * WHETHER THIS SCREEN IS IN THE NAVIGATION, AND THERE IS NO THIRD ANSWER.
+   *
+   * ⚠️ THERE WAS A `secondary` TIER AND IT WAS A MEGA MENU. Five destinations
+   * at the thumb, and everything else behind an item that opened a sheet of
+   * rows — so a product with twelve screens had twelve places to look and the
+   * bar could not answer "where am I" from seven of them. The ceiling was never
+   * the problem; the overflow was. A second tier is what an app reaches for
+   * instead of deciding, and what it produces is a menu somebody has to read.
+   *
+   * ⚠️ SO A SCREEN IS A DESTINATION OR IT BELONGS TO A SUBJECT. `none` is not
+   * "unreachable" — it is reached from the thing it is about: Receive from
+   * Stock, Labels from a location, Suppliers from the catalogue. That is a
+   * shorter path than a menu for the person who wanted it and no path at all
+   * for everybody else, which is what the five slots are protecting.
+   *
+   * ⚠️ Only five may be `primary` — see `PRIMARY_MAX` and D10.
+   */
+  readonly nav?: "primary" | "none";
+  /**
+   * WHAT THIS SCREEN IS TO THE CHROME, WHERE IT IS MORE THAN A DESTINATION.
+   *
+   * ⚠️ TWO SCREENS IN EVERY PRODUCT ARE NOT PLACES YOU GO. Searching and asking
+   * are things somebody does FROM wherever they are, about whatever is in front
+   * of them — so a slot in the bar makes each of them a journey: go to the
+   * search screen, then say what you wanted. Both were destinations, and both
+   * were spending one of five.
+   *
+   * ⚠️ SO THE CHROME DRAWS THEM AND THE SCREEN STILL EXISTS. `search` becomes
+   * the field in the crown's middle; `assistant` becomes the button beside the
+   * notifications. Each keeps its own address, because both are somewhere you
+   * can end up and have to be able to come back to.
+   *
+   * ⚠️ AND A CHROME SCREEN IS NEVER ALSO IN THE NAV. Drawn in both, it is one
+   * destination advertised twice — and the bar's fifth slot is spent on the
+   * thing the crown already offers from every screen in the product.
+   */
+  readonly chrome?: "search" | "assistant";
   readonly icon?: string;
   readonly permission: string;
   /** ⚠️ A screen only a business has. Same rule as an operation's — see there. */
@@ -658,6 +694,32 @@ export function refuseApp(spec: AppSpec): readonly Refusal[] {
   const primary = primaryOf(spec.screens);
   if (primary.length > PRIMARY_MAX) {
     at("nav", `${primary.length} primary destinations — the ceiling is ${PRIMARY_MAX} (D10)`);
+  }
+  /*
+    ⚠️ THE FIRST DESTINATION IS HOME, AND HOME IS THE PRODUCT'S OWN ROOT. The
+    bar's first item is where a thumb lands, where the address bar points at a
+    cold start, and where "go back to the beginning" means — three things that
+    have to be one place. An app whose first destination is anywhere but `/`
+    opens on one screen and offers a different one as its first tap, which reads
+    as the product having two beginnings.
+  */
+  if (primary.length && primary[0]!.route !== "/") {
+    at("nav", `the first destination is "${primary[0]!.route}" — home is the app's own root`);
+  }
+  /*
+    ⚠️ ONE SEARCH AND ONE ASSISTANT, because the chrome has one slot for each. A
+    second is a declaration the surface silently drops — which is the shape where
+    an app author is certain they shipped something and nobody can see it.
+  */
+  for (const role of ["search", "assistant"] as const) {
+    const claimed = spec.screens.filter((s) => s.chrome === role);
+    if (claimed.length > 1) {
+      at("chrome", `${claimed.length} screens claim "${role}" — the chrome has one slot for it`);
+    }
+    /* ⚠️ AND IT IS NOT ALSO A DESTINATION — see `ScreenSpec.chrome`. */
+    for (const s of claimed.filter((c) => c.nav === "primary")) {
+      at("chrome", `"${s.id}" is the ${role} and a destination — the chrome already offers it`);
+    }
   }
 
   const catalog: ProblemCatalog = { ...PLATFORM_PROBLEMS, ...(spec.problems ?? {}) };

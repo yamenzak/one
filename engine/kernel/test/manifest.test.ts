@@ -59,7 +59,7 @@ const app = (over: Partial<AppSpec> = {}): AppSpec => ({
   },
   collections: [{ ...note, quota: "notes" }],
   operations: [stub],
-  screens: [{ id: "notes", route: "/notes", label: "Notes", nav: "primary", permission: "note:read" }],
+  screens: [{ id: "notes", route: "/", label: "Notes", nav: "primary", permission: "note:read" }],
   ...over,
 });
 
@@ -257,9 +257,73 @@ describe("what would fail on the first request", () => {
   /* ⚠️ Past five, a bottom bar stops being tappable and becomes a menu (D10). */
   it("refuses a sixth primary destination", () => {
     const six = Array.from({ length: 6 }, (_, i) => ({
-      id: `s${i}`, route: `/s${i}`, label: `S${i}`, nav: "primary" as const, permission: "note:read",
+      id: `s${i}`, route: i === 0 ? "/" : `/s${i}`, label: `S${i}`,
+      nav: "primary" as const, permission: "note:read",
     }));
     expect(whyOf(app({ screens: six }))).toContain("the ceiling is 5");
+  });
+
+  /*
+    ⚠️ THE FIRST DESTINATION IS HOME. Where a thumb lands, where a cold start
+    points and what "back to the beginning" means are one place — an app whose
+    first tap is not its own root opens on one screen and offers a different one
+    as its beginning.
+  */
+  it("refuses a first destination that is not the app's root", () => {
+    const away = app({
+      screens: [
+        { id: "list", route: "/list", label: "List", nav: "primary" as const,
+          permission: "note:read" },
+        { id: "home", route: "/", label: "Home", nav: "primary" as const,
+          permission: "note:read" },
+      ],
+    });
+    expect(whyOf(away)).toContain("home is the app's own root");
+  });
+
+  /* ⚠️ AND AN APP WITH NO DESTINATIONS IS NOT REFUSED FOR IT. A product whose
+     every screen is reached from a subject is a real shape — the check is about
+     the FIRST of a list, and an empty list has no first. */
+  it("says nothing about the first destination of an app that has none", () => {
+    const none = app({
+      screens: [{ id: "thing", route: "/thing", label: "A thing", nav: "none" as const,
+        permission: "note:read" }],
+    });
+    expect(whyOf(none)).not.toContain("home is the app's own root");
+  });
+
+  /*
+    ⚠️ THE CHROME HAS ONE SLOT FOR EACH, so a second claim is a declaration the
+    surface silently drops — the shape where an author is certain they shipped
+    something and nobody can see it.
+  */
+  it("refuses two screens claiming the same chrome slot", () => {
+    const twice = app({
+      screens: [
+        { id: "home", route: "/", label: "Home", nav: "primary" as const,
+          permission: "note:read" },
+        { id: "find", route: "/find", label: "Find", chrome: "search" as const,
+          permission: "note:read" },
+        { id: "look", route: "/look", label: "Look", chrome: "search" as const,
+          permission: "note:read" },
+      ],
+    });
+    expect(whyOf(twice)).toContain('2 screens claim "search"');
+  });
+
+  /* ⚠️ AND A CHROME SCREEN IS NOT ALSO A DESTINATION. Drawn in both it is one
+     place advertised twice, and the bar's scarcest slot is spent on what the
+     crown already offers from everywhere. */
+  it("refuses a chrome screen that is also in the navigation", () => {
+    const both = app({
+      screens: [
+        { id: "home", route: "/", label: "Home", nav: "primary" as const,
+          permission: "note:read" },
+        { id: "ask", route: "/ask", label: "Ask", nav: "primary" as const,
+          chrome: "assistant" as const, permission: "note:read" },
+      ],
+    });
+    expect(whyOf(both)).toContain("the chrome already offers it");
   });
 
   it("refuses a screen needing a permission nothing declares", () => {
@@ -277,7 +341,7 @@ describe("a declaration that reaches no surface", () => {
     "note.shared": {
       id: "note.shared", label: "Shared", summary: "Somebody shared a note.",
       category: "activity" as const, author: "theirs" as const, tone: "info" as const, icon: "share",
-      needs: "note:read", on: "note.shared", link: "/notes",
+      needs: "note:read", on: "note.shared", link: "/",
       variables: [], channels: ["inbox" as const, "email" as const],
     },
   };

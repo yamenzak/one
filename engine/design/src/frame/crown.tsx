@@ -499,7 +499,15 @@ const CrownSocket = React.createContext<((claim: CrownClaim | null) => void) | n
  */
 export function crownFor(claim: CrownClaim | null, product: {
   readonly who: CrownProps["who"];
-  readonly name: string;
+  /**
+   * ⚠️ THE MIDDLE IS THE APP'S SEARCH, AND IT USED TO BE THE WORKSPACE'S NAME.
+   * A name in the chrome answers a question nobody was asking: the door already
+   * says which workspace, the brand already says it in colour, and the person
+   * chose it a moment ago. What a working screen wants in the widest slot it
+   * has is somewhere to type. An app with no search leaves it empty and the
+   * trail moves left, which is a crown with less in it rather than a gap.
+   */
+  readonly find?: CrownProps["find"];
   readonly also: readonly Slot[];
 }): CrownProps {
   /* ⚠️ A WAY OUT IS WHAT MAKES IT A SUB-PAGE — see `useCrownSocket`. */
@@ -525,7 +533,7 @@ export function crownFor(claim: CrownClaim | null, product: {
   }
   return {
     who: product.who,
-    name: product.name,
+    find: product.find,
     /*
       ⚠️ THE SCREEN'S ACTIONS COME FIRST AND THE PRODUCT'S FILL WHAT IS LEFT. A
       destination's own acts are what somebody came to the screen to do; the

@@ -133,9 +133,8 @@ export function Docked({ width = "read", children }: {
  * was read as the second thing for as long as there was no way to say the first:
  * a product with twelve destinations drew five and the other seven existed on a
  * desktop rail alone, which on a phone is not a compromise, it is an absence.
- * `more` is the fifth item where an app has more than the bar can hold — see it.
  */
-export function Island({ items, here, onGo, act, more, only }: {
+export function Island({ items, here, onGo, act, only }: {
   readonly items: readonly {
     readonly id: string; readonly label: string;
     readonly icon: React.ReactNode; readonly route: string;
@@ -172,35 +171,6 @@ export function Island({ items, here, onGo, act, more, only }: {
     readonly disabled?: boolean;
   };
   /**
-   * EVERYWHERE IN THIS APP THAT IS NOT AT THE THUMB.
-   *
-   * ⚠️ WITHOUT THIS, A SECOND-TIER DESTINATION DID NOT EXIST ON A PHONE. The
-   * shell drew `nav: "secondary"` in the desktop rail and nowhere else, so an
-   * app declaring five primaries and seven secondaries offered five of its
-   * twelve screens to anybody holding one — and the seven were unreachable by
-   * any gesture, on the half of the breakpoint the product is used on.
-   *
-   * ⚠️ IT IS A DESTINATION-SHAPED ITEM, NOT A "MORE" BUTTON, AND THE DIFFERENCE
-   * IS THE LABEL. When somebody IS somewhere it holds, it opens and says WHICH —
-   * so the bar still answers "where am I" from every screen in the app rather
-   * than going blank the moment they leave the four. A button called More can
-   * never do that.
-   *
-   * ⚠️ AND IT COSTS THE FIFTH SLOT RATHER THAN A SIXTH. Five is the ceiling
-   * (D10) and it is a ceiling on WHAT FITS, not on what an app may declare; a
-   * sixth item is refused by the kernel and sliced here. The fifth primary is
-   * one tap away instead of nought — which is the trade that buys seven
-   * destinations their only way in.
-   */
-  readonly more?: {
-    /** ⚠️ Where they are if they are inside it; otherwise the app's own name. */
-    readonly label: string;
-    readonly icon: React.ReactNode;
-    readonly onOpen: () => void;
-    /** ⚠️ True when the current screen is one this holds — see `label`. */
-    readonly here?: boolean;
-  };
-  /**
    * ⚠️ THE BREAKPOINT IS A PROP BECAUSE A WRAPPER BREAKS `sticky`, AND THAT IS
    * NOT A STYLE OPINION — it is the bug this parameter exists to remove. A
    * sticky element can never leave its own PARENT's box, and the `md:hidden`
@@ -218,12 +188,12 @@ export function Island({ items, here, onGo, act, more, only }: {
   readonly only?: "phone";
 }) {
   const away = useScrollingDown();
-  /* ⚠️ THE INDEX TAKES ONE OF THE FIVE, AND ONLY WHERE THERE IS ONE. Five is a
-     ceiling on what fits, so the item that holds everywhere else has to come out
-     of it rather than be added to it — otherwise the bar is six things wide on
-     the device the ceiling exists for. An app with nothing to hold keeps all
-     five. */
-  const shown = items.slice(0, PRIMARY_MAX - (more ? 1 : 0));
+  /* ⚠️ ALL FIVE, BECAUSE THERE IS NOTHING ELSE TO HOLD. One slot used to be
+     spent on an item that opened a sheet of everywhere else; a screen is a
+     destination or it belongs to a subject now, so the bar is the whole
+     navigation and the ceiling is a ceiling on destinations rather than on
+     destinations-plus-a-door. */
+  const shown = items.slice(0, PRIMARY_MAX);
 
   return (
     <nav
@@ -364,49 +334,6 @@ export function Island({ items, here, onGo, act, more, only }: {
             </Button>
           );
         })}
-
-        {/*
-          ⚠️ THE SAME SHAPE AS A DESTINATION, DELIBERATELY. It is one, in every
-          way a person can tell: it sits in the row, it wears a glyph, and when
-          somebody is inside it, it opens and says which place they are in. What
-          it is NOT is a button called More — that reads as an admission the nav
-          ran out of room, and it leaves the bar unable to answer "where am I"
-          from a third of the app's screens.
-        */}
-        {more ? (
-          <Button
-            variant="ghost"
-            aria-haspopup="dialog"
-            aria-current={more.here ? "page" : undefined}
-            data-here={more.here ? "true" : undefined}
-            className={`flex-row items-center justify-center ${SPACE.tight} ${ROW.free} `
-              + (more.here && !act ? `shrink-0 ${ISLAND_HERE}` : `shrink-0 ${ISLAND_ITEM}`)
-              + (act ? "" : more.here ? "" : " grow basis-0 min-w-0")}
-            onPress={more.onOpen}
-          >
-            <span
-              aria-hidden="true"
-              className="flex shrink-0 items-center"
-              style={{ ["--icon" as string]: `${ICON.nav}px` }}
-            >
-              {more.icon}
-            </span>
-            {/* ⚠️ THE LABEL IS THE ACCESSIBLE NAME WHETHER OR NOT IT IS SHOWING,
-                for the reason every other item's is: closed, this is one more
-                unnamed button to anybody reading the page aloud. */}
-            <span
-              className={`${TYPE.note} ${more.here ? "text-foreground" : ""}`
-                + " overflow-hidden whitespace-nowrap leading-none"}
-              style={{
-                maxWidth: more.here && !act ? "10rem" : 0,
-                opacity: more.here && !act ? 1 : 0,
-                transition: MOTION.reveal,
-              }}
-            >
-              {more.label}
-            </span>
-          </Button>
-        ) : null}
 
         {/*
           ⚠️ THE ACT TAKES WHAT IS LEFT, AND IT IS THE ONLY FILLED THING IN THE
