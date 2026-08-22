@@ -11,7 +11,8 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { parseStop, pathFor, routeIn } from "../src/centre/route.js";
+import { screenFor } from "@engine/kernel";
+import { parseStop, pathFor, routeIn, shellAt } from "../src/centre/route.js";
 import { SPACE_SCREENS } from "../src/space/OneSpace.js";
 import { OF_CONSOLE, OF_WORKSPACE, parseWhere, pathOf } from "../src/space/where.js";
 
@@ -38,6 +39,45 @@ describe("the product under a workspace's address", () => {
   it("writes the path back the way it parses it", () => {
     for (const path of ["/", "/beacon", "/beacon/plans", "/atlas"]) {
       expect(pathFor(parseStop(path, APPS))).toBe(path);
+    }
+  });
+
+  /*
+    ⚠️ THE ADDRESS THE SHELL IS HANDED AND THE ADDRESSES ITS SCREENS CARRY ARE
+    ONE SPACE, AND AT THE ROOT THEY WERE NOT. A product's screens are rewritten
+    into the workspace's addressing (`routeIn`), so home becomes `/beacon` — and
+    the shell was handed the browser's own path, which at the single-product root
+    is `/`. Nothing matched: `screenFor` answered undefined, so the screen the
+    page was DRAWING had no title, no nav row, no foot and no sky, and the world
+    fell through to the product's default ground.
+
+    ⚠️ AND IT ONLY EVER BROKE AT THE ROOT, which is the address every person with
+    one product lands on. Every other path is its own answer — `/beacon/plans`
+    parses and writes back identically — so the whole product looked right the
+    moment anybody navigated anywhere.
+  */
+  it("hands the shell an address its own screens can be found at", () => {
+    const declared = [{ route: "/" }, { route: "/plans" }, { route: "/plans/new" }];
+    for (const [path, apps, wanted] of [
+      ["/", ["beacon"], "/"],
+      ["/beacon", APPS, "/"],
+      ["/beacon/plans", APPS, "/plans"],
+      ["/beacon/plans/new", APPS, "/plans/new"],
+    ] as const) {
+      const stop = parseStop(path, [...apps]);
+      if (stop.kind !== "app") throw new Error(`${path} did not resolve to a product`);
+      /* ⚠️ THROUGH `shellAt`, WHICH IS THE ONLY WAY THE PRODUCT SURFACE BUILDS
+         THEM. Rebuilding the pair here would be a second implementation, and a
+         test of a second implementation is the thing that passed while the live
+         root drew a screen the shell could not find. */
+      const { screens, here } = shellAt(stop, declared);
+      const at = screenFor(screens, here);
+      expect(at, `${path} finds no screen`).toBeDefined();
+      /* ⚠️ AND THE RIGHT ONE. Finding SOME screen is what a `/`-rooted match
+         would do for every address in the product. */
+      expect(at?.route).toBe(routeIn(stop.app, wanted));
+      /* ⚠️ The address is still the browser's, so a reload lands where it was. */
+      expect(here).toBe(pathFor(stop));
     }
   });
 

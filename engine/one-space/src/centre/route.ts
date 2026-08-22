@@ -65,3 +65,32 @@ export const pathFor = (stop: Stop): string =>
  */
 export const routeIn = (appId: string, route: string): string =>
   `/${appId}${route === "/" ? "" : route}`;
+
+/**
+ * WHAT THE SHELL NEEDS TO FIND THE SCREEN IT IS DRAWING — both halves, from one
+ * call.
+ *
+ * ⚠️ THE SCREENS AND THE ADDRESS ARE ONE ANSWER, AND ASSEMBLED SEPARATELY THEY
+ * CAME APART. A product's screens are rewritten into the workspace's addressing
+ * — home becomes `/<app>` — and the shell was handed the browser's own path,
+ * which at the single-product root is `/`. Nothing matched: `screenFor` answered
+ * undefined, so the screen the page was DRAWING had no title, no nav row, no
+ * foot and no sky, and the world fell through to the product's default ground.
+ *
+ * ⚠️ IT ONLY BROKE AT THE ROOT, WHICH IS THE ADDRESS EVERY PERSON WITH ONE
+ * PRODUCT LANDS ON. Every other path is its own answer — `/beacon/plans` parses
+ * and writes back identically — so the product looked correct the moment anybody
+ * navigated anywhere, and the one screen nobody navigates TO was the one that
+ * was wrong.
+ *
+ * ⚠️ SO IT IS A SHAPE RATHER THAN A RULE TO REMEMBER. Two expressions that have
+ * to agree, written at one call site, agree until somebody edits one of them;
+ * returning the pair from the function that owns the addressing means a caller
+ * cannot hand the shell a `here` its own screens are not in.
+ */
+export const shellAt = <T extends { readonly route: string }>(
+  stop: Extract<Stop, { kind: "app" }>, screens: readonly T[],
+): { readonly screens: readonly T[]; readonly here: string } => ({
+  screens: screens.map((s) => ({ ...s, route: routeIn(stop.app, s.route) })),
+  here: pathFor(stop),
+});

@@ -27,7 +27,7 @@ import { useSession } from "../session.js";
 import { AppSurface } from "./AppSurface.js";
 import { Choose } from "./Choose.js";
 import { useCentre, useLoad, type InboxView } from "./data.js";
-import { parseStop, routeIn } from "./route.js";
+import { parseStop, shellAt } from "./route.js";
 
 export function Product({ path, onGo, onOpenSpace, onOpenInbox }: {
   readonly path: string;
@@ -50,15 +50,17 @@ export function Product({ path, onGo, onOpenSpace, onOpenInbox }: {
       again={again}
       then={(view) => {
         const stop = parseStop(path, view.apps.map((a) => a.id));
-        const app = stop.kind === "app"
-          ? view.apps.find((a) => a.id === stop.app) ?? null
-          : null;
-        const route = stop.kind === "app" ? stop.route : "/";
+        /* ⚠️ THE STOP TRAVELS, NOT JUST ITS PARTS. `shellAt` needs the whole of
+           it to write an address in the same space as the screens it rewrites,
+           and pulling `route` out here left nothing to narrow against. */
+        const open = stop.kind === "app" ? stop : null;
+        const app = open ? view.apps.find((a) => a.id === open.app) ?? null : null;
+        const route = open?.route ?? "/";
 
         /* ⚠️ No product open: no product's nav either. A shell drawn around a
            chooser would put one app's five destinations over the choice of
            which app somebody wants. */
-        if (!app) {
+        if (!app || !open) {
           return (
             /* ⚠️ THE WORKSPACE'S OWN PLANET, LIKE EVERY OTHER SCREEN OF IT.
                This named `glow` by hand — the one surface in the product that
@@ -90,12 +92,12 @@ export function Product({ path, onGo, onOpenSpace, onOpenInbox }: {
           );
         }
 
-        /* ⚠️ THE SAME FUNCTION THE SURFACE HANDS AN APP (`routeIn`), so a screen
-           reached from the bar and the same screen reached from a row inside it
-           are one address. These were two copies of one expression. */
-        const screens: readonly ScreenSpec[] = app.screens.map((s) => ({
-          ...s, route: routeIn(app.id, s.route),
-        }));
+        /* ⚠️ BOTH HALVES FROM ONE CALL — see `shellAt`. The screens carry the
+           workspace's addressing and `here` is written by the same function, so
+           the shell cannot be handed an address its own screens are not in. Built
+           separately, the root was `/` while every screen was under `/<app>`, and
+           the screen being drawn was one the shell could not find. */
+        const { screens, here } = shellAt<ScreenSpec>(open, app.screens);
 
         return (
           <Shell
@@ -105,7 +107,7 @@ export function Product({ path, onGo, onOpenSpace, onOpenInbox }: {
                the nav; a colour resolved anywhere else would be one more thing
                that has to agree. */
             hue={app.hue}
-            here={path}
+            here={here}
             held={new Set(app.permissions)}
             /* ⚠️ WHAT THE WORKSPACE IS, so a business-only screen is not offered
                to one that is not — the same question the gate asks, in the same
