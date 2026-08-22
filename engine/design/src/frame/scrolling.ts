@@ -63,6 +63,15 @@ const readingOf = (host: HTMLElement | null): Scrolled => {
  * over a product that was already scrolled, has a scroll position before it has
  * a scroll event — and waiting for the event is a first paint with the wrong
  * chrome on it.
+ *
+ * ⚠️ AND AGAIN WHENEVER THE PAGE CHANGES SIZE, WHICH IS NOT A `resize`. A window
+ * resize is a person dragging a corner; what actually changes `scrollHeight` on
+ * a phone is a late image, a font swap, a list that finished loading — and a
+ * baked planet, which is generated after mount and loads after that. Read only
+ * at mount and one frame later, "is there anything below the fold" answered NO
+ * on a page that turned out to be three screens long, so the foot of the screen
+ * had no vignette until somebody scrolled and then it appeared. That reads as
+ * the effect being broken rather than as late.
  */
 export function useScrolling(
   ref: React.RefObject<HTMLElement | null>,
@@ -87,8 +96,18 @@ export function useScrolling(
     const settle = requestAnimationFrame(again);
     document.addEventListener("scroll", read, { passive: true, capture: true });
     addEventListener("resize", again);
+
+    /* ⚠️ ON THE SCROLLER'S CONTENT AND ON THE NODE THAT ASKED, because either
+       can be the one that grew. A `ResizeObserver` fires for the layout changes
+       a `resize` event never hears about, which is every one that happens on a
+       phone somebody is not touching. */
+    const watch = new ResizeObserver(again);
+    watch.observe(document.documentElement);
+    if (ref.current) watch.observe(ref.current);
+
     return () => {
       cancelAnimationFrame(settle);
+      watch.disconnect();
       document.removeEventListener("scroll", read, { capture: true } as EventListenerOptions);
       removeEventListener("resize", again);
     };

@@ -18,7 +18,18 @@ import { Button, Card } from "@heroui/react";
 import { ON_SCENE } from "../tokens/ambience.js";
 import { TYPE } from "../tokens/type.js";
 import {
-  BAND_PAD, CROWN, CROWN_CHIP, CROWN_HERO_PAD, CROWN_SIZE, GUTTER, HEAD_GAP, ICON, SAFE_TOP, SPACE, TITLE_PAD, WIDTH,
+  BAND_PAD,
+  CROWN,
+  CROWN_CHIP,
+  CROWN_HERO_PAD,
+  CROWN_SIZE,
+  GUTTER,
+  HEAD_GAP,
+  ICON,
+  SAFE_TOP,
+  SPACE,
+  TITLE_PAD,
+  WIDTH,
 } from "../tokens/metrics.js";
 import { useScrolling } from "./scrolling.js";
 import type { Width } from "../tokens/metrics.js";
@@ -32,7 +43,11 @@ import { Hint, Pip } from "../parts/beside.js";
 import { Band, type Bleed } from "./page.js";
 import { Spacer } from "../parts/arrange.js";
 
-export function LeaveChip({ leave = "back", label, onDo }: {
+export function LeaveChip({
+  leave = "back",
+  label,
+  onDo,
+}: {
   readonly leave?: "back" | "dismiss";
   readonly label?: string;
   readonly onDo: () => void;
@@ -51,7 +66,10 @@ export function LeaveChip({ leave = "back", label, onDo }: {
         aria-label={says}
         onPress={onDo}
       >
-        <span className="flex items-center" style={{ ["--icon" as string]: `${ICON.crown}px` }}>
+        <span
+          className="flex items-center"
+          style={{ ["--icon" as string]: `${ICON.crown}px` }}
+        >
           {leave === "dismiss" ? <X /> : <Back />}
         </span>
       </Button>
@@ -73,29 +91,78 @@ export function LeaveChip({ leave = "back", label, onDo }: {
 /* ⚠️ AND IT READS WHATEVER IS SCROLLING, NOT THE WINDOW — see `scrolling.ts`.
    Inside a presented surface the window never moves, so a collapsing title
    stayed at full size for ever on every screen in the account centre. */
-function useScrolledPast(
-  ref: React.RefObject<HTMLElement | null>, down = 56, up = 32,
-): boolean {
+/**
+ * ⚠️ AND THE THRESHOLD IS THE TITLE CARD'S OWN HEIGHT, NOT A NUMBER. It was
+ * 56px, and 56px is most of a title but almost none of a title CARD — so a
+ * planet at the size of the page vanished after a thumb's width of scroll, while
+ * the row that replaces it arrived with the picture it replaces still filling
+ * the screen. What "gone" means is a property of what went, so the card
+ * measures itself.
+ *
+ * ⚠️ THE CARD, AND NOT THE BLOCK IT SITS IN. Measured across the crown as well,
+ * the fraction means two different things at two sizes: the crown is a fixed
+ * ~72px of a total that is 130px under a plain heading and 500 under a hero, so
+ * one number lands late on the first and early on the second. The card's own
+ * height is the distance it has to travel, because the crown above it is sticky
+ * and covers everything the card still has left once it passes underneath.
+ *
+ * ⚠️ NEARLY ALL OF IT, NOT MOST OF IT. The hand-off at 62% left a third of a
+ * planet on the screen while its name was already up in the header — the same
+ * word twice, and a subject dissolving in front of somebody still looking at it.
+ * The card is all but gone at 85%, and what remains is behind the crown a moment
+ * later.
+ *
+ * ⚠️ A FLOOR, BECAUSE A HEADING IS SHORTER THAN THE ROW THAT REPLACES IT. A
+ * one-line title measures ~40px; swapping at that is a name crossfading into
+ * the same name a few pixels higher, which reads as a flicker rather than as a
+ * hand-off.
+ *
+ * ⚠️ AND THE HYSTERESIS IS A SHARE OF IT RATHER THAN A SECOND CONSTANT, so the
+ * gap between going and coming back scales with what is going. Two fixed numbers
+ * are two things to keep in step, and the first thing anybody tunes is one.
+ */
+const LEAST = 72;
+const GONE = 0.85;
+
+function useScrolledPast(ref: React.RefObject<HTMLElement | null>): boolean {
   const [past, setPast] = React.useState(false);
-  useScrolling(ref, ({ y }) => setPast((was) => (was ? y > up : y > down)));
+  useScrolling(ref, ({ y }) => {
+    /* ⚠️ MEASURED AT THE READING, not once — a title card is as tall as a baked
+       planet that arrives after mount, and a height read before it would be the
+       fixed number this replaced. */
+    const tall = Math.max(LEAST, ref.current?.offsetHeight ?? 0);
+    const down = tall * GONE;
+    const up = down * 0.55;
+    setPast((was) => (was ? y > up : y > down));
+  });
   return past;
 }
 
-
 /** ⚠️ Drawn here for the same reason `Lens` is — no icon library in this layer. */
 const X = () => (
-  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    aria-hidden="true"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <path d="M18 6 6 18M6 6l12 12" strokeLinecap="round" />
   </svg>
 );
 
 const Back = () => (
-  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    aria-hidden="true"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <path d="M19 12H5" strokeLinecap="round" />
     <path d="m12 19-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
-
 
 /* ------------------------------------------------------------------ crown --- */
 
@@ -183,6 +250,21 @@ export interface CrownProps {
    */
   readonly mark?: MarkOf;
   /**
+   * THE SUBJECT'S OWN FACE, BESIDE THE NAME IT BELONGS TO.
+   *
+   * ⚠️ A TITLE CARD THAT COLLAPSES HANDS OVER A NAME AND SHOULD HAND OVER THE
+   * THING. A workspace's screen is its planet with its name across it; scrolled
+   * past, the name arrived in this row on its own and the picture simply
+   * stopped existing — so the hand-off looked like one element leaving and an
+   * unrelated one appearing, rather than the same subject becoming compact.
+   *
+   * ⚠️ AND IT IS NOT `mark`. A mark is a LOGO — ours, or a product's — and the
+   * comment above it says why it is only ever on a surface that is ours. This is
+   * whatever the page is about, which on a workspace's own screen is that
+   * workspace.
+   */
+  readonly subject?: FaceOf;
+  /**
    * ⚠️ ONE LINE, AND ONLY WHERE IT SAYS SOMETHING THE NAME DOES NOT. A second
    * line in a 64px row is what turned the shell's crown into a block of text
    * beside two circles — see the Shell.
@@ -196,6 +278,20 @@ export interface CrownProps {
    * destination, where the name is simply where you are.
    */
   readonly collapses?: boolean;
+  /**
+   * ⚠️ WHETHER THE NAME BELOW HAS GONE, DECIDED BY WHOEVER DRAWS IT. The crown
+   * used to answer this itself, from its OWN height — and the thing that has to
+   * scroll away is the title card, which on a page with a subject is a picture
+   * at the size of the screen. Two thresholds off two different heights meant
+   * the small name arrived in the header while the big one was still filling the
+   * page: the same word twice, one hand-off drawn as two. The block measures
+   * itself and the crown is told, so the crossing happens once.
+   *
+   * ⚠️ REQUIRED WHERE `collapses` IS SET, AND LOUDLY. A collapsing crown with
+   * nobody answering shows no name at all, on a page whose name is the reason
+   * somebody is looking at the crown.
+   */
+  readonly carried?: boolean;
   /**
    * THE WIDE SLOT — what somebody is looking for on this destination.
    *
@@ -269,19 +365,29 @@ export interface Slot {
 }
 
 export function Crown({
-  who, back, leave = "back", backLabel,
-  name, mark, under, collapses = false, find,
-  also = [], does, bleed = "hold", width = "read",
+  who,
+  back,
+  leave = "back",
+  backLabel,
+  name,
+  mark,
+  subject,
+  under,
+  collapses = false,
+  carried,
+  find,
+  also = [],
+  does,
+  bleed = "hold",
+  width = "read",
 }: CrownProps) {
-  /* ⚠️ THE CROWN'S OWN NODE, so "how far has this scrolled" is asked of the
-     surface it is actually in — see `scrolling.ts`. */
+  /* ⚠️ THE CROWN'S OWN NODE, for its hem — the crossing is `carried`. */
   const at = React.useRef<HTMLElement>(null);
-  const past = useScrolledPast(at);
   /* ⚠️ A collapsing name is HIDDEN until it is needed, and it is `aria-hidden`
      because the display heading in the content is the page's real name. Two
      elements carrying the same words is a duplicate to anybody navigating by
      headings. */
-  const showName = !collapses || past;
+  const showName = !collapses || !!carried;
 
   if (who && back) {
     throw new Error("A crown leads with a face or with a way out, never both.");
@@ -289,9 +395,20 @@ export function Crown({
   if (name && find) {
     throw new Error("A crown's middle is a name or a search, never both.");
   }
+  /* ⚠️ A crown that collapses and is never told shows no name, ever — see
+     `carried`. Silence here is the one failure that looks like a design. */
+  if (collapses && carried === undefined) {
+    throw new Error(
+      "A collapsing crown must be told whether it is carrying the name.",
+    );
+  }
 
   return (
-    <header ref={at} data-hem="top" className={`sticky top-0 z-10 w-full ${SAFE_TOP}`}>
+    <header
+      ref={at}
+      data-hem="top"
+      className={`sticky top-0 z-10 w-full ${SAFE_TOP}`}
+    >
       <Band bleed={bleed} width={width}>
         <div className={`flex items-center ${SPACE.snug} ${CROWN}`}>
           {/* ------------------------------------------------------- lead --- */}
@@ -321,7 +438,9 @@ export function Crown({
               </Button>
             </Hint>
           ) : null}
-          {back ? <LeaveChip leave={leave} label={backLabel} onDo={back} /> : null}
+          {back ? (
+            <LeaveChip leave={leave} label={backLabel} onDo={back} />
+          ) : null}
 
           {/* ----------------------------------------------------- middle --- */}
           {find ? (
@@ -361,9 +480,17 @@ export function Crown({
                   becomes the subject of a header whose subject is where you
                   are. It is decorative here — the name says it in words. */}
               {mark ? <Mark of={mark} size="nav" /> : null}
+              {/* ⚠️ `row`, THE SAME SIZE THE LEAD'S FACE IS, so a subject that
+                  travelled into this row and a person who was always in it are
+                  one scale — see `metrics.ts`. */}
+              {!mark && subject ? (
+                <Face of={subject} name={name} size="row" />
+              ) : null}
               <span className="flex min-w-0 flex-col">
                 <strong className={`truncate ${TYPE.label}`}>{name}</strong>
-                {under ? <span className={`truncate ${TYPE.note}`}>{under}</span> : null}
+                {under ? (
+                  <span className={`truncate ${TYPE.note}`}>{under}</span>
+                ) : null}
               </span>
             </div>
           ) : null}
@@ -409,7 +536,10 @@ export function Crown({
             /* ⚠️ THE REASON BEATS THE NAME. A disabled control's label is
                already visible or already its `aria-label`; what is not knowable
                without being told is why pressing it would do nothing. */
-            <Hint says={does.why ?? does.label} when={Boolean(does.icon) || Boolean(does.why)}>
+            <Hint
+              says={does.why ?? does.label}
+              when={Boolean(does.icon) || Boolean(does.why)}
+            >
               <Button
                 className={does.wide ? "hidden md:flex" : undefined}
                 isIconOnly={Boolean(does.icon)}
@@ -489,7 +619,9 @@ export interface CrownClaim {
   readonly does?: CrownProps["does"];
 }
 
-const CrownSocket = React.createContext<((claim: CrownClaim | null) => void) | null>(null);
+const CrownSocket = React.createContext<
+  ((claim: CrownClaim | null) => void) | null
+>(null);
 
 /**
  * WHICH CROWN WINS, AND WHAT IS IN IT — the whole rule, as a function.
@@ -499,26 +631,29 @@ const CrownSocket = React.createContext<((claim: CrownClaim | null) => void) | n
  * order of a merged trail, checkable only by rendering a shell around a screen
  * and reading the markup. As a function it is four assertions.
  */
-export function crownFor(claim: CrownClaim | null, product: {
-  readonly who: CrownProps["who"];
-  /**
-   * ⚠️ THE MIDDLE IS THE APP'S SEARCH, AND IT USED TO BE THE WORKSPACE'S NAME.
-   * A name in the chrome answers a question nobody was asking: the door already
-   * says which workspace, the brand already says it in colour, and the person
-   * chose it a moment ago. What a working screen wants in the widest slot it
-   * has is somewhere to type. An app with no search leaves it empty and the
-   * trail moves left, which is a crown with less in it rather than a gap.
-   */
-  readonly find?: CrownProps["find"];
-  readonly also: readonly Slot[];
-  /**
-   * ⚠️ WHERE THE ACT GOES, AND IT IS THE SAME ANSWER THE FOOT GIVES — see
-   * `Foot`. On a destination the foot is the navigation, so the crown carries
-   * the act; on a specialized screen the act IS the foot, and a copy up here
-   * would be the same button twice, six inches apart.
-   */
-  readonly foot: Foot;
-}): CrownProps {
+export function crownFor(
+  claim: CrownClaim | null,
+  product: {
+    readonly who: CrownProps["who"];
+    /**
+     * ⚠️ THE MIDDLE IS THE APP'S SEARCH, AND IT USED TO BE THE WORKSPACE'S NAME.
+     * A name in the chrome answers a question nobody was asking: the door already
+     * says which workspace, the brand already says it in colour, and the person
+     * chose it a moment ago. What a working screen wants in the widest slot it
+     * has is somewhere to type. An app with no search leaves it empty and the
+     * trail moves left, which is a crown with less in it rather than a gap.
+     */
+    readonly find?: CrownProps["find"];
+    readonly also: readonly Slot[];
+    /**
+     * ⚠️ WHERE THE ACT GOES, AND IT IS THE SAME ANSWER THE FOOT GIVES — see
+     * `Foot`. On a destination the foot is the navigation, so the crown carries
+     * the act; on a specialized screen the act IS the foot, and a copy up here
+     * would be the same button twice, six inches apart.
+     */
+    readonly foot: Foot;
+  },
+): CrownProps {
   /* ⚠️ A WAY OUT IS WHAT MAKES IT A SUB-PAGE — see `useCrownSocket`. */
   if (claim?.back) {
     return {
@@ -534,7 +669,10 @@ export function crownFor(claim: CrownClaim | null, product: {
         Shell was a back arrow, two action chips and nothing saying where you
         were — until you scrolled, on a page that often has nothing to scroll.
       */
-      back: claim.back, leave: claim.leave, name: claim.title, under: claim.under,
+      back: claim.back,
+      leave: claim.leave,
+      name: claim.title,
+      under: claim.under,
       collapses: false,
       also: claim.also.slice(0, 2) as unknown as readonly [Slot, Slot],
       does: product.foot === "nav" ? claim.does : undefined,
@@ -550,7 +688,10 @@ export function crownFor(claim: CrownClaim | null, product: {
       row. Ordered the other way, a screen with two actions of its own would
       show neither.
     */
-    also: [...(claim?.also ?? []), ...product.also].slice(0, 2) as unknown as readonly [Slot, Slot],
+    also: [...(claim?.also ?? []), ...product.also].slice(
+      0,
+      2,
+    ) as unknown as readonly [Slot, Slot],
     does: product.foot === "nav" ? claim?.does : undefined,
   };
 }
@@ -584,7 +725,11 @@ export const useChromeFoot = (): Foot => React.useContext(ChromeFoot);
  * door, a presented surface — draws its own crown exactly as before, and this
  * whole mechanism is invisible to it.
  */
-export function CrownSocketProvider({ onClaim, foot, children }: {
+export function CrownSocketProvider({
+  onClaim,
+  foot,
+  children,
+}: {
   readonly onClaim: (claim: CrownClaim | null) => void;
   /** ⚠️ See `Foot`. */
   readonly foot: Foot;
@@ -609,9 +754,14 @@ export function useCrownSocket(claim: CrownClaim): boolean {
   /* ⚠️ PRIMITIVES ONLY. A signature over the callbacks would change on every
      render of the caller and republish forever. */
   const sig = JSON.stringify([
-    claim.title, claim.under, Boolean(claim.back), claim.leave,
+    claim.title,
+    claim.under,
+    Boolean(claim.back),
+    claim.leave,
     claim.also.map((a) => [a.id, a.label, Boolean(a.dot)]),
-    claim.does ? [claim.does.label, Boolean(claim.does.disabled), claim.does.tone] : null,
+    claim.does
+      ? [claim.does.label, Boolean(claim.does.disabled), claim.does.tone]
+      : null,
   ]);
 
   const stable = React.useMemo<CrownClaim>(() => {
@@ -621,10 +771,17 @@ export function useCrownSocket(claim: CrownClaim): boolean {
       under: now().under,
       leave: now().leave,
       back: now().back ? () => now().back?.() : undefined,
-      also: now().also.map((a) => ({ ...a, onDo: () => {
-        now().also.find((b) => b.id === a.id)?.onDo();
-      } })),
-      does: now().does ? { ...now().does!, onDo: () => now().does?.onDo() } : undefined,
+      also: now().also.map((a) => ({
+        ...a,
+        onDo: () => {
+          now()
+            .also.find((b) => b.id === a.id)
+            ?.onDo();
+        },
+      })),
+      does: now().does
+        ? { ...now().does!, onDo: () => now().does?.onDo() }
+        : undefined,
     };
     /* ⚠️ The signature IS the dependency — see above. */
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -666,8 +823,16 @@ export function useCrownSocket(claim: CrownClaim): boolean {
  * from a naive opacity swap.
  */
 export function PageCrown({
-  title, face, back, backLabel, leave = "back", also = [], does, under,
-  bleed = "edge", width = "work",
+  title,
+  face,
+  back,
+  backLabel,
+  leave = "back",
+  also = [],
+  does,
+  under,
+  bleed = "edge",
+  width = "work",
 }: {
   readonly title: string;
   /**
@@ -705,14 +870,15 @@ export function PageCrown({
    */
   readonly under?: React.ReactNode;
 }) {
-  /* ⚠️ THE HEADING BELOW THE CROWN, WATCHING THE SAME SURFACE. It has no sticky
-     node of its own, so it asks from where it renders — the same ancestor walk
-     lands on the same scroller. */
+  /* ⚠️ THE CARD, NOT THE BLOCK — the ref is on the heading below, because what
+     has to travel is the heading and the crown above it never moves. It has no
+     sticky node of its own, so it asks from where it renders; the same ancestor
+     walk lands on the same scroller. */
   const at = React.useRef<HTMLDivElement>(null);
   const past = useScrolledPast(at);
 
   return (
-    <div ref={at}>
+    <div>
       <Crown
         bleed={bleed}
         width={width}
@@ -720,7 +886,11 @@ export function PageCrown({
         backLabel={backLabel}
         leave={leave}
         name={title}
+        /* ⚠️ THE SAME FACE THE TITLE CARD DRAWS, so what collapses is the
+           subject rather than only its name — see `CrownProps.subject`. */
+        {...(face ? { subject: face } : {})}
         collapses
+        carried={past}
         also={also}
         does={does}
       />
@@ -728,9 +898,9 @@ export function PageCrown({
       {/* ⚠️ THE PADDING IS BELOW THE HEADING, NOT AROUND IT. The crown above
           already sets the top; `BAND_PAD` here would double it and push the
           title down the screen. What was missing is air UNDER the block. */}
-      <Band bleed={bleed} width={width}>
-        {face
-          ? (
+      <div ref={at}>
+        <Band bleed={bleed} width={width}>
+          {face ? (
             /*
               ⚠️ THE SUBJECT IS THE SCREEN, AND THE NAME SITS ON IT. A page about
               one named thing that has a picture of itself does not need a
@@ -744,7 +914,10 @@ export function PageCrown({
             */
             <div
               className={`grid ${TITLE_PAD}`}
-              style={{ opacity: past ? 0 : 1, transition: past ? MOTION.exit : MOTION.enter }}
+              style={{
+                opacity: past ? 0 : 1,
+                transition: past ? MOTION.exit : MOTION.enter,
+              }}
             >
               <span
                 className="col-start-1 row-start-1 justify-self-center"
@@ -768,29 +941,43 @@ export function PageCrown({
                 /* ⚠️ ON THE WRAPPER, BECAUSE `text-shadow` INHERITS. */
                 style={{ gridArea: "1 / 1", textShadow: ON_SCENE }}
               >
+                {/* ⚠️ THE INK IS THE ROLE'S, NOT THIS CALLER'S — see `TYPE`. A
+                    name at the size of the screen is the loudest thing on it,
+                    and it used to inherit, so it came out a dusty grey wherever
+                    something up the tree was quiet. Fixed here it would have
+                    been fixed for one of the callers. */}
                 <h1 className={TYPE.wordmark}>{title}</h1>
                 {under}
               </span>
             </div>
-          )
-          : (
+          ) : (
             <div className={`flex flex-col ${HEAD_GAP} ${TITLE_PAD}`}>
               <h1
                 className={TYPE.display}
-                style={{ opacity: past ? 0 : 1, transition: past ? MOTION.exit : MOTION.enter }}
+                style={{
+                  opacity: past ? 0 : 1,
+                  transition: past ? MOTION.exit : MOTION.enter,
+                }}
               >
                 {title}
               </h1>
               {under}
             </div>
           )}
-      </Band>
+        </Band>
+      </div>
     </div>
   );
 }
 
 const Lens = () => (
-  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    aria-hidden="true"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <circle cx="11" cy="11" r="7" />
     <path d="m20 20-3.5-3.5" strokeLinecap="round" />
   </svg>

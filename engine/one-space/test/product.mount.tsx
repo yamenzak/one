@@ -18,13 +18,31 @@
  * second, staler copy of that product's data.
  */
 
+import * as React from "react";
 import { createRoot } from "react-dom/client";
 import { Shell } from "@engine/design";
 import { INVENTORY } from "@engine/inventory";
 import { shellAt } from "../src/centre/route.js";
 
 declare global {
-  interface Window { __ROUTE?: string }
+  interface Window { __ROUTE?: string; __GROW?: boolean }
+}
+
+/**
+ * ⚠️ A PAGE THAT ARRIVES SHORT AND BECOMES TALL, WHICH IS EVERY PAGE. Content
+ * lands after the frame does — a list resolves, an image decides its height —
+ * and the chrome's own question ("is anything still below the fold") has a
+ * different answer before and after. Under `__GROW` the child starts inside one
+ * viewport and grows past it a moment later, so a hem that is only ever
+ * answered at mount is a hem that is wrong for the rest of the visit.
+ */
+function Filler() {
+  const [tall, setTall] = React.useState(!window.__GROW);
+  React.useEffect(() => {
+    if (window.__GROW) { const t = setTimeout(() => setTall(true), 120); return () => clearTimeout(t); }
+    return undefined;
+  }, []);
+  return <div style={{ minHeight: tall ? "150vh" : "10vh" }} />;
 }
 
 const path = window.__ROUTE ?? "/";
@@ -49,6 +67,6 @@ createRoot(document.getElementById("root") as HTMLElement).render(
     }}
     onGo={() => undefined}
   >
-    <div style={{ minHeight: "150vh" }} />
+    <Filler />
   </Shell>,
 );

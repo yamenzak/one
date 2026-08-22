@@ -642,6 +642,97 @@ const DRAWN = [...filesIn("design/src"), ...filesIn("one-space/src")];
   }
 }
 
+/* ------------------------------ the hem reaches the edge it is hemming --- */
+{
+  /*
+    ⚠️ A VIGNETTE THAT STARTS A FEW PIXELS IN IS A STRIPE. The hem rides its own
+    element, and that element is `sticky top-0` inside a scroller: at rest it
+    sits at its FLOW position, below whatever the page reserves above it — so
+    the ground showed through in a band along the very top of the screen, which
+    is the one place a vignette exists to have no edge.
+
+    ⚠️ OVERSHOOTING IS THE FIX AND IT IS FREE, because the overshot part is the
+    SOLID end of the gradient. What it cannot be is zero, which is what it was —
+    and it is the TOP's alone: the nav already reaches the foot, and an overshoot
+    there moves the gradient's origin off-screen, which makes the solid part
+    measure longer than the fade while looking identical.
+
+    ⚠️ AND THE RUN IS BOUNDED THE OTHER WAY. At 4.25 + 8.5 the hem dissolved
+    204px of an 844px phone to hold one 64px row legible — a quarter of the
+    screen, which stops reading as a vignette and starts reading as a fade-out.
+    Only the FADE may be cut: `hold` is the height of the controls standing on
+    the edge, and shortening it puts a card's text through the glyphs on top of
+    it — which is a legibility bug wearing a taste fix's clothes.
+  */
+  const MOST = 10;
+  const src = readFileSync(join(ENGINE, "design/src/tokens/ambience.ts"), "utf8");
+  const hold = /^\s*const hold = ([\d.]+);/m.exec(src);
+  const fade = /^\s*const fade = ([\d.]+);/m.exec(src);
+  const over = /^\s*const over = edge === "top" \? ([\d.]+) : 0;/m.exec(src);
+
+  if (!hold || !fade || !over) {
+    fail("design/src/tokens/ambience.ts: the hem's `hold`, `fade` or `over` is gone.\n" +
+         "       Without the overshoot the vignette starts at the element rather than at the\n" +
+         "       screen, and a band of world shows along the edge it is hemming.");
+  } else if (Number(over[1]) <= 0) {
+    fail("design/src/tokens/ambience.ts: the hem overshoots its edge by nothing.\n" +
+         "       At rest a sticky crown sits at its flow position, so the hem begins below\n" +
+         "       the screen's own edge and the ground shows through above it.");
+  } else if (Number(hold[1]) + Number(fade[1]) > MOST) {
+    fail(`design/src/tokens/ambience.ts: the hem runs ${Number(hold[1]) + Number(fade[1])}rem\n` +
+         `       past the edge, over the ${MOST}rem this allows. Beyond that it is not a\n` +
+         `       vignette, it is a quarter of the screen dissolved to hold one row legible.`);
+  } else {
+    ok(`hem: ${hold[1]} solid + ${fade[1]} falloff, overshooting the edge by ${over[1]}`);
+  }
+}
+
+/* -------------------------- what collapses hands over its subject, late --- */
+{
+  /*
+    ⚠️ A TITLE CARD IS AS TALL AS WHAT IT DRAWS, SO ITS THRESHOLD CANNOT BE A
+    NUMBER. It was 56px — most of a title and almost none of a title card — so a
+    planet at the size of the page vanished after a thumb's width of scroll while
+    the row replacing it arrived with the picture still filling the screen.
+
+    ⚠️ AND WHAT HANDS OVER IS THE SUBJECT, NOT ONLY ITS NAME. Scrolled past, the
+    name appeared in the crown on its own and the face simply stopped existing,
+    so the hand-off read as one element leaving and an unrelated one arriving.
+
+    ⚠️ AND IT IS ONE CROSSING, ASKED ONCE. The crown used to answer this for
+    itself, off its OWN height, while the card answered off the card's — so the
+    small name arrived in the header at 45px and the picture it replaces faded
+    hundreds of pixels later. One hand-off drawn as two events is the defect;
+    two measurements of "has it gone" is how it happens, and the only structural
+    way to refuse it is that the crown must be TOLD.
+  */
+  const src = readFileSync(join(ENGINE, "design/src/frame/crown.tsx"), "utf8");
+  const measures = /ref\.current\?\.offsetHeight/.test(src);
+  const fixed = /useScrolledPast\([^)]*,\s*\d+/.test(src);
+  const travels = /subject\?:\s*FaceOf/.test(src) && /subject:\s*face/.test(src);
+  /* ⚠️ ONE CALLER, and it is the one that draws the thing that has to leave. A
+     second `useScrolledPast` anywhere in this file is a second threshold. */
+  const asked = (src.match(/useScrolledPast\(/g) ?? []).length;
+  const told = /carried=\{past\}/.test(src) && /const showName = !collapses \|\| !!carried/.test(src);
+
+  if (!measures || fixed) {
+    fail("design/src/frame/crown.tsx: a collapsing heading swaps at a fixed distance.\n" +
+         "       What `gone` means is a property of what went — a title card is as tall as\n" +
+         "       the picture it draws, and a constant is right for exactly one of them.");
+  } else if (!travels) {
+    fail("design/src/frame/crown.tsx: a title card hands over its name and not its face.\n" +
+         "       The row that replaces a subject has to BE that subject, or the swap reads\n" +
+         "       as one thing leaving and another arriving.");
+  } else if (asked !== 2 || !told) {
+    fail("design/src/frame/crown.tsx: the crown decides the hand-off instead of being told.\n" +
+         "       Two thresholds off two heights put the small name in the header while the\n" +
+         "       picture it replaces is still filling the page. The block measures itself\n" +
+         "       and passes `carried`; the crown reads it and nothing else.");
+  } else {
+    ok("collapse: one crossing, off the card's own height, and the subject goes with it");
+  }
+}
+
 console.log(bad
   ? `\nscene: ${bad} finding(s) — a world that is not the same world twice.`
   : `\nscene: seeded, compositor-only, masked rather than washed, sized by area, bound not built.`);

@@ -26,6 +26,14 @@
  * library's own; a literal would be a screen a workspace's branding does not
  * reach (D7).
  *
+ * ⚠️ AND THE LOUD ROLES STATE THEIR INK RATHER THAN INHERITING IT. `display`,
+ * `wordmark` and `figure` are the thing a screen exists to show; inheriting
+ * makes the loudest element on a page whatever colour its ancestors happened to
+ * hand it, which came out a dusty grey under a quiet block and looked like a
+ * design decision. A role that is *deliberately* secondary says so (`note`), and
+ * everything between the two inherits on purpose — a paragraph takes its
+ * container's voice, a headline does not.
+ *
  * ⚠️ AND THESE GO ON OUR OWN ELEMENTS, NEVER ONTO A HEROUI COMPONENT.
  * `Card.Title` already knows what a card title looks like; putting a role class
  * on it is overriding the library, which the restyle guard refuses.
@@ -45,7 +53,7 @@ export const TYPE = {
     1.25rem the number was twice the size and still lost the screen — the first
     thing anybody's eye landed on was "What needs you". Mass, not multiple.
   */
-  display: "font-mark text-[3.25rem] md:text-6xl font-bold tabular-nums tracking-[-0.035em] leading-[1.05]",
+  display: "font-mark text-[3.25rem] md:text-6xl font-bold tabular-nums tracking-[-0.035em] leading-[1.05] text-foreground",
   /**
    * ⚠️ A NAME THAT IS ACTING AS A MARK, AND THE TRACKING IS THE WHOLE ROLE. A
    * workspace's name over its own planet is not a heading somebody reads on the
@@ -60,7 +68,7 @@ export const TYPE = {
    * "Northwind Strength" breaking to leave "Strength" alone under a nine-letter
    * line is the single thing that makes a large name look unset.
    */
-  wordmark: "font-mark text-[2.75rem] md:text-6xl font-extrabold tracking-[-0.05em] leading-[0.95] text-balance",
+  wordmark: "font-mark text-[2.75rem] md:text-6xl font-extrabold tracking-[-0.05em] leading-[0.95] text-balance text-foreground",
   /**
    * THE TWO HALVES OF A LOCKUP, AND THE WEIGHT SPLIT IS THE WHOLE WORDMARK.
    *
@@ -121,7 +129,7 @@ export const TYPE = {
    * the ripple rather than on the values. This is the number in a ROW or a stat
    * block; the one a screen is built around is `display`.
    */
-  figure: "font-mark text-2xl font-bold tabular-nums tracking-[-0.025em]",
+  figure: "font-mark text-2xl font-bold tabular-nums tracking-[-0.025em] text-foreground",
   /**
    * ⚠️ THE NUMERALS WITHOUT THE SIZE — for a figure that lands INSIDE a row, a
    * heading or a sentence, and takes whatever size it lands in. `figure` is a

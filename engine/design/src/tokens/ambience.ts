@@ -349,21 +349,48 @@ const hemStops = (hold: number, fade: number): string => {
  */
 const hem = (edge: "top" | "bottom") => {
   const far = edge === "top" ? "bottom" : "top";
-  /* ⚠️ Solid to the control's edge, then twice that again in falloff — above. */
+  /*
+    ⚠️ THE SOLID PART IS SET BY WHAT IT HAS TO HIDE, AND ONLY THE FALLOFF IS
+    TASTE. `hold` is the height of the controls that stand on this edge —
+    anything less and a card's text reads through the glyphs sitting on it, which
+    is what `chrome.seen.test.tsx` measures. So shortening a hem that ran too far
+    means shortening the FADE, and shortening the wrong one is a legibility bug
+    wearing a taste fix's clothes.
+
+    ⚠️ AND IT RAN TOO FAR. At 4.25 + 8.5 the vignette dissolved 204px of an 844px
+    phone to hold one 64px row legible — a quarter of the screen, which stops
+    reading as the ground thickening into an edge and starts reading as the page
+    fading out.
+  */
   const hold = 4.25;
-  const fade = 8.5;
-  const run = hold + fade;
+  const fade = 5.5;
+  /*
+    ⚠️ AND THE TOP OVERSHOOTS THE EDGE IT HEMS, WHICH IS NOT PADDING — IT IS THE
+    FIX FOR A GAP. The top hem rides the crown, and the crown is `sticky top-0`
+    inside a scroller: at rest it sits at its FLOW position, below whatever the
+    page reserves above it, so the vignette began a few pixels down and the world
+    showed through in a strip along the very top of the screen. Overshooting is
+    invisible, because the overshot part is the SOLID end of the gradient.
+
+    ⚠️ THE FOOT NEEDS NONE, AND GIVING IT ONE WOULD BE WORSE THAN USELESS. The
+    nav is pinned to the bottom and reaches the screen's own edge, so there is no
+    gap to cover — and an overshoot there moves the gradient's origin off-screen,
+    which makes the solid part MEASURE longer than the fade while looking
+    identical. That is the shape the ratio test exists to refuse.
+  */
+  const over = edge === "top" ? 4 : 0;
+  const run = over + hold + fade;
   return [
     `[data-hem="${edge}"]::before {`,
     `  content: ""; position: absolute; left: 0; right: 0;`,
-    `  ${edge}: 0; ${far}: -${run}rem;`,
+    `  ${edge}: -${over}rem; ${far}: -${hold + fade}rem;`,
     `  pointer-events: none; z-index: -1;`,
     /* ⚠️ The gradient runs AWAY from the edge it is hemming, so `to top` at the
        bottom and `to bottom` at the top — the opaque end is always the screen's
        own edge, where there is nothing to have a boundary against. */
     `  background: linear-gradient(to ${far},`,
     `    var(--scene-veil, var(--background)) 0,`,
-    `    ${hemStops(hold, fade)});`,
+    `    ${hemStops(over + hold, fade)});`,
     /*
       ⚠️ THE STRENGTH IS A PROPERTY AND THE TRANSITION IS ON `opacity`, WHICH IS
       THE ONLY SHAPE THAT ANIMATES. A custom property inside a gradient is not

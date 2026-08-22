@@ -244,8 +244,15 @@ export const CROWN_CHIP = "flex h-11 items-center rounded-full px-4" as const;
  * page whose title also carries a scope row, three rows of words arrive with
  * nothing saying which belongs to which. Padding at the TOP would fight the
  * crown, which already sets it.
+ *
+ * ⚠️ AND IT IS `SPACE.airy`, THE SAME 40px A PAGE'S WIDEST GAP IS. A title's air
+ * was 32 and a hero's was 32 and a section's gap is 24 — three numbers off two
+ * ladders, close enough that nothing looked wrong and far enough apart that
+ * nothing looked deliberate. The page has ONE ladder (8 / 12 / 24 / 40); a
+ * heading takes the top rung of it, a section takes the one below, and the
+ * distance between a title and the page is then a step rather than a rounding.
  */
-export const TITLE_PAD = "pb-6" as const;
+export const TITLE_PAD = "pb-10" as const;
 
 /**
  * ⚠️ THE ISLAND HOLDS ITS ITEMS AT ARM'S LENGTH AND NOTHING MORE. `Card` is
@@ -459,13 +466,28 @@ export const DROP_PAD = "px-6 py-8" as const;
 export const BAND_PAD = "py-6" as const;
 
 /**
- * ⚠️ A HERO IS PADDED ABOVE AND NOT BELOW, AND THE REASON IS ARITHMETIC RATHER
- * THAN TASTE. It sits inside a gapped `Stack`, so its own bottom padding adds to
- * that gap — `py-6` under a `gap-6` is 48px of nothing between the figure and the
- * first section, which is what made the specimen look like a screen with a
- * missing block in it. Below a block in a stack, the stack's gap IS the spacing.
+ * THE ROOM A HERO CLAIMS, AND IT IS MORE BELOW THAN A SECTION GETS.
+ *
+ * ⚠️ A HERO IS SEPARATED FROM THE PAGE BY MORE THAN IT USES INSIDE ITSELF, OR IT
+ * IS THE PAGE'S FIRST ROW. It was `pt-6` and nothing below, on the argument that
+ * a stack's own gap IS the spacing under a block — true, and it stopped being
+ * enough the moment a hero grew a second part. A figure, a caption and a row of
+ * quick actions separated from the first section by the same 24px the caption is
+ * separated from the acts reads as four things in a list, and the one that is
+ * supposed to be the answer to "why did I open this" is simply the top one.
+ *
+ * ⚠️ AND IT IS BELOW ONLY, BECAUSE THE CROWN ALREADY SETS THE TOP. Padding at
+ * both ends is the doubling this file exists to prevent; what was missing was
+ * never air above.
+ *
+ * ⚠️ BOTH NUMBERS ARE RUNGS OF `SPACE`, WHICH IS WHAT MAKES IT THE SAME SYSTEM.
+ * `roomy` above and `airy` below — the same two steps a page's own stack uses,
+ * so a hero is separated from the first section by the widest gap the product
+ * has plus that stack's own, and the answer to "why this much" is a rung rather
+ * than a number somebody liked. It matches `TITLE_PAD` exactly, because a title
+ * card and a hero are the same block on two kinds of screen.
  */
-export const HERO_PAD = "pt-6" as const;
+export const HERO_PAD = "pt-6 pb-10" as const;
 
 /**
  * ⚠️ ONE THIRD DOWN, NOT HALF — the optical centre of a door screen. A sign-in

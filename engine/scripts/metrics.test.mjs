@@ -288,6 +288,85 @@ if (!rows.length) {
   ok(`marker: all ${rows.length} row component(s) tell the card they are one`);
 }
 
+/* ------------------------------------------------- one ladder, not three --- */
+
+/**
+ * ⚠️ A HEADING'S AIR IS A RUNG OF `SPACE`, NOT A NUMBER NEAR ONE. `SPACE` is
+ * 4 / 8 / 12 / 24 / 40 and every gap on a page comes off it — and the two
+ * paddings that separate the biggest block on a screen from the rest of it did
+ * not: 32 above a section's 24, which is close enough that nothing looks wrong
+ * and far enough that nothing looks decided. Whether a hero has ENOUGH air is
+ * taste and moves; whether its air is a step of the same ladder is structure and
+ * does not, so that is what this asks.
+ *
+ * ⚠️ AND THE TWO OF THEM AGREE, because a title card and a hero are the same
+ * block on two kinds of screen. Two rungs for one idea is how a product comes to
+ * have a roomier home page than its own detail pages for no reason anybody
+ * chose.
+ */
+{
+  const METRICS = readFileSync(join(ENGINE, "design/src/tokens/metrics.ts"), "utf8");
+  /* ⚠️ Read OFF `SPACE`, so a rung added or retuned carries these with it. */
+  const rungs = [...METRICS.matchAll(/^\s*(?:hair|tight|snug|roomy|airy): "gap-([\d.]+)"/gm)]
+    .map((m) => m[1]);
+  const below = (name) => /pb-([\d.]+)/.exec(new RegExp(`${name} = "([^"]+)"`).exec(METRICS)?.[1] ?? "")?.[1];
+  const hero = below("HERO_PAD");
+  const title = below("TITLE_PAD");
+
+  if (rungs.length < 4) {
+    fail("metrics.ts: `SPACE` no longer reads as a ladder of `gap-N`, so this guard is blind.");
+  } else if (!hero || !title) {
+    fail("metrics.ts: `HERO_PAD` or `TITLE_PAD` sets no bottom padding.\n" +
+         "       The air under the biggest block on a screen is what separates it from the\n" +
+         "       page; without it a hero is the page's first row.");
+  } else if (!rungs.includes(hero) || !rungs.includes(title)) {
+    fail(`metrics.ts: a heading's air (hero pb-${hero}, title pb-${title}) is off the ladder.\n` +
+         `       \`SPACE\` is gap-${rungs.join(" / gap-")}; a padding beside it rather than on it\n` +
+         `       is a number somebody liked, and the next one will be too.`);
+  } else if (hero !== title) {
+    fail(`metrics.ts: a hero is separated by ${hero} and a title card by ${title}.\n` +
+         "       They are the same block on two kinds of screen, so a product ends up with a\n" +
+         "       roomier home page than its own detail pages for no reason anybody chose.");
+  } else {
+    ok(`ladder: a heading's air is gap-${hero}, a rung of SPACE, and both headings take it`);
+  }
+}
+
+/* ----------------------------------------- the loud roles state their ink --- */
+
+/**
+ * ⚠️ THE LOUDEST THING ON A SCREEN MUST NOT INHERIT ITS COLOUR. `display`,
+ * `wordmark` and `figure` are the answer to "why did I open this" — and with no
+ * ink of their own they take whatever the block around them is set to, so a
+ * hero under a quiet ancestor came out a dusty grey and read as a decision. It
+ * cannot be caught by looking: the same class list is correct on most screens
+ * and wrong on the one with a muted parent.
+ *
+ * ⚠️ AND IT IS FIXED IN THE ROLE, NOT AT THE CALL SITE, which is the half this
+ * asks. `text-foreground` on one `h1` fixes one caller; on the role it fixes
+ * the next one too — and the next caller is the one nobody reviews.
+ */
+{
+  const TYPES = readFileSync(join(ENGINE, "design/src/tokens/type.ts"), "utf8");
+  const LOUD = ["display", "wordmark", "figure"];
+  const quiet = LOUD.filter((role) => {
+    const set = new RegExp(`^\\s*${role}: "([^"]+)"`, "m").exec(TYPES)?.[1];
+    return !set || !/\btext-(foreground|ink)\b/.test(set);
+  });
+  const missing = LOUD.filter((role) => !new RegExp(`^\\s*${role}: "`, "m").test(TYPES));
+
+  if (missing.length) {
+    fail(`type.ts: no \`${missing.join("`, `")}\` role — this guard is blind.`);
+  } else if (quiet.length) {
+    fail(`type.ts: \`${quiet.join("`, `")}\` name no ink, so they inherit one.\n` +
+         "       These are the roles a screen is built around; under a quiet ancestor they\n" +
+         "       come out grey and look chosen. Put the colour on the ROLE — at a call site\n" +
+         "       it fixes one caller and none of the ones after it.");
+  } else {
+    ok(`ink: all ${LOUD.length} loud role(s) state their own colour rather than inheriting`);
+  }
+}
+
 console.log(bad
   ? `\nmetrics: ${bad} finding(s) — spacing nobody owns drifts, and drift is invisible per diff.`
   : `\nmetrics: one source for every measurement, and a floor under every control.`);

@@ -278,6 +278,16 @@ both the biggest thing on it and something you still need four screens down, and
 one element cannot be both, so the big one lives in the content and the crown
 carries the compact copy that replaces it once it has scrolled away.
 
+⚠️ **The hand-off is ONE crossing, and the block is what decides it.** The
+threshold is the title card's OWN height — a card is as tall as the picture it
+draws, so a constant is right for exactly one screen and the crown's own height
+is right for none. The card measures itself, hands the answer to the crown as
+`carried`, and the crown reads it and nothing else: with both of them answering
+separately the small name arrived in the header at 45px while the planet it
+replaces was still filling the page. It crosses at **85%** of the card, not most
+of it — what is left after that is behind the sticky crown a moment later — and
+what travels is the SUBJECT, face and all, not just the name.
+
 ⚠️ **`find` is a typed declaration, not children**, for the reason `who` is: the
 widest, most-seen element in the product is exactly the one that otherwise
 becomes whatever the third caller needed that afternoon.
@@ -875,6 +885,18 @@ same and ask whether they are really the same kind of thing.
 
 Air is structural. `roomy` between kinds of thing, `snug` within one. A heading
 belongs to what is under it, never floating equidistant between two blocks.
+
+⚠️ **One ladder — 4 / 8 / 12 / 24 / 40 — and a heading's own air is a rung of it,
+not a number near one.** A hero and a title card both take `airy` below;
+sections take `roomy` between them. They were 32 against a section's 24 for a
+while, which is close enough that nothing looked wrong and far enough that
+nothing looked decided — and the answer to "why this much" was nobody. Whether a
+hero has *enough* air is taste and will move again; that its air is a step of the
+same ladder is structure, and `metrics.test.mjs` asks only the second question.
+
+⚠️ **And a hero and a title card take the SAME rung**, because they are one block
+on two kinds of screen. Two numbers for one idea is how a product ends up with a
+roomier home page than its own detail pages for no reason anybody chose.
 
 ---
 

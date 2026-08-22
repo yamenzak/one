@@ -127,6 +127,76 @@ describe("the world a person actually opens", () => {
     expect(world.wash, "a family publishing a wash left `data-wash` unset").toBe(true);
   }, 90_000);
 
+  /*
+    ⚠️ THE CHROME ANSWERS BEFORE ANYBODY SCROLLS, AND THAT IS NOT FREE. Both
+    hems are driven by a scroll reading — "is anything behind the crown", "is
+    anything still below the fold" — and a reading taken only in a scroll
+    handler does not exist until somebody scrolls. The foot's hem then sat at
+    its default on a page nobody had touched, and the first flick of a thumb
+    made a vignette appear that should have been there on arrival.
+
+    ⚠️ IT IS THIS SUITE BECAUSE IT IS THE ONLY ONE THAT MOUNTS `Page`. The
+    listener lives there; a `Shell` rendered on its own has the layers and
+    nothing driving them, so every hem reads its safe default and the fault is
+    invisible. Asserted at rest, with the page never scrolled.
+  */
+  it("hems its foot before anybody has scrolled", async () => {
+    const page = await browser.newPage({ viewport: PHONE });
+    await page.setContent(`<!doctype html><html data-theme="dark"><head><style>${css}`
+      + `</style></head><body><div id="root"></div>`
+      + `<script type="module">${code}</script></body></html>`);
+    await page.waitForSelector('[data-hem="bottom"]');
+    await page.waitForTimeout(400);
+    const at = await page.evaluate(() => {
+      const read = (edge: string) => {
+        const el = document.querySelector(`[data-hem="${edge}"]`);
+        return el ? Number(getComputedStyle(el, "::before").opacity) : null;
+      };
+      return { top: read("top"), foot: read("bottom"),
+        scrolled: document.scrollingElement?.scrollTop ?? 0 };
+    });
+    await page.close();
+    expect(at.scrolled, "the page was scrolled, so this proves nothing").toBe(0);
+    /* ⚠️ The foot ON, because a tall page has content under the nav from the
+       first frame — that is what the veil is for. */
+    expect(at.foot, "the foot's veil is not there until somebody scrolls").toBe(1);
+    /* ⚠️ And the head OFF, for the mirror-image reason: nothing has passed
+       under the crown yet, so an opaque strip up there is a bar, not a hem. */
+    expect(at.top, "the head's veil is on with nothing behind it to dissolve").toBe(0);
+  }, 90_000);
+
+  /*
+    ⚠️ AND IT ANSWERS AGAIN WHEN THE PAGE CHANGES SHAPE, WHICH IS NOT THE SAME
+    QUESTION. Reading once at mount is right for a page that arrives finished
+    and wrong for every page that does not: a list resolving turns a screen that
+    fitted into one that does not, and neither a scroll event nor a resize event
+    fires for that. Nothing moves, nothing is touched, and the veil stays at the
+    answer to a question that stopped being true.
+  */
+  it("hems its foot when the page grows under it, untouched", async () => {
+    const page = await browser.newPage({ viewport: PHONE });
+    await page.setContent(`<!doctype html><html data-theme="dark"><head><style>${css}`
+      + `</style></head><body><div id="root"></div>`
+      + `<script>window.__GROW = true</script>`
+      + `<script type="module">${code}</script></body></html>`);
+    await page.waitForSelector('[data-hem="bottom"]');
+    const short = await page.evaluate(() => Number(
+      getComputedStyle(document.querySelector('[data-hem="bottom"]')!, "::before").opacity));
+    await page.waitForTimeout(600);
+    const grown = await page.evaluate(() => ({
+      foot: Number(getComputedStyle(
+        document.querySelector('[data-hem="bottom"]')!, "::before").opacity),
+      over: (document.scrollingElement?.scrollHeight ?? 0) > window.innerHeight,
+      scrolled: document.scrollingElement?.scrollTop ?? 0,
+    }));
+    await page.close();
+    expect(short, "the page did not start short, so this proves nothing").toBe(0);
+    expect(grown.over, "the page never grew past the fold").toBe(true);
+    expect(grown.scrolled, "the page was scrolled, so this proves nothing").toBe(0);
+    expect(grown.foot, "content grew under the nav and the veil never came back")
+      .toBe(1);
+  }, 90_000);
+
   /* ⚠️ AND AT A DESK TOO, because the ground is sized in viewport units and a
      layer that lights a phone can be a stripe on a monitor. */
   it("still lights the page at a desk", async () => {

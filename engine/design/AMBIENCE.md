@@ -139,6 +139,36 @@ depth.
   contrast: the ground thickens continuously into the edge, and a plate laid on
   top of that is a slab with a hard border where a vignette was. The nav rail wore
   one for exactly as long as the wash named `[data-island]` in a rule of its own.
+
+### The hem's shape
+
+- **It is solid for exactly the height of the controls that stand on that edge,
+  and not a pixel of that number is taste.** Anything less and a card's text
+  reads through the glyphs sitting on it. So a hem that runs too far is shortened
+  by shortening the FADE; shortening the solid part is a legibility bug wearing a
+  taste fix's clothes.
+- **What decides whether it reads as a vignette or as a panel is the fade's
+  STEEPNESS, not its length.** This was a length ratio for a while (the fade at
+  least 1.8× the hold) and the proxy got in the way the first time the real
+  requirement changed: asked to shorten a vignette dissolving a quarter of a
+  phone, the only number the rule would let move was the one set by legibility.
+  Two bounds replace it — the fade is never shorter than the hold, and nowhere
+  does the veil lose more than **2% of its strength per pixel**. The shape that
+  was refused (76px solid, 56px fade) fails both, at a peak slope of 2.7%/px.
+- **Both ends are one geometry, measured from the SCREEN'S edge rather than the
+  layer's.** The head overshoots upward because the crown is `sticky top-0`
+  inside a scroller and sits at its flow position; the foot must not, because the
+  nav already reaches the edge and an overshoot there moves the gradient's origin
+  off-screen — which makes the solid part measure longer than the fade while
+  looking identical.
+- **A hem answers on arrival and on every change of shape, not on the first
+  scroll.** "Is anything behind the crown" and "is anything still below the fold"
+  are readings, and a reading taken only in a scroll handler does not exist until
+  somebody scrolls — so the foot's veil sat at its default on a page nobody had
+  touched, and appeared at the first flick of a thumb. A page also GROWS after it
+  mounts (a list resolves, an image decides its height) and neither a scroll nor
+  a resize event fires for that, which is why the reading is driven by a
+  `ResizeObserver` as well.
 - **Mix the hue whole — not pre-darkened, and not pre-lightened either.** Amber
   toward black is BROWN, and a card washed in brown reads as dirty rather than as
   lit; amber toward white arrives at a rule that takes fifteen percent of it and

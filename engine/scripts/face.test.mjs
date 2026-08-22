@@ -102,16 +102,19 @@ const code = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "");
     and `{crown.appMark}` alike. The first version asked for `.mark` exactly and
     passed the crown, which is where the defect actually was; the second caught
     `className={TYPE.wordmark}`, because an attribute value has the same braces
-    as a child. What separates them is the character before the brace: an
-    attribute has `=`, a child never does. `mark: a.mark` building a payload and
-    `appFace(a.id, a.mark)` are how it is meant to travel and neither matches;
-    nor does a bare `{mark}`, which is `Crown`'s ReactNode slot for whatever a
-    door puts over itself and has nothing to do with a manifest.
+    as a child. What separates them is the character before the brace: a CHILD is
+    preceded by markup or whitespace, an attribute by `=`, and an interpolation
+    inside a template literal by `$`. The third was missing, so the moment a
+    class list became `` `text-foreground ${TYPE.wordmark}` `` this reported a
+    heading as a product's glyph rendered raw. `mark: a.mark` building a payload
+    and `appFace(a.id, a.mark)` are how it is meant to travel and neither
+    matches; nor does a bare `{mark}`, which is `Crown`'s ReactNode slot for
+    whatever a door puts over itself and has nothing to do with a manifest.
   */
   let checked = 0;
   for (const file of FILES) {
     const src = code(readFileSync(file, "utf8"));
-    for (const m of src.matchAll(/(?<![=\w])\{\s*[\w?]+(?:[.?]+\w+)*\.\w*[Mm]ark\s*\}/g)) {
+    for (const m of src.matchAll(/(?<![=$\w])\{\s*[\w?]+(?:[.?]+\w+)*\.\w*[Mm]ark\s*\}/g)) {
       checked++;
       fail(`${rel(file)}: renders ${m[0]} as text.\n` +
            `       A mark is a product's identity — put it on the plate every face wears: ` +
