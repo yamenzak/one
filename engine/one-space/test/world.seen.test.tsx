@@ -197,6 +197,56 @@ describe("the world a person actually opens", () => {
       .toBe(1);
   }, 90_000);
 
+  /*
+    ⚠️ AND IT LEAVES ONLY ONCE THE PAGE HAS STOPPED, WHICH IS WHAT KEEPS IT FROM
+    BLINKING. The readings behind both hems are not a smooth ramp on a real
+    phone: a fling overshoots and bounces at either end, and the browser's own
+    toolbar collapsing mid-scroll changes the viewport height underneath the
+    subtraction — so the honest answer flips several times while a thumb is still
+    moving. Answered every time, the two ends of the screen flash.
+
+    ⚠️ THE WEIGHT IS IN ONE DIRECTION, AND THAT IS WHAT THIS PINS. Arriving must
+    stay instant, because a hem that waited would let a card's text read through
+    a title; leaving waits, because nothing is harmed by a vignette lingering
+    over nothing. A departure made instant again passes every other test here.
+
+    ⚠️ READ AS THE PROPERTY, NOT AS THE PAINT. `opacity` is mid-transition for a
+    quarter of a second after the answer changes, so asserting on what is drawn
+    would be measuring the easing rather than the decision.
+  */
+  it("holds its hem while the page is moving, and drops it once still", async () => {
+    const page = await browser.newPage({ viewport: PHONE });
+    await page.setContent(`<!doctype html><html data-theme="dark"><head><style>${css}`
+      + `</style></head><body><div id="root"></div>`
+      + `<script type="module">${code}</script></body></html>`);
+    await page.waitForSelector('[data-hem="bottom"]');
+    await page.waitForTimeout(400);
+    const run = await page.evaluate(async () => {
+      const wait = (ms: number) => new Promise((go) => { setTimeout(go, ms); });
+      const hem = (edge: string) => getComputedStyle(document.documentElement)
+        .getPropertyValue(`--hem-${edge}`).trim();
+      const scroller = document.scrollingElement!;
+      const before = hem("bottom");
+      scroller.scrollTo(0, scroller.scrollHeight);
+      await wait(60);
+      const atOnce = { foot: hem("bottom"), top: hem("top") };
+      await wait(500);
+      const settled = { foot: hem("bottom"), top: hem("top") };
+      return { before, atOnce, settled };
+    });
+    await page.close();
+
+    expect(run.before, "the foot was not hemmed to begin with").toBe("1");
+    /* ⚠️ The head is the other half of the same rule: it ARRIVES on the same
+       scroll, and arriving is never delayed. */
+    expect(run.atOnce.top, "the head's hem waited to arrive — a card's text reads "
+      + "through a title for as long as it does").toBe("1");
+    expect(run.atOnce.foot, "the foot's hem left the moment the page reached the "
+      + "end, while it was still moving").toBe("1");
+    expect(run.settled.foot, "the foot's hem never left, on a page that stopped "
+      + "with nothing behind it").toBe("0");
+  }, 90_000);
+
   /* ⚠️ AND AT A DESK TOO, because the ground is sized in viewport units and a
      layer that lights a phone can be a stripe on a monitor. */
   it("still lights the page at a desk", async () => {

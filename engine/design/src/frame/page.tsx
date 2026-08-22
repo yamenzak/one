@@ -14,7 +14,7 @@ import { useScrolling } from "./scrolling.js";
 import { TYPE } from "../tokens/type.js";
 import { BAND_PAD, GUTTER, NAV_SPACE, SAFE_TOP, WIDTH } from "../tokens/metrics.js";
 import type { Width } from "../tokens/metrics.js";
-import { transition, useMotion } from "../tokens/motion.js";
+import { SETTLE, transition, useMotion } from "../tokens/motion.js";
 import type { Density } from "../scene/index.js";
 
 /* ------------------------------------------------------------------ bleed --- */
@@ -362,32 +362,80 @@ export function Page(
  * THE COMMON CASE. Every layout that mounts a nav reserves its height
  * (`NAV_SPACE`), so a short page's content ends ABOVE the nav and there is
  * genuinely nothing behind it.
+ *
+ * ⚠️ AND A HEM ARRIVES AT ONCE BUT LEAVES ONLY ONCE THE PAGE HAS STOPPED. The
+ * threshold above is 8px, which is enough slack for a settling image and nothing
+ * like enough for a phone: a fling overshoots and bounces at both ends, and the
+ * browser's own toolbar collapsing mid-scroll changes the viewport height
+ * underneath the subtraction — so both answers flip several times while a thumb
+ * is still moving, and the two ends of the screen blink. Widening the threshold
+ * does not fix it, because the readings genuinely cross it; what is wrong is
+ * that the chrome ANSWERS EVERY ONE.
+ *
+ * ⚠️ WEIGHT IN ONE DIRECTION ONLY, WHICH IS WHY IT COSTS NOTHING. Arriving stays
+ * instant — a hem that waited would let a card's text read through a title,
+ * which is the fault the whole layer exists for. Leaving waits for `SETTLE` ms
+ * of stillness, because nothing at all is harmed by a vignette lingering a
+ * moment over nothing. So the chrome cannot be made to flicker by moving the
+ * page, and it is never late where being late would cost something.
+ *
+ * ⚠️ THE FIRST ANSWER IS EXEMPT, AND IT HAS TO BE. Both properties default to 1,
+ * so a page that opens with nothing behind its crown would otherwise hold the
+ * hem for a fifth of a second and then fade it out — an interface visibly
+ * undoing itself in front of somebody who has just arrived, which is the same
+ * fault `data-hems` exists to prevent one beat later.
  */
 function useHems(ref: React.RefObject<HTMLElement | null>, at = 8): void {
   /* ⚠️ EACH EDGE REMEMBERS ITS OWN LAST ANSWER, so a scroll through the middle
      of a long page writes no style at all. */
   const was = React.useRef<{ top: boolean | null; foot: boolean | null }>({ top: null, foot: null });
+  /* ⚠️ AND ITS OWN PENDING DEPARTURE — the two ends reach nothing at different
+     moments, so one timer for both would let the foot cancel the head's. */
+  const going = React.useRef<{ top?: number; foot?: number }>({});
+
+  const settle = (edge: "top" | "foot", now: boolean) => {
+    const root = document.documentElement;
+    const prop = edge === "top" ? "--hem-top" : "--hem-bottom";
+    const write = () => root.style.setProperty(prop, now ? "1" : "0");
+    if (going.current[edge] !== undefined) {
+      clearTimeout(going.current[edge]);
+      delete going.current[edge];
+    }
+    if (now === was.current[edge]) return;
+    /* ⚠️ ARRIVING, OR ANSWERING FOR THE FIRST TIME — both immediate. */
+    if (now || was.current[edge] === null) {
+      was.current[edge] = now;
+      write();
+      return;
+    }
+    /* ⚠️ LEAVING — held until the page has been still, and re-armed by every
+       reading in between, so what it waits for is stillness rather than a fixed
+       delay after the first frame that said "nothing". */
+    going.current[edge] = setTimeout(() => {
+      delete going.current[edge];
+      was.current[edge] = false;
+      write();
+    }, SETTLE) as unknown as number;
+  };
 
   /* ⚠️ FROM WHATEVER IS SCROLLING, NOT FROM THE WINDOW — see `scrolling.ts`.
      Read off `window`, both hems resolved to nothing inside a presented surface:
      `scrollY` stays 0 there for ever, so the account centre had no vignette at
      either end and no way to get one. */
   useScrolling(ref, ({ y, under }) => {
-    const root = document.documentElement;
-    const nowTop = y > at;
-    if (nowTop !== was.current.top) {
-      was.current.top = nowTop;
-      root.style.setProperty("--hem-top", nowTop ? "1" : "0");
-    }
+    settle("top", y > at);
     /* ⚠️ THE SAME SLACK AT THIS END. A document one subpixel taller than the
        viewport — which rounding produces on its own — would otherwise sit
        permanently hemmed with nothing under it. */
-    const nowFoot = under > at;
-    if (nowFoot !== was.current.foot) {
-      was.current.foot = nowFoot;
-      root.style.setProperty("--hem-bottom", nowFoot ? "1" : "0");
-    }
+    settle("foot", under > at);
   });
+
+  /* ⚠️ AND A PENDING DEPARTURE DOES NOT OUTLIVE THE SCREEN THAT ARMED IT — it
+     writes to the ROOT, so it would land on whatever page came next. */
+  React.useEffect(() => () => {
+    for (const id of Object.values(going.current)) clearTimeout(id);
+    going.current = {};
+  }, []);
 
   React.useEffect(() => {
     const root = document.documentElement;

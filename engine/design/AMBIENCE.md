@@ -169,6 +169,19 @@ depth.
   mounts (a list resolves, an image decides its height) and neither a scroll nor
   a resize event fires for that, which is why the reading is driven by a
   `ResizeObserver` as well.
+- **It arrives at once and leaves only once the page has stopped**, and the
+  asymmetry is the whole of it. Those two readings are not a smooth ramp on a
+  real phone: a fling overshoots and bounces at either end, and the browser's own
+  toolbar collapsing mid-scroll changes the viewport height underneath the
+  subtraction — so the honest answer flips several times while a thumb is still
+  moving, and answering every one makes both ends of the screen blink. Widening
+  the 8px threshold does not help, because the readings genuinely cross it.
+  Arriving stays instant, because a hem that waited would let a card's text read
+  through a title; leaving waits `SETTLE` (200ms of stillness, re-armed by every
+  reading), because nothing is harmed by a vignette lingering over nothing. The
+  first answer is exempt in both directions — both properties default to 1, so a
+  page opening with nothing behind its crown would otherwise fade the hem out in
+  front of somebody who has just arrived.
 - **Mix the hue whole — not pre-darkened, and not pre-lightened either.** Amber
   toward black is BROWN, and a card washed in brown reads as dirty rather than as
   lit; amber toward white arrives at a rule that takes fifteen percent of it and

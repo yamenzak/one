@@ -105,6 +105,38 @@ export const DURATION = {
 
 export type Duration = keyof typeof DURATION;
 
+/**
+ * HOW LONG A PAGE HAS TO BE STILL BEFORE THE CHROME BELIEVES IT, IN MILLISECONDS.
+ *
+ * ⚠️ THE ONLY NUMBER HERE THAT IS NOT THE LENGTH OF A MOVEMENT. Everything in
+ * `DURATION` says how long something takes to happen; this says how long nothing
+ * has to happen first. It is a JS number rather than a CSS string because it is
+ * a timer, and it lives beside them because it is the same decision — the pace
+ * at which the interface responds to being moved.
+ *
+ * ⚠️ CHROME THAT CHASES A FINGER IS WHAT MAKES A PRODUCT FEEL CHEAP. The hems
+ * are driven by two readings — "is anything behind the crown", "is anything
+ * still below the fold" — and both are answered from a scroll position that, on
+ * a real phone, is not a smooth ramp: a fling overshoots and bounces, and the
+ * browser's own toolbar collapsing mid-scroll changes the viewport height under
+ * the arithmetic. Answered honestly every frame, the two ends of the screen
+ * blink while a thumb is still moving.
+ *
+ * ⚠️ SO THE RULE IS ASYMMETRIC, AND THAT IS THE WHOLE OF IT. A hem ARRIVES the
+ * instant it has work to do — waiting there would let a card's text read through
+ * a title, which is the fault the hem exists for. It LEAVES only once the page
+ * has stopped, because nothing is harmed by a vignette lingering a moment over
+ * nothing. Weight in one direction only: the chrome cannot be made to flicker by
+ * moving the page, and it cannot be late where being late costs something.
+ *
+ * ⚠️ AND IT IS LONGER THAN A GAP BETWEEN SCROLL EVENTS, WHICH IS WHAT MAKES IT
+ * "STOPPED" RATHER THAN "SLOW". A scrolling page reports every frame or so; a
+ * fifth of a second of silence is a page that is not moving, at any frame rate
+ * this runs at. Shorter and a stutter mid-fling still reads as stopped; much
+ * longer and the hem is visibly late to a deliberate scroll to the end.
+ */
+export const SETTLE = 200;
+
 /** One transition, as a CSS value. */
 export const transition = (
   properties: string, duration: Duration = "quick", ease: Ease = "settle",
