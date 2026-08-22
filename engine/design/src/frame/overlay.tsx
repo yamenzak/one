@@ -112,6 +112,22 @@ export function Dialog({ trigger, title, children, actions }: {
  * ⚠️ IT DECLARES THAT IT SCROLLS. A screen's crown reads the nearest scrolling
  * ancestor to collapse its title, so a presented surface that did not say so
  * would leave every title inside it frozen at full size.
+ *
+ * ⚠️ AND `scroll="inside"` PUTS THE SCROLLING ON `Modal.Body`, NOT ON THE
+ * DIALOG. The dialog it gives `overflow-clip` and a height capped at the
+ * viewport; `.modal__body--scroll-inside` is the only part that gets
+ * `overflow-y: auto`. Rendered straight into the dialog with no body, the
+ * content past the fold was CLIPPED and nothing scrolled — a workspace with six
+ * rows showed four and a half, with the last one fading under a hard edge, and
+ * the docked action sat over content nobody could reach. A `data-scroll`
+ * attribute was there instead, read by nothing.
+ *
+ * ⚠️ AND THE BODY'S OWN TYPE IS ANSWERED BY `Page`, NOT OVERRIDDEN HERE. A modal
+ * body is `text-sm text-muted` because it is usually a paragraph under a heading;
+ * what goes in here is a whole page, and inheriting muted 14px would repaint
+ * every unstyled word in the account centre. Reaching in with a `className` is a
+ * restyle and D7 refuses it — correctly, because the fix belongs one level down:
+ * a page states its own type rather than taking whatever contains it.
  */
 export function Over({ open, onClose, label, children }: {
   readonly open: boolean;
@@ -135,7 +151,11 @@ export function Over({ open, onClose, label, children }: {
               which is where somebody looks for it and which knows whether this
               is a dismiss or a step back. Two ways out is one too many. */}
           <Modal.Dialog aria-label={label} data-scroll="true">
-            {children}
+            {/* ⚠️ THE PART THAT SCROLLS, AND UNSTYLED — see the header. Its own
+                inset is a 3px focus-ring bleed rather than a gutter, so there is
+                nothing to turn off; the type it would otherwise lend is asserted
+                by `Page`, where a statement about a page belongs. */}
+            <Modal.Body>{children}</Modal.Body>
           </Modal.Dialog>
         </Modal.Container>
       </Modal.Backdrop>

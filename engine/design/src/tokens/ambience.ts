@@ -243,19 +243,25 @@ const hemStop = (pct: number): string =>
  * TWO. Written out twice, the top and the bottom are five numbers each that have
  * to stay equal, and the first thing anybody tunes is one of them.
  *
- * ⚠️ `hold` IS WHERE THE CONTROLS END, NOT WHERE THE BOX DOES, AND THE
- * DIFFERENCE BETWEEN THOSE IS WHAT MADE IT BITE. A crown is `min-h-16` and its
- * controls are `h-11` centred in it, so the last pixel of a button is at 54px
- * while the header's own box runs to 64 and the hold was set to 96 — forty-two
- * pixels of FULL opacity below anything anybody can see, and then the falloff on
- * top of that. The chrome stopped blending with the screen and started sitting
- * on a panel with a soft edge, which is the plate this whole idea replaces.
+ * ⚠️ THERE IS NO OPAQUE PART, AND THAT IS THE WHOLE DIFFERENCE BETWEEN A
+ * VIGNETTE AND A BAR. `hold` used to run the veil at FULL opacity as far as the
+ * controls reached — 76px at the foot — and then start the falloff. Measured in
+ * a browser, that is a 76-pixel slab of flat background across the bottom of
+ * every scrollable screen, with the world's pattern stopping dead at its top
+ * edge. A soft edge on a slab is still a slab: the reading it produces is "a
+ * black bar", which is exactly what it produced.
  *
- * ⚠️ SO IT IS MEASURED, PER EDGE, AND THE TWO ARE NOT THE SAME. The crown's
- * controls end 3.375rem from the top; the nav's bar begins 4.5rem from the
- * bottom. Rounded up a notch each so the opaque part reaches the control's edge
- * and stops — "barely reaching it" is the whole brief, because a hem that
- * clears the control by a margin is a bar again.
+ * ⚠️ SO IT FALLS AWAY FROM THE FIRST PIXEL. Full only at the screen's own edge,
+ * where there is nothing to have a boundary against, and thinning from there —
+ * so the ground runs continuously under the chrome and the chrome has no shape
+ * of its own. What keeps a control legible is that the content passing under it
+ * is dissolved WHERE THE CONTROL IS, and at the control's own height the veil is
+ * still most of the way up.
+ *
+ * ⚠️ AND THE CURVE IS EASED RATHER THAN LINEAR. A straight ramp between two
+ * stops shows its own ends as faint lines — the border coming back in the one
+ * place this design cannot afford one — so the stops thin quickly near the edge
+ * and slowly at the far end, which is what an unbroken gradation looks like.
  *
  * ⚠️ THE FALLOFF IS SHARED AND IT IS THE NUMBER WITH THE TENSION IN IT. Too
  * short and the fade's own top edge becomes a visible line, which is the border
@@ -296,10 +302,13 @@ const hemStop = (pct: number): string =>
  */
 const hem = (edge: "top" | "bottom") => {
   const far = edge === "top" ? "bottom" : "top";
-  /* ⚠️ hold: measured to the control's own edge — see above. fade: shared. */
-  const [hold, fade] = edge === "top" ? [3.5, 3.5] : [4.75, 3.5];
-  const run = hold + fade;
-  const mid = (at: number) => +(hold + fade * at).toFixed(2);
+  /*
+    ⚠️ HOW FAR THE VEIL REACHES, AND NOTHING INSIDE IT IS FLAT — see above. The
+    foot reaches further than the head because the nav's own bar is taller than
+    the crown's row and a fade that ends inside a control is a line across it.
+  */
+  const run = edge === "top" ? 7 : 9;
+  const at = (part: number) => +(run * part).toFixed(2);
   return [
     `[data-hem="${edge}"]::before {`,
     `  content: ""; position: absolute; left: 0; right: 0;`,
@@ -308,10 +317,14 @@ const hem = (edge: "top" | "bottom") => {
     /* ⚠️ The gradient runs AWAY from the edge it is hemming, so `to top` at the
        bottom and `to bottom` at the top — the opaque end is always the screen's
        own edge, where there is nothing to have a boundary against. */
+    /* ⚠️ SIX STOPS, BECAUSE THREE SHOW THEIR OWN JOINS. The eye finds a
+       discontinuity in the SLOPE of a gradient long before it finds one in the
+       value, and a hem is the largest soft shape in the product. */
     `  background: linear-gradient(to ${far},`,
     `    var(--scene-veil, var(--background)) 0,`,
-    `    ${hemStop(99)} ${hold}rem, ${hemStop(70)} ${mid(1 / 3)}rem,`,
-    `    ${hemStop(32)} ${mid(2 / 3)}rem, ${hemStop(0)} ${run}rem);`,
+    `    ${hemStop(94)} ${at(0.14)}rem, ${hemStop(80)} ${at(0.3)}rem,`,
+    `    ${hemStop(55)} ${at(0.5)}rem, ${hemStop(26)} ${at(0.72)}rem,`,
+    `    ${hemStop(0)} ${run}rem);`,
     /*
       ⚠️ THE STRENGTH IS A PROPERTY AND THE TRANSITION IS ON `opacity`, WHICH IS
       THE ONLY SHAPE THAT ANIMATES. A custom property inside a gradient is not

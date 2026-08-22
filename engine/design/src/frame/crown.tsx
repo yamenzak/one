@@ -20,6 +20,7 @@ import { TYPE } from "../tokens/type.js";
 import {
   BAND_PAD, CROWN, CROWN_CHIP, CROWN_HERO_PAD, CROWN_SIZE, GUTTER, HEAD_GAP, ICON, SAFE_TOP, SPACE, TITLE_PAD, WIDTH,
 } from "../tokens/metrics.js";
+import { useScrolling } from "./scrolling.js";
 import type { Width } from "../tokens/metrics.js";
 
 /* ⚠️ The crown's own height, for the one caller that must match it. */
@@ -69,16 +70,14 @@ export function LeaveChip({ leave = "back", label, onDo }: {
  * going down, so a page resting exactly on the boundary cannot oscillate — which
  * a single value does, visibly, on any list whose last item is near the fold.
  */
-function useScrolledPast(down = 56, up = 32): boolean {
+/* ⚠️ AND IT READS WHATEVER IS SCROLLING, NOT THE WINDOW — see `scrolling.ts`.
+   Inside a presented surface the window never moves, so a collapsing title
+   stayed at full size for ever on every screen in the account centre. */
+function useScrolledPast(
+  ref: React.RefObject<HTMLElement | null>, down = 56, up = 32,
+): boolean {
   const [past, setPast] = React.useState(false);
-
-  React.useEffect(() => {
-    const onScroll = () => setPast((was) => (was ? scrollY > up : scrollY > down));
-    onScroll();
-    addEventListener("scroll", onScroll, { passive: true });
-    return () => removeEventListener("scroll", onScroll);
-  }, [down, up]);
-
+  useScrolling(ref, ({ y }) => setPast((was) => (was ? y > up : y > down)));
   return past;
 }
 
@@ -274,7 +273,10 @@ export function Crown({
   name, mark, under, collapses = false, find,
   also = [], does, bleed = "hold", width = "read",
 }: CrownProps) {
-  const past = useScrolledPast();
+  /* ⚠️ THE CROWN'S OWN NODE, so "how far has this scrolled" is asked of the
+     surface it is actually in — see `scrolling.ts`. */
+  const at = React.useRef<HTMLElement>(null);
+  const past = useScrolledPast(at);
   /* ⚠️ A collapsing name is HIDDEN until it is needed, and it is `aria-hidden`
      because the display heading in the content is the page's real name. Two
      elements carrying the same words is a duplicate to anybody navigating by
@@ -289,7 +291,7 @@ export function Crown({
   }
 
   return (
-    <header data-hem="top" className={`sticky top-0 z-10 w-full ${SAFE_TOP}`}>
+    <header ref={at} data-hem="top" className={`sticky top-0 z-10 w-full ${SAFE_TOP}`}>
       <Band bleed={bleed} width={width}>
         <div className={`flex items-center ${SPACE.snug} ${CROWN}`}>
           {/* ------------------------------------------------------- lead --- */}
@@ -703,10 +705,14 @@ export function PageCrown({
    */
   readonly under?: React.ReactNode;
 }) {
-  const past = useScrolledPast();
+  /* ⚠️ THE HEADING BELOW THE CROWN, WATCHING THE SAME SURFACE. It has no sticky
+     node of its own, so it asks from where it renders — the same ancestor walk
+     lands on the same scroller. */
+  const at = React.useRef<HTMLDivElement>(null);
+  const past = useScrolledPast(at);
 
   return (
-    <>
+    <div ref={at}>
       <Crown
         bleed={bleed}
         width={width}
@@ -779,7 +785,7 @@ export function PageCrown({
             </div>
           )}
       </Band>
-    </>
+    </div>
   );
 }
 

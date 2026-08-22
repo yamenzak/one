@@ -13,7 +13,7 @@
  */
 
 import * as React from "react";
-import { PRIMARY_MAX, isUnder } from "@engine/kernel";
+import { PRIMARY_MAX, screenFor } from "@engine/kernel";
 import { Button } from "@heroui/react";
 import {
   GUTTER, ICON, ISLAND_HERE, ISLAND_ITEM, ISLAND_PAD, PAD, ROW, SAFE_BOTTOM, SPACE, WIDTH,
@@ -23,6 +23,7 @@ import { MOTION, transition, useStill } from "../tokens/motion.js";
 import { TYPE } from "../tokens/type.js";
 import { Pip } from "../parts/beside.js";
 import { Band } from "./page.js";
+import { useScrolling } from "./scrolling.js";
 
 /**
  * THE ACTION A WHOLE SCREEN EXISTS FOR, PINNED WHERE A THUMB IS.
@@ -187,16 +188,36 @@ export function Island({ items, here, onGo, act, only }: {
    */
   readonly only?: "phone";
 }) {
-  const away = useScrollingDown();
+  /* ⚠️ THE NAV'S OWN NODE — see `scrolling.ts`. */
+  const foot = React.useRef<HTMLElement>(null);
+  const away = useScrollingDown(foot);
   /* ⚠️ ALL FIVE, BECAUSE THERE IS NOTHING ELSE TO HOLD. One slot used to be
      spent on an item that opened a sheet of everywhere else; a screen is a
      destination or it belongs to a subject now, so the bar is the whole
      navigation and the ceiling is a ceiling on destinations rather than on
      destinations-plus-a-door. */
   const shown = items.slice(0, PRIMARY_MAX);
+  /*
+    ⚠️ ONE ANSWER TO "WHERE AM I", AND ASKING EACH ITEM SEPARATELY IS NOT IT.
+    `isUnder` was asked per row, so every item whose route the address sits under
+    marked itself — and a product's ROOT is under everything in it. The literal
+    string `/` is excluded by `isUnder` itself, which is why this was invisible
+    in the fixture: the ground mounts the shell with an app's OWN routes, where
+    home really is `/`. The deployment mounts it with the same screens PREFIXED
+    (`/inventory`, `/inventory/count`), and `/inventory` is a prefix of every
+    address in the product — so home and the screen somebody was actually on
+    were both lit, with both labels open.
+    Two open words do not fit a phone: they push the row past its own width, and
+    the nav is `overflow-clip`, so the fifth destination was silently cut off the
+    right edge. One bar, two lit items, four of five reachable.
+    `screenFor` is the same walk the shell already does — longest route wins —
+    so there is one answer and this compares against it.
+  */
+  const at = screenFor(shown, here);
 
   return (
     <nav
+      ref={foot}
       aria-label="Sections"
       /* ⚠️ THE HEM IS THE NAV'S BACKGROUND — see `ambienceStylesheet`. It is on
          the NAV rather than on the bar inside it, because what has to dissolve
@@ -260,11 +281,11 @@ export function Island({ items, here, onGo, act, only }: {
         {shown.map((item) => {
           /* ⚠️ OPEN ONLY WHEN THERE IS NO ACT — see `act`. The bar carries one
              word, and when a screen has something to do it is that. */
-          /* ⚠️ THE SCREEN THE ADDRESS IS UNDER, NOT THE ONE IT EQUALS. A detail
-             screen carries what it is about (`/thing/t-glove`), and an exact
-             match left the bottom bar with nothing marked the moment anybody
-             opened a record — on the one control that answers "where am I". */
-          const isHere = isUnder(item.route, here);
+          /* ⚠️ THE ONE THE ADDRESS BELONGS TO — see `at`. A detail screen carries
+             what it is about (`/thing/t-glove`), so an exact match left the bar
+             with nothing marked the moment anybody opened a record; asking each
+             item on its own lit two. */
+          const isHere = item.route === at?.route;
           const open = isHere && !act;
           return (
             <Button
@@ -281,6 +302,13 @@ export function Island({ items, here, onGo, act, only }: {
                  the leftover after each item's own content, so widths converge
                  without matching, which is worse than obviously wrong because it
                  looks nearly right. */
+              /* ⚠️ THE CLOSED ONES ARE WHAT GIVES WAY, AND THAT IS ALREADY
+                 DECIDED BELOW BY `grow basis-0 min-w-0`. Measured at 390px with
+                 a deliberately unfittable name: the open item takes 212px and
+                 the other four shrink to 29 — the row stays inside the bar and
+                 no destination is lost. Which matters because the nav clips: a
+                 row that overflowed would not wrap or scroll, it would silently
+                 drop whatever fell off the right edge. */
               className={`flex-row items-center justify-center ${SPACE.tight} ${ROW.free} `
                 + (open ? `shrink-0 ${ISLAND_HERE}` : `shrink-0 ${ISLAND_ITEM}`)
                 + (act ? "" : open ? "" : " grow basis-0 min-w-0")}
@@ -322,7 +350,7 @@ export function Island({ items, here, onGo, act, only }: {
               */}
               <span
                 className={`${TYPE.note} ${isHere ? "text-foreground" : ""}`
-                  + " overflow-hidden whitespace-nowrap leading-none"}
+                  + " overflow-hidden text-ellipsis whitespace-nowrap leading-none"}
                 style={{
                   maxWidth: open ? "10rem" : 0,
                   opacity: open ? 1 : 0,
@@ -395,24 +423,25 @@ export function Island({ items, here, onGo, act, only }: {
  * band, a focus scroll, a fixed element resizing — flips the direction, and the
  * bar folds and unfolds on its own while nobody touches anything.
  */
-function useScrollingDown(threshold = 6, top = 24): boolean {
+/* ⚠️ AND IT WATCHES WHATEVER IS SCROLLING, NOT THE WINDOW — see `scrolling.ts`.
+   Inside a presented surface the window never moves, so the bar never left and
+   never came back: a feature that reads as absent rather than as broken. */
+function useScrollingDown(
+  ref: React.RefObject<HTMLElement | null>, threshold = 6, top = 24,
+): boolean {
   const [down, setDown] = React.useState(false);
+  const last = React.useRef(0);
 
-  React.useEffect(() => {
+  useScrolling(ref, ({ y }) => {
+    /* ⚠️ ASKED PER READING RATHER THAN ONCE AT MOUNT, because the setting is a
+       preference somebody can change while the page is open. */
     if (typeof matchMedia === "function"
-      && matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-
-    let last = window.scrollY;
-    const onScroll = () => {
-      const y = window.scrollY;
-      if (y <= top) { setDown(false); last = y; return; }
-      if (Math.abs(y - last) < threshold) return;
-      setDown(y > last);
-      last = y;
-    };
-    addEventListener("scroll", onScroll, { passive: true });
-    return () => removeEventListener("scroll", onScroll);
-  }, [threshold, top]);
+      && matchMedia("(prefers-reduced-motion: reduce)").matches) { setDown(false); return; }
+    if (y <= top) { setDown(false); last.current = y; return; }
+    if (Math.abs(y - last.current) < threshold) return;
+    setDown(y > last.current);
+    last.current = y;
+  });
 
   return down;
 }

@@ -22,7 +22,7 @@
 
 import * as React from "react";
 import type { Kind, ScreenSpec } from "@engine/kernel";
-import { PRIMARY_MAX, isBusiness, isUnder, primaryOf, screenFor } from "@engine/kernel";
+import { PRIMARY_MAX, isBusiness, primaryOf, screenFor } from "@engine/kernel";
 import { Button } from "@heroui/react";
 import {
   Banknote, Bell, Building2, Calendar, CheckCheck, Circle, ClipboardList, Clock, Cog, Coins, Database,
@@ -568,11 +568,17 @@ export function Shell(props: ShellProps) {
         >
           <div data-island="true" className={`flex flex-col ${SPACE.hair}`}>
             {inBar.map((s) => {
-              /* ⚠️ THE SCREEN THE ADDRESS IS UNDER, NOT THE ONE IT EQUALS — the
-                 rail asked `route === at?.route`, so opening one record left the
-                 whole rail unmarked. `Island` had already been fixed; this is the
-                 same question asked in the second place. */
-              const isHere = isUnder(s.route, here);
+              /*
+                ⚠️ THE ONE THE ADDRESS BELONGS TO, AND THE SHELL HAS ALREADY
+                WORKED IT OUT. Two wrong answers have stood here. An exact match
+                left the rail blank the moment anybody opened a record, because a
+                detail screen carries what it is about (`/thing/t-glove`). Asking
+                `isUnder` per row then lit every item the address sits under —
+                and a product's ROOT is under everything in it, so home and the
+                screen somebody was on were both marked. `at` is one walk over
+                the same list, longest route wins, decided once.
+              */
+              const isHere = s.route === at?.route;
               return (
                 <Button
                   key={s.id}

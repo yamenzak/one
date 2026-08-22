@@ -10,6 +10,8 @@
 import * as React from "react";
 import type { Sky, World } from "../tokens/ambience.js";
 import { skyWorld, worldCss } from "../tokens/ambience.js";
+import { useScrolling } from "./scrolling.js";
+import { TYPE } from "../tokens/type.js";
 import { BAND_PAD, GUTTER, NAV_SPACE, SAFE_TOP, WIDTH } from "../tokens/metrics.js";
 import type { Width } from "../tokens/metrics.js";
 import { transition, useMotion } from "../tokens/motion.js";
@@ -227,14 +229,24 @@ export function Page(
   /* ⚠️ THE PAGE OWNS IT BECAUSE THE PAGE OWNS THE ROOM AT BOTH ENDS — see
      `useHems`. Every address goes through here, so one listener covers every
      crown and every nav in the product and neither has to remember. */
-  useHems();
+  /* ⚠️ THE PAGE'S OWN NODE, because "what is scrolling" is a question about
+     where this instance was mounted rather than about the document — see
+     `scrolling.ts`. */
+  const at = React.useRef<HTMLDivElement>(null);
+  useHems(at);
   /* ⚠️ ONE PATH FOR BOTH. A subject's world and a named sky differ only in where
      the family and the two colours came from — everything after that is the same
      engine, which is what "one engine powers every scene" has to mean. */
   const own = useScenery({ sky, seedling, world, density });
   return (
     <div
-      className="min-h-dvh flex flex-col"
+      ref={at}
+      /* ⚠️ A PAGE STATES ITS OWN TYPE RATHER THAN INHERITING IT. Presented over a
+         product it sits inside a `Modal.Body`, which is `text-sm text-muted`
+         because a modal body is usually a paragraph — so every unstyled word in
+         the account centre came out muted and a step small. The baseline belongs
+         here, where "this is a page" is the claim being made. */
+      className={`min-h-dvh flex flex-col ${TYPE.body}`}
       {...own.attrs}
       style={own.css}
     >
@@ -295,45 +307,42 @@ export function Page(
  * (`NAV_SPACE`), so a short page's content ends ABOVE the nav and there is
  * genuinely nothing behind it.
  */
-function useHems(at = 8): void {
+function useHems(ref: React.RefObject<HTMLElement | null>, at = 8): void {
+  /* ⚠️ EACH EDGE REMEMBERS ITS OWN LAST ANSWER, so a scroll through the middle
+     of a long page writes no style at all. */
+  const was = React.useRef<{ top: boolean | null; foot: boolean | null }>({ top: null, foot: null });
+
+  /* ⚠️ FROM WHATEVER IS SCROLLING, NOT FROM THE WINDOW — see `scrolling.ts`.
+     Read off `window`, both hems resolved to nothing inside a presented surface:
+     `scrollY` stays 0 there for ever, so the account centre had no vignette at
+     either end and no way to get one. */
+  useScrolling(ref, ({ y, under }) => {
+    const root = document.documentElement;
+    const nowTop = y > at;
+    if (nowTop !== was.current.top) {
+      was.current.top = nowTop;
+      root.style.setProperty("--hem-top", nowTop ? "1" : "0");
+    }
+    /* ⚠️ THE SAME SLACK AT THIS END. A document one subpixel taller than the
+       viewport — which rounding produces on its own — would otherwise sit
+       permanently hemmed with nothing under it. */
+    const nowFoot = under > at;
+    if (nowFoot !== was.current.foot) {
+      was.current.foot = nowFoot;
+      root.style.setProperty("--hem-bottom", nowFoot ? "1" : "0");
+    }
+  });
+
   React.useEffect(() => {
     const root = document.documentElement;
-    /* ⚠️ ONE LISTENER FOR BOTH, and each edge remembers its own last answer —
-       so a scroll in the middle of a long page writes nothing at all. */
-    let top: boolean | null = null;
-    let foot: boolean | null = null;
-    const read = () => {
-      const now = scrollY > at;
-      if (now !== top) {
-        top = now;
-        root.style.setProperty("--hem-top", now ? "1" : "0");
-      }
-      /* ⚠️ THE SAME SLACK AT THIS END. A document one subpixel taller than the
-         viewport — which rounding produces on its own — would otherwise sit
-         permanently hemmed with nothing under it. */
-      const left = document.documentElement.scrollHeight - (scrollY + innerHeight);
-      const under = left > at;
-      if (under !== foot) {
-        foot = under;
-        root.style.setProperty("--hem-bottom", under ? "1" : "0");
-      }
-    };
-    read();
     /* ⚠️ THE EASING IS TURNED ON AFTER THE FIRST ANSWER, NOT BEFORE IT — see the
        `data-hems` rule in `ambienceStylesheet`. Without this a screen arriving
        with nothing behind its nav visibly fades the hem away in front of
        somebody who has just got there, because `opacity` transitions from the
        stylesheet's own default. */
     const armed = requestAnimationFrame(() => { root.dataset.hems = "on"; });
-    addEventListener("scroll", read, { passive: true });
-    /* ⚠️ AND A RESIZE MOVES THE BOTTOM ANSWER WITHOUT A SCROLL. A sheet opening,
-       a keyboard arriving, a list finishing its load: the page gets taller under
-       a finger that never moved, and only this end of it notices. */
-    addEventListener("resize", read);
     return () => {
       cancelAnimationFrame(armed);
-      removeEventListener("scroll", read);
-      removeEventListener("resize", read);
       delete root.dataset.hems;
       /* ⚠️ Cleared rather than left at whatever it was, because the property is
          on the ROOT and outlives this page — a screen that unmounted while
@@ -341,7 +350,7 @@ function useHems(at = 8): void {
       root.style.removeProperty("--hem-top");
       root.style.removeProperty("--hem-bottom");
     };
-  }, [at]);
+  }, []);
 }
 
 /**
