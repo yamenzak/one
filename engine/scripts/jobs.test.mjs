@@ -23,6 +23,7 @@
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { appDirs, appManifests, appTrees } from "./lib/trees.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ENGINE = join(HERE, "..");
@@ -42,12 +43,8 @@ const read = (p) => readFileSync(join(ENGINE, p), "utf8");
  * that stops covering the tree the day somebody adds the fifth — which is the
  * same failure it exists to catch, one level up.
  */
-const APPS = existsSync(join(ENGINE, "apps"))
-  ? readdirSync(join(ENGINE, "apps"), { withFileTypes: true })
-    .filter((e) => e.isDirectory())
-    .map((e) => `apps/${e.name}/src/index.ts`)
-    .filter((p) => existsSync(join(ENGINE, p)))
-  : [];
+const APPS = appDirs().map((d) => `${d}/index.ts`)
+  .filter((p) => existsSync(join(ENGINE, p)));
 
 {
   let books = 0;

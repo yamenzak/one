@@ -792,7 +792,7 @@ its own header, cited by other files, and doing nothing.
 | `a-pressable-row-drops-the-button-s-own-metrics` | D7 | a row satisfying the touch floor with a string that changes nothing, because the button's own height and gutter still win |
 | `the-page-reserves-room-for-its-nav` | D7 | a sticky island floating over the last card on every screen — the island cannot fix it, since by the time it lays out the content above is already sized |
 | `every-component-shipped-is-drawn-somewhere` | D7 | a component exported, tested, documented and rendered by nobody — an absence, which typechecks and has no failing test, and whose first caller is the one who finds out it nests a button, draws its arc in a monochrome accent, or prints "min120" |
-| `the-test-ground-draws-most-of-the-package` | D7 | apps/hello quietly ceasing to be where this package is tried, which would leave the excuse list as the only thing keeping the check green |
+| `the-test-ground-draws-most-of-the-package` | D7 | engine/ground quietly ceasing to be where this package is tried, which would leave the excuse list as the only thing keeping the check green |
 | `a-changeable-fact-is-a-value-and-an-edit` | D7 | a settings card that is a column of live inputs — nothing saying which row is dirty, a stray tap on a phone editing a setting somebody was scrolling past, and a failure reported in a toast beside a control already showing the value the server threw away |
 | `a-refused-change-keeps-what-was-typed` | D7 | the sheet closing on a refusal, so somebody who spent a minute on a value watches it disappear and reads why in a toast that is gone before they look back |
 | `every-refusal-comes-from-a-catalogue` | D5 | one code meaning three things — three screens stamping platform.invalid on three sentences they wrote themselves, so a client switching on the code cannot, and the wording of a refusal lives wherever it was last edited |
@@ -926,6 +926,12 @@ its own header, cited by other files, and doing nothing.
 | `the-last-product-cannot-be-switched-off` | D51 | a workspace its own owner cannot reach, with the bill still running — nothing is on, so the screen that would switch something back on is not drawn |
 | `a-field-never-exceeds-its-mark-budget` | D50 | half a megabyte of markup parsed before the first paint of every screen, on the device least able to afford it — a cost a motion setting cannot reach, because it is there whether anything moves or not |
 | `the-world-moves-only-where-it-was-earned` | D50 | a viewport-sized repaint on the main thread for as long as a screen is open, competing with the scroll, on a phone that never asked for it |
+| `the-ground-is-outside-the-product-catalogue` | D51 | a fixture living in engine/apps, where being a product is decided by position rather than by anybody |
+| `the-deployment-serves-no-fixture` | D51 | the test ground back in APPS, where an operator can put a demo notebook with sample content into somebody's workspace |
+| `the-deployment-sells-no-fixture` | D51 | the test ground back in SELLS, where anybody founding a workspace can switch it on |
+| `the-worker-does-not-import-the-ground` | D51 | a list that does not name the fixture over a worker that still composes it |
+| `the-product-loader-does-not-name-the-ground` | D17 | a customer opening the fixture's screens over their own records |
+| `the-ground-has-no-live-entry-point` | D17 | the half that turns sample screens into a product's real ones coming back, which is what makes the loader entry easy to add again |
 <!-- /generated -->
 
 ### And how well each decision is defended
@@ -949,7 +955,7 @@ its own header, cited by other files, and doing nothing.
 | D14 | Provider AI calls go through the unified AI binding and its gateway, never direct fetch | 1 |
 | D15 | One membership, two authorities: a platform role for the workspace, a role per app inside it | 7 |
 | D16 | A package is a role with a clock: timed grants on the membership, resolved by the same resolver | 4 |
-| D17 | The tenant centre is one bundle for every product, and declarations reach the page as data | 6 |
+| D17 | The tenant centre is one bundle for every product, and declarations reach the page as data | 8 |
 | D18 | The operator stands outside every workspace, and the console is a door rather than a role | 8 |
 | D19 | An AI action declares a lane and a letterhead; the operator binds the model, and words narrow downward | 4 |
 | D20 | OneSpace is one surface presented over the product, reachable from every door, and it is a route | 3 |
@@ -983,7 +989,8 @@ its own header, cited by other files, and doing nothing.
 | D48 | A gift is a row about a person, not a state on a workspace | 0 |
 | D49 | A browser test does not gate a deploy | 4 |
 | D50 | Ambient motion is earned; essential motion is assumed | 2 |
-| D51 | A workspace is founded with the products somebody chose | 3 |
+| D51 | A workspace is founded with the products somebody chose | 7 |
+| D52 | The proving ground is a fixture, and the deployment serves no fixture | 0 |
 <!-- /generated -->
 
 ---
@@ -1091,8 +1098,9 @@ that names no stage, so this list cannot grow by forgetting.
 | 77 | A browser test does not gate a deploy | shipped |
 | 78 | Ambient motion is earned, and a field has a budget | shipped |
 | 79 | A workspace is founded with the products somebody chose | shipped |
+| 80 | The ground is a fixture, and the deployment serves no fixture | shipped |
 
-**69 shipped, 10 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**70 shipped, 10 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---
@@ -1136,9 +1144,9 @@ Two doors are worth knowing by hand. `pnpm engine:dev` serves every door on
 workspace slug. `engine/one/README.md` is how to run the deployment on its own.
 
 ⚠️ **AND ONE COMMAND WRITES RATHER THAN CHECKS.**
-`EMIT=1 pnpm --filter @engine/hello test` recomputes `docs/surface.json` — the
+`EMIT=1 pnpm --filter @engine/ground test` recomputes `docs/surface.json` — the
 file §1 through §7 are generated from. It is emitted by the real composer
-(`apps/hello/test/surface.screens.test.tsx`) rather than parsed out of the source,
+(`ground/test/surface.screens.test.tsx`) rather than parsed out of the source,
 because a script that grepped for operation ids would be a second, worse composer
 and would not know a route's method, its permission, or that two of the lanes
 mount conditionally. The test FAILS on a stale file rather than rewriting it, so a

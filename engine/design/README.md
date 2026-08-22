@@ -36,7 +36,7 @@ And two above it, for the half a screen stands on:
 the operations, the doors, the gates, the tables — and
 [../docs/BUILDING.md](../docs/BUILDING.md) is how to add to any of it.
 
-⚠️ **AND THE TEST GROUND IS `apps/hello`.** Its eight screens are built from
+⚠️ **AND THE TEST GROUND IS `engine/ground`.** Its eight screens are built from
 nothing but this package, take their data as props, and render with no session,
 no worker and no database — `pnpm --filter @engine/space dev`, then
 `?screen=/reports`. That last property is the one that matters: every defect

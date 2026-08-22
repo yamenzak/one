@@ -15,10 +15,10 @@ import { files, read } from "./rules.mjs";
 
 /**
  * ⚠️ EVERY APP, DERIVED — never a list beside this one. Both consumer lists
- * named `apps/hello/src` by hand, so the second product to arrive would have
- * made a kernel export it alone reaches read as unreachable: the guard reporting
- * a capability as dead precisely because a new app is using it. A narrow check
- * is the one that gets waived, and this is how it starts.
+ * named one app's `src` by hand, so the second product to arrive would have made
+ * a kernel export it alone reaches read as unreachable: the guard reporting a
+ * capability as dead precisely because a new app is using it. A narrow check is
+ * the one that gets waived, and this is how it starts.
  */
 const APPS = readdirSync(join(dirname(fileURLToPath(import.meta.url)), "../../apps"))
   .map((name) => `apps/${name}/src`);
@@ -32,12 +32,19 @@ const APPS = readdirSync(join(dirname(fileURLToPath(import.meta.url)), "../../ap
  * rail, the settings or the bill; `toolsOf` built a catalogue the agent door
  * cannot use, because the real one is filtered per caller by the gate. Both were
  * deleted rather than deferred, which is the third honest answer.
+ *
+ * ⚠️ AND THE GROUND COUNTS AS A CONSUMER, because it is the app that declares
+ * every cross-cutting concern on purpose. Left out, every kernel export only the
+ * ground reaches — `vaultField` is one — reads as a capability nothing can
+ * address: a true finding about the catalogue and a false one about the engine.
  */
+const CONSUMERS = ["ground/src", ...APPS];
+
 const PACKAGES = [
   { pkg: "runtime", barrel: "@engine/runtime",
-    consumers: ["one/src", "one-space/src", ...APPS] },
+    consumers: ["one/src", "one-space/src", ...CONSUMERS] },
   { pkg: "kernel", barrel: "@engine/kernel",
-    consumers: ["runtime/src", "design/src", "one/src", "one-space/src", ...APPS] },
+    consumers: ["runtime/src", "design/src", "one/src", "one-space/src", ...CONSUMERS] },
 ];
 
 /**

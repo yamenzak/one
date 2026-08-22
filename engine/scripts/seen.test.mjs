@@ -151,7 +151,7 @@ const holders = [...new Set(named.map(packageOf).filter(Boolean))];
 /* --------------------------- ...and `test` in those packages does NOT run them --- */
 
 /**
- * ⚠️ THE EXCLUSION IS PER CONFIG, AND A PACKAGE CAN HAVE THREE. `apps/hello`
+ * ⚠️ THE EXCLUSION IS PER CONFIG, AND A PACKAGE CAN HAVE THREE. `engine/ground`
  * runs a Workers-pool config and a screens config from one `test` script; a
  * `.seen.` file left in either one is the whole cost back in front of the
  * deploy, and the second config is the one nobody remembers.

@@ -32,6 +32,7 @@
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { appDirs, appTrees } from "./lib/trees.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ENGINE = join(HERE, "..");
@@ -89,9 +90,7 @@ const NOT_A_SCREEN = new Set([
 
 const SCREENS = [
   ...filesIn("one-space/src"),
-  ...readdirSync(join(ENGINE, "apps"), { withFileTypes: true })
-    .filter((e) => e.isDirectory())
-    .flatMap((e) => filesIn(`apps/${e.name}/src`)),
+  ...appDirs().flatMap((d) => filesIn(d)),
 ].filter((f) => !NOT_A_SCREEN.has(rel(f)));
 
 /* ------------------------------------------------------- nobody crowns itself --- */

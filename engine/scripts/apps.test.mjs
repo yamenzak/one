@@ -141,7 +141,7 @@ if (!eager) ok(`lazy: nothing composes an app at startup`);
  * OF IT. Every Workers-pool suite here writes the same fixture names into the
  * same databases — `northwind` is created by nine tests, one wallet is spent by a
  * dozen — so without a per-test storage stack each of those is a test of whichever
- * ran first. Measured on `@engine/hello`: roughly one run in two failed with
+ * ran first. Measured on `@engine/ground`: roughly one run in two failed with
  * retries off, and the failure was never near the code that caused it.
  *
  * ⚠️ AND `retry` IS THE FIX SOMEBODY REACHES FOR, because it works: it turns the

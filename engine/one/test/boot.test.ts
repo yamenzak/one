@@ -252,22 +252,23 @@ describe("what happens to a workspace nobody is looking at", () => {
   /** Past due by `days`, with one record on its shard. */
   const overdue = async (slug: string, days: number) => {
     const made = await createTenant(directory(), {
-      slug, name: slug, country: "DE", where: "eu", apps: ["hello"],
+      slug, name: slug, country: "DE", where: "eu", apps: ["inventory"],
     });
     if (typeof made === "string") throw new Error(made);
     const at = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
     await directory().prepare(
       `INSERT INTO subscription (tenant_id, app_id, plan_id, status, past_due_at, at)
-       VALUES (?, 'hello', 'free', 'past_due', ?, ?)`)
+       VALUES (?, 'inventory', 'free', 'past_due', ?, ?)`)
       .bind(made.tenant.id, at, at).run();
     await shard().prepare(
-      `INSERT INTO note (id, tenant_id, title, at, by) VALUES (?, ?, 'Kept', ?, NULL)`)
-      .bind(`note_${slug}`, made.tenant.id, at).run();
+      `INSERT INTO product (id, tenant_id, name, tracking, unit, at, by)
+       VALUES (?, ?, 'Kept', 'counted', 'each', ?, NULL)`)
+      .bind(`prd_${slug}`, made.tenant.id, at).run();
     return made.tenant.id;
   };
 
-  const notesOf = async (tenantId: string) => {
-    const rows = await shard().prepare(`SELECT id FROM note WHERE tenant_id = ?`)
+  const recordsOf = async (tenantId: string) => {
+    const rows = await shard().prepare(`SELECT id FROM product WHERE tenant_id = ?`)
       .bind(tenantId).all<{ id: string }>();
     return rows.results.length;
   };
@@ -285,42 +286,11 @@ describe("what happens to a workspace nobody is looking at", () => {
 
     await fire();
 
-    expect(await notesOf(doomed)).toBe(0);
+    expect(await recordsOf(doomed)).toBe(0);
     /* ⚠️ READ-ONLY IS NOT ERASED. A few days past due is a conversation about a
        bill; the destructive rung is months away, and a sweep that took the whole
        list would delete the records of everybody who was merely late. */
-    expect(await notesOf(inArrears)).toBe(1);
-  });
-
-  /*
-    ⚠️ A RETENTION NOBODY ENFORCES IS WORSE THAN NONE, and that was its state:
-    declared on every collection, PUBLISHED to the person by the processing
-    record, and read by nothing. Telling somebody in writing that a check-in is
-    kept for two years and keeping it for ever is not a gap — it is a commitment
-    the system contradicts, found by whoever asks in year three.
-  */
-  it("deletes what has been kept for longer than it was promised", async () => {
-    const made = await createTenant(directory(), {
-      slug: "lasting", name: "Lasting", country: "DE", where: "eu", apps: ["hello"],
-    });
-    if (typeof made === "string") throw new Error(made);
-
-    const day = 24 * 60 * 60 * 1000;
-    const rows = [["ci_old", new Date(Date.now() - 800 * day).toISOString()],
-      ["ci_new", new Date().toISOString()]] as const;
-    for (const [id, at] of rows) {
-      await shard().prepare(
-        `INSERT INTO check_in (id, person, week, went, at, by) VALUES (?, 'acc_x', '2026-01-01', 'fine', ?, NULL)`)
-        .bind(id, at).run();
-    }
-
-    await fire();
-
-    const left = await shard().prepare(`SELECT id FROM check_in ORDER BY id`)
-      .all<{ id: string }>();
-    /* ⚠️ The fresh one survives. A sweep that took the whole table would pass a
-       test asserting only that the old one is gone. */
-    expect(left.results.map((r) => r.id)).toEqual(["ci_new"]);
+    expect(await recordsOf(inArrears)).toBe(1);
   });
 
   /* ⚠️ RE-RUNNABLE, BECAUSE A SCHEDULER NOBODY DARES RE-RUN AFTER A FAILURE IS
@@ -374,11 +344,11 @@ describe("what happens to a workspace nobody is looking at", () => {
   */
   it("runs a job an app declared, not only the platform's own", async () => {
     await createTenant(directory(), {
-      slug: "tidied", name: "Tidied", country: "DE", where: "eu", apps: ["hello"],
+      slug: "tidied", name: "Tidied", country: "DE", where: "eu", apps: ["inventory"],
     });
     await fire();
     const run = await directory().prepare(
-      `SELECT ok, detail FROM job_run WHERE job_id = 'tidy'`)
+      `SELECT ok, detail FROM job_run WHERE job_id = 'inventory.expiry'`)
       .first<{ ok: number; detail: string | null }>();
     expect(run).not.toBeNull();
     expect(run?.ok).toBe(1);
@@ -423,27 +393,27 @@ describe("what somebody who has not agreed can do", () => {
 
   beforeAll(async () => {
     const made = await createTenant(directory(), {
-      slug, name: "Unread", country: "DE", where: "eu", apps: ["hello"],
+      slug, name: "Unread", country: "DE", where: "eu", apps: ["inventory"],
     });
     if (typeof made === "string") throw new Error(made);
     const shard = env.SHARD_EU_1 as unknown as Db;
 
     ownerId = await upsertAccount(directory(), "founder@example.com", null);
-    await found(shard, made.tenant.id, ownerId as never, "founder@example.com", { hello: "writer" });
+    await found(shard, made.tenant.id, ownerId as never, "founder@example.com", { inventory: "keeper" });
     await noteBelonging(directory(), ownerId as never, made.tenant.id);
     owner = `one_session=${(await startSession(directory(), ownerId as never)).id}`;
 
     const second = await upsertAccount(directory(), "colleague@example.com", null);
     await shard.prepare(
       `INSERT INTO membership (id, tenant_id, account_id, email, platform_role, app_roles_json, grants_json, revoked_json, at, accepted_at, removed_at)
-       VALUES ('mem_guest', ?, ?, 'colleague@example.com', 'member', '{"hello":"writer"}', '[]', '[]', ?, ?, NULL)`)
+       VALUES ('mem_guest', ?, ?, 'colleague@example.com', 'member', '{"inventory":"keeper"}', '[]', '[]', ?, ?, NULL)`)
       .bind(made.tenant.id, second, new Date().toISOString(), new Date().toISOString()).run();
     await noteBelonging(directory(), second as never, made.tenant.id);
     guest = `one_session=${(await startSession(directory(), second as never)).id}`;
   });
 
   it("is stopped from the product until it has agreed", async () => {
-    const out = await at("/api/note.list", { headers: { cookie: owner } });
+    const out = await at("/api/product.list", { headers: { cookie: owner } });
     /* ⚠️ 451, which is the one status that means this: not a permission (403
        invites somebody to look for another route) and not a payment. */
     expect(out.status).toBe(451);
@@ -549,7 +519,7 @@ describe("what somebody who has not agreed can do", () => {
   it("opens once it agrees, and closes again when the wording changes", async () => {
     await agreeTo(owner, "person");
     await agreeTo(owner, "tenant");
-    expect((await at("/api/note.list", { headers: { cookie: owner } })).status).toBe(200);
+    expect((await at("/api/product.list", { headers: { cookie: owner } })).status).toBe(200);
 
     /* The wording moves on. Nothing about the stored acceptance changes, and it
        stops being an acceptance of what is being asked. */
@@ -590,12 +560,12 @@ describe("switching a product off for a workspace", () => {
 
   const flip = (on: boolean) => at("admin", "/api/op.tenant.app", {
     method: "POST", headers: { cookie, "content-type": "application/json" },
-    body: JSON.stringify({ tenant: tenantId, app: "hello", on }),
+    body: JSON.stringify({ tenant: tenantId, app: "inventory", on }),
   });
 
   beforeAll(async () => {
     const made = await createTenant(directory(), {
-      slug, name: "Switchable", country: "DE", where: "eu", apps: ["hello"],
+      slug, name: "Switchable", country: "DE", where: "eu", apps: ["inventory"],
     });
     if (typeof made === "string") throw new Error(made);
     tenantId = made.tenant.id;
@@ -604,7 +574,7 @@ describe("switching a product off for a workspace", () => {
        `OPERATOR_EMAILS` set, development admits whoever is signed in — and this
        suite runs in development. */
     const me = await upsertAccount(directory(), "ops@example.com", null);
-    await found(shard(), made.tenant.id, me as never, "ops@example.com", { hello: "writer" });
+    await found(shard(), made.tenant.id, me as never, "ops@example.com", { inventory: "keeper" });
     await noteBelonging(directory(), me as never, made.tenant.id);
     cookie = `one_session=${(await startSession(directory(), me as never)).id}`;
     for (const doc of Object.values(LEGAL.documents)) {
@@ -613,20 +583,22 @@ describe("switching a product off for a workspace", () => {
         body: JSON.stringify({ document: doc.id, version: doc.version }),
       });
     }
-    await shard().prepare(`INSERT INTO note (id, tenant_id, title, at, by) VALUES (?, ?, 'Kept', ?, NULL)`)
-      .bind("note_switchable", made.tenant.id, new Date().toISOString()).run();
+    await shard().prepare(
+      `INSERT INTO product (id, tenant_id, name, tracking, unit, at, by)
+       VALUES (?, ?, 'Kept', 'counted', 'each', ?, NULL)`)
+      .bind("prd_switchable", made.tenant.id, new Date().toISOString()).run();
   });
 
   it("stops answering the product's routes, and starts again", async () => {
-    expect((await at(slug, "/api/note.list", { headers: { cookie } })).status).toBe(200);
+    expect((await at(slug, "/api/product.list", { headers: { cookie } })).status).toBe(200);
 
     expect((await flip(false)).status).toBe(200);
     /* ⚠️ 404 rather than 403: the operation is not one this workspace has, so
        there is nothing to be permitted to do. */
-    expect((await at(slug, "/api/note.list", { headers: { cookie } })).status).toBe(404);
+    expect((await at(slug, "/api/product.list", { headers: { cookie } })).status).toBe(404);
 
     expect((await flip(true)).status).toBe(200);
-    const back = await at(slug, "/api/note.list", { headers: { cookie } });
+    const back = await at(slug, "/api/product.list", { headers: { cookie } });
     expect(back.status).toBe(200);
     /* ⚠️ THE RECORDS CAME BACK WITH IT. Turning a product off keeps them; a
        switch that quietly erased would be indistinguishable until somebody
@@ -641,7 +613,7 @@ describe("switching a product off for a workspace", () => {
     const seen = await at("admin", "/api/op.tenants", { headers: { cookie } })
       .then((r) => r.json()) as { items: { id: string; apps: { id: string; on: boolean }[] }[] };
     const row = seen.items.find((t) => t.id === tenantId)!;
-    expect(row.apps.map((a) => [a.id, a.on])).toEqual([["hello", false]]);
+    expect(row.apps.map((a) => [a.id, a.on])).toEqual([["inventory", false]]);
     await flip(true);
   });
 
@@ -650,80 +622,8 @@ describe("switching a product off for a workspace", () => {
   it("cannot be pressed from the workspace's own door", async () => {
     expect((await at(slug, "/api/op.tenant.app", {
       method: "POST", headers: { cookie, "content-type": "application/json" },
-      body: JSON.stringify({ tenant: tenantId, app: "hello", on: false }),
+      body: JSON.stringify({ tenant: tenantId, app: "inventory", on: false }),
     })).status).toBe(404);
-  });
-
-  /* ----------------------------------------------- and the owner's own --- */
-
-  /**
-   * ⚠️ THE SAME TWO SWITCHES, FROM INSIDE, WHICH IS THE HALF THAT DID NOT EXIST.
-   * `enableApp` and `disableApp` were the operator's alone, so a workspace that
-   * wanted a different product had to ask us — a support conversation for a
-   * decision the customer is entitled to make about their own workspace.
-   */
-  const listApps = () => at(slug, "/api/app.list", { headers: { cookie } })
-    .then(async (r) => [r.status, await r.json()] as const);
-
-  const switchApp = (on: boolean, id: string) => at(slug, `/api/app.${on ? "add" : "remove"}`, {
-    method: "POST", headers: { cookie, "content-type": "application/json" },
-    body: JSON.stringify({ id }),
-  });
-
-  it("lists what is on beside what could be added", async () => {
-    const [status, said] = await listApps();
-    expect(status).toBe(200);
-    const items = (said as { items: { id: string; on: boolean; last: boolean }[] }).items;
-    /* ⚠️ BOTH PRODUCTS, one on and one not — a list of only what is switched on
-       is a status, and the pair is what makes it a decision. */
-    expect(items.map((a) => [a.id, a.on]))
-      .toEqual([["inventory", false], ["hello", true]]);
-    /* ⚠️ AND THE SCREEN IS TOLD WHICH ONE IS THE LAST, so it can disable that
-       switch rather than let it be pressed and refused. */
-    expect(items.find((a) => a.id === "hello")?.last).toBe(true);
-  });
-
-  /**
-   * ⚠️ THE WHOLE POINT, END TO END: an owner adds a product and its routes start
-   * answering at their own door, with no operator anywhere in it.
-   */
-  it("adds a product, and the product answers", async () => {
-    expect((await at(slug, "/api/product.list", { headers: { cookie } })).status).toBe(404);
-
-    expect((await switchApp(true, "inventory")).status).toBe(200);
-    expect((await at(slug, "/api/product.list", { headers: { cookie } })).status).toBe(200);
-
-    /* ⚠️ AND THE LAST-ONE FLAG MOVED WITH IT. With two on, neither is the last,
-       so both switches are live. */
-    const [, said] = await listApps();
-    expect((said as { items: { last: boolean }[] }).items.every((a) => !a.last)).toBe(true);
-  });
-
-  it("removes one, and keeps the records behind it", async () => {
-    expect((await switchApp(false, "inventory")).status).toBe(200);
-    expect((await at(slug, "/api/product.list", { headers: { cookie } })).status).toBe(404);
-
-    /* ⚠️ OFF IS NOT GONE. Switching it back on returns everything — a toggle
-       that erased would be the most destructive control in the product. */
-    expect((await switchApp(true, "inventory")).status).toBe(200);
-    expect((await at(slug, "/api/product.list", { headers: { cookie } })).status).toBe(200);
-    await switchApp(false, "inventory");
-  });
-
-  /**
-   * ⚠️ A WORKSPACE CANNOT EMPTY ITSELF. With nothing switched on it has no
-   * screens — including the one that would switch something back on — so it is a
-   * door that locks from the inside, with the bill still running.
-   */
-  it("refuses to switch off the only product it has", async () => {
-    expect((await switchApp(false, "hello")).status).toBe(409);
-    expect((await at(slug, "/api/note.list", { headers: { cookie } })).status).toBe(200);
-  });
-
-  /* ⚠️ THE REGISTRY HOLDS WHAT THIS DEPLOYMENT CAN RUN; `sells` holds what
-     anybody may switch on for themselves. An id in neither is not found. */
-  it("refuses a product this deployment does not sell", async () => {
-    expect((await switchApp(true, "nonesuch")).status).toBe(404);
   });
 });
 

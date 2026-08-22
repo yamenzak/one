@@ -23,6 +23,7 @@
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { appDirs, appManifests, appTrees } from "./lib/trees.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ENGINE = join(HERE, "..");
@@ -35,12 +36,8 @@ const strip = (s) => s
   .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "))
   .replace(/^(\s*)\/\/.*$/gm, "$1");
 
-const apps = existsSync(join(ENGINE, "apps"))
-  ? readdirSync(join(ENGINE, "apps"), { withFileTypes: true })
-    .filter((d) => d.isDirectory())
-    .map((d) => [d.name, join(ENGINE, "apps", d.name, "src")])
-    .filter(([, src]) => existsSync(join(src, "index.ts")))
-  : [];
+const apps = appTrees().map(([id, dir]) => [id, join(ENGINE, dir)])
+  .filter(([, src]) => existsSync(join(src, "index.ts")));
 
 let checked = 0;
 for (const [app, src] of apps) {

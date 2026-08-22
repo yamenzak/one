@@ -13,6 +13,7 @@
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { appDirs, appManifests, appTrees } from "./lib/trees.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ENGINE = join(HERE, "..");
@@ -246,7 +247,7 @@ for (const file of sourcesIn("kernel")) {
   because setting is `guide:` and reading is `.guide`.
 */
 const LANE_DIRS = ["kernel", "runtime", "design", "one-space", "one",
-  ...readdirSync(join(ENGINE, "apps")).map((a) => `apps/${a}`)];
+  ...appDirs().map((d) => d.replace(/\/src$/, ""))];
 
 /*
   ⚠️ THE SHAPE BODIES ARE CUT OUT BEFORE ANYTHING IS SEARCHED, and this is the

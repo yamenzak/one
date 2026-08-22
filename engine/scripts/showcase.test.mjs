@@ -76,6 +76,12 @@ const CONSUMERS = [
   ...filesIn("design/src"),
   ...filesIn("one-space/src"),
   ...filesIn("one/src"),
+  /* ⚠️ THE GROUND IS NOT UNDER `apps`, AND IT IS WHERE MOST OF THEM ARE DRAWN.
+     Enumerating the product catalogue alone reported every component in this
+     package as rendered by nothing — a total failure, which reads as a broken
+     guard rather than as a finding, and is how a rename comes to disable a
+     check without deleting it. */
+  ...filesIn("ground/src"),
   ...readdirSync(join(ENGINE, "apps"), { withFileTypes: true })
     .filter((e) => e.isDirectory())
     .flatMap((e) => filesIn(`apps/${e.name}/src`)),
@@ -142,7 +148,7 @@ for (const [name, home] of [...shipped].sort()) {
   if (where || excused) continue;
   missing++;
   fail(`${home}: \`${name}\` is exported and nothing renders it.\n` +
-       `       Draw it in the test ground (\`apps/hello\`), or stop shipping it, or add it\n` +
+       `       Draw it in the test ground (\`engine/ground\`), or stop shipping it, or add it\n` +
        `       to ELSEWHERE with the reason. An untried component is one whose first\n` +
        `       caller finds out what is wrong with it.`);
 }
@@ -156,10 +162,10 @@ if (!missing && !stale) {
 
 /**
  * ⚠️ AND THE GROUND IS WHERE MOST OF THEM ARE DRAWN, which is the claim this
- * whole file rests on. If hello stops being the place, the excuse list becomes
- * the only thing keeping this green and the guard stops meaning anything.
+ * whole file rests on. If it stops being the place, the excuse list becomes the
+ * only thing keeping this green and the guard stops meaning anything.
  */
-const groundFiles = filesIn("apps/hello/src/screens");
+const groundFiles = filesIn("ground/src/screens");
 const groundSrc = groundFiles.map((f) => readFileSync(f, "utf8")).join("\n");
 const inGround = [...shipped.keys()].filter((n) => new RegExp(`<${n}[\\s/>]`).test(groundSrc));
 /*
@@ -171,11 +177,11 @@ const inGround = [...shipped.keys()].filter((n) => new RegExp(`<${n}[\\s/>]`).te
 const FLOOR = 78;
 if (inGround.length < FLOOR) {
   fail(`the test ground draws ${inGround.length} component(s), under the ${FLOOR} floor.\n` +
-       `       \`apps/hello\` is where this package is tried before anybody's product\n` +
+       `       \`engine/ground\` is where this package is tried before anybody's product\n` +
        `       meets it. A ground that stopped growing with the package is a ground\n` +
        `       whose screens are a museum.`);
 } else {
-  ok(`ground: apps/hello draws ${inGround.length} of the package's ${shipped.size} components`);
+  ok(`ground: the ground draws ${inGround.length} of the package's ${shipped.size} components`);
 }
 
 console.log(bad

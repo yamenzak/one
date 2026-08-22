@@ -23,7 +23,7 @@ import { fileURLToPath } from "node:url";
 import { chromium, type Browser } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { DESK, PHONE, geometryOf, mounted, stylesheet, tooSmall } from "@engine/design/measuring";
-import { HELLO } from "@engine/hello";
+import { GROUND } from "@engine/ground";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -37,7 +37,7 @@ beforeAll(async () => {
 }, 180_000);
 afterAll(async () => { await browser?.close(); });
 
-const ROUTES = HELLO.screens.map((s) => s.route);
+const ROUTES = GROUND.screens.map((s) => s.route);
 
 const at = (route: string, viewport: { width: number; height: number }) =>
   geometryOf(browser, { code, route }, css, viewport);

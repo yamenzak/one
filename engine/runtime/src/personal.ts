@@ -238,7 +238,7 @@ export interface IdentityDeps {
      * ⚠️ WHETHER IT NEEDS SOMEBODY, AND IT REPLACED A WALK THAT COULD NOT ANSWER.
      * This was `needsAttention(directory, tenantId, appId)`, called once per
      * PRODUCT — and the plan moved to the workspace, where the row is filed
-     * under no app. So `subscriptionFor(db, id, "hello")` matched nothing on
+     * under no app. So `subscriptionFor(db, id, appId)` matched nothing on
      * every deployment, the answer was always `false`, and the "Needs attention"
      * chip could not appear for a workspace whose card had been declined.
      *

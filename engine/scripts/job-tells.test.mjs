@@ -21,6 +21,7 @@
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { appDirs, appManifests, appTrees } from "./lib/trees.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ENGINE = join(HERE, "..");
@@ -48,12 +49,7 @@ const jobsIn = (code) => {
   return at.map((from, i) => code.slice(from, at[i + 1] ?? code.length));
 };
 
-const apps = existsSync(join(ENGINE, "apps"))
-  ? readdirSync(join(ENGINE, "apps"), { withFileTypes: true })
-    .filter((d) => d.isDirectory())
-    .map((d) => [d.name, join(ENGINE, "apps", d.name, "src", "index.ts")])
-    .filter(([, path]) => existsSync(path))
-  : [];
+const apps = appManifests();
 
 let raising = 0;
 for (const [app, path] of apps) {

@@ -119,8 +119,8 @@ Three files, asking two different questions.
 
 | | Asks | Fails when |
 |---|---|---|
-| `apps/hello/test/request-cost.test.ts` | how many round trips a request costs, and how many WAIT | a chain grows — depth 3 for a list read, 4 for `me.who` |
-| `apps/hello/test/boot-cost.test.ts` | what a cold isolate pays before the first byte | the schema is asked per module again |
+| `ground/test/request-cost.test.ts` | how many round trips a request costs, and how many WAIT | a chain grows — depth 3 for a list read, 4 for `me.who` |
+| `ground/test/boot-cost.test.ts` | what a cold isolate pays before the first byte | the schema is asked per module again |
 | `one/test/cold.test.ts` | which paths WAIT for that schema and which do not | the page or the probe starts waiting again, or an operation stops |
 | `design/vite.ts` (`entryUnder`) | what every visitor downloads before anything is drawn | the entry chunk passes its gzipped ceiling |
 | `scripts/runaway.test.mjs` | is anything UNBOUNDED | a poll, a retry with no ceiling, a paged walk with no ceiling, a cron finer than a quarter hour, a log per request, a query per row |

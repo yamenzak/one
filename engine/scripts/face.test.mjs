@@ -22,6 +22,7 @@
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { appDirs, appManifests, appTrees } from "./lib/trees.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ENGINE = join(HERE, "..");
@@ -49,9 +50,7 @@ const filesIn = (dir) => {
 const FILES = [
   ...filesIn("design/src"),
   ...filesIn("one-space/src"),
-  ...readdirSync(join(ENGINE, "apps"), { withFileTypes: true })
-    .filter((e) => e.isDirectory())
-    .flatMap((e) => filesIn(join("apps", e.name, "src"))),
+  ...appDirs().flatMap((d) => filesIn(d)),
 ];
 
 /**
@@ -249,12 +248,11 @@ const code = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "");
     }
   };
   /* ⚠️ EVERY APP, DERIVED — never a list beside this one. This walk named
-     `apps/hello/src` by hand, so the second product's whole primary nav was
+     `ground/src` by hand, so the second product's whole primary nav was
      invisible to it: four screens, a settings area and two milestones all
      naming marks the map does not have, on a guard whose own comment says this
      has happened twice. A narrow check is the one that gets waived. */
-  const roots = readdirSync(join(ENGINE, "apps")).map((name) => `apps/${name}/src`);
-  for (const root of [...roots, "one-space/src", "design/src"]) {
+  for (const root of [...appDirs(), "one-space/src", "design/src"]) {
     const at = join(ENGINE, root);
     if (existsSync(at)) walk(at);
   }

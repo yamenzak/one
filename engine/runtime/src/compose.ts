@@ -393,7 +393,7 @@ const verbSummary = (spec: CollectionSpec, verb: CrudVerb): string => {
 /**
  * ⚠️ KEYED BY THE MANIFEST ITSELF, NOT BY ITS ID. Both are memos of the same
  * work; only one of them can be wrong. An id key answers "some declaration that
- * called itself `hello`", which is the right answer for as long as there is
+ * called itself `notes`", which is the right answer for as long as there is
  * exactly one — and a silently wrong surface the moment there are two. A key
  * that IS the declaration cannot mistake one for another, so nothing has to
  * invalidate it and no suite has to remember to.

@@ -108,7 +108,7 @@ async function everything(
 
       ⚠️ AND THE ORDER OF THE CODE STOPS SAYING WHICH. `await` reads the same
       whether a call needed the one before it or merely followed it, which is
-      why `apps/hello/test/request-cost.test.ts` measures the DEPTH rather than
+      why `ground/test/request-cost.test.ts` measures the DEPTH rather than
       trusting a reading of this file.
     */
     const [apps, charging, wallet] = await Promise.all([

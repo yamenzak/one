@@ -895,7 +895,7 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
            answered a map keyed by app id, so the console had nothing to head a
            section with but the id — rendered through `sentence()`, which
            capitalises a key and calls it a name. A product's name and its mark
-           are declared; manufacturing one of them at the screen is how "hello"
+           are declared; manufacturing one of them at the screen is how an id
            came to be a heading. */
         const apps = every()
           .filter((a) => a.flags && Object.keys(a.flags).length)

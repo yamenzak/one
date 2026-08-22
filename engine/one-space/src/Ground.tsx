@@ -5,7 +5,7 @@
  * behind an `import.meta.env.DEV` check, which reads as dev-only and is not: the
  * IMPORT is static, so the reference app's whole manifest and every one of its
  * screens shipped in the production bundle. Measured — a marker string from
- * hello's own settings was in the built `index-*.js`. D17 says a page never
+ * the ground's own settings was in the built `index-*.js`. D17 says a page never
  * imports `@engine/<app>`, and the reason is exactly this: a bundle that grows
  * with the catalogue, holding a second copy of what the deployment already
  * knows. A dynamic import puts it in a chunk nothing in production ever asks
@@ -24,8 +24,8 @@
  */
 
 import { Shell, whoFace } from "@engine/design";
-import { HELLO } from "@engine/hello";
-import { HelloScreen } from "@engine/hello/screens";
+import { GROUND } from "@engine/ground";
+import { GroundScreen } from "@engine/ground/screens";
 
 export function Ground({ route }: { readonly route: string }) {
   const go = (next: string) => {
@@ -36,7 +36,7 @@ export function Ground({ route }: { readonly route: string }) {
 
   return (
     <Shell
-      screens={HELLO.screens}
+      screens={GROUND.screens}
       here={route}
       /* ⚠️ Everything, because the ground is for looking at every screen — what
          a permission HIDES is `reachable`'s job and it has its own test. A
@@ -51,9 +51,9 @@ export function Ground({ route }: { readonly route: string }) {
          every screen. */
       kind="commercial"
       crown={{
-        appId: HELLO.id,
-        appName: HELLO.name,
-        appMark: HELLO.mark,
+        appId: GROUND.id,
+        appName: GROUND.name,
+        appMark: GROUND.mark,
         tenantName: "The test ground",
         unread: 2,
         personEmail: "somebody@example.com",
@@ -61,10 +61,10 @@ export function Ground({ route }: { readonly route: string }) {
       }}
       onGo={go}
     >
-      <HelloScreen route={route} onGo={go} />
+      <GroundScreen route={route} onGo={go} />
     </Shell>
   );
 }
 
 /** ⚠️ The app's own routes, for the address bar — same module, same chunk. */
-export const GROUND_ROUTES: readonly string[] = (HELLO.screens ?? []).map((s) => s.route);
+export const GROUND_ROUTES: readonly string[] = (GROUND.screens ?? []).map((s) => s.route);

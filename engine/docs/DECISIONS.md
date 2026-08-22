@@ -1040,7 +1040,7 @@ screen — the same rule every polling surface here already follows.
 
 ⚠️ **The count is the thing no behavioural test can see.** Each of those reads is
 correct, covered, and cheap in isolation; what was wrong was how many there were.
-`apps/hello/test/boot-cost.test.ts` measures it, because the alternative is
+`ground/test/boot-cost.test.ts` measures it, because the alternative is
 noticing in production, which is what happened.
 
 ---
@@ -1149,7 +1149,7 @@ nothing it had not spent.
 ⚠️ **And the helper for a hand-written lookup lives with the tests, not in the
 runtime.** `asLocating` adapts a one-answer wiring, one wait slower; nothing
 shipped uses it, and `capability.test.mjs` was right to call it out as an export
-with no caller. It is `apps/hello/test/wiring.ts`.
+with no caller. It is `ground/test/wiring.ts`.
 
 ## D40 — The weight of the first screen is a number somebody has to raise
 
@@ -1569,3 +1569,39 @@ on shelves. `compose` refuses a shadowing id now rather than resolving it.
 catalogue written beside a wizard instead of read from the manifests; a workspace
 founded with nothing in it, or emptied down to nothing; a toggle that erases; or
 a platform operation that wins a name collision quietly.
+
+## D52 — The proving ground is a fixture, and the deployment serves no fixture
+
+**It was a product because of where it lived.** The smallest complete app on the
+engine — one notebook, sample content, every cross-cutting concern declared so
+the framework's claims are asserted against something real — sat in `engine/apps`
+beside the products. So it was in the deployment's `APPS`, in its `SELLS`, and in
+the browser's product loader, and a person who came for one product founded a
+workspace holding a demo they never asked for, with somebody else's notes in it.
+Only an operator could take it away. Nobody decided any of that.
+
+**The rule is a path, not an exemption.** `engine/apps/*` is the product
+catalogue and everything in it is served; `engine/ground` is not among them. So
+the question a guard asks is "does anything the deployment serves come from
+outside the catalogue" rather than "is this one app special" — the second is an
+excuse list, and an excuse list is what a rename quietly empties.
+
+**A fixture with a live browser half is a product nobody sold.** Its `live`
+entry — the module that drew its screens over a workspace's OWN records rather
+than over the sample world — is deleted, and `package.json` exports no `./live`
+for a loader to reach. The dev-only ground PAGE stays: it is behind
+`import.meta.env.DEV`, folded out of the production bundle, and that is what
+`bundle.test.mjs` already holds.
+
+**A fixture is still asked every question a product is.** It declares the widest
+manifest in the repository and draws most of the design system, so it is the
+corpus these checks are most worth running against. Being outside the catalogue
+is about what a CUSTOMER can reach, never about what a GUARD may read — and
+twenty guards enumerated `engine/apps/*` by hand, so the move narrowed all of
+them at once, silently, each going on printing `ok` over a corpus one app
+smaller. `lib/trees.mjs` is the one walk they read now.
+
+**Therefore never:** a fixture inside the product catalogue; a manifest the
+deployment composes that nobody decided to sell; a sample world reachable over a
+customer's own records; or a guard that names a tree by hand when a move can take
+it out of the corpus without taking it out of the check.

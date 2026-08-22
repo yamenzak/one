@@ -15,7 +15,7 @@
  *
  * ⚠️ THE RULE FOR ADDING TO THIS FILE: a check belongs here if the failure it
  * catches is UNBOUNDED. Something that costs twice as much is a performance
- * question and lives in `apps/hello/test/request-cost.test.ts`; something that
+ * question and lives in `ground/test/request-cost.test.ts`; something that
  * costs until it is stopped lives here.
  */
 
@@ -46,7 +46,7 @@ function sources(dir, out = []) {
 
 const ALL = [
   ...sources("kernel/src"), ...sources("runtime/src"), ...sources("design/src"),
-  ...sources("one/src"), ...sources("one-space/src"), ...sources("apps/hello/src"),
+  ...sources("one/src"), ...sources("one-space/src"), ...sources("ground/src"),
 ];
 
 /* ------------------------------------------------------------------ polls --- */

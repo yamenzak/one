@@ -24,7 +24,7 @@ import {
 const shard = () => env.SHARD_EU_1 as unknown as Db;
 const TENANT = "ten_find";
 const NOW = new Date("2026-08-19T09:00:00.000Z");
-const APP = "hello";
+const APP = "beacon";
 
 const note: CollectionSpec = collection({
   id: "findable",
@@ -326,8 +326,8 @@ describe("how things are named", () => {
     holding both — so a staging query would return production records.
   */
   it("puts the deployment in the instance name", () => {
-    expect(instanceFor("one", "hello")).toBe("one-hello");
-    expect(instanceFor("staging", "hello")).not.toBe(instanceFor("one", "hello"));
+    expect(instanceFor("one", "beacon")).toBe("one-beacon");
+    expect(instanceFor("staging", "beacon")).not.toBe(instanceFor("one", "beacon"));
   });
 
   /** ⚠️ The trailing slash is load-bearing: `a/b` would also match `a/bc`. */

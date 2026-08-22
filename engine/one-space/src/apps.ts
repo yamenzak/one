@@ -17,11 +17,11 @@
  * arrow points `apps → design → runtime → kernel`, so a product reaching back
  * into OneSpace would be the one direction the boundary guard exists to refuse.
  *
- * ⚠️ AND IT IS THE PRODUCT ENTRY, NEVER THE TEST GROUND. `@engine/hello/screens`
- * is the ground — every screen over a sample world, so any of them renders with
- * no session or database. `@engine/hello/live` is the same screens over the
- * workspace's own records, and loading the wrong one would ship a sample world
- * to a customer and draw somebody else's notes in their workspace.
+ * ⚠️ AND THE GROUND IS NOT HERE, WHICH IS THE WHOLE OF WHAT IT MEANS FOR IT NOT
+ * TO BE A PRODUCT. `@engine/ground` had an entry beside the real ones, over the
+ * workspace's own records — so a customer could switch on a notebook demo and
+ * find sample content in their own workspace. A fixture with a live browser half
+ * is not a fixture; it is a product nobody decided to sell.
  *
  * ⚠️ AND AN APP WITH NO ENTRY IS NOT A FAILURE. Its declared screens render an
  * honest notice (`AppSurface`), which is the state of every product before its
@@ -47,7 +47,6 @@ export interface Mounting {
  * product is a line here and a `mount` in that product's browser half.
  */
 const LOADERS: Readonly<Record<string, () => Promise<{ mount: (at: Mounting) => void }>>> = {
-  hello: () => import("@engine/hello/live"),
   inventory: () => import("@engine/inventory/live"),
 };
 

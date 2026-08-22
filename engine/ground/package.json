@@ -1,0 +1,36 @@
+{
+  "name": "@engine/ground",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The engine's proving ground: the smallest complete app, declaring every cross-cutting concern, so every claim the framework makes is asserted against something real. It is never sold, never mounted, and lives outside apps/ for that reason.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./screens": "./src/screens/index.tsx"
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "test": "vitest run && vitest run --config vitest.screens.config.ts",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit",
+    "clean": "rm -rf .turbo *.tsbuildinfo",
+    "seen": "vitest run --config vitest.seen.config.ts"
+  },
+  "dependencies": {
+    "@engine/design": "workspace:*",
+    "@engine/kernel": "workspace:*",
+    "@engine/runtime": "workspace:*",
+    "@heroui/react": "^3.0.5",
+    "react": "^19.2.0"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "0.8.55",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.0",
+    "playwright": "^1.56.1"
+  }
+}

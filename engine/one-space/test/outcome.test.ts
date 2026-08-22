@@ -39,7 +39,7 @@ const centre = {
   tenant: { name: "Northwind", slug: "northwind" },
   you: { accountId: "a1", email: null, platformRole: "owner", appRoles: {}, platform: [] },
   apps: [{
-    id: "hello",
+    id: "beacon",
     outcomes: {
       "note.publish": { message: "Published.", tone: "success", invalidates: ["note.list"] },
       "note.retract": { message: "Taken down.", tone: "warning" },

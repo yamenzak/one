@@ -27,7 +27,7 @@ const one = () => env.SHARD_EU_1 as unknown as Db;
 const two = () => env.SHARD_EU_2 as unknown as Db;
 
 const app = (): AppSpec => ({
-  id: "hello" as never, name: "Hello", mark: "H",
+  id: "beacon" as never, name: "Beacon", mark: "H",
   access: { roles: {}, permissions: {}, founding: "owner" } as never,
   entitlements: {}, collections: [], operations: [], screens: [],
 });
@@ -40,10 +40,10 @@ describe("moving a workspace's records", () => {
     for (const db of [one(), two()]) await applySchema(db, SHARD_MODULES);
     await addShard(directory(), "eu-1", "eu", 100);
     await addShard(directory(), "eu-2", "eu", 100);
-    for (const s of ["eu-1", "eu-2"]) await noteShardApp(directory(), s, "hello" as never);
+    for (const s of ["eu-1", "eu-2"]) await noteShardApp(directory(), s, "beacon" as never);
 
     const made = await createTenant(directory(), {
-      slug: "carry", name: "Carry", country: "DE", where: "eu", apps: ["hello" as never],
+      slug: "carry", name: "Carry", country: "DE", where: "eu", apps: ["beacon" as never],
     });
     if (typeof made === "string") throw new Error(made);
     id = made.tenant.id;
@@ -170,7 +170,7 @@ describe("moving a workspace's records", () => {
   */
   it("carries the jurisdiction only when the move was asked to", async () => {
     await addShard(directory(), "global-1", "global", 100);
-    await noteShardApp(directory(), "global-1", "hello" as never);
+    await noteShardApp(directory(), "global-1", "beacon" as never);
 
     await beginMove(directory(), id as never, "eu-2");
     await carryRows(one(), two(), id as never, [app()]);
@@ -180,7 +180,7 @@ describe("moving a workspace's records", () => {
 
   it("writes the new jurisdiction when the move was into one", async () => {
     await addShard(directory(), "global-1", "global", 100);
-    await noteShardApp(directory(), "global-1", "hello" as never);
+    await noteShardApp(directory(), "global-1", "beacon" as never);
 
     /* ⚠️ THE TARGET IS IN THE JURISDICTION BEING MOVED INTO, and a first draft of
        this test moved to an EU shard "into global" — refused, correctly. The
@@ -242,7 +242,7 @@ describe("moving a workspace's records", () => {
   */
   it("will not hand over a shard somebody else is on", async () => {
     const other = await createTenant(directory(), {
-      slug: "nearby", name: "Nearby", country: "DE", where: "eu", apps: ["hello" as never],
+      slug: "nearby", name: "Nearby", country: "DE", where: "eu", apps: ["beacon" as never],
     });
     if (typeof other === "string") throw new Error(other);
     /* ⚠️ `placeOn` spreads to the emptiest, so the second workspace lands on the

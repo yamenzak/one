@@ -24,6 +24,7 @@
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { appDirs, appManifests, appTrees } from "./lib/trees.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ENGINE = join(HERE, "..");
@@ -58,9 +59,7 @@ const filesIn = (dir) => {
 const FILES = [
   ...filesIn("design/src"),
   ...filesIn("one-space/src"),
-  ...readdirSync(join(ENGINE, "apps"), { withFileTypes: true })
-    .filter((e) => e.isDirectory())
-    .flatMap((e) => filesIn(`apps/${e.name}/src`)),
+  ...appDirs().flatMap((d) => filesIn(d)),
 ];
 
 /**
@@ -346,8 +345,7 @@ if (!assembled) ok(`composed: no screen assembles a control the package already 
  */
 const DRAWERS = /^(ui|components?|shared|common|widgets|primitives|design)\.(tsx?|ts)$/;
 let drawers = 0;
-for (const dir of ["one-space/src", ...readdirSync(join(ENGINE, "apps"), { withFileTypes: true })
-  .filter((e) => e.isDirectory()).map((e) => `apps/${e.name}/src`)]) {
+for (const dir of ["one-space/src", ...appDirs()]) {
   const at = join(ENGINE, dir);
   if (!existsSync(at)) continue;
   for (const e of readdirSync(at, { withFileTypes: true })) {

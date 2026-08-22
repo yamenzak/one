@@ -61,7 +61,7 @@ const GROUND = "one-space/src/Ground.tsx";
    a dynamic `import()`, which is what emits a chunk per product instead of
    folding all of them into the one everybody downloads. */
 const REGISTRY = "one-space/src/apps.ts";
-const APP_IMPORT = /^import[\s\S]*?from "@engine\/(hello|[a-z-]+)\/?[\w./]*";$/gm;
+const APP_IMPORT = /^import[\s\S]*?from "@engine\/([a-z-]+)\/?[\w./]*";$/gm;
 
 const importers = files("one-space/src").filter((f) => {
   const src = read(f);

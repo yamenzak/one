@@ -21,6 +21,7 @@ import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { refuseCopy } from "../kernel/src/tone.ts";
+import { appDirs, appTrees } from "./lib/trees.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ENGINE = join(HERE, "..");
@@ -48,9 +49,7 @@ const filesIn = (dir, re = /\.tsx?$/) => {
 const SOURCES = [
   ...filesIn("design/src"),
   ...filesIn("one-space/src"),
-  ...readdirSync(join(ENGINE, "apps"), { withFileTypes: true })
-    .filter((e) => e.isDirectory())
-    .flatMap((e) => filesIn(`apps/${e.name}/src`)),
+  ...appDirs().flatMap((d) => filesIn(d)),
 ];
 
 /**

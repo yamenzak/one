@@ -110,7 +110,7 @@ export function Shards() {
                       placing somebody on it. */}
                   {/* ⚠️ THE PLACE IS A PLACE, NOT THE KEY. `where` is `eu` | `global`
                       — values the placement branches on, and printed raw a shard
-                      read "eu · Hello". See `sayWhere` in the kernel. */}
+                      read "eu · Inventory". See `sayWhere` in the kernel. */}
                   <span className={TYPE.note}>
                     {s.dedicatedTo
                       ? `In ${sayWhere(s.where)} · kept for one workspace`

@@ -23,6 +23,7 @@
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { appDirs, appManifests, appTrees } from "./lib/trees.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ENGINE = join(HERE, "..");
@@ -35,12 +36,7 @@ const strip = (s) => s
   .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "))
   .replace(/^(\s*)\/\/.*$/gm, "$1");
 
-const apps = existsSync(join(ENGINE, "apps"))
-  ? readdirSync(join(ENGINE, "apps"), { withFileTypes: true })
-    .filter((d) => d.isDirectory())
-    .map((d) => [d.name, join(ENGINE, "apps", d.name, "src", "index.ts")])
-    .filter(([, path]) => existsSync(path))
-  : [];
+const apps = appManifests();
 
 /* ⚠️ Every statement that moves a verdict, whole — the `SET` clause and the
    `WHERE` that guards it, because the guard is half the rule. */

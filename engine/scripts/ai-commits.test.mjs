@@ -24,6 +24,7 @@
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { appDirs, appManifests, appTrees } from "./lib/trees.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ENGINE = join(HERE, "..");
@@ -52,12 +53,7 @@ const operationsIn = (code) => {
 
 const WRITE = /\b(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+([a-z_]+)/gi;
 
-const apps = existsSync(join(ENGINE, "apps"))
-  ? readdirSync(join(ENGINE, "apps"), { withFileTypes: true })
-    .filter((d) => d.isDirectory())
-    .map((d) => [d.name, join(ENGINE, "apps", d.name, "src", "index.ts")])
-    .filter(([, path]) => existsSync(path))
-  : [];
+const apps = appManifests();
 
 let actions = 0;
 for (const [app, path] of apps) {

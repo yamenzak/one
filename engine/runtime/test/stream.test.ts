@@ -33,7 +33,7 @@ const MODEL: ModelRow = {
 } as ModelRow;
 
 const ASK: Ask = {
-  tenantId: TENANT, appId: "hello" as AppId, action: "note.draft", lane: "text",
+  tenantId: TENANT, appId: "beacon" as AppId, action: "note.draft", lane: "text",
   system: "Write a note.", prompt: "about a thing", maxOutput: 800,
 };
 

@@ -22,6 +22,7 @@
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { appDirs, appManifests, appTrees } from "./lib/trees.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ENGINE = join(HERE, "..");
@@ -49,9 +50,7 @@ const filesIn = (dir, re) => {
 const SOURCES = [
   ...filesIn("design/src", /\.(tsx?|css)$/),
   ...filesIn("one-space/src", /\.(tsx?|css)$/),
-  ...readdirSync(join(ENGINE, "apps"), { withFileTypes: true })
-    .filter((e) => e.isDirectory())
-    .flatMap((e) => filesIn(`apps/${e.name}/src`, /\.(tsx?|css)$/)),
+  ...appDirs().flatMap((d) => filesIn(d, /\.(tsx?|css)$/)),
 ];
 
 /** ⚠️ Comments describe the rules; matching them reports each rule as its own breach. */

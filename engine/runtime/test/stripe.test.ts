@@ -138,7 +138,7 @@ describe("an event", () => {
   it("ignores whatever product an event claims to be about", async () => {
     const { did, ladder } = spy();
     const out = await applyEvent(db(), event("evt_app", "invoice.paid", {
-      metadata: { tenant: TENANT, app: "hello", plan: "team" },
+      metadata: { tenant: TENANT, app: "beacon", plan: "team" },
     }), ladder, NOW);
 
     expect(out).toMatchObject({ did: "applied", appId: MEMBERSHIP });

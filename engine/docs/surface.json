@@ -1,5 +1,5 @@
 {
-  "from": "apps/hello/test/surface.screens.test.tsx",
+  "from": "ground/test/surface.screens.test.tsx",
   "doors": [
     {
       "label": "(the root)",

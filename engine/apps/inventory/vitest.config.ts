@@ -7,7 +7,7 @@ import { defineConfig } from "vitest/config";
  * its inputs, so a suite that booted Miniflare to ask them would be paying for a
  * runtime it never touches.
  *
- * ⚠️ THE HANDLERS ARE PROVED AGAINST A REAL DATABASE ELSEWHERE — `apps/hello` is
+ * ⚠️ THE HANDLERS ARE PROVED AGAINST A REAL DATABASE ELSEWHERE — `engine/ground` is
  * where the deployment's own integration suite lives, because that is where a
  * shard, a directory and a session already exist.
  */

@@ -17,7 +17,7 @@ import type { AppId, Instant, TenantId } from "../src/primitives.js";
 const AT = "2026-08-14T00:00:00.000Z" as Instant;
 
 const shard = (over: Partial<Shard> = {}): Shard => ({
-  id: "eu-1", where: "eu", apps: ["hello"], tenants: 10, ceiling: 100, ...over,
+  id: "eu-1", where: "eu", apps: ["beacon"], tenants: 10, ceiling: 100, ...over,
 });
 
 const on = (appId: AppId, over: Partial<Enablement> = {}): Enablement => ({
@@ -28,7 +28,7 @@ const on = (appId: AppId, over: Partial<Enablement> = {}): Enablement => ({
 
 describe("where a tenant's records may go", () => {
   it("accepts a shard that has the residency and the schemas", () => {
-    expect(refusePlacement(shard(), { where: "eu", apps: ["hello"] })).toBe(null);
+    expect(refusePlacement(shard(), { where: "eu", apps: ["beacon"] })).toBe(null);
   });
 
   /*
@@ -38,7 +38,7 @@ describe("where a tenant's records may go", () => {
     table", after a move that reported success.
   */
   it("refuses a shard whose schema does not cover the tenant's apps", () => {
-    expect(refusePlacement(shard(), { where: "eu", apps: ["hello", "atlas"] })).toBe("schema_missing");
+    expect(refusePlacement(shard(), { where: "eu", apps: ["beacon", "atlas"] })).toBe("schema_missing");
   });
 
   /*
@@ -47,7 +47,7 @@ describe("where a tenant's records may go", () => {
     capacity and broke it would be a compliance failure reported as a success.
   */
   it("refuses a shard in the wrong place, whatever else is true of it", () => {
-    expect(refusePlacement(shard({ where: "global", tenants: 0 }), { where: "eu", apps: ["hello"] }))
+    expect(refusePlacement(shard({ where: "global", tenants: 0 }), { where: "eu", apps: ["beacon"] }))
       .toBe("wrong_residency");
   });
 
@@ -57,8 +57,8 @@ describe("where a tenant's records may go", () => {
     whatever hour it happened to be crossed.
   */
   it("stops accepting at the ceiling, and says nothing about who is already there", () => {
-    expect(refusePlacement(shard({ tenants: 100 }), { where: "eu", apps: ["hello"] })).toBe("full");
-    expect(refusePlacement(shard({ tenants: 99 }), { where: "eu", apps: ["hello"] })).toBe(null);
+    expect(refusePlacement(shard({ tenants: 100 }), { where: "eu", apps: ["beacon"] })).toBe("full");
+    expect(refusePlacement(shard({ tenants: 99 }), { where: "eu", apps: ["beacon"] })).toBe(null);
   });
 });
 
@@ -70,15 +70,15 @@ describe("choosing between the shards there are", () => {
   */
   it("spreads rather than packs", () => {
     const chosen = placeOn([shard({ id: "eu-1", tenants: 80 }), shard({ id: "eu-2", tenants: 3 })],
-      { where: "eu", apps: ["hello"] });
+      { where: "eu", apps: ["beacon"] });
     expect(chosen?.id).toBe("eu-2");
   });
 
   /* ⚠️ Null rather than a bad placement: nowhere to put somebody is an operator's
      problem to solve, and answering with an ineligible shard hides it. */
   it("answers with nothing rather than somewhere wrong", () => {
-    expect(placeOn([shard({ where: "global" })], { where: "eu", apps: ["hello"] })).toBe(null);
-    expect(placeOn([], { where: "eu", apps: ["hello"] })).toBe(null);
+    expect(placeOn([shard({ where: "global" })], { where: "eu", apps: ["beacon"] })).toBe(null);
+    expect(placeOn([], { where: "eu", apps: ["beacon"] })).toBe(null);
   });
 });
 
@@ -168,23 +168,23 @@ describe("a shard somebody paid to have to themselves", () => {
 
   it("takes nobody but the workspace it belongs to", () => {
     const alone = shard({ dedicatedTo: mine });
-    expect(refusePlacement(alone, { where: "eu", apps: ["hello"], tenantId: theirs }))
+    expect(refusePlacement(alone, { where: "eu", apps: ["beacon"], tenantId: theirs }))
       .toBe("someone_elses");
-    expect(refusePlacement(alone, { where: "eu", apps: ["hello"], tenantId: mine })).toBe(null);
+    expect(refusePlacement(alone, { where: "eu", apps: ["beacon"], tenantId: mine })).toBe(null);
     /* ⚠️ And a placement checked in the abstract carries no tenant, so it is a
        stranger too — the safe reading of "we do not know who this is". */
-    expect(refusePlacement(alone, { where: "eu", apps: ["hello"] })).toBe("someone_elses");
+    expect(refusePlacement(alone, { where: "eu", apps: ["beacon"] })).toBe("someone_elses");
   });
 
   it("refuses a shared shard to a workspace that asked to be alone", () => {
-    expect(refusePlacement(shard(), { where: "eu", apps: ["hello"], tenantId: mine, alone: true }))
+    expect(refusePlacement(shard(), { where: "eu", apps: ["beacon"], tenantId: mine, alone: true }))
       .toBe("shared");
   });
 
   it("is never chosen for anybody else, however empty it is", () => {
     const chosen = placeOn(
       [shard({ id: "dedicated", tenants: 0, dedicatedTo: theirs }), shard({ id: "shared", tenants: 40 })],
-      { where: "eu", apps: ["hello"], tenantId: mine });
+      { where: "eu", apps: ["beacon"], tenantId: mine });
     /* ⚠️ The emptiest eligible shard — and the empty one is not eligible. */
     expect(chosen?.id).toBe("shared");
   });
@@ -201,7 +201,7 @@ describe("a shard somebody paid to have to themselves", () => {
 */
 describe("wanting the next shard before the last one fills", () => {
   const at = (over: Partial<Shard>): Shard => ({
-    id: "eu-1", where: "eu", apps: ["hello" as never], tenants: 0, ceiling: 100, ...over,
+    id: "eu-1", where: "eu", apps: ["beacon" as never], tenants: 0, ceiling: 100, ...over,
   });
 
   it("wants nothing while there is room", () => {

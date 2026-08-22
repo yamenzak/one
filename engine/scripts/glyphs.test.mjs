@@ -22,6 +22,7 @@
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { appDirs, appManifests, appTrees } from "./lib/trees.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ENGINE = join(HERE, "..");
@@ -238,7 +239,7 @@ if (!stolen) ok(`no screen draws a registered mark itself (${looked} files, ${KN
     "one-space/src/console/Ai.tsx",
     "one-space/src/console/Actions.tsx",
     /* A note about what a DRAFT cost — the credits a model spent. */
-    "apps/hello/src/screens/Note.tsx",
+    "ground/src/screens/Note.tsx",
     /*
       ⚠️ ONEINVENTORY'S THREE, AND ALL THREE MEAN EXACTLY WHAT THE MARK MEANS.
       `Ask` is a screen whose entire content a model wrote, so its nav entry
@@ -276,9 +277,7 @@ if (!stolen) ok(`no screen draws a registered mark itself (${looked} files, ${KN
 /* --------------------------------------------------------------- distinct --- */
 
 /** Every app's manifest, which is where a screen declares its mark. */
-const apps = readdirSync(join(ENGINE, "apps"), { withFileTypes: true })
-  .filter((d) => d.isDirectory())
-  .map((d) => [d.name, join(ENGINE, "apps", d.name, "src", "index.ts")]);
+const apps = appManifests();
 
 /**
  * ⚠️ NO TWO NAV-VISIBLE SCREENS OF ONE APP WEAR THE SAME MARK. The bar's whole

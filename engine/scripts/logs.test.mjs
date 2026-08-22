@@ -40,7 +40,7 @@ const EXEMPT = /logs-exempt:\s*\S/;
 
 /* ⚠️ Only the runtime and the deployment. The design system logs nothing about
    anybody, and the guard scripts run on a developer's machine. */
-const ROOTS = ["engine/runtime/src", "engine/one/src", "engine/apps/hello/src"];
+const ROOTS = ["engine/runtime/src", "engine/one/src", "engine/ground/src"];
 
 let checked = 0;
 let exempted = 0;

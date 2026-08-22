@@ -263,7 +263,7 @@ describe("the notification policy screen", () => {
   is a LIST that descends, the workspace's is a toggle beside a row leading to its
   own people. The kill switch's absorbing `off` is now `flag.list` answering with
   nothing at all rather than a row explaining why it is dead, asserted and
-  mutation-tested in `apps/hello/test/operator.test.ts`; the overdue wording is
+  mutation-tested in `ground/test/operator.test.ts`; the overdue wording is
   the switch list's second line, in `one-space/test/where.test.ts`.
 */
 
@@ -419,7 +419,7 @@ describe("a stored value, in words", () => {
 });
 
 describe("the shell", () => {
-  const crown = { appId: "hello", appName: "Hello", appMark: "◇", tenantName: "Northwind" };
+  const crown = { appId: "beacon", appName: "Beacon", appMark: "◇", tenantName: "Northwind" };
 
   /*
     ⚠️ A DESTINATION SOMEBODY CANNOT REACH IS NOT DRAWN. A nav item leading to a
@@ -1097,24 +1097,24 @@ describe("the screen shapes", () => {
   it("skips the list where there is only one to choose between", () => {
     const one = html(
       <Whichever
-        items={[{ id: "hello", name: "Hello" }]}
+        items={[{ id: "beacon", name: "Beacon" }]}
         id={(a) => a.id} name={(a) => a.name}
         onChoose={() => {}} nothing={{ says: "None" }}
         then={(a) => <p>inside {a.name}</p>}
       />,
     );
-    expect(one).toContain("inside Hello");
+    expect(one).toContain("inside Beacon");
 
     const several = html(
       <Whichever
-        items={[{ id: "hello", name: "Hello" }, { id: "atlas", name: "Atlas" }]}
+        items={[{ id: "beacon", name: "Beacon" }, { id: "atlas", name: "Atlas" }]}
         id={(a) => a.id} name={(a) => a.name}
         onChoose={() => {}} nothing={{ says: "None" }}
         then={(a) => <p>inside {a.name}</p>}
       />,
     );
     expect(several).not.toContain("inside");
-    expect(several).toContain("Hello");
+    expect(several).toContain("Beacon");
     expect(several).toContain("Atlas");
   });
 });

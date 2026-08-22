@@ -263,7 +263,7 @@
       "stage": "5",
       "status": "live",
       "fails": "a switch somebody turns on that does nothing, so they stop watching the thing it promised",
-      "impl": "apps/hello/test/reference.screens.test.tsx",
+      "impl": "ground/test/reference.screens.test.tsx",
       "proves": "the screens show nothing the manifest does not declare"
     },
     {
@@ -424,7 +424,7 @@
       "protects": "D12",
       "stage": "54",
       "status": "live",
-      "impl": "apps/hello/test/surface.screens.test.tsx",
+      "impl": "ground/test/surface.screens.test.tsx",
       "proves": "makes a queued collection's writes recognisable on a replay",
       "fails": "a shelf counted once in a basement is counted twice when the signal comes back, with nothing anywhere failing"
     },
@@ -460,7 +460,7 @@
       "protects": "D17",
       "stage": "54",
       "status": "live",
-      "impl": "apps/hello/test/centre-ops.test.ts",
+      "impl": "ground/test/centre-ops.test.ts",
       "proves": "carries what a phone may hold and what a write says",
       "fails": "the page holds no manifest, so a payload that stops carrying these leaves every write silent and every phone unable to hold one, with the browser's own suite still green"
     },
@@ -577,7 +577,7 @@
       "protects": "D12",
       "stage": "3",
       "status": "live",
-      "impl": "apps/hello/test/serve.test.ts",
+      "impl": "ground/test/serve.test.ts",
       "proves": "without the handler running",
       "fails": "a handler that runs for somebody who was never allowed to call it, because one call site forgot the check"
     },
@@ -586,7 +586,7 @@
       "protects": "D12",
       "stage": "3",
       "status": "live",
-      "impl": "apps/hello/test/serve.test.ts",
+      "impl": "ground/test/serve.test.ts",
       "proves": "answers a replay with the first answer",
       "fails": "a phone that retried in a basement getting a second charge, a second notification and two of what it made once"
     },
@@ -595,7 +595,7 @@
       "protects": "D12",
       "stage": "3",
       "status": "live",
-      "impl": "apps/hello/test/serve.test.ts",
+      "impl": "ground/test/serve.test.ts",
       "proves": "records an attempt that was refused",
       "fails": "an incident review asking who tried and finding silence, because only the successes were recorded"
     },
@@ -604,7 +604,7 @@
       "protects": "D12",
       "stage": "4",
       "status": "live",
-      "impl": "apps/hello/test/identity.test.ts",
+      "impl": "ground/test/identity.test.ts",
       "proves": "role beyond the inviter",
       "fails": "a two-step escalation: invite a second address of your own as an owner, then sign in as it"
     },
@@ -613,7 +613,7 @@
       "protects": "D12",
       "stage": "4",
       "status": "live",
-      "impl": "apps/hello/test/identity.test.ts",
+      "impl": "ground/test/identity.test.ts",
       "proves": "they claim it by signing in as it",
       "fails": "anybody holding an account id adding themselves to a workspace they were never invited to"
     },
@@ -622,7 +622,7 @@
       "protects": "D12",
       "stage": "4",
       "status": "live",
-      "impl": "apps/hello/test/identity.test.ts",
+      "impl": "ground/test/identity.test.ts",
       "proves": "resolved from the roster on every request",
       "fails": "a role taken away that keeps working until the person signs out, which is exactly when it matters that it does not"
     },
@@ -631,7 +631,7 @@
       "protects": "D1",
       "stage": "4",
       "status": "live",
-      "impl": "apps/hello/test/identity.test.ts",
+      "impl": "ground/test/identity.test.ts",
       "proves": "cannot be started from inside somebody else's workspace",
       "fails": "somebody who followed a colleague's link being invited to start a second workspace on that workspace's own branded page"
     },
@@ -640,7 +640,7 @@
       "protects": "D12",
       "stage": "4",
       "status": "live",
-      "impl": "apps/hello/test/identity.test.ts",
+      "impl": "ground/test/identity.test.ts",
       "proves": "stops accepting guesses",
       "fails": "a six-digit password with unlimited attempts, and a sign-in endpoint anybody can use to mail somebody a hundred times"
     },
@@ -694,7 +694,7 @@
       "protects": "D1",
       "stage": "6",
       "status": "live",
-      "impl": "apps/hello/test/money.test.ts",
+      "impl": "ground/test/money.test.ts",
       "proves": "pays for one membership rather than one bill per product",
       "fails": "a customer of two products becoming two customers - two cards, two renewal dates, two companies as far as they can tell"
     },
@@ -703,7 +703,7 @@
       "protects": "D1",
       "stage": "6",
       "status": "live",
-      "impl": "apps/hello/test/money.test.ts",
+      "impl": "ground/test/money.test.ts",
       "proves": "resolves every product's keys from the one plan",
       "fails": "a workspace paying for two products being told it holds neither, because each app's keys were resolved against a catalogue that only knew the other's"
     },
@@ -802,7 +802,7 @@
       "protects": "D18",
       "stage": "6",
       "status": "live",
-      "impl": "apps/hello/test/operator.test.ts",
+      "impl": "ground/test/operator.test.ts",
       "proves": "gives credits that survive a renewal, and refuses a comp with no reason",
       "fails": "an apology for something we broke expiring on the first of the month, silently - and a balance that moved with nothing on the statement explaining it"
     },
@@ -811,7 +811,7 @@
       "protects": "D18",
       "stage": "6",
       "status": "live",
-      "impl": "apps/hello/test/operator.test.ts",
+      "impl": "ground/test/operator.test.ts",
       "proves": "shows what a workspace holds, and what it spent",
       "fails": "a console that can change a customer's balance and cannot read it, so every support conversation about credits starts by opening the database"
     },
@@ -982,7 +982,7 @@
       "protects": "D1",
       "stage": "6",
       "status": "live",
-      "impl": "apps/hello/test/money.test.ts",
+      "impl": "ground/test/money.test.ts",
       "proves": "sets the month's allowance rather than adding to it",
       "fails": "an allowance that compounds, so a quiet quarter buys three months of headroom and the busy month after it costs more than the customer ever paid"
     },
@@ -991,7 +991,7 @@
       "protects": "D1",
       "stage": "6",
       "status": "live",
-      "impl": "apps/hello/test/money.test.ts",
+      "impl": "ground/test/money.test.ts",
       "proves": "never touches credits somebody paid for",
       "fails": "a monthly confiscation of something bought with a card, on the day somebody is least likely to be looking at it"
     },
@@ -1000,7 +1000,7 @@
       "protects": "D1",
       "stage": "6",
       "status": "live",
-      "impl": "apps/hello/test/money.test.ts",
+      "impl": "ground/test/money.test.ts",
       "proves": "spends the allowance before what was bought",
       "fails": "a customer paying cash for something they had already been given, and then watching it lapse unused"
     },
@@ -1009,7 +1009,7 @@
       "protects": "D12",
       "stage": "6",
       "status": "live",
-      "impl": "apps/hello/test/money.test.ts",
+      "impl": "ground/test/money.test.ts",
       "proves": "leaves the balance alone when the workspace is suspended",
       "fails": "credits bought with a card disappearing the moment a card expires - the entitlement clamp is correct for a permission and theft for a balance"
     },
@@ -1018,7 +1018,7 @@
       "protects": "D12",
       "stage": "6",
       "status": "live",
-      "impl": "apps/hello/test/money.test.ts",
+      "impl": "ground/test/money.test.ts",
       "proves": "never charges more than was held",
       "fails": "every unit an estimate fails to anticipate charged to a customer instead of absorbed, or absorbed silently on every call"
     },
@@ -1027,7 +1027,7 @@
       "protects": "D12",
       "stage": "6",
       "status": "live",
-      "impl": "apps/hello/test/money.test.ts",
+      "impl": "ground/test/money.test.ts",
       "proves": "refuses a second hold that the balance cannot cover",
       "fails": "two concurrent calls both passing the same balance check, and a balance that went negative long after the calls that did it"
     },
@@ -1036,7 +1036,7 @@
       "protects": "D12",
       "stage": "6",
       "status": "live",
-      "impl": "apps/hello/test/money.test.ts",
+      "impl": "ground/test/money.test.ts",
       "proves": "stops writes after a week and still serves every read",
       "fails": "a business locked out of its own records over an unpaid invoice, which is holding their data hostage"
     },
@@ -1045,7 +1045,7 @@
       "protects": "D12",
       "stage": "6",
       "status": "live",
-      "impl": "apps/hello/test/money.test.ts",
+      "impl": "ground/test/money.test.ts",
       "proves": "never reads a signup in progress as arrears",
       "fails": "a brand-new workspace held read-only over an invoice that never existed, in its first minute"
     },
@@ -1054,7 +1054,7 @@
       "protects": "D12",
       "stage": "6",
       "status": "live",
-      "impl": "apps/hello/test/money.test.ts",
+      "impl": "ground/test/money.test.ts",
       "proves": "holds a workspace at what it was sold",
       "fails": "give this workspace ten seats becoming a one-way door whose only reverse discards what they were originally sold"
     },
@@ -1072,7 +1072,7 @@
       "protects": "D12",
       "stage": "7",
       "status": "live",
-      "impl": "apps/hello/test/services.test.ts",
+      "impl": "ground/test/services.test.ts",
       "proves": "gives the credits back when the provider fails",
       "fails": "a customer whose balance shrank for a call that returned nothing, with the hold never released"
     },
@@ -1081,7 +1081,7 @@
       "protects": "D12",
       "stage": "7",
       "status": "live",
-      "impl": "apps/hello/test/services.test.ts",
+      "impl": "ground/test/services.test.ts",
       "proves": "still files the row when every interruption is switched off",
       "fails": "somebody who muted email having no record at all of what happened while they were not looking"
     },
@@ -1090,7 +1090,7 @@
       "protects": "D12",
       "stage": "7",
       "status": "live",
-      "impl": "apps/hello/test/services.test.ts",
+      "impl": "ground/test/services.test.ts",
       "proves": "reaches everybody who holds the key",
       "fails": "a workspace that made its own role silently receiving nothing, with every dispatch reporting success against an empty audience"
     },
@@ -1099,7 +1099,7 @@
       "protects": "D11",
       "stage": "7",
       "status": "live",
-      "impl": "apps/hello/test/services.test.ts",
+      "impl": "ground/test/services.test.ts",
       "proves": "never shows one person another person's inbox",
       "fails": "a workspace filter without the account, which is everybody reading everybody else's notifications"
     },
@@ -1117,7 +1117,7 @@
       "protects": "D11",
       "stage": "8",
       "status": "live",
-      "impl": "apps/hello/test/vault.test.ts",
+      "impl": "ground/test/vault.test.ts",
       "proves": "destroys the key, and then nobody can read any of it",
       "fails": "telling somebody they were forgotten while a readable copy sits in a backup that already left the building"
     },
@@ -1126,7 +1126,7 @@
       "protects": "D11",
       "stage": "8",
       "status": "live",
-      "impl": "apps/hello/test/vault.test.ts",
+      "impl": "ground/test/vault.test.ts",
       "proves": "refuses a perfectly good grant once consent is withdrawn",
       "fails": "an operator-written grant standing in for the subject's own agreement, which is a lawful-basis failure wearing an access-control shape"
     },
@@ -1135,7 +1135,7 @@
       "protects": "D11",
       "stage": "8",
       "status": "live",
-      "impl": "apps/hello/test/vault.test.ts",
+      "impl": "ground/test/vault.test.ts",
       "proves": "records the reads and the refusals alike",
       "fails": "the question \"did anybody try to look at this\" answered with silence, which is the question actually asked after something goes wrong"
     },
@@ -1144,7 +1144,7 @@
       "protects": "D11",
       "stage": "8",
       "status": "live",
-      "impl": "apps/hello/test/vault.test.ts",
+      "impl": "ground/test/vault.test.ts",
       "proves": "refuses to reopen somebody who was erased",
       "fails": "a fresh salt after a shredding, making everything written afterwards a second collection nobody agreed to"
     },
@@ -1153,7 +1153,7 @@
       "protects": "D12",
       "stage": "9",
       "status": "live",
-      "impl": "apps/hello/test/serve.test.ts",
+      "impl": "ground/test/serve.test.ts",
       "proves": "derives every route from the declarations alone",
       "fails": "a product that has to write its own router, schema, gates and audit, which is a product that can leave one of them out"
     },
@@ -1162,7 +1162,7 @@
       "protects": "D11",
       "stage": "9",
       "status": "live",
-      "impl": "apps/hello/test/identity.test.ts",
+      "impl": "ground/test/identity.test.ts",
       "proves": "keeps one person's check-in out of another's list, without a handler saying so",
       "fails": "somebody's own records readable by anybody in the workspace, because a handler forgot a WHERE"
     },
@@ -1171,7 +1171,7 @@
       "protects": "D12",
       "stage": "9",
       "status": "live",
-      "impl": "apps/hello/test/identity.test.ts",
+      "impl": "ground/test/identity.test.ts",
       "proves": "counts an unanswered invitation against the seats — and customers never",
       "fails": "a workspace on the smallest plan unable to add the customers it exists to serve, refused for staff seats it was not asking for"
     },
@@ -1180,7 +1180,7 @@
       "protects": "D21",
       "stage": "20",
       "status": "live",
-      "impl": "apps/hello/test/workspace.test.ts",
+      "impl": "ground/test/workspace.test.ts",
       "proves": "cannot be undone",
       "fails": "a business quietly rolled back to personal — its brand gone one morning with no event that removed it, and its records due to move off a shard it was promised"
     },
@@ -1189,7 +1189,7 @@
       "protects": "D21",
       "stage": "20",
       "status": "live",
-      "impl": "apps/hello/test/workspace.test.ts",
+      "impl": "ground/test/workspace.test.ts",
       "proves": "cannot use a commercial-only operation, and is told what to do about it",
       "fails": "a customer sent to a price list where nothing they can buy would help, which is selling something that does not exist"
     },
@@ -1234,7 +1234,7 @@
       "protects": "D22",
       "stage": "20",
       "status": "live",
-      "impl": "apps/hello/test/workspace.test.ts",
+      "impl": "ground/test/workspace.test.ts",
       "proves": "cannot brand itself, and the refusal comes from the write rather than the screen",
       "fails": "somebody else's logo on an installable icon, written past a control that was only hidden"
     },
@@ -1252,7 +1252,7 @@
       "protects": "D5",
       "stage": "20",
       "status": "live",
-      "impl": "apps/hello/test/workspace.test.ts",
+      "impl": "ground/test/workspace.test.ts",
       "proves": "is refused on a shard that already holds somebody else",
       "fails": "a database of one's own sold over a shard full of strangers, with every workspace on it working perfectly and nothing downstream noticing"
     },
@@ -1405,7 +1405,7 @@
       "protects": "D5",
       "stage": "10",
       "status": "live",
-      "impl": "apps/hello/test/serve.test.ts",
+      "impl": "ground/test/serve.test.ts",
       "proves": "cannot reach a record that is not the caller's",
       "fails": "a guessed id from another workspace answering 200 as though the change landed"
     },
@@ -1875,7 +1875,7 @@
       "status": "live",
       "impl": "scripts/showcase.test.mjs",
       "proves": "ground:",
-      "fails": "apps/hello quietly ceasing to be where this package is tried, which would leave the excuse list as the only thing keeping the check green"
+      "fails": "engine/ground quietly ceasing to be where this package is tried, which would leave the excuse list as the only thing keeping the check green"
     },
     {
       "id": "a-changeable-fact-is-a-value-and-an-edit",
@@ -2089,7 +2089,7 @@
       "protects": "D11",
       "stage": "26",
       "status": "live",
-      "impl": "apps/hello/test/identity.test.ts",
+      "impl": "ground/test/identity.test.ts",
       "proves": "keeps a special category out of its own column and in the vault",
       "fails": "health data in plaintext beside the ordinary fields, outside consent, outside the record of who looked and outside erasure — with the manifest's refusal satisfied and every other test green"
     },
@@ -2332,7 +2332,7 @@
       "protects": "D12",
       "stage": "38",
       "status": "live",
-      "impl": "apps/hello/test/services.test.ts",
+      "impl": "ground/test/services.test.ts",
       "proves": "offers only what the deployment can actually deliver",
       "fails": "a switch offered for a channel the deployment cannot send on, so somebody waits for a notification nothing attempted"
     },
@@ -2341,7 +2341,7 @@
       "protects": "D12",
       "stage": "38",
       "status": "live",
-      "impl": "apps/hello/test/services.test.ts",
+      "impl": "ground/test/services.test.ts",
       "proves": "sends only what the notification type offers a channel for",
       "fails": "a phone lighting up for a type that declared inbox and email, and for a person who switched push off — the setting saved, read by nothing"
     },
@@ -2350,7 +2350,7 @@
       "protects": "D12",
       "stage": "39",
       "status": "live",
-      "impl": "apps/hello/test/surface.screens.test.tsx",
+      "impl": "ground/test/surface.screens.test.tsx",
       "proves": "no longer describes what the engine composes",
       "fails": "an index of what an app gets for free, typed by hand and wrong within a week — so the same capability is written twice by somebody who read that it did not exist"
     },
@@ -2359,7 +2359,7 @@
       "protects": "D1",
       "stage": "39",
       "status": "live",
-      "impl": "apps/hello/test/surface.screens.test.tsx",
+      "impl": "ground/test/surface.screens.test.tsx",
       "proves": "is no longer free",
       "fails": "an operation quietly leaving the set every app gets without asking, so the next product writes its own roster, its own inbox and its own two doors bounding an invitation"
     },
@@ -2395,7 +2395,7 @@
       "protects": "D12",
       "stage": "40",
       "status": "live",
-      "impl": "apps/hello/test/workspace.test.ts",
+      "impl": "ground/test/workspace.test.ts",
       "proves": "answers the declared fallback before anybody has chosen",
       "fails": "a switch that persists, is drawn back, and changes nothing — or a handler inventing its own default, so a screen and the code disagree about what a workspace switched on"
     },
@@ -2404,7 +2404,7 @@
       "protects": "D12",
       "stage": "31",
       "status": "live",
-      "impl": "apps/hello/test/identity.test.ts",
+      "impl": "ground/test/identity.test.ts",
       "proves": "ends every session, including the one that asked",
       "fails": "the laptop somebody lost staying signed in for thirty days, because a signed claim cannot be withdrawn before it expires — which is the whole reason a session is a row"
     },
@@ -2413,7 +2413,7 @@
       "protects": "D12",
       "stage": "31",
       "status": "live",
-      "impl": "apps/hello/test/identity.test.ts",
+      "impl": "ground/test/identity.test.ts",
       "proves": "re-opens the proof window without replacing the session",
       "fails": "an irreversible operation reachable for fifteen minutes after signing in and refused for ever after, with the refusal naming a confirmation no control could perform"
     },
@@ -2422,7 +2422,7 @@
       "protects": "D12",
       "stage": "31",
       "status": "live",
-      "impl": "apps/hello/test/identity.test.ts",
+      "impl": "ground/test/identity.test.ts",
       "proves": "the body names Mallory",
       "fails": "somebody holding a stolen cookie confirming themselves at an inbox they own, which is the entire thing the proof gate is against"
     },
@@ -2431,7 +2431,7 @@
       "protects": "D4",
       "stage": "32",
       "status": "live",
-      "impl": "apps/hello/test/surface.screens.test.tsx",
+      "impl": "ground/test/surface.screens.test.tsx",
       "proves": "composes two declarations under one id separately",
       "fails": "one product being served another's routes, permissions and quotas — a wrong ANSWER rather than an error, which is why an invalidation call somebody has to remember cannot be the fix"
     },
@@ -2710,7 +2710,7 @@
       "protects": "D12",
       "stage": "45",
       "status": "live",
-      "impl": "apps/hello/test/operator.test.ts",
+      "impl": "ground/test/operator.test.ts",
       "proves": "edits a plan, holds everybody on it, and puts it back",
       "fails": "the price list edited on one screen and read from the code everywhere else — the gate, the bill and the checkout resolving against a catalogue nobody can see, which is a screen promising what a route refuses"
     },
@@ -2937,7 +2937,7 @@
       "protects": "D7",
       "stage": "19",
       "status": "live",
-      "impl": "apps/hello/test/geometry.seen.test.tsx",
+      "impl": "ground/test/geometry.seen.test.tsx",
       "lane": "seen",
       "proves": "does not push the page sideways on ${name}",
       "fails": "a layout fault in the app every new screen is tried in first, which is then copied into a product before anything measures it"
@@ -2984,7 +2984,7 @@
       "protects": "D22",
       "stage": "41",
       "status": "live",
-      "impl": "apps/hello/test/workspace.test.ts",
+      "impl": "ground/test/workspace.test.ts",
       "proves": "leaves the tile ours where the workspace did not ask for it",
       "fails": "every switch on the branding screen saving and changing nothing — the tile painted from the entitlement alone, so a business that turned its icon off still installed as itself"
     },
@@ -2993,7 +2993,7 @@
       "protects": "D22",
       "stage": "41",
       "status": "live",
-      "impl": "apps/hello/test/workspace.test.ts",
+      "impl": "ground/test/workspace.test.ts",
       "proves": "leaves the screens ours where the workspace did not ask for them",
       "fails": "a theme applied to every screen of a workspace that asked for it on none — or, the way it actually was, applied to none of them at all"
     },
@@ -3077,6 +3077,60 @@
       "impl": "design/src/tokens/motion.ts",
       "proves": "earned",
       "fails": "a viewport-sized repaint on the main thread for as long as a screen is open, competing with the scroll, on a phone that never asked for it"
+    },
+    {
+      "id": "the-ground-is-outside-the-product-catalogue",
+      "protects": "D51",
+      "stage": "80",
+      "status": "live",
+      "impl": "scripts/fixture.test.mjs",
+      "proves": "ground:",
+      "fails": "a fixture living in engine/apps, where being a product is decided by position rather than by anybody"
+    },
+    {
+      "id": "the-deployment-serves-no-fixture",
+      "protects": "D51",
+      "stage": "80",
+      "status": "live",
+      "impl": "scripts/fixture.test.mjs",
+      "proves": "serves:",
+      "fails": "the test ground back in APPS, where an operator can put a demo notebook with sample content into somebody's workspace"
+    },
+    {
+      "id": "the-deployment-sells-no-fixture",
+      "protects": "D51",
+      "stage": "80",
+      "status": "live",
+      "impl": "scripts/fixture.test.mjs",
+      "proves": "sells:",
+      "fails": "the test ground back in SELLS, where anybody founding a workspace can switch it on"
+    },
+    {
+      "id": "the-worker-does-not-import-the-ground",
+      "protects": "D51",
+      "stage": "80",
+      "status": "live",
+      "impl": "scripts/fixture.test.mjs",
+      "proves": "worker:",
+      "fails": "a list that does not name the fixture over a worker that still composes it"
+    },
+    {
+      "id": "the-product-loader-does-not-name-the-ground",
+      "protects": "D17",
+      "stage": "80",
+      "status": "live",
+      "impl": "scripts/fixture.test.mjs",
+      "proves": "browser:",
+      "fails": "a customer opening the fixture's screens over their own records"
+    },
+    {
+      "id": "the-ground-has-no-live-entry-point",
+      "protects": "D17",
+      "stage": "80",
+      "status": "live",
+      "impl": "scripts/fixture.test.mjs",
+      "proves": "ground: no live",
+      "fails": "the half that turns sample screens into a product's real ones coming back, which is what makes the loader entry easy to add again"
     }
   ]
 }

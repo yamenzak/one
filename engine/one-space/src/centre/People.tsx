@@ -107,7 +107,7 @@ export function People({ view }: { readonly view: CentreView }) {
                  a picture of nobody. */
               face: m.accountId ? whoFace(m.accountId) : undefined,
               /* ⚠️ A ROLE IS NAMED, NOT KEYED. These are the strings the roster
-                 stores, and printed raw the row read "staff · Hello: writer" —
+                 stores, and printed raw the row read "staff · Inventory: keeper" —
                  on a screen where the name beside them is capitalised. */
               under: [
                 sentence(m.platformRole),

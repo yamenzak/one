@@ -53,7 +53,7 @@ beforeAll(async () => {
   business = `biz${Date.now().toString(36)}`;
   for (const slug of [personal, business]) {
     const made = await createTenant(directory(), {
-      slug, name: slug, country: "DE", where: "eu", apps: ["hello"],
+      slug, name: slug, country: "DE", where: "eu", apps: ["inventory"],
     });
     if (typeof made === "string") throw new Error(`${slug}: ${made}`);
   }

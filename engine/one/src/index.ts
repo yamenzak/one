@@ -48,7 +48,6 @@ import {
   mockProvider,
   type Searcher,
 } from "@engine/runtime";
-import { hello } from "@engine/hello";
 import { inventory } from "@engine/inventory";
 
 /* ------------------------------------------------------------------ what --- */
@@ -73,7 +72,6 @@ const APPS: Readonly<Record<string, () => AppSpec>> = {
      them; declared per app it is one chance per product to forget, and the
      recipient nobody disclosed is the disclosure failure that gets found from
      outside. See `under`. */
-  hello: once(() => under(LEGAL, hello())),
   inventory: once(() => under(LEGAL, inventory())),
 };
 
@@ -81,17 +79,16 @@ const APPS: Readonly<Record<string, () => AppSpec>> = {
  * WHICH OF THEM ANYBODY MAY SWITCH ON FOR THEMSELVES.
  *
  * ⚠️ THIS WAS ONE ID, HARDCODED, AND IT DECIDED EVERY WORKSPACE EVER MADE.
- * Founding took `deps.appId` — the string `"hello"` — so a person who came for
- * one product founded a workspace holding a different one, and the only way to
- * change it afterwards was to ask an operator to do it in the console. The
- * catalogue was two products and the door offered one.
+ * Founding took `deps.appId` — one app's id — so a person who came for one
+ * product founded a workspace holding a different one, and the only way to
+ * change it afterwards was to ask an operator to do it in the console.
  *
  * ⚠️ IT IS A LIST OF ITS OWN RATHER THAN `Object.keys(APPS)`, because "served"
  * and "offered" are different questions. A product mid-build stays mounted and
  * answering for the workspaces an operator put it in, and comes out of THIS list
  * — one line, in review, rather than an unmounting that breaks them.
  */
-const SELLS: readonly string[] = ["inventory", "hello"];
+const SELLS: readonly string[] = ["inventory"];
 
 /**
  * ONE MEMBERSHIP — WHAT THIS DEPLOYMENT SELLS, IN ONE LIST.
@@ -132,7 +129,7 @@ const PLANS: readonly PlanSpec[] = [
     id: "none", name: "No plan", kind: "personal", order: 0, parking: true,
     said: "Read and export what is here. Nothing new can be added.",
     price: 0, currency: "USD", credits: 0,
-    includes: { seats: 1, storage: GB, domains: 0, notes: 0, publishing: false,
+    includes: { seats: 1, storage: GB, domains: 0,
       products: 0, locations: 0, processes: false, jobs: false, imports: false },
   },
   {
@@ -153,28 +150,28 @@ const PLANS: readonly PlanSpec[] = [
       cancels in the trial. It is off on the parking row for the same reason
       everything else is: that row adds nothing.
     */
-    includes: { seats: 1, storage: 10 * GB, domains: 0, notes: -1, publishing: true,
+    includes: { seats: 1, storage: 10 * GB, domains: 0,
       products: 200, locations: 25, processes: false, jobs: true, imports: true },
   },
   {
     id: "plus", name: "Plus", kind: "personal", order: 2, trialDays: 14,
     said: "Room to work, and somebody beside you.",
     price: 2500, currency: "USD", credits: 4_000,
-    includes: { seats: 2, storage: 50 * GB, domains: 0, notes: -1, publishing: true,
+    includes: { seats: 2, storage: 50 * GB, domains: 0,
       products: 1_000, locations: 100, processes: true, jobs: true, imports: true },
   },
   {
     id: "studio", name: "Studio", kind: "commercial", order: 3, trialDays: 14,
     said: "A business: your own name on it, your own address, your own database.",
     price: 4900, currency: "USD", credits: 7_500,
-    includes: { seats: 5, storage: 250 * GB, domains: 1, notes: -1, publishing: true,
+    includes: { seats: 5, storage: 250 * GB, domains: 1,
       products: 10_000, locations: 1_000, processes: true, jobs: true, imports: true },
   },
   {
     id: "company", name: "Company", kind: "commercial", order: 4, trialDays: 14,
     said: "A team, and the room a team needs.",
     price: 19900, currency: "USD", credits: 40_000,
-    includes: { seats: 25, storage: 2048 * GB, domains: 3, notes: -1, publishing: true,
+    includes: { seats: 25, storage: 2048 * GB, domains: 3,
       products: -1, locations: -1, processes: true, jobs: true, imports: true },
   },
 ];
@@ -282,11 +279,13 @@ const PROCESSORS: SubProcessorBook = {
   cloudflare: subProcessor({
     id: "cloudflare", name: "Cloudflare, Inc.", country: "US",
     role: "Runs the application, stores its records and files, and carries the email we send you.",
-    /* ⚠️ EVERYTHING, BECAUSE IT RUNS EVERYTHING. The databases, the object
-       store, the compute and the outbound mail are all theirs — so every
-       category this deployment holds passes through them by construction, and
-       any narrower list here would be a claim rather than a description. */
-    receives: ["identity", "contact", "usage", "financial", "sensitive"],
+    /* ⚠️ EVERYTHING THIS DEPLOYMENT ACTUALLY HOLDS, BECAUSE IT RUNS EVERYTHING.
+       The databases, the object store, the compute and the outbound mail are all
+       theirs, so every category passes through them by construction — and a
+       category NO app collects is an over-claim rather than a safe margin, which
+       `refuseLegal` refuses. `sensitive` belongs here the day a product declares
+       a vault field for it, and not before. */
+    receives: ["identity", "contact", "usage", "financial"],
     url: "https://www.cloudflare.com/trust-hub/gdpr/",
   }),
   /* ⚠️ NAMED IN TWO DOCUMENTS BEFORE IT WAS EVER IN THE REGISTER. It receives
@@ -1567,11 +1566,14 @@ const handler = async (env: Env) => {
     */
     products: {
       sells: () => SELLS,
+      /* ⚠️ EVERY REFUSAL TRAVELS BACK, because the caller answers `200` on a
+         `true` and a product that is not there on anything less. See
+         `Wiring.products`. */
       switchOn: async (tenantId, appId, now) => {
         const app = APPS[appId]?.();
         const tenant = await tenantById(directory, tenantId as never);
-        if (!app || !tenant) return;
-        await enableApp(
+        if (!app || !tenant) return false;
+        return !await enableApp(
           directory, shardFor(env as never, tenant.shardId),
           tenantId as never, appId as never, schemaFor(app), applySchema, now,
         );

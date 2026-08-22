@@ -319,14 +319,14 @@ if (what === "guards") {
    * WHAT AN APP GETS WITHOUT ASKING — read from what the composer actually did.
    *
    * ⚠️ `docs/surface.json` IS EMITTED BY THE REAL COMPOSER, never parsed out of
-   * the source (see `apps/hello/test/surface.screens.test.tsx`). A script that
+   * the source (see `ground/test/surface.screens.test.tsx`). A script that
    * grepped `*-ops.ts` for operation ids would be a second, worse composer, and
    * the copy is the one that goes stale — it would miss the two lanes that mount
    * conditionally and would not know a route's method or permission at all.
    */
   const at = join(ENGINE, "docs/surface.json");
   if (!existsSync(at)) {
-    console.error("docs/surface.json is missing — run `EMIT=1 pnpm --filter @engine/hello test`, "
+    console.error("docs/surface.json is missing — run `EMIT=1 pnpm --filter @engine/ground test`, "
       + "because an index of what the engine offers cannot be written by hand");
     process.exit(2);
   }

@@ -68,7 +68,7 @@ export function moneyOps(app: AppSpec): Readonly<Record<string, Resolved>> {
 
       /*
         ⚠️ AND WHICH ACTION, NOT ONLY WHICH PRODUCT. "You spent 400 credits on
-        Hello" is a heading, not an answer — the question is always about a
+        Inventory" is a heading, not an answer — the question is always about a
         thing somebody pressed. This is the same read one level finer, and it
         travels here for the reason the rest of it does: a screen that fetches
         the explanation separately shows the number first and the explanation

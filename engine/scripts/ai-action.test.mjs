@@ -16,6 +16,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { appDirs, appManifests, appTrees } from "./lib/trees.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ENGINE = join(HERE, "..");
@@ -33,9 +34,7 @@ const strip = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$
  * `gemini-…`, `gpt-…`, `claude-…` — and an app source is the one place none of
  * them belongs.
  */
-const apps = readdirSync(join(ENGINE, "apps"), { withFileTypes: true })
-  .filter((d) => d.isDirectory())
-  .map((d) => [d.name, join(ENGINE, "apps", d.name, "src", "index.ts")]);
+const apps = appManifests();
 
 const MODEL_ID = /["'`](@cf\/[\w.\-/]+|gemini-[\w.\-]+|gpt-[\w.\-]+|claude-[\w.\-]+)["'`]/;
 const named = apps

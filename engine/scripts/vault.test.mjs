@@ -17,6 +17,7 @@
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { appDirs, appTrees } from "./lib/trees.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ENGINE = join(HERE, "..");
@@ -26,13 +27,10 @@ const fail = (m) => { console.error(`BAD  ${m}`); bad++; };
 const ok = (m) => console.log(`ok   ${m}`);
 const rel = (p) => p.slice(ENGINE.length + 1);
 
-const APPS = existsSync(join(ENGINE, "apps"))
-  ? readdirSync(join(ENGINE, "apps"), { withFileTypes: true }).filter((e) => e.isDirectory())
-    .map((e) => e.name)
-  : [];
+const APPS = appTrees();
 
-const sourcesOf = (app) => {
-  const dir = join(ENGINE, "apps", app, "src");
+const sourcesOf = (tree) => {
+  const dir = join(ENGINE, tree);
   if (!existsSync(dir)) return [];
   const out = [];
   const walk = (at) => {
@@ -53,8 +51,8 @@ const stripComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\
 const VAULT_TABLES = /\b(vault_fact|vault_subject|vault_consent|vault_grant|vault_look)\b/;
 
 let touched = 0;
-for (const app of APPS) {
-  for (const file of sourcesOf(app)) {
+for (const [app, dir] of APPS) {
+  for (const file of sourcesOf(dir)) {
     const code = stripComments(readFileSync(file, "utf8"));
     const hit = code.match(VAULT_TABLES);
     if (hit) {
@@ -78,8 +76,8 @@ const OWN_CRYPTO = [
   [/\bAES-GCM\b/, "its own cipher"],
 ];
 let rolled = 0;
-for (const app of APPS) {
-  for (const file of sourcesOf(app)) {
+for (const [app, dir] of APPS) {
+  for (const file of sourcesOf(dir)) {
     const code = stripComments(readFileSync(file, "utf8"));
     for (const [re, what] of OWN_CRYPTO) {
       if (re.test(code)) {
@@ -101,8 +99,8 @@ if (!rolled) ok(`keys: no app carries its own encryption`);
  * one place it could slip through is an app whose tests never call `defineApp`.
  */
 let stray = 0;
-for (const app of APPS) {
-  for (const file of sourcesOf(app)) {
+for (const [app, dir] of APPS) {
+  for (const file of sourcesOf(dir)) {
     const code = stripComments(readFileSync(file, "utf8"));
     for (const m of code.matchAll(/holds:\s*"sensitive"([^}]*)\}/g)) {
       if (!/vault:\s*true/.test(m[1])) {

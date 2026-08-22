@@ -22,6 +22,7 @@
 import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { appDirs, appManifests, appTrees } from "./lib/trees.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ENGINE = join(HERE, "..");
@@ -121,10 +122,7 @@ for (const pair of PAIRS) {
   bulk pair shares its planner" and "there are no bulk pairs" are the same
   sentence without a number.
 */
-const apps = existsSync(join(ENGINE, "apps"))
-  ? readdirSync(join(ENGINE, "apps"), { withFileTypes: true })
-    .filter((d) => d.isDirectory()).map((d) => d.name)
-  : [];
+const apps = appTrees().map(([id]) => id);
 
 if (!PAIRS.length) {
   fail("one-planner: no preview/commit pair is declared at all.");

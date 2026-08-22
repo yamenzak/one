@@ -71,7 +71,7 @@ export function AppSurface({ app, route, onGo }: {
     that knows which product is open — and one bundle serves every product, so it
     cannot have been loaded before now (D17, `apps.ts`).
 
-    ⚠️ AND THE NOTICE IS NOT DRAWN WHILE IT LOADS. "This screen ships with Hello"
+    ⚠️ AND THE NOTICE IS NOT DRAWN WHILE IT LOADS. "This screen ships with the product"
     is what an unwritten screen says; showing it for the length of a fetch and
     then replacing it makes a working product look broken for a beat, which is
     the reading somebody reports.

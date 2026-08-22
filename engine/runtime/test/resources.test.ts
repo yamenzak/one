@@ -39,7 +39,7 @@ const seeded = (where: "eu" | "global" = "eu"): readonly Made[] =>
 
 /** A product that needs one bucket per jurisdiction and one queue everywhere. */
 const app = (needs: AppSpec["needs"]): AppSpec => ({
-  id: "hello" as never, name: "Hello", mark: "H",
+  id: "beacon" as never, name: "Beacon", mark: "H",
   access: { roles: {}, permissions: {}, founding: "owner" } as never,
   entitlements: {}, collections: [], operations: [], screens: [],
   needs,
@@ -211,8 +211,8 @@ describe("what the deployment makes for itself", () => {
     /* ⚠️ THE JURISDICTION IS THE ASSERTION. Cloudflare fixes it at creation and
        there is no edit afterwards, so a bucket made without it is in the wrong
        regime until somebody copies every object out of it. */
-    expect(cf.made).toEqual([{ kind: "r2", name: "one-hello-r2-covers-eu", jurisdiction: "eu" }]);
-    expect(out.did.join()).toContain("created one-hello-r2-covers-eu");
+    expect(cf.made).toEqual([{ kind: "r2", name: "one-beacon-r2-covers-eu", jurisdiction: "eu" }]);
+    expect(out.did.join()).toContain("created one-beacon-r2-covers-eu");
   });
 
   /*
@@ -288,7 +288,7 @@ describe("what the deployment makes for itself", () => {
       apps: [app(covers)], serves: ["eu"],
     });
     expect(cf.bound()).toContainEqual({ type: "d1", name: "DIRECTORY" });
-    expect(cf.bound().some((b) => b.name === "HELLO_COVERS_EU")).toBe(true);
+    expect(cf.bound().some((b) => b.name === "BEACON_COVERS_EU")).toBe(true);
   });
 
   /*
@@ -305,7 +305,7 @@ describe("what the deployment makes for itself", () => {
     expect((await resources(db()))[0]?.state).toBe("bound");
 
     /* The next boot, on the version the patch produced. */
-    await observe(db(), { HELLO_COVERS_EU: {} });
+    await observe(db(), { BEACON_COVERS_EU: {} });
     expect((await resources(db()))[0]?.state).toBe("live");
   });
 
@@ -386,17 +386,17 @@ describe("resolving a binding when the deployment serves more than one", () => {
       apps: [app(covers)], serves: ["eu", "global"],
     });
     expect(cf.made.map((m) => m.name).sort())
-      .toEqual(["one-hello-r2-media-eu", "one-hello-r2-media-global"]);
+      .toEqual(["one-beacon-r2-media-eu", "one-beacon-r2-media-global"]);
 
     /* Both are bound and, on the next boot, both are live. */
-    const seen = { HELLO_MEDIA_EU: { it: "eu" }, HELLO_MEDIA_GLOBAL: { it: "global" } };
+    const seen = { BEACON_MEDIA_EU: { it: "eu" }, BEACON_MEDIA_GLOBAL: { it: "global" } };
     await observe(db(), seen);
 
     const live = await liveBindings(db(), seen);
     /* ⚠️ TWO ENTRIES, NOT ONE. Keyed without the residency both rows collapse
-       onto `hello:media` and whichever is read last wins for everybody. */
+       onto `beacon:media` and whichever is read last wins for everybody. */
     expect(live.size).toBe(2);
-    expect(live.get(bindingKey("hello", "media", "eu"))).toEqual({ it: "eu" });
-    expect(live.get(bindingKey("hello", "media", "global"))).toEqual({ it: "global" });
+    expect(live.get(bindingKey("beacon", "media", "eu"))).toEqual({ it: "eu" });
+    expect(live.get(bindingKey("beacon", "media", "global"))).toEqual({ it: "global" });
   });
 });

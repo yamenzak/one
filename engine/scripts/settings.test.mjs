@@ -23,6 +23,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { knownStages } from "./lib/stages.mjs";
+import { appDirs, appTrees } from "./lib/trees.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ENGINE = join(HERE, "..");
@@ -61,17 +62,15 @@ function block(src, key) {
 
 /* ----------------------------------------------------------------- apps --- */
 
-const APPS = readdirSync(join(ENGINE, "apps"))
-  .filter((name) => {
-    try { return statSync(join(ENGINE, "apps", name, "src")).isDirectory(); }
-    catch { return false; }
-  });
+const APPS = appTrees().filter(([, dir]) => {
+  try { return statSync(join(ENGINE, dir)).isDirectory(); } catch { return false; }
+});
 
-if (!APPS.length) fail("apps: nothing under apps/ has a src — a check that cannot fail");
+if (!APPS.length) fail("apps: no app tree has a src — a check that cannot fail");
 
 let declared = 0;
-for (const app of APPS) {
-  const root = join(ENGINE, "apps", app, "src");
+for (const [app, dir] of APPS) {
+  const root = join(ENGINE, dir);
   const files = under(root);
 
   /* ⚠️ Wherever the manifest is. It is `index.ts` in every app today, and

@@ -79,10 +79,9 @@
       "dependsOn": ["^build", "@engine/space#build"],
       "cache": false
     },
-    // The reference app runs the same sweep over its own routes, so it needs
-    // the same stylesheet — one guard asked of one product is the one that gets
-    // waived.
-    "@engine/hello#test": {
+    // The ground runs the same sweep over its own screens, so it needs the same
+    // stylesheet — one guard asked of one product is the one that gets waived.
+    "@engine/ground#test": {
       "dependsOn": ["^build", "@engine/space#build"],
       "outputs": ["coverage/**"]
     },

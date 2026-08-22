@@ -71,7 +71,7 @@ describe("the faces DiceBear draws for us", () => {
 
   /* ⚠️ AND THE TWO KINDS WITH NO PICTURE GET NULL RATHER THAN A GUESS. */
   it("draws nothing for a product or for the deployment", () => {
-    expect(faceUri(appFace("hello", "H"))).toBeNull();
+    expect(faceUri(appFace("beacon", "B"))).toBeNull();
     expect(faceUri(ONE_FACE)).toBeNull();
   });
 
@@ -100,7 +100,7 @@ describe("the faces DiceBear draws for us", () => {
      glyph its manifest declared and ONE wears a fixed mark, so both take the
      theme's own two values rather than a picture's. */
   it("hands a product and the deployment the theme instead of a palette", () => {
-    for (const of of [appFace("hello", "H"), ONE_FACE]) {
+    for (const of of [appFace("beacon", "B"), ONE_FACE]) {
       expect(worldFor(of)?.deep, of.kind).toMatch(/^var\(--/);
     }
   });

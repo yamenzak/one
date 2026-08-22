@@ -804,7 +804,7 @@ const ledger = collection({
 
 /* ------------------------------------------------------------- operations --- */
 
-/** ⚠️ The narrowest shape a handler here needs — see hello's, and the reason. */
+/** ⚠️ The narrowest shape a handler here needs — see the ground's, and the reason. */
 interface Db {
   prepare(q: string): {
     bind(...v: unknown[]): {

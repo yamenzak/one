@@ -315,7 +315,7 @@ export function MoneyInput({ currency, ...rest }: Omit<NumberInputProps, "format
     ⚠️ REFUSED HERE RATHER THAN FOUR FRAMES INSIDE `Intl`. Passing the symbol
     throws `Invalid currency code : €` out of `NumberFormatter`, which names
     neither this component nor the screen that called it — the first render of
-    hello's form did exactly that, and the stack was entirely library code. This
+    the ground's form did exactly that, and the stack was entirely library code. This
     is the same failure with the caller's name on it.
   */
   if (!/^[A-Z]{3}$/.test(currency)) {

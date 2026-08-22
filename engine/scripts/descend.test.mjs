@@ -92,7 +92,7 @@ if (/<Whichever/.test(surface) && /areasOn\(book, areas, level\)/.test(surface))
 const settingsSurfaces = [
   "design/src/rendered/settings.tsx",
   "one-space/src/centre/SettingsArea.tsx",
-  "apps/hello/src/screens/Settings.tsx",
+  "ground/src/screens/Settings.tsx",
 ];
 const crammed = settingsSurfaces.filter((f) => {
   const src = read(f);

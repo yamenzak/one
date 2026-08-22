@@ -15,16 +15,16 @@ import { parseStop, pathFor, routeIn } from "../src/centre/route.js";
 import { SPACE_SCREENS } from "../src/space/OneSpace.js";
 import { OF_CONSOLE, OF_WORKSPACE, parseWhere, pathOf } from "../src/space/where.js";
 
-const APPS = ["hello", "atlas"];
+const APPS = ["beacon", "atlas"];
 
 describe("the product under a workspace's address", () => {
   it("routes a product's screens by its own id", () => {
-    expect(parseStop("/hello", APPS)).toEqual({ kind: "app", app: "hello", route: "/" });
-    expect(parseStop("/hello/plans", APPS)).toEqual({ kind: "app", app: "hello", route: "/plans" });
+    expect(parseStop("/beacon", APPS)).toEqual({ kind: "app", app: "beacon", route: "/" });
+    expect(parseStop("/beacon/plans", APPS)).toEqual({ kind: "app", app: "beacon", route: "/plans" });
   });
 
   it("opens the only product rather than offering a choice of one", () => {
-    expect(parseStop("/", ["hello"])).toEqual({ kind: "app", app: "hello", route: "/" });
+    expect(parseStop("/", ["beacon"])).toEqual({ kind: "app", app: "beacon", route: "/" });
     expect(parseStop("/", APPS)).toEqual({ kind: "choose" });
     /* ⚠️ And nothing switched on is still a screen, never a blank page. */
     expect(parseStop("/", [])).toEqual({ kind: "choose" });
@@ -36,7 +36,7 @@ describe("the product under a workspace's address", () => {
   });
 
   it("writes the path back the way it parses it", () => {
-    for (const path of ["/", "/hello", "/hello/plans", "/atlas"]) {
+    for (const path of ["/", "/beacon", "/beacon/plans", "/atlas"]) {
       expect(pathFor(parseStop(path, APPS))).toBe(path);
     }
   });
@@ -101,7 +101,7 @@ describe("every address in OneSpace has a branch", () => {
 describe("an app's own route as an address", () => {
   it("adds the product's prefix and nothing else", () => {
     expect(routeIn("inventory", "/thing")).toBe("/inventory/thing");
-    expect(routeIn("hello", "/write")).toBe("/hello/write");
+    expect(routeIn("beacon", "/write")).toBe("/beacon/write");
   });
 
   /* ⚠️ THE ROOT IS THE APP ITSELF. A trailing slash is a different string to
@@ -115,8 +115,8 @@ describe("an app's own route as an address", () => {
      from a row and the same screen reached from the bar one address. */
   it("round-trips through the parser", () => {
     for (const route of ["/", "/thing", "/where", "/start"]) {
-      expect(parseStop(routeIn("hello", route), APPS))
-        .toEqual({ kind: "app", app: "hello", route });
+      expect(parseStop(routeIn("beacon", route), APPS))
+        .toEqual({ kind: "app", app: "beacon", route });
     }
   });
 });

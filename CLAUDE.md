@@ -887,7 +887,7 @@ required to resume the work; **start there rather than from recall.**
 ⚠️ **AND THE DOCUMENTS ARE NOT WHERE THE WORK IS RECORDED.** A new module needs a
 line in `engine/scripts/inventory.mjs`; a new table needs a row in `HOLDINGS`; a
 new operation, door, gate or problem appears by itself from
-`EMIT=1 pnpm --filter @engine/hello test`. Each generator REFUSES rather than
+`EMIT=1 pnpm --filter @engine/ground test`. Each generator REFUSES rather than
 skipping, so a capability cannot be added and quietly left out of the index —
 which is the mechanism that makes reinvention hard. BUILDING.md §7 is the list.
 
@@ -901,13 +901,25 @@ generated, so "does this already exist" is a question with a current answer.
 **The two names mean different things and neither is the other.** **OneEngine** is the
 FRAMEWORK — `@engine/kernel` (pure contracts), `@engine/runtime` (the only code that
 touches a binding), **`@engine/design`** — the browser half and the design system
-every app draws with, named **OneDesign**, router-free — and the reference apps.
-**One** is the DEPLOYMENT built on it: `engine/one` is the worker
-that answers every door for every product, `engine/one-space` is the page a person
-opens at the root, `id.` and `setup.`. A product is a manifest inside
-it, and `hello` is the only one — the coaching app that proved stage 9 left the
-tree on 2026-08-16 to be rewritten under a new name. So "One" is what a customer types and "OneEngine" is what a contributor imports,
-and the day there is a second deployment the split is what makes that cheap.
+every app draws with, named **OneDesign**, router-free — and **`engine/ground`**,
+the PROVING GROUND. **One** is the DEPLOYMENT built on it: `engine/one` is the
+worker that answers every door for every product, `engine/one-space` is the page a
+person opens at the root, `id.` and `setup.`. A product is a manifest inside it,
+and **OneInventory is the only one** — the coaching app that proved stage 9 left
+the tree on 2026-08-16 to be rewritten under a new name. So "One" is what a
+customer types and "OneEngine" is what a contributor imports, and the day there is
+a second deployment the split is what makes that cheap.
+
+⚠️ **`engine/ground` IS NOT A PRODUCT, AND THAT IS ENFORCED BY WHERE IT LIVES.**
+It is the smallest complete app — one notebook over a SAMPLE world, declaring
+every cross-cutting concern — and every claim the framework makes is asserted
+against it: 241 of the engine's tests are its, and most of the design system is
+drawn in its screens. It was `engine/apps/hello` until 2026-08-22, which put it in
+the deployment's `APPS`, its `SELLS` and the browser's product loader — so a
+person who came for OneInventory founded a workspace holding a demo they never
+asked for. `engine/apps/*` is the product catalogue; the ground is outside it, has
+no `live` entry a browser could load, and `scripts/fixture.test.mjs` refuses all
+three back. Its dev-only page is still at `?screen=ground` (D52).
 
 **`engine/` is INERT to the legacy tree by construction**: nothing in it is in
 `apps.json`, so `deploy.yml` can never select it. Its tests and guards DO run —

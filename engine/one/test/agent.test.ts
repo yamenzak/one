@@ -19,7 +19,7 @@ import {
   subscribe,
   upsertAccount, type Db,
 } from "@engine/runtime";
-import { HELLO } from "@engine/hello";
+import { INVENTORY } from "@engine/inventory";
 import worker, { LEGAL } from "../src/index.js";
 import { booted } from "./warm.js";
 
@@ -45,11 +45,11 @@ let tenantId = "";
 beforeAll(async () => {
   await booted(asDev);
   await addShard(directory(), "eu-1", "eu", 100);
-  await noteShardApp(directory(), "eu-1", "hello");
+  await noteShardApp(directory(), "eu-1", "inventory");
 
   const made = await createTenant(directory(), {
     slug: "ironworks", name: "Ironworks", country: "DE",
-    where: residencyFor("DE"), apps: ["hello"],
+    where: residencyFor("DE"), apps: ["inventory"],
   });
   if (typeof made === "string" || !("tenant" in made)) throw new Error(String(made));
   tenantId = made.tenant.id;
@@ -60,7 +60,7 @@ beforeAll(async () => {
   await subscribe(directory(), tenantId as never, MEMBERSHIP, "solo", "active");
 
   const owner = await upsertAccount(directory(), "amara@example.com", null);
-  await found(shard(), made.tenant.id, owner, "amara@example.com", { hello: "writer" });
+  await found(shard(), made.tenant.id, owner, "amara@example.com", { inventory: "keeper" });
   await noteBelonging(directory(), owner, made.tenant.id);
   ownerCookie = `one_session=${(await startSession(directory(), owner)).id}`;
 
@@ -68,9 +68,9 @@ beforeAll(async () => {
      the platform's writes and roster stay out of their catalogue. */
   const reader = await upsertAccount(directory(), "sam@example.com", null);
   await invite(shard(), made.tenant.id,
-    { email: "sam@example.com", platformRole: "customer", appRoles: { hello: "reader" } },
-    { platform: new Set(PLATFORM_ROLES.owner), inApp: async () => new Set(HELLO.access.permissions) },
-    async () => HELLO.access.roles, { counts: ["owner", "manager", "staff"], allowed: -1 });
+    { email: "sam@example.com", platformRole: "customer", appRoles: { inventory: "viewer" } },
+    { platform: new Set(PLATFORM_ROLES.owner), inApp: async () => new Set(INVENTORY.access.permissions) },
+    async () => INVENTORY.access.roles, { counts: ["owner", "manager", "staff"], allowed: -1 });
   await shard().prepare(
     `UPDATE membership SET account_id = ?, accepted_at = ? WHERE tenant_id = ? AND email = ?`)
     .bind(reader, new Date().toISOString(), made.tenant.id, "sam@example.com").run();
@@ -147,8 +147,8 @@ describe("what is listed", () => {
   */
   it("lists the owner's tools, the opt-outs absent", async () => {
     const names = (await list(ownerCookie)).map((t) => t.name);
-    expect(names).toContain("note.create");
-    expect(names).toContain("note.publish");
+    expect(names).toContain("product.create");
+    expect(names).toContain("job.open");
     expect(names).toContain("member.list");
     /* ⚠️ Granting access is the canonical opt-out — see `member-ops.ts`. */
     expect(names).not.toContain("member.invite");
@@ -158,8 +158,8 @@ describe("what is listed", () => {
 
   it("narrows to what a reader may actually call", async () => {
     const names = (await list(readerCookie)).map((t) => t.name);
-    expect(names).toContain("note.list");
-    expect(names).not.toContain("note.create");
+    expect(names).toContain("product.list");
+    expect(names).not.toContain("product.create");
   });
 });
 
@@ -175,17 +175,18 @@ describe("what a call does", () => {
   };
 
   it("runs a real operation and leaves the audit entry the HTTP door would", async () => {
-    const out = await callTool("note.create", { title: "From an agent" }, ownerCookie);
+    const out = await callTool(
+      "product.create", { name: "From an agent", tracking: "counted", unit: "each" }, ownerCookie);
     expect(out.result?.isError).toBe(false);
     expect(out.result?.structuredContent).toHaveProperty("id");
 
     const row = await shard().prepare(
-      `SELECT COUNT(*) AS n FROM note WHERE tenant_id = ? AND title = ?`)
+      `SELECT COUNT(*) AS n FROM product WHERE tenant_id = ? AND name = ?`)
       .bind(tenantId, "From an agent").first<{ n: number }>();
     expect(row?.n).toBe(1);
 
     const audit = await shard().prepare(
-      `SELECT COUNT(*) AS n FROM audit WHERE tenant_id = ? AND op = 'note.create' AND ok = 1`)
+      `SELECT COUNT(*) AS n FROM audit WHERE tenant_id = ? AND op = 'product.create' AND ok = 1`)
       .bind(tenantId).first<{ n: number }>();
     expect(audit?.n).toBeGreaterThan(0);
   });
@@ -206,7 +207,8 @@ describe("what a call does", () => {
   /* ⚠️ A gate saying no is a TOOL RESULT the model reads, not a protocol
      error — in the same words the HTTP door would have used. */
   it("relays a gate's refusal in the platform's words", async () => {
-    const out = await callTool("note.create", { title: "Nope" }, readerCookie);
+    const out = await callTool(
+      "product.create", { name: "Nope", tracking: "counted", unit: "each" }, readerCookie);
     expect(out.result?.isError).toBe(true);
     expect(out.result?.structuredContent).toHaveProperty("problem");
   });
@@ -218,17 +220,12 @@ describe("what a call does", () => {
     would go on letting an agent do what the workspace no longer may.
   */
   it("holds the entitlement gate, and reads it as it stands now", async () => {
-    /* ⚠️ TWO NOTES, AND THE SECOND IS THE ONE THAT PROVES IT. `note.publish`
-       declares natural idempotency on `id`, and a replay is answered BEFORE the
-       gates — correctly, because a retry must return the same answer. Publishing
-       the same note twice would therefore pass this test on a platform with no
-       entitlement gate at all. */
-    const ids = await Promise.all(["To publish", "And another"].map(async (title) => {
-      const made = await callTool("note.create", { title }, ownerCookie);
-      return String((made.result?.structuredContent as { id?: string })?.id ?? "");
-    }));
-    expect((await callTool("note.publish", { id: ids[0] }, ownerCookie)).result?.isError)
-      .toBe(false);
+    /* ⚠️ A DIFFERENT JOB EACH TIME, AND THAT IS NOT COSMETIC. An operation with
+       natural idempotency answers a replay BEFORE the gates — correctly, because
+       a retry must return the same answer — so calling one twice with the same
+       input would pass this test on a platform with no entitlement gate at all. */
+    expect((await callTool("job.open", { ref: "First", day: "2026-08-20" }, ownerCookie))
+      .result?.isError).toBe(false);
 
     /*
       ⚠️ THE MEMBERSHIP CHANGES UNDER A LIVE SESSION, and the agent door has to
@@ -238,8 +235,8 @@ describe("what a call does", () => {
     */
     try {
       await subscribe(directory(), tenantId as never, MEMBERSHIP, "none", "active");
-      expect((await callTool("note.publish", { id: ids[1] }, ownerCookie)).result?.isError)
-        .toBe(true);
+      expect((await callTool("job.open", { ref: "Second", day: "2026-08-21" }, ownerCookie))
+        .result?.isError).toBe(true);
     } finally {
       await subscribe(directory(), tenantId as never, MEMBERSHIP, "solo", "active");
     }
@@ -247,7 +244,7 @@ describe("what a call does", () => {
 
   it("refuses malformed arguments before anything runs", async () => {
     const res = await rpc("ironworks.localhost",
-      { jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "note.create", arguments: [1] } },
+      { jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "product.create", arguments: [1] } },
       { cookie: ownerCookie });
     const body = await res.json() as { error: { code: number } };
     expect(body.error.code).toBe(-32602);
@@ -271,7 +268,7 @@ describe("the bearer lane", () => {
       { jsonrpc: "2.0", id: 4, method: "tools/list" },
       { authorization: `Bearer ${token}` });
     const body = await listed.json() as { result: { tools: readonly { name: string }[] } };
-    expect(body.result.tools.map((t) => t.name)).toContain("note.create");
+    expect(body.result.tools.map((t) => t.name)).toContain("product.create");
 
     /* ⚠️ A token is a row: revoking it means NOW, not at expiry. */
     const revoked = await call("id.localhost", "/api/me.token.revoke", {

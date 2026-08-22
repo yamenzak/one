@@ -76,7 +76,8 @@ export interface PlatformCtx extends Ctx {
    */
   readonly products?: {
     readonly sells: () => readonly string[];
-    readonly switchOn: (tenantId: TenantId, appId: string, now: Date) => Promise<void>;
+    /** ⚠️ Whether it landed — see `Wiring.products`. */
+    readonly switchOn: (tenantId: TenantId, appId: string, now: Date) => Promise<boolean>;
     readonly switchOff: (tenantId: TenantId, appId: string, now: Date) => Promise<void>;
   };
   /**
@@ -666,8 +667,16 @@ export function memberOps(app: AppSpec): Readonly<Record<string, Resolved>> {
         /* ⚠️ ALREADY ON IS A SUCCESS, NOT A CONFLICT. The control is a switch and
            a switch that refuses the position it is already in is a screen that
            shows an error for agreeing with it. */
-        if (!ctx.enabledApps.includes(id)) {
-          await ctx.products.switchOn(ctx.tenantId as TenantId, id, new Date(ctx.now));
+        /*
+          ⚠️ AND A SWITCH THAT DID NOT LAND SAYS SO. Enabling applies a schema to
+          a shard and writes a row, and both can decline — so answering `200`
+          regardless gave the customer a switch that snaps on, a nav that does
+          not change, and a product whose every route is 404. A write that fails
+          is reported where it failed.
+        */
+        if (!ctx.enabledApps.includes(id)
+          && !await ctx.products.switchOn(ctx.tenantId as TenantId, id, new Date(ctx.now))) {
+          return ctx.fail("platform.unavailable");
         }
 
         /*

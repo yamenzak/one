@@ -39,7 +39,7 @@ import { Signpost } from "./screens/Signpost.js";
 
 /* ⚠️ DYNAMIC, SO THE REFERENCE APP IS NOT IN THE PRODUCTION BUNDLE. A static
    import behind `import.meta.env.DEV` reads as dev-only and is not — the module
-   graph is decided before the branch is, and hello's whole manifest was measured
+   graph is decided before the branch is, and the ground's whole manifest was measured
    in the built `index-*.js`. See `Ground.tsx`. */
 /* ⚠️ THE TERNARY IS LOAD-BEARING AND `null` IS THE PRODUCTION VALUE. A bare
    `React.lazy(() => import(...))` still puts the module in the graph: the chunk

@@ -68,31 +68,24 @@ describe("what a person can take with them, and what they can destroy", () => {
   beforeEach(async () => {
     const made = await createTenant(directory(), {
       slug: `leaving-${Math.floor(Math.random() * 1e9)}`,
-      name: "Leaving", country: "DE", where: "eu", apps: ["hello"],
+      name: "Leaving", country: "DE", where: "eu", apps: ["inventory"],
     });
     if (typeof made === "string") throw new Error(made);
     tenantId = made.tenant.id;
 
     me = await upsertAccount(directory(), "packing@example.com", "Sam");
-    await found(shard(), tenantId as never, me as never, "packing@example.com", { hello: "writer" });
+    await found(shard(), tenantId as never, me as never, "packing@example.com", { inventory: "keeper" });
     await noteBelonging(directory(), me as never, tenantId as never);
     cookie = `one_session=${(await startSession(directory(), me as never)).id}`;
 
-    /* ⚠️ The scope of a subject-scoped collection is the PERSON, which is
-       exactly what the walk binds on. */
-    const spec = APPS.hello!().collections.find((c) => c.id === "check-in")!;
-    const wrote = await put(shard(), spec, me,
-      { week: "2026-08-10", went: "fine", said: "a quiet one" }, me);
-    expect(wrote, JSON.stringify(wrote)).toHaveProperty("id");
-
     await shard().prepare(
       `INSERT INTO inbox (id, tenant_id, account_id, type, title, body, link, tone, icon, at, seen_at)
-       VALUES ('inb_1', ?, ?, 'note.published', 'A note', '', '/', 'info', 'bell', ?, NULL)`)
+       VALUES ('inb_1', ?, ?, 'stock.low', 'Running low', '', '/', 'info', 'bell', ?, NULL)`)
       .bind(tenantId, me, new Date().toISOString()).run();
 
     await consent(shard(), tenantId as never, me as never, "wellbeing", true);
     await keep(shard(), "vault-test-secret", tenantId as never, me as never,
-      "check-in.struggling", "not much, honestly");
+      "supplier.contact", "not much, honestly");
   });
 
   /* ------------------------------------------------------------- the copy --- */
@@ -105,8 +98,12 @@ describe("what a person can take with them, and what they can destroy", () => {
     const tables = new Set(said.held.map((h) => h.table));
     /* ⚠️ ONE ASSERTION PER LAYER, because a walk that reached only the directory
        would satisfy any single one of them. */
+    /* ⚠️ THE VAULT IS THE SUBJECT-SCOPED HALF HERE, and it is the platform's.
+       That an APP's own subject-scoped collection is walked too is asked of the
+       ground, where a collection declares that scope — this deployment's one
+       product files everything under the workspace. */
     for (const table of ["account", "belongs", "session", "membership", "inbox",
-      "vault_subject", "vault_fact", "vault_consent", "check_in"]) {
+      "vault_subject", "vault_fact", "vault_consent"]) {
       expect([...tables], table).toContain(table);
     }
 
@@ -124,13 +121,14 @@ describe("what a person can take with them, and what they can destroy", () => {
   });
 
   it("hands over nothing of the workspace's that is not theirs", async () => {
-    /* A note is the WORKSPACE's — everybody who can read notes reads all of
-       them — so it is not in one member's copy however they ask. */
-    const spec = APPS.hello!().collections.find((c) => c.id === "note")!;
-    await put(shard(), spec, tenantId, { title: "The company's" }, me);
+    /* A product is the WORKSPACE's — everybody who can read the catalogue reads
+       all of it — so it is not in one member's copy however they ask. */
+    const spec = APPS.inventory!().collections.find((c) => c.id === "product")!;
+    await put(shard(), spec, tenantId,
+      { name: "The company's", tracking: "counted", unit: "each" }, me);
 
     const said = await (await copyFor(cookie)).json() as { held: Held[] };
-    expect(said.held.map((h) => h.table)).not.toContain("note");
+    expect(said.held.map((h) => h.table)).not.toContain("product");
   });
 
   /* --------------------------------------------------------- the deletion --- */
@@ -147,14 +145,14 @@ describe("what a person can take with them, and what they can destroy", () => {
        anybody in, and the bill still running. */
     expect(said.closed.length).toBe(1);
 
-    for (const table of ["account", "belongs", "membership", "inbox", "vault_fact", "check_in"]) {
+    for (const table of ["account", "belongs", "membership", "inbox", "vault_fact"]) {
       expect(said.deleted.map((d) => d.table), table).toContain(table);
     }
     /* ⚠️ It looked in far more than it deleted from, and reports both. */
     expect(said.lookedIn).toBeGreaterThan(said.deleted.length);
 
     for (const [db, table] of [[directory(), "account"], [shard(), "membership"],
-      [shard(), "vault_fact"], [shard(), "check_in"]] as const) {
+      [shard(), "vault_fact"]] as const) {
       const left = await db.prepare(`SELECT COUNT(*) AS n FROM "${table}"`).first<{ n: number }>();
       expect(left?.n, table).toBe(0);
     }
@@ -172,12 +170,12 @@ describe("what a person can take with them, and what they can destroy", () => {
        this assertion pass over a walk that does no unwriting at all. */
     const other = await upsertAccount(directory(), "staying@example.com", null);
     await found(shard(), tenantId as never, other as never, "staying@example.com",
-      { hello: "writer" });
+      { inventory: "keeper" });
     await noteBelonging(directory(), other as never, tenantId as never);
 
     await shard().prepare(
       `INSERT INTO audit (id, tenant_id, at, actor, op, verb, subject, ok, problem)
-       VALUES ('aud_1', ?, ?, ?, 'note.publish', 'write', 'note_1', 1, NULL)`)
+       VALUES ('aud_1', ?, ?, ?, 'stock.take', 'write', 'prd_1', 1, NULL)`)
       .bind(tenantId, new Date().toISOString(), me).run();
 
     await at("/api/me.forget", cookie,

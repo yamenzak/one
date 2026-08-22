@@ -133,7 +133,15 @@ export interface Wiring {
    */
   readonly products?: {
     readonly sells: () => readonly string[];
-    readonly switchOn: (tenantId: string, appId: string, now: Date) => Promise<void>;
+    /**
+     * ⚠️ IT ANSWERS WHETHER IT LANDED, AND THE CALLER REFUSES WHEN IT DID NOT.
+     * Switching a product on applies a schema to a shard and writes a row, and
+     * both can decline — an unknown workspace, a shard that cannot hold the app.
+     * Returning nothing made every one of those a `200` with the product still
+     * absent: the switch snaps on, the nav does not change, and every route the
+     * customer just paid attention to answers 404.
+     */
+    readonly switchOn: (tenantId: string, appId: string, now: Date) => Promise<boolean>;
     readonly switchOff: (tenantId: string, appId: string, now: Date) => Promise<void>;
   };
   readonly directory: Db;
@@ -761,7 +769,7 @@ export function serve(wiring: Wiring): (request: Request) => Promise<Response> {
       ⚠️ AND IT COSTS NO DEPTH. The deployment's rows need nothing; the
       workspace's need `where`, which is the SAME promise `identify` already
       chains off (see above) — so both run beside the identity rather than after
-      the whole of `locate`. `apps/hello/test/request-cost.test.ts` measures it.
+      the whole of `locate`. `ground/test/request-cost.test.ts` measures it.
     */
     /*
       ⚠️ AND IT WAITS FOR THE IDENTITY, BECAUSE THE THIRD LEVEL IS A PERSON. A

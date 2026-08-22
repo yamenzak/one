@@ -23,6 +23,7 @@
 import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { appDirs, appManifests, appTrees } from "./lib/trees.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ENGINE = join(HERE, "..");
@@ -46,12 +47,8 @@ const walk = (dir) => {
   });
 };
 
-const apps = existsSync(join(ENGINE, "apps"))
-  ? readdirSync(join(ENGINE, "apps"), { withFileTypes: true })
-    .filter((d) => d.isDirectory() && statSync(join(ENGINE, "apps", d.name)).isDirectory())
-    .map((d) => [d.name, join(ENGINE, "apps", d.name, "src")])
-    .filter(([, src]) => existsSync(src))
-  : [];
+const apps = appTrees().map(([id, dir]) => [id, join(ENGINE, dir)])
+  .filter(([, src]) => existsSync(src));
 
 /*
   ⚠️ THE STATEMENT, TEMPLATE LITERAL AND ALL. A table name interpolated into the

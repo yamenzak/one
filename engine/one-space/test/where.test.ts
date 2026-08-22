@@ -38,15 +38,15 @@ describe("a preference is not a workspace's setting", () => {
     expect(pathOf({ at: "prefs" })).toBe(`${SPACE}/prefs`);
     expect(above({ at: "prefs" })).toEqual({ at: "you" });
     /* ⚠️ And it descends the same two levels, so back goes up one at a time. */
-    expect(above({ at: "prefs", app: "hello", area: "notes" }))
-      .toEqual({ at: "prefs", app: "hello" });
-    expect(above({ at: "prefs", app: "hello" })).toEqual({ at: "prefs" });
+    expect(above({ at: "prefs", app: "beacon", area: "notes" }))
+      .toEqual({ at: "prefs", app: "beacon" });
+    expect(above({ at: "prefs", app: "beacon" })).toEqual({ at: "prefs" });
   });
 
   it("steps back through a workspace's settings one page at a time", () => {
-    expect(above({ at: "settings", slug: "atlas", app: "hello", area: "notes" }))
-      .toEqual({ at: "settings", slug: "atlas", app: "hello" });
-    expect(above({ at: "settings", slug: "atlas", app: "hello" }))
+    expect(above({ at: "settings", slug: "atlas", app: "beacon", area: "notes" }))
+      .toEqual({ at: "settings", slug: "atlas", app: "beacon" });
+    expect(above({ at: "settings", slug: "atlas", app: "beacon" }))
       .toEqual({ at: "settings", slug: "atlas" });
     expect(above({ at: "settings", slug: "atlas" }))
       .toEqual({ at: "workspace", slug: "atlas" });
@@ -59,10 +59,10 @@ describe("every screen has an address", () => {
       { at: "home" }, { at: "you" }, { at: "inbox" }, { at: "told" }, { at: "workspaces" },
       /* ⚠️ YOURS, NOT A WORKSPACE'S — so it carries no slug, and it descends by
          product and then by page exactly as the workspace's own settings do. */
-      { at: "prefs" }, { at: "prefs", app: "hello" },
-      { at: "prefs", app: "hello", area: "appearance" },
-      { at: "settings", slug: "atlas", app: "hello" },
-      { at: "settings", slug: "atlas", app: "hello", area: "notes" },
+      { at: "prefs" }, { at: "prefs", app: "beacon" },
+      { at: "prefs", app: "beacon", area: "appearance" },
+      { at: "settings", slug: "atlas", app: "beacon" },
+      { at: "settings", slug: "atlas", app: "beacon", area: "notes" },
       { at: "workspace", slug: "atlas" },
       ...OF_WORKSPACE.map((part) => ({ at: part, slug: "atlas" })),
       { at: "console" },

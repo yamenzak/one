@@ -509,7 +509,7 @@ which is exactly why it is written down.
    `DEFER(engine-N)` marker on the declaration and add the stage to
    `docs/stages.json`.
 3. **Give the reference app an instance.** `refusePolicy`'s sharpest branch — an
-   `action` notification may not be silenced — had no instance in `hello`, so no
+   `action` notification may not be silenced — had no instance in the ground, so no
    test could reach it and the branch was unexercised for as long as it existed.
    Anything absent from the reference app is absent from every app copied out of
    it.
@@ -533,7 +533,7 @@ places the generators read. Nothing here is a second description of the code.
    after the person who wrote it has moved on.
 3. **A new operation** that every app gets appears by itself, because
    `docs/surface.json` is emitted by the real composer. Run
-   `EMIT=1 pnpm --filter @engine/hello test` and review the diff.
+   `EMIT=1 pnpm --filter @engine/ground test` and review the diff.
 4. **A new door, gate or problem** appears by itself too, from the same file.
    A gate additionally needs its sentence in `inventory.mjs`, and the generator
    refuses without one.
@@ -556,5 +556,5 @@ to describe the one that is there.
 4. New behaviour has a guard, and the guard names its decision and its stage.
 5. New decisions are in [DECISIONS.md](DECISIONS.md) with what they forbid.
 6. Anything unfinished carries a `DEFER(engine-N)` marker.
-7. If the engine's surface changed, `EMIT=1 pnpm --filter @engine/hello test`
+7. If the engine's surface changed, `EMIT=1 pnpm --filter @engine/ground test`
    and then `node engine/scripts/docs.test.mjs --write`.

@@ -101,7 +101,7 @@ export const lanes = () => ({
   composition: ["kernel/src/manifest.ts"],
   runtime: files("runtime/src"),
   surface: [...files("design/src"), ...files("one-space/src"), ...files("one/src")],
-  app: files("apps/hello/src"),
+  app: files("ground/src"),
   guard: files("scripts", /\.test\.mjs$/),
 });
 
