@@ -509,6 +509,13 @@ export function crownFor(claim: CrownClaim | null, product: {
    */
   readonly find?: CrownProps["find"];
   readonly also: readonly Slot[];
+  /**
+   * ⚠️ WHERE THE ACT GOES, AND IT IS THE SAME ANSWER THE FOOT GIVES — see
+   * `Foot`. On a destination the foot is the navigation, so the crown carries
+   * the act; on a specialized screen the act IS the foot, and a copy up here
+   * would be the same button twice, six inches apart.
+   */
+  readonly foot: Foot;
 }): CrownProps {
   /* ⚠️ A WAY OUT IS WHAT MAKES IT A SUB-PAGE — see `useCrownSocket`. */
   if (claim?.back) {
@@ -528,7 +535,7 @@ export function crownFor(claim: CrownClaim | null, product: {
       back: claim.back, leave: claim.leave, name: claim.title, under: claim.under,
       collapses: false,
       also: claim.also.slice(0, 2) as unknown as readonly [Slot, Slot],
-      does: claim.does,
+      does: product.foot === "nav" ? claim.does : undefined,
     };
   }
   return {
@@ -542,20 +549,50 @@ export function crownFor(claim: CrownClaim | null, product: {
       show neither.
     */
     also: [...(claim?.also ?? []), ...product.also].slice(0, 2) as unknown as readonly [Slot, Slot],
-    does: claim?.does,
+    does: product.foot === "nav" ? claim?.does : undefined,
   };
 }
+
+/**
+ * WHAT IS AT THE FOOT OF THIS SCREEN — the navigation, or the one act.
+ *
+ * ⚠️ NEVER BOTH, AND THAT WAS `Docked`'S OWN RULE BEFORE IT WAS OVERRIDDEN. For
+ * one day a screen rendered a dock AND a nav: 180px of an 844px phone in two
+ * objects with a gap between them, and a content column reserving room for one
+ * of them, so the last row of the last card sat under the other permanently. The
+ * rule was right; what was missing was a way to say which of the two it is.
+ *
+ * ⚠️ AND WHAT DECIDES IS WHAT THE SCREEN IS, NOT WHAT ITS AUTHOR PREFERRED. A
+ * DESTINATION is one of the five somebody navigates between, so the foot is the
+ * navigation and its act goes to the crown. A SPECIALIZED screen — one somebody
+ * WENT to — is not a place you leave sideways: its act replaces the navigation,
+ * which is what the workspace screen has always done. One boolean, read by the
+ * shell that draws the nav and by the screen that draws the dock, so the two
+ * cannot disagree.
+ */
+export type Foot = "nav" | "act";
+
+const ChromeFoot = React.createContext<Foot>("act");
+
+/** ⚠️ What is at the foot here. `act` outside a shell: a lone screen has no nav. */
+export const useChromeFoot = (): Foot => React.useContext(ChromeFoot);
 
 /**
  * ⚠️ A SOCKET IS OFFERED, NEVER REQUIRED. A `Screen` outside one — OneSpace, a
  * door, a presented surface — draws its own crown exactly as before, and this
  * whole mechanism is invisible to it.
  */
-export function CrownSocketProvider({ onClaim, children }: {
+export function CrownSocketProvider({ onClaim, foot, children }: {
   readonly onClaim: (claim: CrownClaim | null) => void;
+  /** ⚠️ See `Foot`. */
+  readonly foot: Foot;
   readonly children: React.ReactNode;
 }) {
-  return <CrownSocket.Provider value={onClaim}>{children}</CrownSocket.Provider>;
+  return (
+    <CrownSocket.Provider value={onClaim}>
+      <ChromeFoot.Provider value={foot}>{children}</ChromeFoot.Provider>
+    </CrownSocket.Provider>
+  );
 }
 
 /**

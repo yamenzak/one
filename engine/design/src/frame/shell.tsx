@@ -39,7 +39,7 @@ import {
 import { Page } from "./page.js";
 import { Island } from "./chrome.js";
 import {
-  Crown, CrownSocketProvider, crownFor, type CrownClaim, type Slot,
+  Crown, CrownSocketProvider, crownFor, type CrownClaim, type Foot, type Slot,
 } from "./crown.js";
 import { type Sky } from "../tokens/ambience.js";
 import { PAD, SPACE } from "../tokens/metrics.js";
@@ -429,6 +429,18 @@ export function Shell(props: ShellProps) {
   */
   const [claim, setClaim] = React.useState<CrownClaim | null>(null);
 
+  /*
+    ⚠️ WHAT IS AT THE FOOT, DECIDED BY WHAT THE SCREEN IS — see `Foot`. One of
+    the five is somewhere you navigate BETWEEN, so the foot is the navigation and
+    the act goes up to the crown. Anything else is somewhere you WENT — receiving
+    a delivery, counting a shelf, reading one product — and its act replaces the
+    nav, which is what the workspace screen has always done.
+
+    ⚠️ AN UNRECOGNISED ADDRESS IS SPECIALIZED, WHICH IS THE SAFE DIRECTION. It
+    withholds a bar rather than drawing one with nothing marked in it.
+  */
+  const foot: Foot = at?.nav === "primary" ? "nav" : "act";
+
   const named = at?.sky as Sky | undefined;
   /* ⚠️ SEEDED ON THE SCREEN'S OWN ROUTE, which is the whole gain over a name.
      Two screens of one product naming `glow` are two grounds of one material
@@ -446,26 +458,25 @@ export function Shell(props: ShellProps) {
       /* ⚠️ `only`, NOT A WRAPPER — a `md:hidden` div around a sticky element is
          its containing block, and it is exactly the nav's own height. See
          `Island`. */
-      nav={<Island
-        only="phone"
-        here={here}
-        onGo={onGo}
-        /*
-          ⚠️ THE SCREEN'S ACT, IN THE BAR — the phone half of the same
-          declaration the crown carries above `md`. It arrives through the crown
-          socket, which is already the seam a screen publishes itself through, so
-          the nav needs no second channel and cannot disagree with the crown
-          about what the button says.
-
-          ⚠️ AND `wide` IS THE CROWN'S BUSINESS, NOT THIS ONE'S. `Screen` marks
-          its act `wide` so the crown's copy is `hidden md:flex`; the bar is
-          `md:hidden` already, so exactly one of the two is ever on screen.
-        */
-        act={claim?.does}
-        items={inBar.map((s) => ({
-          id: s.id, label: s.label, route: s.route, icon: glyphOf(s.icon ?? s.id),
-        }))}
-      />}
+      /*
+        ⚠️ AND THERE IS NO NAV ON A SPECIALIZED SCREEN — see `foot`. Its one act
+        takes the foot instead, which is what the workspace screen does and what
+        `Docked`'s own rule always said: a screen has a dock or an island, never
+        both. The act used to ride INSIDE the bar, which meant a screen somebody
+        went to still offered four ways to leave it mid-decision.
+      */
+      nav={foot === "nav"
+        ? (
+          <Island
+            only="phone"
+            here={here}
+            onGo={onGo}
+            items={inBar.map((s) => ({
+              id: s.id, label: s.label, route: s.route, icon: glyphOf(s.icon ?? s.id),
+            }))}
+          />
+        )
+        : undefined}
     >
       {/*
         ------------------------------------------------------------ crown ---
@@ -519,6 +530,7 @@ export function Shell(props: ShellProps) {
                   dot: Boolean(crown.unread) }]
               : []),
           ],
+          foot,
         })}
       />
 
@@ -558,7 +570,7 @@ export function Shell(props: ShellProps) {
             failed; the screens simply did not line up with each other, which is
             the kind of thing nobody can point at and everybody feels. */}
         <main className="flex flex-1 min-w-0 flex-col">
-          <CrownSocketProvider onClaim={setClaim}>{children}</CrownSocketProvider>
+          <CrownSocketProvider onClaim={setClaim} foot={foot}>{children}</CrownSocketProvider>
         </main>
       </div>
     </Page>

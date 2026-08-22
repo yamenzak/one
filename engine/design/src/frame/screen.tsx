@@ -32,7 +32,7 @@
 import * as React from "react";
 import { Button } from "@heroui/react";
 import { Band, Page } from "./page.js";
-import { PageCrown, useCrownSocket, type Slot } from "./crown.js";
+import { PageCrown, useChromeFoot, useCrownSocket, type Slot } from "./crown.js";
 import { Docked } from "./chrome.js";
 import { sayGate, useGate } from "../parts/gated.js";
 import { TYPE } from "../tokens/type.js";
@@ -502,6 +502,11 @@ export function Screen<T = unknown>({
     also: trail, does: act,
   });
   const ownCrown = !socketed;
+  /* ⚠️ THE NAV OR THE ACT, NEVER BOTH — see `Foot`. Socketed under a shell, a
+     DESTINATION publishes its act to the crown and the foot is the navigation;
+     a specialized screen has no nav under it, so the act takes the foot here.
+     Outside a shell the answer is `act`, because a lone screen has no nav. */
+  const foot = useChromeFoot();
   /* ⚠️ A DESTINATION'S NAME IS A HEADING, NOT CHROME. With the shell's crown
      standing there is nothing to collapse into, so the name belongs in the
      content where a heading belongs — which is where it was going to end up the
@@ -571,11 +576,10 @@ export function Screen<T = unknown>({
           carries above `md`, and the crown's copy is `wide` so exactly one of
           them is ever on screen. */}
       {/*
-        ⚠️ NO DOCK WHERE A CHROME ABOVE HAS TAKEN THE ACT. Socketed, this screen
-        published its `does` to the shell — whose crown shows it above `md` and
-        whose NAV shows it below, in the bar (`Island.act`). A dock as well would
-        be the same act twice on a phone, six inches apart, which is the fault
-        `Crown`'s `wide` already exists to prevent one breakpoint over.
+        ⚠️ NO DOCK ON A DESTINATION. Its foot is the navigation and its act is in
+        the crown, so a dock as well would be the same act twice with the nav
+        between them. On a specialized screen there is no nav to share the foot
+        with, and the act is what replaces it.
 
         ⚠️ AND IT IS `Docked`'s OWN RULE, RESTORED. "A screen has this or an
         `Island`, never both" was overridden for a day: stacked, the two were
@@ -584,7 +588,7 @@ export function Screen<T = unknown>({
         the other permanently. The rule was right; what was missing was somewhere
         for the act to go.
       */}
-      {where === "act" && does && !socketed
+      {where === "act" && does && (!socketed || foot === "act")
         ? (
           <Docked width={preset.width}>
             {/* ⚠️ THE REASON IS WRITTEN OUT DOWN HERE, not put in a tooltip. This

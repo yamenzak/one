@@ -511,6 +511,9 @@ describe("the shell", () => {
        what a working screen wants in its widest slot is somewhere to type. */
     find: { label: "Search Notes", onOpen: () => {} },
     also: [act("apps"), act("inbox")],
+    /* ⚠️ A DESTINATION: the foot is the navigation, so the crown carries the
+       act. The other answer is asserted below. */
+    foot: "nav" as const,
   };
 
   it("stands the product's crown down for a screen with a way out", () => {
@@ -548,6 +551,27 @@ describe("the shell", () => {
        afford to be the one that falls off a full row; a screen with two of its
        own would otherwise show neither. */
     expect(out.also?.map((a) => a.id)).toEqual(["filter", "apps"]);
+  });
+
+  /*
+    ⚠️ AND ON A SPECIALIZED SCREEN THE CROWN LETS THE ACT GO. Its foot is the
+    act — there is no nav under it to share with — so a copy up here would be the
+    same button twice with the page between them. The nav or the act, never both.
+  */
+  it("gives the act up where the act is the foot", () => {
+    const out = crownFor(
+      { title: "Receive", also: [], does: { label: "Done", onDo: () => {} } },
+      { ...product, foot: "act" as const },
+    );
+    expect(out.does).toBeUndefined();
+  });
+
+  it("keeps the act where the foot is the navigation", () => {
+    const out = crownFor(
+      { title: "Stock", also: [], does: { label: "Receive", onDo: () => {} } },
+      product,
+    );
+    expect(out.does?.label).toBe("Receive");
   });
 
   it("is the product's own crown when no screen has spoken", () => {

@@ -414,6 +414,50 @@ const DRAWN = [...filesIn("design/src"), ...filesIn("one-space/src")];
   }
 }
 
+/* ---------------------------------------------------- built once, not per render --- */
+
+/**
+ * ⚠️ A GROUND IS COMPOSED, AND COMPOSING IT ON EVERY RENDER IS THE MOST
+ * EXPENSIVE THING IN THE PRODUCT. `worldCss` places up to `MARKS` marks and
+ * builds the markup around them; it ran unmemoised inside `useScenery`, so a
+ * poll landing, a toast opening or a crown republishing rebuilt several hundred
+ * marks into a fresh string and handed React a new element to reconcile — under
+ * a page that was often also changing. That is what made moving between screens
+ * read as the app reloading rather than as a page sliding over a world.
+ *
+ * ⚠️ AND THE KEY HAS TO BE THE CONTENTS. Every caller builds its scene inline,
+ * so a dependency on the OBJECT changes identity every render and the memo never
+ * hits once — a memo that is present and does nothing, which is worse than an
+ * absent one because it reads as solved.
+ */
+{
+  const SCENERY = "design/src/frame/page.tsx";
+  const src = readFileSync(join(ENGINE, SCENERY), "utf8");
+  const calls = [...src.matchAll(/worldCss\(/g)];
+  if (!calls.length) {
+    fail(`${SCENERY}: composes no world — this guard is reading the wrong file, `
+      + `and would report green over a page that rebuilds its ground per render.`);
+  } else {
+    /* ⚠️ EVERY CALL, because one memoised and one not is the same fault with a
+       green check over it. The window is the line and what precedes it. */
+    const loose = calls.filter((m) => {
+      const before = src.slice(Math.max(0, m.index - 400), m.index);
+      return !/useMemo\(/.test(before);
+    });
+    if (loose.length) {
+      fail(`${SCENERY}: composes a world outside a \`useMemo\` (${loose.length} call(s)).\n` +
+           `       A ground is hundreds of marks and a string; built per render it is the\n` +
+           `       largest thing on the page, replaced under a page that is also changing.`);
+    } else if (!/scene\?\.(?:family|seed)/.test(src)) {
+      fail(`${SCENERY}: memoises on something other than the scene's contents.\n` +
+           `       Callers build their scene inline, so a dependency on the object never\n` +
+           `       hits — a memo that is present and does nothing.`);
+    } else {
+      ok(`ground: composed once per scene, not once per render (${calls.length} call(s))`);
+    }
+  }
+}
+
 console.log(bad
   ? `\nscene: ${bad} finding(s) — a world that is not the same world twice.`
   : `\nscene: seeded, compositor-only, masked rather than washed, sized by area, bound not built.`);

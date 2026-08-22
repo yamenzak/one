@@ -136,8 +136,31 @@ export function useScenery(
   const scene = world ?? (!sky || sky === "plain"
     ? null
     : skyWorld(sky as Exclude<Sky, "plain">, seedling ?? sky));
-  if (!scene) return { attrs: { "data-sky": "plain" }, field: null };
-  const own = worldCss(scene, { night, density, still });
+
+  /*
+    ⚠️ MEMOISED ON WHAT DECIDES THE DRAWING, AND IT WAS NOT MEMOISED AT ALL.
+    `worldCss` composes the whole field — up to `MARKS` placements and the
+    markup around them — and it ran on EVERY RENDER of the page. Not every
+    navigation: every render. A poll landing, a toast opening, a crown claim
+    republishing, anything at all above this rebuilt several hundred marks into
+    a fresh string and handed React a brand-new element to reconcile.
+
+    ⚠️ WHICH IS WHY MOVING BETWEEN SCREENS READ AS THE APP RELOADING. The ground
+    is the largest thing on the page; replacing it wholesale under a page that
+    is also changing is two full repaints where the design intends one slide
+    over a world that stays put.
+
+    ⚠️ AND THE KEY IS THE CONTENTS, NEVER THE OBJECT. Every caller builds its
+    scene inline, so a dependency on `scene` itself changes identity on every
+    render and the memo would never hit once — the exact shape that makes a
+    memo look present and do nothing.
+  */
+  const own = React.useMemo(
+    () => (scene ? worldCss(scene, { night, density, still }) : null),
+    [scene?.family, scene?.deep, scene?.lit, scene?.seed, night, density, still],
+  );
+
+  if (!scene || !own) return { attrs: { "data-sky": "plain" }, field: null };
   return {
     /*
       ⚠️ THE FAMILY'S OWN NAME, AND IT USED TO SAY `world` FOR ALL SEVEN. Nothing
