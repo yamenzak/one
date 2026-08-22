@@ -21,7 +21,7 @@
  */
 
 import {
-  AmountRow, BarChart, ChartPanel, Group, Hero, LineChart, NoteRow, Num,
+  AmountRow, BarChart, ChartPanel, Group, Hero, LineChart, NavRow, NoteRow, Num,
   Screen, Segmented, Stat, StatRow, glyphOf, type Loaded,
 } from "@engine/design";
 
@@ -51,6 +51,12 @@ export interface ReportsProps {
   readonly onSpan: (of: Span) => void;
   readonly again: () => void;
   readonly onOpen: (product: string) => void;
+  /**
+   * ⚠️ THE LAST STEP OF THIS SCREEN'S OWN WORKFLOW. The list above says what to
+   * buy, how much and how long the shelf lasts; without a way to the people it
+   * is bought from, the decision it worked out is finished somewhere else.
+   */
+  readonly onSuppliers: () => void;
 }
 
 const SPANS: readonly { readonly id: Span; readonly label: string }[] = [
@@ -75,7 +81,7 @@ export const sayCover = (days: number): string => {
   return `${Math.floor(days)} days left`;
 };
 
-export function Reports({ title, of, span, onSpan, again, onOpen }: ReportsProps) {
+export function Reports({ title, of, span, onSpan, again, onOpen, onSuppliers }: ReportsProps) {
   return (
     <Screen
       shape="figure"
@@ -209,6 +215,11 @@ export function Reports({ title, of, span, onSpan, again, onOpen }: ReportsProps
                   Everything lasts longer than a delivery takes
                 </NoteRow>
               )}
+            {/* ⚠️ INSIDE THE LIST IT FINISHES, NOT IN A GROUP OF ITS OWN. Who to
+                ring is already on every row above; this is the same subject one
+                step further, and a section between them would put a heading
+                between a decision and the act it ends in. */}
+            <NavRow icon={glyphOf("people")} label="Suppliers" onOpen={onSuppliers} />
           </Group>
         </>
       )}

@@ -495,6 +495,7 @@ export function InventoryScreen({ route, onGo }: {
           onTake={nothing}
           onOpen={nothing}
           onPiece={nothing}
+          onLabel={nothing}
         />
       );
     /* ⚠️ THE GROUND SHOWS THE ANSWER RATHER THAN THE CAMERA'S FIRST SECOND. A
@@ -640,6 +641,7 @@ export function InventoryScreen({ route, onGo }: {
           onSpan={nothing}
           again={nothing}
           onOpen={() => go("/thing")}
+          onSuppliers={nothing}
         />
       );
     case "/labels":
@@ -797,7 +799,16 @@ export function InventoryScreen({ route, onGo }: {
           again={nothing}
           onGo={setHere}
           onOpen={() => go("/thing")}
-          onAdd={nothing}
+          onAdd={() => go("/receive")}
+          onDue={() => go("/due")}
+          onImport={() => go("/import")}
+          onSuppliers={() => go("/suppliers")}
+          /* ⚠️ THE GROUND SHOWS THE ROW, because the state worth photographing
+             is the one a new workspace actually lands on. A specimen board that
+             only ever draws the finished case is a board that cannot say what
+             the first morning looks like. */
+          onStart={() => go("/start")}
+          held={HELD}
         />
       );
   }

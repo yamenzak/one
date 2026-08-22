@@ -1277,6 +1277,7 @@ describe("the reports", () => {
         of={ready(said)}
         span="month"
         onSpan={() => undefined}
+        onSuppliers={() => undefined}
         again={() => undefined}
         onOpen={() => undefined}
       />,
@@ -1537,6 +1538,11 @@ describe("a list that is a page", () => {
         more={more}
         onMore={() => undefined}
         again={() => undefined}
+        onDue={() => undefined}
+        onImport={() => undefined}
+        onSuppliers={() => undefined}
+        onStart={null}
+        held={new Set(["product:write"])}
         onGo={() => undefined}
         onOpen={() => undefined}
         onAdd={() => undefined}

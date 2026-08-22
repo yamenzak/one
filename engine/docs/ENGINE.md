@@ -932,6 +932,10 @@ its own header, cited by other files, and doing nothing.
 | `the-worker-does-not-import-the-ground` | D51 | a list that does not name the fixture over a worker that still composes it |
 | `the-product-loader-does-not-name-the-ground` | D17 | a customer opening the fixture's screens over their own records |
 | `the-ground-has-no-live-entry-point` | D17 | the half that turns sample screens into a product's real ones coming back, which is what makes the loader entry easy to add again |
+| `a-ground-is-composed-once-per-scene` | D53 | moving between screens reads as the app reloading rather than as a page sliding over a world, because several hundred marks are rebuilt and handed to React under a page that is also changing |
+| `a-screen-off-the-bar-is-reached-from-its-subject` | D53 | a screen nothing in the product leads to — declared, mounted, rendering perfectly at an address only a person who types it can open, with every other lane green |
+| `the-chrome-slot-and-the-bar-seat-are-exclusive` | D53 | one screen offered twice in one row of chrome, and a scarce bar slot spent on a door the crown is already holding open |
+| `the-first-destination-is-the-app-s-own-root` | D53 | a product whose bar opens on its second screen — two answers to where it starts, and the one somebody lands on is unmarked |
 <!-- /generated -->
 
 ### And how well each decision is defended
@@ -991,6 +995,7 @@ its own header, cited by other files, and doing nothing.
 | D50 | Ambient motion is earned; essential motion is assumed | 2 |
 | D51 | A workspace is founded with the products somebody chose | 7 |
 | D52 | The proving ground is a fixture, and the deployment serves no fixture | 0 |
+| D53 | The navigation is five destinations, and the chrome carries the rest | 4 |
 <!-- /generated -->
 
 ---
@@ -1099,8 +1104,9 @@ that names no stage, so this list cannot grow by forgetting.
 | 78 | Ambient motion is earned, and a field has a budget | shipped |
 | 79 | A workspace is founded with the products somebody chose | shipped |
 | 80 | The ground is a fixture, and the deployment serves no fixture | shipped |
+| 81 | The navigation is five destinations, and the chrome carries the rest | shipped |
 
-**70 shipped, 10 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**71 shipped, 10 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---

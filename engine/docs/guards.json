@@ -3131,6 +3131,42 @@
       "impl": "scripts/fixture.test.mjs",
       "proves": "ground: no live",
       "fails": "the half that turns sample screens into a product's real ones coming back, which is what makes the loader entry easy to add again"
+    },
+    {
+      "id": "a-ground-is-composed-once-per-scene",
+      "protects": "D53",
+      "stage": "81",
+      "status": "live",
+      "impl": "scripts/scene.test.mjs",
+      "proves": "composed once per scene",
+      "fails": "moving between screens reads as the app reloading rather than as a page sliding over a world, because several hundred marks are rebuilt and handed to React under a page that is also changing"
+    },
+    {
+      "id": "a-screen-off-the-bar-is-reached-from-its-subject",
+      "protects": "D53",
+      "stage": "81",
+      "status": "live",
+      "impl": "scripts/reached.test.mjs",
+      "proves": "reached from its subject",
+      "fails": "a screen nothing in the product leads to — declared, mounted, rendering perfectly at an address only a person who types it can open, with every other lane green"
+    },
+    {
+      "id": "the-chrome-slot-and-the-bar-seat-are-exclusive",
+      "protects": "D53",
+      "stage": "81",
+      "status": "live",
+      "impl": "kernel/src/manifest.ts",
+      "proves": "the chrome has one slot for it",
+      "fails": "one screen offered twice in one row of chrome, and a scarce bar slot spent on a door the crown is already holding open"
+    },
+    {
+      "id": "the-first-destination-is-the-app-s-own-root",
+      "protects": "D53",
+      "stage": "81",
+      "status": "live",
+      "impl": "kernel/src/manifest.ts",
+      "proves": "home is the app's own root",
+      "fails": "a product whose bar opens on its second screen — two answers to where it starts, and the one somebody lands on is unmarked"
     }
   ]
 }

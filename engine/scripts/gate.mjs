@@ -30,7 +30,7 @@ const GUARDS = [
   "heroui", "ground", "motion", "metrics", "rhythm", "travel", "cards", "glyphs", "attrs", "showcase", "states", "shape", "face", "scene",
   "gates",
   "present", "keys",
-  "provenance", "surface", "space", "doors", "services", "agent", "access", "package",
+  "provenance", "surface", "space", "doors", "services", "agent", "access", "package", "reached",
   "operator", "jobs", "ledger-chokepoint", "reach", "item-life", "ai-commits", "release-ladder", "job-tells", "label-once", "inferred-consumption", "one-planner", "input-checked", "screen-index", "ai-action", "vault", "workspace", "edit", "problem", "descend", "settings", "rules", "bundle", "capability", "routed", "dossier", "infra", "logs",
 ];
 

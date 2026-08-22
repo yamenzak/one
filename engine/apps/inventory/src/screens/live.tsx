@@ -355,8 +355,31 @@ function both<A, B, C>(a: Loaded<A>, b: Loaded<B>, join: (a: A, b: B) => C): Loa
   return ready(join(a.data, b.data));
 }
 
-const STOCK = (api: Door) => function StockHere({ go }: Mounted) {
+const STOCK = (api: Door) => function StockHere({ app, go }: Mounted) {
   const world = useWorld(api);
+  /* ⚠️ WHAT THIS PERSON HOLDS COMES WITH THE PRODUCT, NOT FROM A SECOND
+     REQUEST — the centre already resolved it to draw the nav. Same narrowing
+     `START` does, for the same reason. */
+  const held = React.useMemo(
+    () => new Set((app as { readonly permissions?: readonly string[] }).permissions ?? []),
+    [app],
+  );
+  /*
+    ⚠️ THE GUIDE IS ASKED FOR HERE BECAUSE THIS IS WHERE IT IS OFFERED, and it
+    is the only read on this screen whose ANSWER may be nothing at all. A
+    workspace that has finished the checklist gets no row; while the answer is
+    still coming it gets no row either, because a "Getting started" that appears
+    a beat after the list and then leaves again is a row that moved under
+    somebody's thumb.
+  */
+  const far = useAsked<Far>(() => api.get("guide.view"));
+  const got = far.of.status === "ready" ? far.of.data : null;
+  /* ⚠️ THE EVENTS, NOT THE STEPS — `guide.view` counts what HAPPENED, and a
+     step is done when its `done` event is among them. Comparing step ids
+     against those keys would find no overlap and hold the row open for ever. */
+  const left = got
+    ? Object.values(INVENTORY.guide ?? {}).filter((s) => !(s.done in got.counts)).length
+    : 0;
   /* ⚠️ WHERE THE READER IS IN THE TREE, HELD HERE. It is not in the address on
      purpose: narrowing a list is a filter rather than a destination, and putting
      it in the path would make the back button undo a filter one step at a time
@@ -391,10 +414,16 @@ const STOCK = (api: Door) => function StockHere({ go }: Mounted) {
       again={world.again}
       onGo={setHere}
       onOpen={(line) => go(`/thing/${line.id}`)}
-      /* ⚠️ NOT WIRED YET, AND SAYING SO IS THE HONEST STATE. Putting stock on a
-         shelf is its own screen with a scanner in it (OI-6); a button that
-         silently does nothing is the defect this file exists to avoid. */
-      onAdd={() => undefined}
+      /* ⚠️ RECEIVING IS STOCK'S OWN ACT, AND THIS IS THE ONE PLACE IT IS
+         OFFERED. It was `() => undefined` with a comment calling that honest;
+         it stopped being honest the moment `/receive` existed, and it was the
+         only thing standing between the screen and the session it names. */
+      onAdd={() => go("/receive")}
+      onDue={() => go("/due")}
+      onImport={() => go("/import")}
+      onSuppliers={() => go("/suppliers")}
+      onStart={left > 0 ? () => go("/start") : null}
+      held={held}
     />
   );
 };
@@ -451,6 +480,14 @@ const THING = (api: Door) => function ThingHere({ go, at }: Mounted) {
         onGo={() => undefined}
         onOpen={() => undefined}
         onAdd={() => undefined}
+        /* ⚠️ NOTHING LEADS ANYWHERE FROM A RECORD THAT IS NOT THERE. This is
+           the empty shelf drawn over a wrong address, so its rows would be
+           offers made by a screen that is reporting a mistake. */
+        onDue={() => undefined}
+        onImport={() => undefined}
+        onSuppliers={() => undefined}
+        onStart={null}
+        held={new Set()}
       />
     );
   }
@@ -504,6 +541,7 @@ const THING = (api: Door) => function ThingHere({ go, at }: Mounted) {
       batches={batches}
       pieces={pieces}
       onPiece={(id) => go(tracking === "assembled" ? `/kit/${id}` : `/item/${id}`)}
+      onLabel={() => go("/labels")}
       /* ⚠️ OFFERED ONLY WHERE A KIT IS A THING THIS PRODUCT HAS. The operation
          refuses a kit of anything not on that rung, so a button anywhere else
          would be one that can only argue. */
@@ -566,7 +604,12 @@ const WHERE = (api: Door) => function WhereHere({ go, at }: Mounted) {
       back={() => go("/")}
       onGo={(to) => go(to ? `/where/${to}` : "/")}
       onOpen={(line) => go(`/thing/${line.id}`)}
-      onLabel={() => undefined}
+      /* ⚠️ REACHED FROM WHAT IS BEING LABELLED, which is where somebody is
+         standing when they want one — and it stays a SESSION rather than
+         becoming a print button per row, because the job is forty of them at a
+         printer. It was `() => undefined`: a control that took a press and did
+         nothing, on the screen the whole label mechanism exists for. */
+      onLabel={() => go("/labels")}
       onCopy={(value) => { void navigator.clipboard?.writeText(value); }}
     />
   );
@@ -1565,6 +1608,7 @@ const REPORTS = (api: Door) => function ReportsHere({ go }: Mounted) {
       onSpan={setSpan}
       again={said.again}
       onOpen={(product) => go(`/thing/${product}`)}
+      onSuppliers={() => go("/suppliers")}
     />
   );
 };

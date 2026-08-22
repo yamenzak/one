@@ -1605,3 +1605,58 @@ smaller. `lib/trees.mjs` is the one walk they read now.
 deployment composes that nobody decided to sell; a sample world reachable over a
 customer's own records; or a guard that names a tree by hand when a move can take
 it out of the corpus without taking it out of the check.
+
+## D53 — The navigation is five destinations, and the chrome carries the rest
+
+**A second tier is what an app reaches for instead of deciding.** `ScreenSpec`
+carried `nav: "primary" | "secondary"`. The rail drew the secondary tier as a
+list; the phone spent the fifth of its five slots on an item that opened a sheet
+of everything else. So a product with thirteen screens had thirteen places to
+look, the bar could not answer "where am I" from eight of them, and the same
+product read differently either side of the breakpoint. The ceiling was never the
+problem — the OVERFLOW was, and a ceiling with an overflow behind it is not a
+ceiling.
+
+**A screen is a destination or it belongs to a subject.** `nav` is
+`"primary" | "none"` now: one list, everything in the navigation is in it, and it
+fits. The first destination is the app's own root, because Home is where somebody
+lands and a product whose first bar item is not where it opens has two answers to
+where it starts.
+
+**The chrome has two named slots and the app declares which screen fills them.**
+`chrome: "search"` is the crown's middle — the widest slot on a working screen,
+which used to hold the workspace's name, a question nobody was asking. The door
+already says which workspace and the person chose it a moment ago.
+`chrome: "assistant"` is a button beside the notifications, because asking is
+something somebody does FROM a screen about what is on it; a destination for it
+means going somewhere first and saying what you wanted second. A screen claiming
+either and ALSO claiming a bar slot is refused: the chrome already offers it.
+
+**Where a screen's one action goes is decided by what the screen is.** A
+destination's foot is the navigation, so its act rides up into the crown. A
+screen somebody WENT to — receiving a delivery, counting a shelf, reading one
+record — has no bar at its foot, so the act takes that room instead: the widest,
+nearest thing a thumb can reach. Never both, which was `Docked`'s own rule before
+it was overridden for a day and produced 180px of an 844px phone in two objects
+with a gap between them.
+
+**Neither end of the chrome is a bar.** Both are the page's own ground with a
+hem — a gradient that dissolves content passing under them — so the world runs
+through the crown and the five destinations stand on it. The rail was the last
+plate: a column of filled buttons on a desktop against ink on a phone, which is
+one product with two designs. It wears the bar's own `data-island` treatment now
+rather than a second set of colours, and pins under the crown.
+
+**A screen off the bar is reached from what it is about, and that is checked.**
+The route is declared, the container is mounted, the screen renders at its
+address — and if no control leads there it is reachable only by typing, which
+nobody does, and every other lane reports green. Taking six screens out of a bar
+in one commit is exactly when it happens, and it did. `reached.test.mjs` matches
+the router handoff rather than the route's NAME: every container carries the
+mount table, so a check on the string passes over an app whose every control has
+been unwired.
+
+**Therefore never:** a navigation tier that overflows into a menu; a screen that
+is a destination and a chrome slot at once; a product whose first bar item is not
+its root; an act drawn twice at both ends of one screen; a chrome plate that
+stops the world at its edge; or a screen off the bar that nothing leads to.

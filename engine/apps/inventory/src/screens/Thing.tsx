@@ -13,7 +13,7 @@
  */
 
 import {
-  AmountRow, FieldRow, Group, NavRow, NoteRow, Screen, Section, Timeline, useFigures, useShown,
+  AmountRow, FieldRow, Group, NavRow, NoteRow, Screen, Section, Timeline, glyphOf, useFigures, useShown,
   type Loaded, type Moment,
 } from "@engine/design";
 import { Button } from "@heroui/react";
@@ -77,6 +77,12 @@ export interface ThingProps {
   readonly onTake: () => void;
   readonly onOpen: (batch: string) => void;
   readonly onPiece: (id: string) => void;
+  /**
+   * ⚠️ THE LABEL SESSION, REACHED FROM WHAT IS BEING LABELLED. A product's own
+   * screen is where somebody is standing when they want a tag for it — the
+   * other way in is the location's, for the same reason.
+   */
+  readonly onLabel: () => void;
   /** ⚠️ Offered only on an `assembled` product — see `kit.assemble`. */
   readonly onAssemble?: () => void;
 }
@@ -121,7 +127,7 @@ const CAPTURED: Readonly<Record<string, string>> = {
 };
 
 export function Thing({
-  line, history, batches, pieces, again, back, onTake, onOpen, onPiece, onAssemble,
+  line, history, batches, pieces, again, back, onTake, onOpen, onPiece, onLabel, onAssemble,
 }: ThingProps) {
   /* ⚠️ THE READER'S OWN CONVENTIONS. A stored instant printed as it is stored is
      the database's spelling shown to somebody who told us how they write a
@@ -183,6 +189,14 @@ export function Thing({
                 />
               )
               : null}
+            {/*
+              ⚠️ A LABEL IS SOMETHING THIS PRODUCT HAS, WHICH IS WHY IT IS A ROW
+              IN ITS FACTS RATHER THAN A BUTTON IN THE CHROME. Somebody wanting
+              one is looking at the thing they want it for; the label SESSION is
+              still a session — forty at a printer, on one address — so this
+              opens it rather than printing anything.
+            */}
+            <NavRow icon={glyphOf("tag")} label="Print a label" onOpen={onLabel} />
           </Group>
 
           {/* ⚠️ BEFORE THE HISTORY, BECAUSE IT IS ABOUT WHAT HAPPENS NEXT. The
