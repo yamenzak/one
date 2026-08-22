@@ -289,10 +289,13 @@ const hemStops = (hold: number, fade: number): string => {
  * largest soft shape in the product; a ramp described by three stops shows all
  * three. `hemStops` walks an ease-out with no step wider than 18 points.
  *
- * ⚠️ `hold` IS MEASURED TO THE CONTROL'S OWN EDGE, PER EDGE, and the two are not
- * the same: the crown's controls end 3.375rem from the top and the nav's bar
- * begins 4rem from the bottom. Rounded up a notch so the solid part reaches the
- * control and stops.
+ * ⚠️ ONE GEOMETRY, BOTH EDGES, AND THAT IS THE WHOLE POINT OF ONE FUNCTION. The
+ * two used to be measured separately — the crown's controls end 3.375rem down,
+ * the nav's begin 4rem up — which is a real difference of 10 pixels and a
+ * visible difference of none. What it bought was two numbers that had to be
+ * tuned in step and never were, and a product whose head and foot were the same
+ * idea at two strengths. It is the taller of the two now, mirrored, so the top
+ * and the bottom of a screen are one shape.
  *
  * ⚠️ AND THE TOP ONE IS NOT THERE UNTIL SOMETHING IS BEHIND IT, WHICH IS THE
  * DIFFERENCE BETWEEN A VIGNETTE AND A BAR. The hem is OPAQUE — it has to be, or
@@ -327,7 +330,8 @@ const hemStops = (hold: number, fade: number): string => {
 const hem = (edge: "top" | "bottom") => {
   const far = edge === "top" ? "bottom" : "top";
   /* ⚠️ Solid to the control's edge, then twice that again in falloff — above. */
-  const [hold, fade] = edge === "top" ? [3.5, 7] : [4.25, 8.5];
+  const hold = 4.25;
+  const fade = 8.5;
   const run = hold + fade;
   return [
     `[data-hem="${edge}"]::before {`,

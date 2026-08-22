@@ -676,7 +676,16 @@ if (!uneven) ok(`peers: ${EQUALS.length} group(s) of equals share their width`);
        correct code, one reformat away. A variant prefix is excluded by name. */
     const gone =
       /(?:className=[^\n]*(?<![\w:-])hidden(?![\w-])|display:\s*["']?none)/.test(body);
-    const leaves = /transform:\s*away\s*\?/.test(body);
+    /* ⚠️ AND IT MUST NOT MOVE AT ALL. This used to REQUIRE a transform: the bar
+       left downwards while somebody scrolled, and animating that by height would
+       have been layout work on every frame. The travel is gone — the crown never
+       had one, and two ends of a screen behaving differently is what a person
+       notices — so what is worth checking inverted with it. A transform on a
+       sticky bar is not merely dead style: a transformed box still counts toward
+       the document's scrollable overflow, so the page grows while the bar is away
+       and shrinks when it returns, and the browser clamps the scroll to a document
+       that just changed size. */
+    const moves = /transform:\s*[^\n]*\b(?:away|translate)/.test(body);
 
     if (!marks || !names) {
       fail(`design/src/frame/chrome.tsx: the nav's fill and its label are not one condition (D7).\n` +
@@ -688,11 +697,15 @@ if (!uneven) ok(`peers: ${EQUALS.length} group(s) of equals share their width`);
       fail(`design/src/frame/chrome.tsx: a closed label is removed rather than narrowed.\n` +
            `       \`display: none\` takes it out of the accessibility tree, which is five\n` +
            `       unnamed buttons to the one group the icon carries nothing for.`);
-    } else if (!leaves) {
-      fail(`design/src/frame/chrome.tsx: the nav does not leave by \`transform\`.\n` +
-           `       Animating height or padding on scroll is layout work on every frame.`);
+    } else if (moves) {
+      fail(`design/src/frame/chrome.tsx: the nav moves itself.\n` +
+           `       A transformed sticky bar still counts toward the document's scrollable\n` +
+           `       overflow, so the page grows while it is away and shrinks when it comes\n` +
+           `       back — reach the foot of a long page, move a finger the other way, and it\n` +
+           `       jumps upward with nobody touching it. The hem is what handles content\n` +
+           `       arriving at a control, at both ends of the screen.`);
     } else {
-      ok(`travel: the nav names one destination, and leaves on the compositor`);
+      ok(`travel: the nav names one destination, and stays where it is`);
     }
   }
 }

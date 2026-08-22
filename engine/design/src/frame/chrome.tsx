@@ -115,12 +115,14 @@ export function Docked({ width = "read", children }: {
  * resize observer, which the equal-column pill only avoided by forcing every
  * item to the same width in the first place.
  *
- * ⚠️ IT LEAVES DOWNWARDS AND COMES BACK UP. Reading and navigating are different
- * moments: during the first the nav is in the way, during the second it is the
- * point. The whole bar translates out rather than shedding its labels, because a
- * bar that changes SHAPE while you scroll is a thing moving in the corner of the
- * eye — and a translate is the compositor's work while a height is the layout
- * engine's, on every frame of a scroll.
+ * ⚠️ IT DOES NOT LEAVE, AND THAT IS THE SAME DECISION THE CROWN MAKES. The bar
+ * used to translate out while somebody scrolled down and come back on the way
+ * up, on the argument that reading and navigating are different moments. The
+ * crown never did — it sits, and its hem dissolves what passes under it — and
+ * the two ends of one screen behaving differently is what a person actually
+ * notices: one edge of the product is furniture and the other is a thing that
+ * moves. The hem is what handles content arriving at a control, at both ends,
+ * so a bar that also hides is a second answer to a question already answered.
  *
  * ⚠️ AND THE LABEL GOES TO ZERO WIDTH, NEVER TO `display: none`. A nav that
  * removed its labels from the accessibility tree would be five unnamed buttons
@@ -188,9 +190,6 @@ export function Island({ items, here, onGo, act, only }: {
    */
   readonly only?: "phone";
 }) {
-  /* ⚠️ THE NAV'S OWN NODE — see `scrolling.ts`. */
-  const foot = React.useRef<HTMLElement>(null);
-  const away = useScrollingDown(foot);
   /* ⚠️ ALL FIVE, BECAUSE THERE IS NOTHING ELSE TO HOLD. One slot used to be
      spent on an item that opened a sheet of everywhere else; a screen is a
      destination or it belongs to a subject now, so the bar is the whole
@@ -217,7 +216,6 @@ export function Island({ items, here, onGo, act, only }: {
 
   return (
     <nav
-      ref={foot}
       aria-label="Sections"
       /* ⚠️ THE HEM IS THE NAV'S BACKGROUND — see `ambienceStylesheet`. It is on
          the NAV rather than on the bar inside it, because what has to dissolve
@@ -225,21 +223,16 @@ export function Island({ items, here, onGo, act, only }: {
          a 402px screen. */
       data-hem="bottom"
       /*
-        ⚠️ `overflow-clip` IS WHAT STOPS THE PAGE MOVING ON ITS OWN, and it is
-        the whole of the bug below. A TRANSFORMED box still counts toward the
-        document's scrollable overflow, so a sticky bar translated past the
-        bottom edge makes the page 88px TALLER while it is away — and shorter
-        again the moment it comes back. Reach the foot of a long page, move a
-        finger the other way, and the browser clamps the scroll to a document
-        that just shrank: the page jumps upward, by itself, with nobody
-        touching it. Measured synthetically: 1288 → 1376 → 1288.
-
-        ⚠️ IT IS ON THE NAV AND THE TRAVEL IS ON THE BAR INSIDE IT, because
-        clipping cannot help an element against its own transform. `clip`
-        rather than `hidden`: `hidden` makes this a scroll container, and the
-        note on `overflow-x: clip` below is the same trap one element over.
+        ⚠️ NOTHING IS CLIPPED HERE ANY MORE, BECAUSE NOTHING MOVES. This carried
+        `overflow-clip` for one reason: a TRANSFORMED box still counts toward the
+        document's scrollable overflow, so the bar translating past the bottom
+        edge made the page taller while it was away and shorter when it came
+        back — reach the foot of a long page, move a finger the other way, and it
+        jumps upward on its own. With the travel gone the clip has no job, and a
+        clip with no job is not free: it is what silently cut a destination off
+        the right edge the day two items opened at once.
       */
-      className={`sticky bottom-0 z-10 flex justify-center overflow-clip ${GUTTER} ${PAD} ${SAFE_BOTTOM}`
+      className={`sticky bottom-0 z-10 flex justify-center ${GUTTER} ${PAD} ${SAFE_BOTTOM}`
         + (only === "phone" ? " md:hidden" : "")}
     >
       {/*
@@ -266,17 +259,6 @@ export function Island({ items, here, onGo, act, only }: {
       <div
         data-island="true"
         className={`flex w-full ${WIDTH.read} flex-row items-center ${SPACE.hair} ${ISLAND_PAD}`}
-        style={{
-          /* ⚠️ PAST ITS OWN HEIGHT PLUS THE SAFE AREA, or it rests half off the
-             bottom edge on a phone with a home indicator — which reads as a bar
-             that failed to finish rather than as one that left. The distance is
-             the nav's own bottom inset, so it clears the clip exactly. */
-          transform: away
-            ? "translateY(calc(100% + max(0.75rem, env(safe-area-inset-bottom))))"
-            : "none",
-          opacity: away ? 0 : 1,
-          transition: away ? MOTION.exit : MOTION.enter,
-        }}
       >
         {shown.map((item) => {
           /* ⚠️ OPEN ONLY WHEN THERE IS NO ACT — see `act`. The bar carries one
@@ -423,25 +405,3 @@ export function Island({ items, here, onGo, act, only }: {
  * band, a focus scroll, a fixed element resizing — flips the direction, and the
  * bar folds and unfolds on its own while nobody touches anything.
  */
-/* ⚠️ AND IT WATCHES WHATEVER IS SCROLLING, NOT THE WINDOW — see `scrolling.ts`.
-   Inside a presented surface the window never moves, so the bar never left and
-   never came back: a feature that reads as absent rather than as broken. */
-function useScrollingDown(
-  ref: React.RefObject<HTMLElement | null>, threshold = 6, top = 24,
-): boolean {
-  const [down, setDown] = React.useState(false);
-  const last = React.useRef(0);
-
-  useScrolling(ref, ({ y }) => {
-    /* ⚠️ ASKED PER READING RATHER THAN ONCE AT MOUNT, because the setting is a
-       preference somebody can change while the page is open. */
-    if (typeof matchMedia === "function"
-      && matchMedia("(prefers-reduced-motion: reduce)").matches) { setDown(false); return; }
-    if (y <= top) { setDown(false); last.current = y; return; }
-    if (Math.abs(y - last.current) < threshold) return;
-    setDown(y > last.current);
-    last.current = y;
-  });
-
-  return down;
-}

@@ -10,8 +10,8 @@
  *
  * ⚠️ AND IT IS A BROWSER BECAUSE THE FAULTS WERE GEOMETRIC. Two lit items is a
  * string assertion; the destination that then fell off the right edge of a
- * `overflow-clip` bar is not, and neither is a hem whose opaque part is a
- * seventy-six pixel slab. Rendered to a string, all three are invisible.
+ * clipping bar is not, and neither is a hem's own curve. Rendered to a string,
+ * every one of them is invisible.
  */
 
 import { dirname, join } from "node:path";
@@ -115,11 +115,11 @@ describe("the bar, at the addresses a deployment uses", () => {
   });
 
   /*
-    ⚠️ AND EVERY DESTINATION IS INSIDE THE BAR. The nav is `overflow-clip` — it
-    has to be, or the bar's leaving transform makes the document taller — so a
-    row that does not fit does not wrap or scroll, it silently loses whatever
-    falls off the right edge. Two open labels was enough: five declared
-    destinations, four reachable, nothing to see.
+    ⚠️ AND EVERY DESTINATION IS INSIDE THE BAR. Two open labels pushed the row
+    past its own width, and the nav clipped — so the fifth destination was gone
+    with nothing to see: five declared, four reachable. The clip is gone with the
+    travel that needed it, but the row still has to fit, because a bar wider than
+    the screen is the same destination lost one way or another.
   */
   it("never pushes a destination off its own edge", async () => {
     for (const here of [IN, `${IN}/count`, `${IN}/reports`]) {
@@ -133,8 +133,7 @@ describe("the bar, at the addresses a deployment uses", () => {
   /*
     ⚠️ AND A NAME THAT DOES NOT FIT SHORTENS, RATHER THAN COSTING A DESTINATION.
     The open item is the only one that can grow, so it is the only one that can
-    push the row past the bar — and the nav clips, so what it pushes out is gone
-    with nothing to see.
+    push the row past the bar.
   */
   it("shortens a long name rather than losing a destination", async () => {
     for (const here of [IN, `${IN}/count`, `${IN}/reports`]) {
@@ -198,48 +197,73 @@ describe("the bar, at the addresses a deployment uses", () => {
 
     expect(stops!.at(-1)!.alpha, "the veil never reaches nothing").toBe(0);
   });
-});
 
-/**
- * A SURFACE PRESENTED OVER A PRODUCT IS STILL A PAGE, AND A PAGE SCROLLS.
- *
- * ⚠️ `scroll="inside"` PUTS THE OVERFLOW ON `Modal.Body`, AND `Over` RENDERED
- * NONE. The dialog it gives `overflow-clip` and a height capped at the viewport,
- * so the account centre showed as much as fitted and clipped the rest: the last
- * row faded under a hard edge and nothing moved. Every other lane was green,
- * because the markup was complete — only the box around it was wrong.
- *
- * ⚠️ AND THE FRAME'S THREE SCROLL READINGS WENT WITH IT. The hem's strength, the
- * crown's collapse and the nav's leaving each read `window.scrollY`, which
- * inside a presented surface is 0 for ever. Three features that looked separately
- * missing, one cause.
- */
-describe("a surface presented over a product", () => {
-  it("scrolls, rather than clipping what does not fit", async () => {
-    const code = await mounted(join(HERE, "mount", "over.tsx"));
+  /*
+    ⚠️ AND THE HEAD AND THE FOOT ARE ONE SHAPE. They were measured separately —
+    the crown's controls end 3.375rem down, the nav's begin 4rem up — which is
+    ten pixels of real difference and none anybody can see, bought at the price
+    of two numbers that had to be tuned in step and never were. A screen whose
+    two ends are the same idea at two strengths is what "it does not look like
+    the header" actually means.
+  */
+  it("hems its head and its foot with the same shape", async () => {
     const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
     await page.setContent(
-      `<!doctype html><html data-theme="dark"><head><style>${css}</style></head>`
-      + `<body><div id="root"></div><script type="module">${code}</script></body></html>`,
+      `<!doctype html><html data-theme="dark"><head><style>${css}</style></head><body>`
+      + html(
+        <Shell screens={SCREENS} here={IN} held={new Set(["any:read"])} crown={CROWN} onGo={() => {}} />,
+      )
+      + "</body></html>",
     );
-    await page.waitForFunction(
-      () => (document.body.textContent ?? "").includes("Row 40"), undefined, { timeout: 20_000 });
-    const seen = await page.evaluate(() => {
-      const all = Array.prototype.slice.call(document.querySelectorAll("*")) as HTMLElement[];
-      /* ⚠️ The one element that can actually take the content, whatever it is —
-         asked of the DOM rather than of a class name, so the answer survives the
-         library renaming its own parts. */
-      const scrollers = all.filter((el) => {
-        const how = getComputedStyle(el).overflowY;
-        return (how === "auto" || how === "scroll") && el.scrollHeight > el.clientHeight + 1;
-      });
-      return { reach: scrollers.map((el) => el.scrollHeight - el.clientHeight) };
+    const both = await page.evaluate(() => {
+      const read = (edge: string) => {
+        const el = document.querySelector(`[data-hem="${edge}"]`);
+        if (!el) return null;
+        const image = getComputedStyle(el, "::before").backgroundImage;
+        return (image.match(/oklab\([^)]*\)\s+[\d.]+px/g) ?? []).map((one) => {
+          const a = /\/\s*([\d.]+)\)/.exec(one);
+          return `${a ? a[1] : "1"}@${Math.round(Number(/([\d.]+)px/.exec(one)![1]))}`;
+        }).join(" ");
+      };
+      return { top: read("top"), bottom: read("bottom") };
     });
     await page.close();
-    /* ⚠️ AND IT REACHES THE END. A scroller a pixel deep is still a clip. */
-    expect(seen.reach.length, "nothing inside the surface can scroll — the rest is clipped")
-      .toBeGreaterThan(0);
-    expect(Math.max(...seen.reach), "the scroller cannot reach the content below it")
-      .toBeGreaterThan(400);
-  }, 180_000);
+    expect(both.top, "no top hem is painted").not.toBeNull();
+    expect(both.bottom, "the two ends of one screen are different shapes").toBe(both.top);
+  });
+
+  /*
+    ⚠️ AND THE BAR DOES NOT HIDE ITSELF. It used to translate out on the way down
+    and back on the way up; the crown never did, and two ends of one screen
+    behaving differently is the thing a person notices. The hem is what handles
+    content arriving at a control, at both ends — a bar that also leaves is a
+    second answer to a question already answered, and it took the page's own
+    height with it every time it moved.
+  */
+  it("stays put, the way the crown does", async () => {
+    const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    await page.setContent(
+      `<!doctype html><html data-theme="dark"><head><style>${css}</style></head><body>`
+      + html(
+        <Shell screens={SCREENS} here={IN} held={new Set(["any:read"])} crown={CROWN} onGo={() => {}} />,
+      )
+      + "</body></html>",
+    );
+    const moved = await page.evaluate(() => {
+      const bar = Array.prototype.slice.call(
+        document.querySelectorAll('[data-island="true"]')) as HTMLElement[];
+      const foot = bar.find((b) => b.getBoundingClientRect().width > 0);
+      const nav = foot?.closest("nav") as HTMLElement | null;
+      return {
+        /* ⚠️ Both, because the travel lived on the bar and the clip that served
+           it lived on the nav around it. */
+        transform: foot ? getComputedStyle(foot).transform : null,
+        clip: nav ? getComputedStyle(nav).overflow : null,
+      };
+    });
+    await page.close();
+    expect(moved.transform, "the bar is transformed — it still leaves").toBe("none");
+    expect(moved.clip, "the nav still clips, so it can still lose a destination")
+      .toBe("visible");
+  });
 });
