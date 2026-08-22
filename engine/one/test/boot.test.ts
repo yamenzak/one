@@ -617,6 +617,31 @@ describe("switching a product off for a workspace", () => {
     await flip(true);
   });
 
+  /**
+   * ⚠️ AND SOMEBODY IN THERE CAN OPEN IT, WHICH THE ROW ALONE DOES NOT SAY.
+   * Enabling a product is a directory row — the workspace HAS it — and nobody
+   * holds a key in a product switched on a moment ago. Without a grant the
+   * operator turns something on for a customer, the nav gains a product, and its
+   * every route answers 403 to every person in the workspace, with no way out
+   * that anybody in it can reach.
+   */
+  it("leaves the owners able to open what it switched on", async () => {
+    await flip(false);
+    await shard().prepare(
+      `UPDATE membership SET app_roles_json = '{}' WHERE tenant_id = ?`).bind(tenantId).run();
+    expect((await at(slug, "/api/product.list", { headers: { cookie } })).status).toBe(404);
+
+    expect((await flip(true)).status).toBe(200);
+    /* ⚠️ 200 RATHER THAN 403, which is the whole assertion. The route existing
+       is the row; being allowed to call it is the grant. */
+    expect((await at(slug, "/api/product.list", { headers: { cookie } })).status).toBe(200);
+
+    const row = await shard().prepare(
+      `SELECT app_roles_json AS roles FROM membership WHERE tenant_id = ? AND platform_role = 'owner'`)
+      .bind(tenantId).first<{ roles: string }>();
+    expect(JSON.parse(row!.roles)).toHaveProperty("inventory");
+  });
+
   /* ⚠️ THE OPERATOR DOOR AND NOWHERE ELSE — a switch reachable at a workspace's
      own address is a switch any member can try. */
   it("cannot be pressed from the workspace's own door", async () => {

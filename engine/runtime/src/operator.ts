@@ -25,7 +25,7 @@ import type {
 } from "@engine/kernel";
 import {
   ALLOWANCE_KEY, KEEPS_RESIDENCY, LANES as LANE_NAMES, MIN_MULTIPLIER, allowanceFor,
-  entitlementKeys, giftOver, inLane, isSearchable, laneOf,
+  entitlementKeys, foundingAppRole, giftOver, inLane, isSearchable, laneOf,
   mayIsolate,
   sayKind,
   refuseCatalogue,
@@ -55,7 +55,7 @@ import {
   disableApp, enableApp, give, giftsFor, liveAppsOfTenant, setCommercialGrant, shards,
   stopGift, tenantById, tenantBySlug, tenantsOf, waitingAlone,
 } from "./directory.js";
-import { memberFor } from "./membership.js";
+import { memberFor, membersOf, setAppRole } from "./membership.js";
 import { applyGifts } from "./gifts.js";
 import { CREDENTIALS, LANES, configState, setConfig } from "./config.js";
 import { parkedEvents } from "./stripe.js";
@@ -525,10 +525,41 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
            The other order opens a window in which the product is on and every
            one of its reads answers "no such table", and that window is the
            customer's first minute with it. */
+        const shard = ctx.shardOf(tenant);
         const why = await enableApp(
-          ctx.directory, ctx.shardOf(tenant), tenantId, appId,
+          ctx.directory, shard, tenantId, appId,
           schemaFor(app), applySchema, ctx.now);
         if (why) return ctx.fail("platform.invalid");
+
+        /*
+          ⚠️ AND SOMEBODY IN THERE CAN OPEN IT, WHICH A ROW ALONE DOES NOT SAY.
+          Enabling a product is a directory row: the workspace HAS it. Nobody
+          holds a key in a product switched on a moment ago — so without this an
+          operator turns something on for a customer, the nav gains a product,
+          and its every route answers 403 to every person in the workspace. The
+          only way out was a second operator act nobody knew to perform.
+
+          ⚠️ THE OWNERS, AND NOBODY ELSE. `app.add` grants the person who pressed
+          it; there is no such person here — an operator is not a member of this
+          workspace and must not become one. The office that can hand the key
+          onward through the roster is `owner`, so the owners get it and decide
+          who else does. Handing it to the whole roster would be a grant nobody
+          made, on somebody else's staff.
+
+          ⚠️ AND `canAssign` IS BYPASSED AT THIS ONE POINT, for the reason it is
+          bypassed at the other: a grant is bounded by what the granter holds IN
+          THAT PRODUCT, and in a product nobody has ever held a key in that
+          bound is empty. The first role in any new product would be ungrantable
+          for ever.
+        */
+        const role = foundingAppRole(app.access);
+        if (role) {
+          const keys = new Set(app.access.roles[role] ?? []);
+          for (const m of await membersOf(shard, tenantId)) {
+            if (m.platformRole !== "owner" || m.appRoles[appId]) continue;
+            await setAppRole(shard, tenantId, m.id, appId, role, keys, app.access.roles);
+          }
+        }
         return { tenant: tenantId, app: appId, on: true };
       },
     },
