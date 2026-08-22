@@ -48,6 +48,50 @@ const WALK = `(el) => {
 }`;
 
 describe("the name a title card hands to the crown", () => {
+  /*
+    ⚠️ THE ROW STAYS AT THE TOP, WHICH IS NOT SOMETHING `sticky top-0` DECIDES ON
+    ITS OWN. A sticky element travels only within its PARENT, so a wrapper that
+    ends where the title card ends pins the crown for exactly as long as the card
+    is on screen and then takes it away — on the workspace centre and on every
+    screen of the operator console, while the identical component under a Shell
+    stayed up for ever because there it is a direct child of the page.
+
+    ⚠️ AND NOTHING IN THE MARKUP LOOKS WRONG. The classes are right, the styles
+    are right, the component is the same one; only the enclosure differs, and the
+    symptom needs a page long enough to scroll past its own heading. So this
+    scrolls well past it and asks where the row actually is.
+  */
+  it("keeps the row at the top of the screen, long past its own heading", async () => {
+    const page = await browser.newPage({ viewport: PHONE });
+    await page.setContent(
+      `<!doctype html><html data-theme="dark"><head><style>${css}</style></head>`
+      + `<body><div id="root"></div>`
+      + `<script type="module">${code}</script></body></html>`,
+    );
+    await page.waitForSelector("h1");
+    await page.waitForTimeout(400);
+    const seen = await page.evaluate(async () => {
+      const wait = () => new Promise((go) => { setTimeout(go, 80); });
+      const scroller = document.scrollingElement!;
+      const row = document.querySelector('[data-hem="top"]') as HTMLElement;
+      const out: { y: number; top: number }[] = [];
+      for (const y of [0, 300, 700, 1200]) {
+        scroller.scrollTo(0, y);
+        await wait();
+        out.push({ y, top: Math.round(row.getBoundingClientRect().top) });
+      }
+      return out;
+    });
+    await page.close();
+    /* ⚠️ ABSOLUTE, because a row that stopped sticking is ABOVE the screen and
+       reports a NEGATIVE top. Asserting it is not below the top passes for a
+       crown that has left the page entirely, which is the fault. */
+    const left = seen.filter((s) => Math.abs(s.top) > 1);
+    expect(left.map((s) => `${s.y}→${s.top}px`),
+      "the crown is not at the top of the screen — a sticky row travels only inside "
+      + "its parent, so something is enclosing it").toEqual([]);
+  }, 120_000);
+
   it("is on the page or in the crown, at every point of the scroll", async () => {
     const page = await browser.newPage({ viewport: PHONE });
     await page.setContent(

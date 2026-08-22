@@ -281,6 +281,18 @@ is what they did: `Crown`, `AppCrown`, `PageCrown`'s row and a hand-rolled
 `<header>` inside the Shell were one shape written four times, at four heights,
 with four answers to what a secondary action looks like.
 
+⚠️ **`PageCrown` RETURNS A FRAGMENT, AND THAT IS LOAD-BEARING.** A `sticky`
+element travels only within its parent, so a wrapper `div` around the crown and
+the title card pinned the row for exactly as long as the card it introduced was
+on screen — and then took it away. A header that leaves, on every page that draws
+its own crown (the workspace centre, the whole operator console), while the same
+component under a `Shell` stayed up for ever because there it is a direct child
+of the page. Nothing about the crown differs between the two; only what encloses
+it. So nothing may wrap it: a ref, a class, a motion wrapper — each is one line,
+each looks harmless, and each un-sticks the row with identical markup and no
+symptom until a page is long enough to scroll past its own heading.
+`handover.seen` scrolls well past one and asks where the row actually is.
+
 ⚠️ **`PageCrown` is `Crown` plus a block, not a second crown.** The row is the
 same component; what it adds is the part that is not chrome — the display
 heading, the subject's title card, and any scope row under them. A page's name is

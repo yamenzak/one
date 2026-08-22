@@ -913,8 +913,23 @@ export function PageCrown({
   const row = React.useRef<HTMLElement>(null);
   const past = useHandedOver(named, row);
 
+  /*
+    ⚠️ A FRAGMENT, NOT A BOX, AND THAT IS THE WHOLE OF WHY THE ROW STAYS UP. A
+    `sticky` element travels only within ITS PARENT — so wrapped in a div that
+    ends where the title card ends, the crown pinned to the top for exactly as
+    long as the card it introduced was on screen and then scrolled away with it.
+    A header that leaves, on every page that draws its own crown: the workspace
+    centre and the whole operator console. The same component under a Shell
+    stayed up for ever, because there it is a direct child of the page — nothing
+    about the crown differs between the two, only what encloses it.
+
+    ⚠️ AND NOTHING MAY WRAP IT AGAIN, however tidy the reason. A ref, a class, a
+    motion wrapper — each is one line, each looks harmless, and each un-sticks
+    the row silently: the markup is identical, the styles are identical, and the
+    only symptom is on a page long enough to scroll past its own heading.
+  */
   return (
-    <div>
+    <>
       <Crown
         ref={row}
         bleed={bleed}
@@ -1012,7 +1027,7 @@ export function PageCrown({
           </div>
         )}
       </Band>
-    </div>
+    </>
   );
 }
 
