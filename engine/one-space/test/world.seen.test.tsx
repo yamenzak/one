@@ -198,53 +198,49 @@ describe("the world a person actually opens", () => {
   }, 90_000);
 
   /*
-    ⚠️ AND IT LEAVES ONLY ONCE THE PAGE HAS STOPPED, WHICH IS WHAT KEEPS IT FROM
-    BLINKING. The readings behind both hems are not a smooth ramp on a real
-    phone: a fling overshoots and bounces at either end, and the browser's own
-    toolbar collapsing mid-scroll changes the viewport height underneath the
-    subtraction — so the honest answer flips several times while a thumb is still
-    moving. Answered every time, the two ends of the screen flash.
+    ⚠️ AND IT ARRIVES BY DEGREES, NOT AS A SWITCH. The strength is the amount of
+    page behind the hem, so scrolling a little from the top brings a little of it
+    — which is the whole difference between a vignette and a bar appearing. As a
+    boolean it snapped on at 8px and eased over a quarter of a second, so the
+    first flick of a thumb produced a dark strip arriving under its own steam
+    while the page moved under a different one.
 
-    ⚠️ THE WEIGHT IS IN ONE DIRECTION, AND THAT IS WHAT THIS PINS. Arriving must
-    stay instant, because a hem that waited would let a card's text read through
-    a title; leaving waits, because nothing is harmed by a vignette lingering
-    over nothing. A departure made instant again passes every other test here.
-
-    ⚠️ READ AS THE PROPERTY, NOT AS THE PAINT. `opacity` is mid-transition for a
-    quarter of a second after the answer changes, so asserting on what is drawn
-    would be measuring the easing rather than the decision.
+    ⚠️ THE MIDDLE OF THE RAMP IS WHAT THIS PINS, because both ENDS are the same
+    either way. A value that is 0 at the top and 1 further down is satisfied by
+    the switch this replaced; a value strictly between them, at a scroll offset
+    inside the veil's own depth, is only produced by a ramp.
   */
-  it("holds its hem while the page is moving, and drops it once still", async () => {
+  it("brings its hem on by degrees, not as a switch", async () => {
     const page = await browser.newPage({ viewport: PHONE });
     await page.setContent(`<!doctype html><html data-theme="dark"><head><style>${css}`
       + `</style></head><body><div id="root"></div>`
       + `<script type="module">${code}</script></body></html>`);
-    await page.waitForSelector('[data-hem="bottom"]');
+    await page.waitForSelector('[data-hem="top"]');
     await page.waitForTimeout(400);
-    const run = await page.evaluate(async () => {
-      const wait = (ms: number) => new Promise((go) => { setTimeout(go, ms); });
-      const hem = (edge: string) => getComputedStyle(document.documentElement)
-        .getPropertyValue(`--hem-${edge}`).trim();
+    const walk = await page.evaluate(async () => {
+      const wait = () => new Promise((go) => { setTimeout(go, 90); });
       const scroller = document.scrollingElement!;
-      const before = hem("bottom");
-      scroller.scrollTo(0, scroller.scrollHeight);
-      await wait(60);
-      const atOnce = { foot: hem("bottom"), top: hem("top") };
-      await wait(500);
-      const settled = { foot: hem("bottom"), top: hem("top") };
-      return { before, atOnce, settled };
+      const out: { y: number; hem: number }[] = [];
+      for (const y of [0, 16, 34, 52, 200]) {
+        scroller.scrollTo(0, y);
+        await wait();
+        out.push({ y, hem: Number(getComputedStyle(document.documentElement)
+          .getPropertyValue("--hem-top").trim() || "0") });
+      }
+      return out;
     });
     await page.close();
 
-    expect(run.before, "the foot was not hemmed to begin with").toBe("1");
-    /* ⚠️ The head is the other half of the same rule: it ARRIVES on the same
-       scroll, and arriving is never delayed. */
-    expect(run.atOnce.top, "the head's hem waited to arrive — a card's text reads "
-      + "through a title for as long as it does").toBe("1");
-    expect(run.atOnce.foot, "the foot's hem left the moment the page reached the "
-      + "end, while it was still moving").toBe("1");
-    expect(run.settled.foot, "the foot's hem never left, on a page that stopped "
-      + "with nothing behind it").toBe("0");
+    expect(walk[0]!.hem, "the head is hemmed with nothing behind it").toBe(0);
+    expect(walk.at(-1)!.hem, "the head never reaches full strength").toBe(1);
+    /* ⚠️ Strictly between, at every step inside the veil's own depth — and
+       rising, because a ramp that is not monotonic is a wobble. */
+    const middle = walk.slice(1, -1);
+    expect(middle.filter((s) => s.hem <= 0 || s.hem >= 1).map((s) => `${s.y}→${s.hem}`),
+      "the hem is fully on or fully off part-way through its own ramp, which is a "
+      + "switch wearing a gradient's name").toEqual([]);
+    expect(middle.map((s) => s.hem), "the ramp does not rise with the scroll")
+      .toEqual([...middle.map((s) => s.hem)].sort((a, b) => a - b));
   }, 90_000);
 
   /* ⚠️ AND AT A DESK TOO, because the ground is sized in viewport units and a

@@ -426,18 +426,13 @@ const hem = (edge: "top" | "bottom") => {
       missing feature should be the SAFE state, and the safe state here is the
       one that cannot let a card read through a title.
     */
+    /* ⚠️ AND NO TRANSITION, BECAUSE THE SCROLL IS THE TRANSITION. The strength
+       is the amount of page behind the hem (`useHems`), so it already moves
+       continuously with the finger — an ease on top of that is the veil lagging
+       the page it is dissolving. It carried a 260ms one for as long as the
+       property was a BOOLEAN, and a second rule to suppress that ease on the
+       first answer, and neither has anything left to do. */
     `  opacity: var(--hem-${edge}, 1);`,
-    `}`,
-    /* ⚠️ `moderate`, not `quick` — the hem arriving is ambient rather than a
-       response to a press, and at the pace of a control it reads as a flicker
-       on the first few pixels of a scroll.
-
-       ⚠️ AND IT IS A SECOND RULE, GATED ON `data-hems`, so the FIRST answer
-       lands without one. `Page` stamps the root a frame after it reads, which
-       means a screen that arrives with nothing behind its nav is drawn that way
-       rather than fading out of a hem it never should have had. */
-    `[data-hems] [data-hem="${edge}"]::before {`,
-    `  transition: ${transition("opacity", "moderate")};`,
     `}`,
   ];
 };

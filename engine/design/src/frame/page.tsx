@@ -9,12 +9,12 @@
 
 import * as React from "react";
 import type { Sky, World } from "../tokens/ambience.js";
-import { skyWorld, worldCss } from "../tokens/ambience.js";
+import { HEM_HOLD, skyWorld, worldCss } from "../tokens/ambience.js";
 import { useScrolling } from "./scrolling.js";
 import { TYPE } from "../tokens/type.js";
 import { BAND_PAD, GUTTER, NAV_SPACE, SAFE_TOP, WIDTH } from "../tokens/metrics.js";
 import type { Width } from "../tokens/metrics.js";
-import { SETTLE, transition, useMotion } from "../tokens/motion.js";
+import { transition, useMotion } from "../tokens/motion.js";
 import type { Density } from "../scene/index.js";
 
 /* ------------------------------------------------------------------ bleed --- */
@@ -336,17 +336,26 @@ export function Page(
  * page nobody has scrolled that is a flat strip of one colour across the top
  * with a pattern under it, which is a bar whatever the softness of its edge.
  *
- * ⚠️ SO THE FIX IS NOT HOW STRONG IT IS, IT IS WHEN IT IS THERE. The hem exists
- * for content passing UNDER the chrome; at scroll zero there is none, so there
- * is nothing to dissolve and the crown sits on the world.
+ * ⚠️ SO THE FIX IS NOT HOW STRONG IT IS, IT IS HOW MUCH OF IT THERE IS. The hem
+ * exists for content passing UNDER the chrome, so its strength is the amount of
+ * page behind it: nothing at rest at the top, full once a veil's depth of page
+ * has gone under, and every value in between on the way. A vignette that is
+ * halfway there is a vignette over half a row — which is exactly what is behind
+ * it — so unlike a heading at 50%, the middle of this ramp is a state and not a
+ * glitch.
+ *
+ * ⚠️ AND THAT REPLACES A THRESHOLD, A TRANSITION AND A SETTLE. It was a boolean
+ * crossed at 8px, eased over 260ms, and held on the way out until the page
+ * stopped — three mechanisms, all of them there because a boolean can BLINK. A
+ * value that moves with the finger cannot: there is no threshold to cross, so
+ * there is nothing to cross it twice. The transition went with them, because a
+ * quarter-second ease on a value the scroll is already driving is the veil
+ * lagging behind the page.
  *
  * ⚠️ IT WRITES A PROPERTY RATHER THAN SETTING STATE, so a scroll costs a style
  * write instead of a React render of every screen in the tree — and it writes
- * only when the answer CHANGES, so resting at the top costs nothing at all.
- *
- * ⚠️ AND THE THRESHOLD IS NOT ZERO. A rubber band, a focus scroll, an image
- * settling — anything that moves the page by a pixel would otherwise flicker the
- * hem on and off under somebody's hands.
+ * only when the value actually MOVES, to a hundredth, so the whole middle of a
+ * long page costs nothing at all.
  *
  * ⚠️ THE BOTTOM ONE IS THE SAME QUESTION ASKED DOWNWARDS, AND IT USED TO BE
  * ASKED BY NOBODY. `--hem-bottom` was written nowhere, so it fell to its default
@@ -363,60 +372,32 @@ export function Page(
  * (`NAV_SPACE`), so a short page's content ends ABOVE the nav and there is
  * genuinely nothing behind it.
  *
- * ⚠️ AND A HEM ARRIVES AT ONCE BUT LEAVES ONLY ONCE THE PAGE HAS STOPPED. The
- * threshold above is 8px, which is enough slack for a settling image and nothing
- * like enough for a phone. `under` is `scrollHeight - (y + innerHeight)`, and a
- * mobile browser's toolbar collapsing mid-scroll grows `innerHeight` by about
- * 56px — so near the end of a page the subtraction crosses 8 with nothing about
- * the scroll itself having changed, and a fling that overshoots and bounces
- * crosses it again on the way back. Widening the threshold does not fix that,
- * because the readings genuinely cross it; what is wrong is that the chrome
- * ANSWERS EVERY ONE.
- *
- * ⚠️ WEIGHT IN ONE DIRECTION ONLY, WHICH IS WHY IT COSTS NOTHING. Arriving stays
- * instant — a hem that waited would let a card's text read through a title,
- * which is the fault the whole layer exists for. Leaving waits for `SETTLE` ms
- * of stillness, because nothing at all is harmed by a vignette lingering a
- * moment over nothing. So the chrome cannot be made to flicker by moving the
- * page, and it is never late where being late would cost something.
- *
- * ⚠️ THE FIRST ANSWER IS EXEMPT, AND IT HAS TO BE. Both properties default to 1,
- * so a page that opens with nothing behind its crown would otherwise hold the
- * hem for a fifth of a second and then fade it out — an interface visibly
- * undoing itself in front of somebody who has just arrived, which is the same
- * fault `data-hems` exists to prevent one beat later.
+ * ⚠️ AND THE RAMP IS WHAT MAKES IT STEADY ON A PHONE, WHICH IS THE OTHER HALF.
+ * `under` is `scrollHeight - (y + innerHeight)`, and a mobile browser's toolbar
+ * collapsing mid-scroll grows `innerHeight` by about 56px — so a threshold near
+ * the end of a page gets crossed with nothing about the scroll itself having
+ * changed, and a fling that overshoots and bounces crosses it again coming back.
+ * Against a boolean each crossing is a BLINK, which needed a hold on the way out
+ * to absorb; against a ramp the same wobble is a few percent of strength on a
+ * layer nobody is looking at directly. The mechanism that answers the request is
+ * the mechanism that removes the flicker, which is the reason to prefer it over
+ * the three it replaced.
  */
-function useHems(ref: React.RefObject<HTMLElement | null>, at = 8): void {
-  /* ⚠️ EACH EDGE REMEMBERS ITS OWN LAST ANSWER, so a scroll through the middle
-     of a long page writes no style at all. */
-  const was = React.useRef<{ top: boolean | null; foot: boolean | null }>({ top: null, foot: null });
-  /* ⚠️ AND ITS OWN PENDING DEPARTURE — the two ends reach nothing at different
-     moments, so one timer for both would let the foot cancel the head's. */
-  const going = React.useRef<{ top?: number; foot?: number }>({});
+function useHems(ref: React.RefObject<HTMLElement | null>): void {
+  /* ⚠️ EACH EDGE REMEMBERS ITS OWN LAST VALUE, so a scroll through the middle of
+     a long page — where both are pinned at 1 — writes no style at all. */
+  const was = React.useRef<{ top: number | null; foot: number | null }>({ top: null, foot: null });
 
-  const settle = (edge: "top" | "foot", now: boolean) => {
-    const root = document.documentElement;
-    const prop = edge === "top" ? "--hem-top" : "--hem-bottom";
-    const write = () => root.style.setProperty(prop, now ? "1" : "0");
-    if (going.current[edge] !== undefined) {
-      clearTimeout(going.current[edge]);
-      delete going.current[edge];
-    }
-    if (now === was.current[edge]) return;
-    /* ⚠️ ARRIVING, OR ANSWERING FOR THE FIRST TIME — both immediate. */
-    if (now || was.current[edge] === null) {
-      was.current[edge] = now;
-      write();
-      return;
-    }
-    /* ⚠️ LEAVING — held until the page has been still, and re-armed by every
-       reading in between, so what it waits for is stillness rather than a fixed
-       delay after the first frame that said "nothing". */
-    going.current[edge] = setTimeout(() => {
-      delete going.current[edge];
-      was.current[edge] = false;
-      write();
-    }, SETTLE) as unknown as number;
+  const show = (edge: "top" | "foot", behind: number) => {
+    /* ⚠️ THE VEIL'S OWN OPAQUE DEPTH IS THE RAMP, which is what makes this a
+       measurement rather than a taste: full strength exactly when there is
+       enough page behind the hem to fill the part of it that hides anything. */
+    const now = Math.min(1, Math.max(0, behind / (HEM_HOLD * 16)));
+    const to = Number(now.toFixed(2));
+    if (to === was.current[edge]) return;
+    was.current[edge] = to;
+    document.documentElement.style.setProperty(
+      edge === "top" ? "--hem-top" : "--hem-bottom", String(to));
   };
 
   /* ⚠️ FROM WHATEVER IS SCROLLING, NOT FROM THE WINDOW — see `scrolling.ts`.
@@ -424,37 +405,19 @@ function useHems(ref: React.RefObject<HTMLElement | null>, at = 8): void {
      `scrollY` stays 0 there for ever, so the account centre had no vignette at
      either end and no way to get one. */
   useScrolling(ref, ({ y, under }) => {
-    settle("top", y > at);
-    /* ⚠️ THE SAME SLACK AT THIS END. A document one subpixel taller than the
-       viewport — which rounding produces on its own — would otherwise sit
-       permanently hemmed with nothing under it. */
-    settle("foot", under > at);
+    show("top", y);
+    /* ⚠️ THE SAME QUESTION ASKED DOWNWARDS: what is still below the fold is on
+       its way under the nav, and at the end of the page there is nothing left to
+       dissolve. */
+    show("foot", under);
   });
 
-  /* ⚠️ AND A PENDING DEPARTURE DOES NOT OUTLIVE THE SCREEN THAT ARMED IT — it
-     writes to the ROOT, so it would land on whatever page came next. */
   React.useEffect(() => () => {
-    for (const id of Object.values(going.current)) clearTimeout(id);
-    going.current = {};
-  }, []);
-
-  React.useEffect(() => {
-    const root = document.documentElement;
-    /* ⚠️ THE EASING IS TURNED ON AFTER THE FIRST ANSWER, NOT BEFORE IT — see the
-       `data-hems` rule in `ambienceStylesheet`. Without this a screen arriving
-       with nothing behind its nav visibly fades the hem away in front of
-       somebody who has just got there, because `opacity` transitions from the
-       stylesheet's own default. */
-    const armed = requestAnimationFrame(() => { root.dataset.hems = "on"; });
-    return () => {
-      cancelAnimationFrame(armed);
-      delete root.dataset.hems;
-      /* ⚠️ Cleared rather than left at whatever it was, because the property is
-         on the ROOT and outlives this page — a screen that unmounted while
-         scrolled would hand the next one a hem it never asked for. */
-      root.style.removeProperty("--hem-top");
-      root.style.removeProperty("--hem-bottom");
-    };
+    /* ⚠️ CLEARED RATHER THAN LEFT AT WHATEVER IT WAS, because the property is on
+       the ROOT and outlives this page — a screen that unmounted while scrolled
+       would hand the next one a hem it never asked for. */
+    document.documentElement.style.removeProperty("--hem-top");
+    document.documentElement.style.removeProperty("--hem-bottom");
   }, []);
 }
 

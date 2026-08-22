@@ -180,14 +180,23 @@ depth.
   mounts (a list resolves, an image decides its height) and neither a scroll nor
   a resize event fires for that, which is why the reading is driven by a
   `ResizeObserver` as well.
-- **It arrives at once and leaves only once the page has stopped**, and the
-  asymmetry is the whole of it. Those two readings are not a smooth ramp on a
-  real phone: the foot's is `scrollHeight - (y + innerHeight)`, and a mobile
-  browser's toolbar collapsing mid-scroll grows `innerHeight` by about 56px — so
-  near the end of a page the subtraction crosses the 8px threshold with nothing
-  about the scroll itself having changed, and a fling that overshoots and bounces
-  crosses it again coming back. Widening the threshold does not help, because the
-  readings genuinely cross it.
+- **Its STRENGTH is the amount of page behind it, and that is the whole
+  mechanism.** Nothing at rest at the top; full once a veil's own opaque depth
+  (`HEM_HOLD`) has gone under the chrome; every value in between on the way. So
+  it comes on WITH the finger rather than switching at a threshold — which is
+  what a person actually asked for, and unlike a heading at 50%, a vignette
+  halfway there is a vignette over half a row and reads as a state rather than a
+  glitch.
+- **That one property replaced three mechanisms**, and it is worth knowing why
+  they were there. It was a boolean crossed at 8px, eased over 260ms, and held on
+  the way out until the page stopped — all three because a boolean can BLINK. The
+  foot's reading is `scrollHeight - (y + innerHeight)`, and a mobile browser's
+  toolbar collapsing mid-scroll grows `innerHeight` by about 56px, so a threshold
+  near the end of a page gets crossed with nothing about the scroll itself having
+  changed. Against a ramp the same wobble is a few percent of strength on a layer
+  nobody looks at directly; there is no threshold to cross, so there is nothing
+  to cross twice. The transition went too — a quarter-second ease on a value the
+  scroll is already driving is the veil lagging the page it is dissolving.
   Arriving stays instant, because a hem that waited would let a card's text read
   through a title; leaving waits `SETTLE` (200ms of stillness, re-armed by every
   reading), because nothing is harmed by a vignette lingering over nothing. The
