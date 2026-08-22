@@ -15,7 +15,7 @@
 import * as React from "react";
 import type { Tone } from "@engine/kernel";
 import { Button, Card } from "@heroui/react";
-import { ON_SCENE } from "../tokens/ambience.js";
+import { HEM_HOLD, ON_SCENE } from "../tokens/ambience.js";
 import { TYPE } from "../tokens/type.js";
 import {
   BAND_PAD,
@@ -88,12 +88,20 @@ export function LeaveChip({
  * crown then sat empty for another third of the card — the name nowhere, on a
  * screen whose name is the reason somebody is looking at the crown.
  *
- * ⚠️ SO IT ASKS THE ONLY QUESTION THAT MATTERS: has the name reached the row
- * that is going to carry it? The name's own box against the crown's own height,
- * both measured at the reading. There is no fraction to tune, it is exact on
- * every composition — a centred hero name and a heading at the top of its block
- * hand over at the moment each disappears — and it stays right when either one
- * changes size.
+ * ⚠️ SO IT ASKS THE ONLY QUESTION THAT MATTERS: has the name reached the thing
+ * that is about to hide it? The heading's own box against the veil at the top of
+ * the page, both measured at the reading. There is no fraction to tune, it is
+ * exact on every composition — a centred hero name and a heading at the top of
+ * its block hand over at the moment each disappears — and it stays right when
+ * either one changes size.
+ *
+ * ⚠️ AND "THE NAME" IS THE HEADING, NOT THE BLOCK IT SITS IN. Measured on the
+ * block, the crown waits for the line under the name and then for the block's
+ * own bottom padding to clear it — measured on a recording of the live screen,
+ * about 150px of scroll after the heading itself had gone. What that looks like
+ * is the product losing the name entirely for a second or two: dissolved out of
+ * the page by the hem, and not yet anywhere else. A person reads the heading as
+ * the name, so the heading is what has to be somewhere at every moment.
  *
  * ⚠️ AND WHAT SCROLLS AWAY IS NOT WHAT HANDS OVER. Only the NAME dissolves at
  * the crossing; the subject's picture simply leaves the top of the screen the
@@ -114,7 +122,19 @@ export function LeaveChip({
  */
 /** ⚠️ A crown's height, for the frame where its own box is not measurable yet. */
 const LEAST = 72;
-/** ⚠️ The overlap that stops a page resting on the crossing from flickering. */
+/**
+ * ⚠️ THE CROWN TAKES THE NAME WHILE THE HEADING STILL HAS THIS MUCH SHOWING.
+ * Two reasons and neither is a defect anything here has demonstrated, which is
+ * worth saying: a hand-off with a few pixels of both is a CROSSFADE rather than
+ * a swap, and the page's copy is being dissolved by the veil while it happens so
+ * nobody reads it as the name appearing twice; and handed over at the exact line
+ * a sub-pixel box can round to "gone" on one side and "not yet" on the other.
+ * `handover.seen` steps in whole pixels and cannot land there, so this is
+ * deliberate slack rather than a fix — remove it and that guard still passes.
+ */
+const OVERLAP = 12;
+/** ⚠️ And it is given back further down again, so a page resting exactly on the
+    crossing cannot oscillate. */
 const SLACK = 24;
 
 function useHandedOver(
@@ -128,9 +148,19 @@ function useHandedOver(
   useScrolling(name, () => {
     const box = name.current?.getBoundingClientRect();
     if (!box) return;
-    /* ⚠️ MEASURED AT THE READING, not once — a crown is as tall as the safe area
-       under a notch, and a name is as tall as the words in it. */
-    const line = crown.current?.offsetHeight ?? LEAST;
+    /*
+      ⚠️ THE LINE IS WHICHEVER HIDES THE NAME FIRST, AND THE VEIL USUALLY DOES.
+      The crown's box was the whole answer for one revision and it is the wrong
+      one by four pixels on an ordinary phone: what removes a heading at the top
+      of a page is the HEM, opaque for `HEM_HOLD`, and the crown's row is drawn
+      on top of that rather than being it. Where they differ the larger wins,
+      because either one hiding the name is the name hidden — and they do differ:
+      a crown grows with the safe area under a notch and the veil does not.
+
+      ⚠️ MEASURED AT THE READING, not once — a crown is as tall as that safe
+      area, and a name is as tall as the words in it.
+    */
+    const line = Math.max(crown.current?.offsetHeight ?? LEAST, HEM_HOLD * 16) + OVERLAP;
     setPast((was) => (was ? box.bottom < line + SLACK : box.bottom < line));
   });
   return past;
@@ -932,10 +962,10 @@ export function PageCrown({
                   holds the type is WEIGHT, the mask, and `ON_SCENE` — a halo in
                   the ground's OWN colour, which has no shape and dims nothing. */}
             <span
-              /* ⚠️ AND THIS IS WHAT THE HAND-OFF WATCHES — the NAME, not the
-                   card around it. The picture keeps its own opacity and simply
+              /* ⚠️ THE WHOLE NAME BLOCK FADES — the heading and the line under
+                   it belong together — while what the crossing WATCHES is the
+                   heading alone. The picture keeps its own opacity and simply
                    scrolls away under the hem. */
-              ref={named}
               /* ⚠️ `relative` IS NOT COSMETIC HERE. The orb carries a
                    `mask-image`, and a mask CREATES A STACKING CONTEXT — so the
                    picture paints after in-flow content and the name vanished
@@ -955,7 +985,14 @@ export function PageCrown({
                     and it used to inherit, so it came out a dusty grey wherever
                     something up the tree was quiet. Fixed here it would have
                     been fixed for one of the callers. */}
-              <h1 className={TYPE.wordmark}>{title}</h1>
+              {/* ⚠️ AND THE HEADING IS WHAT THE CROSSING MEASURES — see
+                    `useHandedOver`. Measured on the block instead, the crown
+                    waits for the line under the name AND the block's own bottom
+                    padding to clear it, which is 150px of scroll after the
+                    heading itself has gone. */}
+              <h1 ref={named as React.RefObject<HTMLHeadingElement>} className={TYPE.wordmark}>
+                {title}
+              </h1>
               {under}
             </span>
           </div>

@@ -289,19 +289,30 @@ one element cannot be both, so the big one lives in the content and the crown
 carries the compact copy that replaces it once it has scrolled away.
 
 ⚠️ **The hand-off is ONE crossing, it is a POSITION rather than a distance, and
-what dissolves is the name alone.** Three distances were tried and every one was
-a fraction of something that is not the thing being handed over: 56px flat, 62%
-of the block, 85% of the card. The last is the clearest — a hero's name is
-*centred* in its card, so it leaves the screen at the halfway mark and the crown
-then sat empty for another third of the card. What is actually being asked is
-whether the name has reached the row that will carry it, which is one rect
-against another and has no number in it: the name's own box against the crown's
-measured height. The block asks it once and hands the answer to the crown as
-`carried`; the crown reads that and nothing else, because with both of them
-answering separately the small name arrived at 45px while the planet was still
-filling the page. What travels is the SUBJECT, face and all — and only the name
-fades, because fading the whole card takes the picture out in front of somebody
-still looking at it.
+the thing measured is the HEADING.** Every version of this that failed measured a
+fraction of something that is not what is being handed over — 56px flat, 62% of
+the block, 85% of the card, then the name's whole block. The block is the
+instructive one: it includes the line under the name and the block's own bottom
+padding, so on a recording of the live screen the crown waited about 150px of
+scroll after the heading itself had gone, and the product had no name anywhere
+for two seconds.
+
+What is actually being asked is whether the name has reached the thing about to
+hide it, which is one rect against another and has no fraction in it: the
+heading's box against the veil at the top of the page. The line is
+`max(crown height, HEM_HOLD)` — the hem is what removes a heading and the crown's
+row is drawn on top of it, and they differ, because a crown grows with the safe
+area under a notch and the veil does not. The block asks it once and hands the
+answer to the crown as `carried`; the crown reads that and nothing else, because
+with both of them answering separately the small name arrived at 45px while the
+planet was still filling the page. What travels is the SUBJECT, face and all —
+and only the name fades, because fading the whole card takes the picture out in
+front of somebody still looking at it.
+
+⚠️ **And the rule that actually holds is about the OUTCOME, not the mechanism**
+(`handover.seen`): scrolling a page about a named thing, the name is either on
+the page or in the crown, and there is no moment where it is in neither. Two
+mechanisms passed their own tests while failing that.
 
 ⚠️ **`find` is a typed declaration, not children**, for the reason `who` is: the
 widest, most-seen element in the product is exactly the one that otherwise

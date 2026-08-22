@@ -282,6 +282,18 @@ const hemStops = (hold: number, fade: number): string => {
 };
 
 /**
+ * HOW FAR THE VEIL IS FULLY OPAQUE, IN `rem`, AND THEREFORE WHERE A PAGE'S OWN
+ * CONTENT STOPS BEING READABLE AT AN EDGE.
+ *
+ * ⚠️ EXPORTED BECAUSE IT IS A FACT ABOUT THE SCREEN, NOT ONLY ABOUT THIS FILE.
+ * "Is the page's heading still legible" is the question the crown's hand-off is
+ * really asking, and the answer is this number — anything above it at the top of
+ * a page is behind solid veil. A second copy of it somewhere else would be a
+ * hand-off tuned against a hem that had since moved.
+ */
+export const HEM_HOLD = 4.25;
+
+/**
  * THE HEM, IN ONE DIRECTION OR THE OTHER.
  *
  * ⚠️ ONE FUNCTION FOR BOTH EDGES, BECAUSE THEY ARE ONE IDEA AND WOULD DRIFT AS
@@ -362,7 +374,7 @@ const hem = (edge: "top" | "bottom") => {
     reading as the ground thickening into an edge and starts reading as the page
     fading out.
   */
-  const hold = 4.25;
+  const hold = HEM_HOLD;
   const fade = 5.5;
   /*
     ⚠️ AND THE TOP OVERSHOOTS THE EDGE IT HEMS, WHICH IS NOT PADDING — IT IS THE

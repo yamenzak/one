@@ -666,11 +666,16 @@ const DRAWN = [...filesIn("design/src"), ...filesIn("one-space/src")];
   */
   const MOST = 10;
   const src = readFileSync(join(ENGINE, "design/src/tokens/ambience.ts"), "utf8");
-  const hold = /^\s*const hold = ([\d.]+);/m.exec(src);
+  /* ⚠️ READ OFF THE EXPORTED CONSTANT, because the crown's hand-off measures
+     against the same one — "is the page's name still legible" is answered by
+     how far the veil is opaque, and two copies of that number would be a
+     hand-off tuned against a hem that had since moved. */
+  const hold = /^export const HEM_HOLD = ([\d.]+);/m.exec(src);
+  const uses = /^\s*const hold = HEM_HOLD;/m.test(src);
   const fade = /^\s*const fade = ([\d.]+);/m.exec(src);
   const over = /^\s*const over = edge === "top" \? ([\d.]+) : 0;/m.exec(src);
 
-  if (!hold || !fade || !over) {
+  if (!hold || !uses || !fade || !over) {
     fail("design/src/tokens/ambience.ts: the hem's `hold`, `fade` or `over` is gone.\n" +
          "       Without the overshoot the vignette starts at the element rather than at the\n" +
          "       screen, and a band of world shows along the edge it is hemming.");
@@ -724,11 +729,21 @@ const DRAWN = [...filesIn("design/src"), ...filesIn("one-space/src")];
      second `useHandedOver` anywhere in this file is a second threshold. */
   const asked = (src.match(/useHandedOver\(/g) ?? []).length;
   const told = /carried=\{past\}/.test(src) && /const showName = !collapses \|\| !!carried/.test(src);
-  /* ⚠️ AND THE NAME IS WHAT DISSOLVES, NOT THE CARD AROUND IT. Fading the block
-     takes the picture out in front of somebody still looking at it, which is
-     the complaint this whole crossing exists to answer — so the element the
-     hand-off WATCHES is the element it fades. */
-  const watched = /ref=\{named\}[\s\S]{0,900}?opacity: past \? 0 : 1/.test(src);
+  /*
+    ⚠️ AND WHAT IS WATCHED IS THE HEADING — every `named` sits on an `h1`. On the
+    block instead, the crown waits for the line under the name and then for the
+    block's own bottom padding to clear it, and the product has no name anywhere
+    in between. It typechecks, it looks like a wrapper being tidied, and
+    `handover.seen` is the only thing that can see it.
+
+    ⚠️ AND THE PICTURE DOES NOT FADE WITH IT. The subject's own cell keeps its
+    opacity and simply scrolls away under the hem; fading the block took a planet
+    out in front of somebody still looking at it.
+  */
+  const named = [...src.matchAll(/ref=\{named\b/g)];
+  const heads = [...src.matchAll(/<h1[\s\n]+ref=\{named\b/g)];
+  const watched = named.length > 0 && named.length === heads.length
+    && !/`grid \$\{TITLE_PAD\}`[\s\S]{0,200}?opacity: past/.test(src);
 
   if (!placed || shared) {
     fail("design/src/frame/crown.tsx: the hand-off is a distance rather than a position.\n" +
@@ -746,9 +761,11 @@ const DRAWN = [...filesIn("design/src"), ...filesIn("one-space/src")];
          "       picture it replaces is still filling the page. The block measures itself\n" +
          "       and passes `carried`; the crown reads it and nothing else.");
   } else if (!watched) {
-    fail("design/src/frame/crown.tsx: the hand-off fades something other than the name.\n" +
-         "       Fading the whole card takes the subject's picture out in front of somebody\n" +
-         "       still looking at it. What dissolves is the element the crossing watches.");
+    fail("design/src/frame/crown.tsx: the hand-off watches something other than the heading.\n" +
+         "       On the block around it, the crown waits for the line under the name AND the\n" +
+         "       block's own padding to clear — and the product has no name anywhere in\n" +
+         "       between. On the subject's cell, the picture goes out in front of somebody\n" +
+         "       still looking at it. Every `named` belongs on an `h1`.");
   } else {
     ok("collapse: the name hands over where it meets the crown, and only the name goes");
   }
