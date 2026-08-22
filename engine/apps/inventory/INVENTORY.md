@@ -13,9 +13,9 @@ container in `live.tsx`, and most sub-surfaces live inside their parent's file.
 
 It is the second app on **OneEngine** and the first one built on it rather than
 migrated onto it. The framework is
-[engine/docs/ENGINE.md](engine/docs/ENGINE.md); why it is shaped that way is
-[engine/docs/BUILDING.md](engine/docs/BUILDING.md); the design language is
-[engine/design/DESIGN.md](engine/design/DESIGN.md).
+[engine/docs/ENGINE.md](../../docs/ENGINE.md); why it is shaped that way is
+[engine/docs/BUILDING.md](../../docs/BUILDING.md); the design language is
+[engine/design/DESIGN.md](../../design/DESIGN.md).
 
 ---
 
@@ -268,9 +268,9 @@ the `settings` guard enforces).
 |---|---|
 | `apps/inventory/test/*.test.ts` | the pure halves — 193 tests over ten files |
 | `apps/inventory/test/ground.screens.test.tsx` | every declared screen renders, and says the true thing — 97 |
-| `apps/inventory/test/geometry.screens.test.tsx` | every declared screen MEASURED, in real Chromium, in the frame, at a phone and a desk — 56 |
+| `apps/inventory/test/geometry.seen.test.tsx` | every declared screen MEASURED, in real Chromium, in the frame, at a phone and a desk — 56 |
 | `apps/inventory/test/acts.screens.test.tsx` | every primary action names the operation it calls, and it is real — 31 |
-| `apps/inventory/test/hazard.screens.test.tsx` | every hazard name, whole and inside its diamond, measured in a browser — 3 |
+| `apps/inventory/test/hazard.seen.test.tsx` | every hazard name, whole and inside its diamond, measured in a browser — 3 |
 
 ⚠️ **AND A DATE ON A SCREEN IS THE READER'S, NOT THE RECORD'S.** `ground.screens`
 fails on any screen that renders a stored `2026-08-19` — five did, and on the run

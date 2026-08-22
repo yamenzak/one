@@ -23,7 +23,6 @@ import { dirname, join } from "node:path";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ENGINE = join(HERE, "..");
-const ROOT = join(ENGINE, "..");
 
 let bad = 0;
 const fail = (m) => { console.error(`BAD  ${m}`); bad++; };
@@ -49,7 +48,11 @@ const INDEXED = [
   {
     app: "inventory",
     manifest: "apps/inventory/src/index.ts",
-    doc: "INVENTORY.md",
+    /* ⚠️ BESIDE THE CODE IT DESCRIBES, and rooted in `engine/` like the manifest
+       above it. This was `INVENTORY.md` at the repository root, resolved against
+       a different base from the field next to it — the asymmetry existed only
+       because the document was outside the engine, and it moved in. */
+    doc: "apps/inventory/INVENTORY.md",
     /* Where a `screens/Thing.tsx:123` reference is rooted. */
     under: "apps/inventory/src",
   },
@@ -83,7 +86,7 @@ const strip = (s) => s
 
 for (const one of INDEXED) {
   const manifest = join(ENGINE, one.manifest);
-  const doc = join(ROOT, one.doc);
+  const doc = join(ENGINE, one.doc);
   if (!existsSync(manifest) || !existsSync(doc)) {
     fail(`screen-index: ${one.app} — ${existsSync(manifest) ? one.doc : one.manifest} is missing.`);
     continue;

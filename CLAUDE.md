@@ -52,7 +52,7 @@ and which of its ideas generalise is
 `git log`. Prose below that still names Tessa is describing incidents that
 happened; the code it refers to is in history.
 
-**Everything OneInventory is lives in [INVENTORY.md](INVENTORY.md)**: Part I the
+**Everything OneInventory is lives in [engine/apps/inventory/INVENTORY.md](engine/apps/inventory/INVENTORY.md)**: Part I the
 product, Part II how it is built, **Part III the screen index** — every surface
 mapped to `file:line`. **Looking for the file that draws a screen? Part III**, and
 update it in the same commit as any screen you add or move. It is the second app
