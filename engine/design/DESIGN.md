@@ -1057,6 +1057,7 @@ Some of this is guarded and some is judgement. What is checked today:
 - `surface` — every declaration reaches a screen, and every field kind has a control.
 - `tone` — one voice — label length, description length, sentence case, full stops.
 - `travel` — the route decides the direction and the world decides the gesture; nothing else moves the page.
+- `weight` — a component nobody has drawn yet is not in the bundle they are waiting for.
 <!-- /generated -->
 
 ⚠️ **THAT LIST IS GENERATED, AND IT IS GENERATED BECAUSE IT HAD DRIFTED.** It was

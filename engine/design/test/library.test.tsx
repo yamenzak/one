@@ -8,7 +8,9 @@
  * moving a subcomponent before any screen does.
  */
 
+import type * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { prerender } from "react-dom/static";
 import { describe, expect, it } from "vitest";
 import { PLATFORM_PROBLEMS, problem } from "@engine/kernel";
 import {
@@ -19,6 +21,26 @@ import {
 } from "../src/index.js";
 
 const nothing = () => {};
+
+/**
+ * ⚠️ A LAZY CHUNK NEVER RESOLVES INSIDE `renderToStaticMarkup`, so a control
+ * that arrives in one renders as its own skeleton and nothing else. The
+ * expensive components — a calendar, a colour picker, a table — are behind
+ * `React.lazy` so their weight stays out of the entry chunk
+ * (`scripts/weight.test.mjs`), and asserting on the CONTROL means waiting for
+ * what the boundary is waiting for.
+ *
+ * ⚠️ AND IT IS `prerender` RATHER THAN A SECOND PASS. Rendering twice with a
+ * tick between reads plausibly and is wrong: the sync renderer answers a
+ * suspended boundary with its fallback rather than starting the import, so the
+ * second pass returns the same skeleton and every assertion on LENGTH passes on
+ * it. That is the shape this whole round is about — a check agreeing with the
+ * thing it exists to catch. `react-dom/static` waits.
+ */
+const drawn = async (node: React.ReactElement): Promise<string> => {
+  const { prelude } = await prerender(node);
+  return new Response(prelude as unknown as ReadableStream).text();
+};
 
 interface Row { readonly id: string; readonly who: string; readonly amount: number }
 const ROWS: readonly Row[] = [
@@ -31,8 +53,8 @@ const COLS: readonly Col<Row>[] = [
 ];
 
 describe("the listing", () => {
-  it("renders rows when ready", () => {
-    const html = renderToStaticMarkup(
+  it("renders rows when ready", async () => {
+    const html = await drawn(
       <Listing label="Test" of={ready(ROWS)} cols={COLS} rowKey={(r) => r.id} />,
     );
     expect(html).toContain("Priya");
@@ -106,7 +128,7 @@ describe("the form grammar", () => {
     expect(html).not.toContain("value=\"sk-");
   });
 
-  it("every control renders with the same four sentences", () => {
+  it("every control renders with the same four sentences", async () => {
     const opts = [{ id: "a", label: "Alpha" }, { id: "b", label: "Beta" }];
     const controls = [
       <LongText key="l" label="About" value="" onChange={nothing} help="H" />,
@@ -125,8 +147,13 @@ describe("the form grammar", () => {
       <TimeInput key="ti" label="At" onChange={nothing} />,
     ];
     for (const control of controls) {
-      const html = renderToStaticMarkup(control);
+      const html = await drawn(control);
       expect(html.length).toBeGreaterThan(40);
+      /* ⚠️ AND NOT AS ITS OWN PLACEHOLDER. A lazy control that never resolved
+         renders a skeleton, which is longer than forty characters and passes
+         the line above — so the length check alone would report every
+         split-out control as drawn while drawing none of them. */
+      expect(html, "rendered as a skeleton").not.toMatch(/data-slot="skeleton"/);
     }
   });
 

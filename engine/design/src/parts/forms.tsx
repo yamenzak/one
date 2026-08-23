@@ -27,13 +27,28 @@
 
 import * as React from "react";
 import {
-  Checkbox, CheckboxGroup, ComboBox, DateField, DateRangePicker, Description, FieldError, Input, InputGroup,
+  Checkbox, CheckboxGroup, ComboBox, Description, FieldError, Input, InputGroup,
   InputOTP, Label, ListBox, NumberField, Radio, RadioGroup, REGEXP_ONLY_DIGITS, SearchField,
-  RangeCalendar, Select, Slider, Tag, TagGroup, TextArea, TextField, TimeField, ToggleButton,
+  Select, Skeleton, Slider, Tag, TagGroup, TextArea, TextField, TimeField, ToggleButton,
   ToggleButtonGroup,
 } from "@heroui/react";
 import { dayOf, instant } from "@engine/kernel";
 import { CODE_SLOT, SPACE } from "../tokens/metrics.js";
+
+/**
+ * ⚠️ EVERY DATE SURFACE ARRIVES IN ONE CHUNK — see `pickers.tsx`. A calendar
+ * named in this file is a calendar in the entry of every app on the engine,
+ * because this is where `TextInput` lives and `TextInput` is on every screen.
+ * That is how the range picker on a report came to be downloaded before a phone
+ * could paint its loading curtain.
+ */
+const DayField = React.lazy(() =>
+  import("./pickers.js").then((m) => ({ default: m.DayField })));
+const Ranged = React.lazy(() =>
+  import("./pickers.js").then((m) => ({ default: m.Ranged })));
+
+/** ⚠️ A control-height box, so the form does not jump when the chunk lands. */
+const Waiting = () => <Skeleton className="h-10 w-full rounded-xl" />;
 
 /* ⚠️ The code box's height, beside the control that sets it. */
 export { CODE_SLOT };
@@ -84,7 +99,13 @@ export function NamedAlready({ children }: { readonly children: React.ReactNode 
   return <Named.Provider value>{children}</Named.Provider>;
 }
 
-function Naming({ children }: { readonly children: React.ReactNode }) {
+/**
+ * ⚠️ EXPORTED FOR THE SAME REASON `Tail` IS. The date surfaces live in
+ * `pickers.tsx` so their calendar stays out of the entry chunk, and a label that
+ * knows about `Named` is exactly what keeps a control in a settings ROW from
+ * printing its own name under the row that already said it.
+ */
+export function Naming({ children }: { readonly children: React.ReactNode }) {
   return <Label className={React.useContext(Named) ? "sr-only" : undefined}>{children}</Label>;
 }
 
@@ -621,20 +642,25 @@ export function Tags({ items, onRemove, ...p }: Omit<Said, "error"> & {
  * `@internationalized/date`, and a dependency for that conversion belongs to
  * the app that wants a controlled date, not to every consumer of this package.
  */
+/**
+ * ⚠️ UNCONTROLLED, REPORTING ISO — the one exception to the controlled rule, and
+ * `pickers.tsx` says why: constructing a calendar value from a string needs
+ * `@internationalized/date`, and a dependency for that conversion belongs to the
+ * app that wants a controlled date, not to every consumer of this package.
+ *
+ * ⚠️ AND THE BOUNDARY IS HERE RATHER THAN AROUND THE FORM. Without one of its
+ * own this suspended into whatever boundary happened to be above it — which in a
+ * form is every other control on it, blanked together, and in a string render is
+ * a thrown "component suspended while responding to synchronous input".
+ */
 export function DateInput({ onChange, ...p }: Said & {
   /** `YYYY-MM-DD`, or null when cleared. */
   readonly onChange: (iso: string | null) => void;
 }) {
   return (
-    <DateField onChange={(v) => onChange(v ? v.toString() : null)} {...said(p)}>
-      <Naming>{p.label}</Naming>
-      <DateField.Group>
-        <DateField.Input>
-          {(segment) => <DateField.Segment segment={segment} />}
-        </DateField.Input>
-      </DateField.Group>
-      <Tail help={p.help} error={p.error} />
-    </DateField>
+    <React.Suspense fallback={<Waiting />}>
+      <DayField {...p} onChange={onChange} />
+    </React.Suspense>
   );
 }
 
@@ -825,62 +851,18 @@ export function PeriodInput({ value, onChange, today, label = "Period", ...p }: 
         disabled={p.disabled}
       />
       {value === "custom" ? (
-        /* ⚠️ VERBOSE ON PURPOSE, AND WRITTEN ONCE. A range picker is a field
-           group, a separator, a trigger, a popover and a calendar with its own
-           header and grid — thirty lines of composition that every screen
-           wanting a date range would otherwise write again, slightly
-           differently. That is the whole argument for it being here. */
-        <DateRangePicker
-          isDisabled={p.disabled === true}
-          /* ⚠️ REPORTED ONLY WHEN BOTH ENDS ARE IN. A half-entered range is not
-             a period, and handing one on would redraw the figure over a span
-             the person is still in the middle of choosing. */
-          onChange={(v) => {
-            if (!v?.start || !v.end) return;
-            onChange("custom", { from: v.start.toString(), to: v.end.toString() });
-          }}
-        >
-          <Label className="sr-only">{label}</Label>
-          <DateField.Group fullWidth>
-            <DateField.Input slot="start">
-              {(segment) => <DateField.Segment segment={segment} />}
-            </DateField.Input>
-            <DateRangePicker.RangeSeparator />
-            <DateField.Input slot="end">
-              {(segment) => <DateField.Segment segment={segment} />}
-            </DateField.Input>
-            <DateField.Suffix>
-              <DateRangePicker.Trigger>
-                <DateRangePicker.TriggerIndicator />
-              </DateRangePicker.Trigger>
-            </DateField.Suffix>
-          </DateField.Group>
-          <DateRangePicker.Popover>
-            <RangeCalendar aria-label={label}>
-              <RangeCalendar.Header>
-                <RangeCalendar.YearPickerTrigger>
-                  <RangeCalendar.YearPickerTriggerHeading />
-                  <RangeCalendar.YearPickerTriggerIndicator />
-                </RangeCalendar.YearPickerTrigger>
-                <RangeCalendar.NavButton slot="previous" />
-                <RangeCalendar.NavButton slot="next" />
-              </RangeCalendar.Header>
-              <RangeCalendar.Grid>
-                <RangeCalendar.GridHeader>
-                  {(day) => <RangeCalendar.HeaderCell>{day}</RangeCalendar.HeaderCell>}
-                </RangeCalendar.GridHeader>
-                <RangeCalendar.GridBody>
-                  {(date) => <RangeCalendar.Cell date={date} />}
-                </RangeCalendar.GridBody>
-              </RangeCalendar.Grid>
-              <RangeCalendar.YearPickerGrid>
-                <RangeCalendar.YearPickerGridBody>
-                  {({ year }) => <RangeCalendar.YearPickerCell year={year} />}
-                </RangeCalendar.YearPickerGridBody>
-              </RangeCalendar.YearPickerGrid>
-            </RangeCalendar>
-          </DateRangePicker.Popover>
-        </DateRangePicker>
+        /* ⚠️ A RANGE PICKER IS A FIELD GROUP, A SEPARATOR, A TRIGGER, A POPOVER
+           AND A CALENDAR WITH ITS OWN HEADER AND GRID — thirty lines of
+           composition every screen wanting a date range would otherwise write
+           again, slightly differently. That is the whole argument for it being
+           in this package, and `pickers.tsx` is why it is not in this CHUNK. */
+        <React.Suspense fallback={<Waiting />}>
+          <Ranged
+            label={label}
+            disabled={p.disabled === true}
+            onChange={(dates) => onChange("custom", dates)}
+          />
+        </React.Suspense>
       ) : null}
     </div>
   );

@@ -16,16 +16,54 @@
  * will act on it.
  */
 
+import * as React from "react";
 import type { FieldSpec } from "@engine/kernel";
 import {
-  Calendar, ColorArea, ColorField, ColorPicker, ColorSlider, ColorSwatch,
-  DateField, DatePicker, Description, Input, Label, ListBox, NumberField, Select, Switch,
+  Description, Input, Label, ListBox, NumberField, Select, Skeleton, Switch,
   TextArea, TextField,
 } from "@heroui/react";
-import { parseDate, parseDateTime } from "@internationalized/date";
-import type { DateValue } from "@internationalized/date";
-import { TYPE, sentence } from "../tokens/type.js";
+import { sentence } from "../tokens/type.js";
+import { SPACE } from "../tokens/metrics.js";
 import { Tail } from "../parts/forms.js";
+import type { PickerProps } from "../parts/pickers.js";
+
+/**
+ * ⚠️ THE TWO EXPENSIVE KINDS ARE FETCHED WHEN ONE IS DRAWN, AND THIS IS THE ONE
+ * PLACE THAT DECIDES IT. A generic renderer imports every kind it can draw, so
+ * naming a calendar and a colour picker here put both in the module graph of
+ * every screen that can render a field — which is all of them. Measured: 154 KB
+ * of a 1,354 KB entry chunk, downloaded, parsed and compiled before the loading
+ * curtain could draw. See `pickers.tsx` for why it is these two and no others.
+ *
+ * ⚠️ TWO DECLARATIONS, ONE MODULE, ONE ROUND TRIP. Both resolve from the same
+ * chunk, so a form with a date and a colour on it fetches once.
+ */
+const Colour = React.lazy(() =>
+  import("../parts/pickers.js").then((m) => ({ default: m.Colour })));
+const DayPicker = React.lazy(() =>
+  import("../parts/pickers.js").then((m) => ({ default: m.DayPicker })));
+
+/**
+ * ⚠️ THE CONTROL'S OWN SHAPE WHILE ITS CODE ARRIVES, not a spinner and not
+ * nothing. A field that occupies no room until its chunk lands makes the form
+ * under it jump; these are the two bars `FormWaiting` draws, which is what every
+ * control in `forms.tsx` measures.
+ */
+const Arriving = ({ bare }: { readonly bare?: boolean }) => (
+  <div className={`flex flex-col ${SPACE.tight}`} role="status" aria-label="Loading control">
+    {bare ? null : <Skeleton className="h-4 w-28 rounded-full" />}
+    <Skeleton className="h-10 w-full rounded-xl" />
+  </div>
+);
+
+/**
+ * ⚠️ THE SUSPENSE BOUNDARY IS PER FIELD, NOT PER FORM. One boundary around the
+ * whole form would blank every control on it — including the ones already
+ * rendered — for as long as one lazy chunk took to arrive.
+ */
+const Awaited = (
+  { bare, children }: { readonly bare?: boolean; readonly children: React.ReactNode },
+) => <React.Suspense fallback={<Arriving bare={bare} />}>{children}</React.Suspense>;
 
 export interface FieldProps {
   readonly name: string;
@@ -149,129 +187,27 @@ export function Field({ name, spec, value, onChange, disabled, set, bare, error 
       );
 
     /*
-      ⚠️ A COLOUR IS THE LIBRARY'S COLOUR PICKER. This kind is declared and fell
-      through to the text case, so a workspace's brand colour was a box holding
-      `#2563eb`, to be typed correctly by somebody who already knows hex. The
-      first fix was a native `<input type="color">`, which is a swatch and
-      nothing else — no presets, no keyboard channel entry, and a browser
-      dialogue that belongs to the operating system rather than to this product.
-      `ColorPicker` is a swatch trigger over an area, a hue slider and a hex
-      field, themed like everything else (D7).
-
-      ⚠️ THE VALUE CROSSES AS A HEX STRING, because that is what is stored. The
-      picker's own `Color` object is a rendering detail and must not reach a
-      manifest's setting.
+      ⚠️ BOTH OF THESE ARRIVE IN THEIR OWN CHUNK — see the top of this file and
+      `pickers.tsx`. What stays here is the DECISION that the kind makes the
+      control; what moved is the control, because two of them cost more than
+      everything else this renderer can draw put together.
     */
     case "colour":
       return (
-        <ColorPicker
-          value={typeof value === "string" && value ? value : "#000000"}
-          onChange={(next) => onChange(next.toString("hex"))}
-        >
-          {/* ⚠️ THE TRIGGER TAKES THE DISABLED STATE, because react-aria's
-              `ColorPicker` is state and has no interactive surface of its own —
-              the trigger is the button, and it is what a person can press. */}
-          <ColorPicker.Trigger isDisabled={disabled || pending}>
-            <ColorSwatch size="lg" />
-            {bare ? null : <Label>{label}</Label>}
-            {/* ⚠️ THE VALUE IN WORDS, BECAUSE A SWATCH CANNOT SAY "UNSET". An
-                empty colour falls back to `#000000` above — it has to, the
-                picker needs one — and a black disc is indistinguishable from a
-                black somebody chose. On a dark card it is not even a disc: it
-                is a hole. So the hex is written beside it, and when there is
-                nothing it says so.
-
-                ⚠️ AND IT STAYS IN `bare`, WHERE THE LABEL DOES NOT. `bare` drops
-                the NAME because the row beside it already said that; the VALUE
-                is the one thing a trailing control is for. Dropping both left a
-                settings row whose entire answer was a coloured disc. */}
-            <span className={TYPE.note}>
-              {typeof value === "string" && value ? value : "Not set"}
-            </span>
-          </ColorPicker.Trigger>
-          <ColorPicker.Popover>
-            <ColorArea
-              aria-label={`${label} — saturation and brightness`}
-              className="max-w-full"
-              colorSpace="hsb"
-              xChannel="saturation"
-              yChannel="brightness"
-            >
-              <ColorArea.Thumb />
-            </ColorArea>
-            <ColorSlider aria-label={`${label} — hue`} channel="hue" colorSpace="hsb">
-              <ColorSlider.Track><ColorSlider.Thumb /></ColorSlider.Track>
-            </ColorSlider>
-            {/* ⚠️ The hex field stays, because a brand colour is usually one
-                somebody was GIVEN rather than one they are choosing. */}
-            <ColorField aria-label={`${label} — hex`}>
-              <ColorField.Group variant="secondary">
-                <ColorField.Prefix><ColorSwatch size="xs" /></ColorField.Prefix>
-                <ColorField.Input />
-              </ColorField.Group>
-            </ColorField>
-          </ColorPicker.Popover>
-          {/* ⚠️ THE ONE KIND WHOSE TAIL IS OUTSIDE ITS TRIGGER, because the
-              trigger is a swatch and a sentence does not belong inside it. */}
-          {tail}
-        </ColorPicker>
+        <Awaited bare={bare}>
+          <Colour {...picker({ label, value, onChange, disabled, pending, bare, invalid, tail })} />
+        </Awaited>
       );
 
-    /*
-      ⚠️ AND A DAY IS THE LIBRARY'S DATE PICKER, for the same reason. A text box
-      asking for a date gets `12/03` from half of Europe and the other half of it
-      from everywhere else; a native `<input type="date">` fixes the ambiguity
-      and hands the calendar to the operating system, which is a different
-      product appearing inside this one.
-
-      ⚠️ AN UNPARSEABLE STORED VALUE IS `null`, NOT A THROW. `parseDate` raises
-      on anything that is not exactly its format, and a row written before this
-      kind existed would take the whole screen down rather than show one empty
-      field.
-    */
     case "day":
     case "instant":
       return (
-        <DatePicker
-          value={asDate(value, spec.kind)}
-          granularity={spec.kind === "day" ? "day" : "minute"}
-          isDisabled={disabled || pending}
-          isInvalid={invalid}
-          onChange={(next) => onChange(next ? next.toString() : null)}
-          aria-label={bare ? label : undefined}
-        >
-          {bare ? null : <Label>{label}</Label>}
-          <DateField.Group fullWidth>
-            <DateField.Input>{(segment) => <DateField.Segment segment={segment} />}</DateField.Input>
-            <DateField.Suffix>
-              <DatePicker.Trigger><DatePicker.TriggerIndicator /></DatePicker.Trigger>
-            </DateField.Suffix>
-          </DateField.Group>
-          {tail}
-          <DatePicker.Popover>
-            <Calendar aria-label={label}>
-              <Calendar.Header>
-                <Calendar.YearPickerTrigger>
-                  <Calendar.YearPickerTriggerHeading />
-                  <Calendar.YearPickerTriggerIndicator />
-                </Calendar.YearPickerTrigger>
-                <Calendar.NavButton slot="previous" />
-                <Calendar.NavButton slot="next" />
-              </Calendar.Header>
-              <Calendar.Grid>
-                <Calendar.GridHeader>
-                  {(day) => <Calendar.HeaderCell>{day}</Calendar.HeaderCell>}
-                </Calendar.GridHeader>
-                <Calendar.GridBody>{(date) => <Calendar.Cell date={date} />}</Calendar.GridBody>
-              </Calendar.Grid>
-              <Calendar.YearPickerGrid>
-                <Calendar.YearPickerGridBody>
-                  {({ year }) => <Calendar.YearPickerCell year={year} />}
-                </Calendar.YearPickerGridBody>
-              </Calendar.YearPickerGrid>
-            </Calendar>
-          </DatePicker.Popover>
-        </DatePicker>
+        <Awaited bare={bare}>
+          <DayPicker
+            kind={spec.kind}
+            {...picker({ label, value, onChange, disabled, pending, bare, invalid, tail })}
+          />
+        </Awaited>
       );
 
     case "long":
@@ -312,12 +248,9 @@ export function Field({ name, spec, value, onChange, disabled, set, bare, error 
   }
 }
 
-/** ⚠️ See the `day` case — a stored value this cannot read is empty, never a throw. */
-function asDate(value: unknown, kind: "day" | "instant"): DateValue | null {
-  if (typeof value !== "string" || !value) return null;
-  try {
-    return kind === "day" ? parseDate(value) : parseDateTime(value.replace(/Z$/, ""));
-  } catch {
-    return null;
-  }
-}
+/**
+ * ⚠️ THE PROPS BOTH PICKERS TAKE, ASSEMBLED ONCE. Spreading a literal at each
+ * call site is two lists that have to agree, and the one that drifts is the one
+ * whose kind nobody opened this week.
+ */
+const picker = (of: PickerProps): PickerProps => of;

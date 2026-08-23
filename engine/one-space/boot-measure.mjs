@@ -21,6 +21,21 @@
  *
  * Measured 2026-08-23, entry 1.32 MB: curtain at 380 ms (x1), 1568 ms (x4),
  * 1924 ms (x6).
+ *
+ * After D58 took 339 KB out of the entry (1,354 → 1,015 KB): 974 ms (x4),
+ * 1278 ms (x6).
+ *
+ * ⚠️ TAKE THE READING ON A QUIET MACHINE, AND TAKE MORE THAN ONE. Samples
+ * collected while turbo was building read 1,915 ms for a build that measures
+ * 1,278 ms — which is not noise around a number, it is a different conclusion:
+ * they said the split had changed nothing. A CPU throttle multiplies whatever
+ * contention is already there.
+ *
+ * ⚠️ AND SIZE IS ONLY HALF OF IT. `main.tsx` imports the design system and the
+ * whole application, so React, react-dom and HeroUI all evaluate before
+ * `createRoot` is called at all. Shipping less shortens the wait; painting the
+ * curtain before any of that is a different fix, and this is what will measure
+ * it.
  */
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";

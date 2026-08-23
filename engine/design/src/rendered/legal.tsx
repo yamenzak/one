@@ -11,15 +11,26 @@
  * a list of company names without it answers nothing.
  */
 
+import * as React from "react";
 import type { DocumentDef, Instant, NeedBook, RopaEntry, SubProcessorBook } from "@engine/kernel";
 import { sayDate } from "@engine/kernel";
-import { Button, Card, Chip, Table } from "@heroui/react";
+import { Button, Card, Chip } from "@heroui/react";
 import { ControlRow, FieldRow, Group, NavRow } from "../parts/surfaces.js";
 import { glyphOf } from "../frame/shell.js";
 import { AgreedMark } from "../parts/marks.js";
 import { useShown } from "../parts/said.js";
+import { TableWaiting } from "../parts/state.js";
 import { SPACE } from "../tokens/metrics.js";
 import { TYPE } from "../tokens/type.js";
+
+/**
+ * ⚠️ THE REGISTER'S TABLE ARRIVES WITH THE SCREEN THAT DRAWS IT — see
+ * `listing-table.tsx`. This module is reached from `main.tsx` (the terms can be
+ * read from the sign-in screen), so a `Table` named here is a table in the entry
+ * chunk of every app on the engine.
+ */
+const Grid = React.lazy(() =>
+  import("../parts/listing-table.js").then((m) => ({ default: m.PlainTable })));
 
 export function Ropa({ rows }: { readonly rows: readonly RopaEntry[] }) {
   return (
@@ -174,28 +185,21 @@ export function SubProcessors({ book }: { readonly book: SubProcessorBook }) {
         build, while the typechecker and every suite stayed green.
       */}
       <div className="hidden md:block">
-        <Table>
-          <Table.ScrollContainer>
-            <Table.Content aria-label="Sub-processors">
-              <Table.Header>
-                <Table.Column id="who" isRowHeader>Who</Table.Column>
-                <Table.Column id="role">What they do</Table.Column>
-                <Table.Column id="where">Where</Table.Column>
-                <Table.Column id="receives">What they receive</Table.Column>
-              </Table.Header>
-              <Table.Body>
-                {all.map((p) => (
-                  <Table.Row key={p.id}>
-                    <Table.Cell>{p.name}</Table.Cell>
-                    <Table.Cell>{p.role}</Table.Cell>
-                    <Table.Cell>{p.country}</Table.Cell>
-                    <Table.Cell>{p.receives.join(", ")}</Table.Cell>
-                  </Table.Row>
-                ))}
-              </Table.Body>
-            </Table.Content>
-          </Table.ScrollContainer>
-        </Table>
+        <React.Suspense fallback={<TableWaiting cols={4} rows={Math.min(all.length, 6)} />}>
+          <Grid
+            label="Sub-processors"
+            cols={[
+              { id: "who", label: "Who" },
+              { id: "role", label: "What they do" },
+              { id: "where", label: "Where" },
+              { id: "receives", label: "What they receive" },
+            ]}
+            rows={all.map((p) => ({
+              key: p.id,
+              cells: [p.name, p.role, p.country, p.receives.join(", ")],
+            }))}
+          />
+        </React.Suspense>
       </div>
     </>
   );

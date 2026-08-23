@@ -13,6 +13,7 @@
  */
 
 import { renderToStaticMarkup } from "react-dom/server";
+import { prerender } from "react-dom/static";
 import { describe, expect, it } from "vitest";
 import {
   PLATFORM_ENTITLEMENTS, PLATFORM_ROLES, areasOn, eventsOf, primaryOf,
@@ -24,6 +25,20 @@ import {
 import { GROUND } from "../src/index.js";
 
 const html = (node: React.ReactNode): string => renderToStaticMarkup(node);
+
+/**
+ * ⚠️ AND THE SAME SCREEN, WAITED FOR, WHERE A LAZY CHUNK IS INSIDE IT. The
+ * expensive components — a calendar, a colour picker, a table — arrive in a
+ * chunk of their own so their weight stays out of the entry
+ * (`scripts/weight.test.mjs`), and `renderToStaticMarkup` answers a suspended
+ * boundary with its fallback rather than starting the import. So a screen with
+ * a table on it renders as a skeleton here, confidently, and every `toContain`
+ * fails on something that is right. `react-dom/static` waits for the boundary.
+ */
+const drawn = async (node: React.ReactNode): Promise<string> => {
+  const { prelude } = await prerender(node);
+  return new Response(prelude as unknown as ReadableStream).text();
+};
 
 /** Everything a founder holds: the platform's `owner` office ∪ the app's
     founding role (D15) — resolved exactly as `permissionsFor` would. */
@@ -112,7 +127,7 @@ describe("everything ground declares reaches a screen", () => {
   /* ⚠️ THE CATALOGUE IS THE DEPLOYMENT'S, so the shelf is fed one rather than
      reading an app's — a product has no plans of its own since the membership
      became one. What it still draws is every KEY the workspace could hold. */
-  it("renders every plan and every entitlement it sells", () => {
+  it("renders every plan and every entitlement it sells", async () => {
     /* ⚠️ ITS OWN CATALOGUE, NOT THE DEPLOYMENT'S. An app importing One's plans
        would point the dependency arrow backwards — and what is under test is
        that the shelf draws a catalogue, not which one this deployment sells. */
@@ -123,7 +138,7 @@ describe("everything ground declares reaches a screen", () => {
         credits: 1500, order: 1, includes: {} },
     ];
     const keys = { ...PLATFORM_ENTITLEMENTS, ...GROUND.entitlements };
-    const out = html(
+    const out = await drawn(
       <Shelf plans={plans} entitlements={keys} current="none" onChoose={() => {}} />,
     );
     for (const plan of plans) expect(out).toContain(plan.name);

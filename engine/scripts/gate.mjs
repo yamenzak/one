@@ -31,7 +31,7 @@ const GUARDS = [
   "gates",
   "present", "keys",
   "provenance", "surface", "space", "doors", "services", "agent", "access", "package", "reached",
-  "operator", "jobs", "ledger-chokepoint", "reach", "item-life", "ai-commits", "release-ladder", "job-tells", "label-once", "inferred-consumption", "one-planner", "input-checked", "screen-index", "ai-action", "vault", "workspace", "edit", "problem", "descend", "settings", "rules", "bundle", "capability", "routed", "dossier", "infra", "logs", "asking", "renewal",
+  "operator", "jobs", "ledger-chokepoint", "reach", "item-life", "ai-commits", "release-ladder", "job-tells", "label-once", "inferred-consumption", "one-planner", "input-checked", "screen-index", "ai-action", "vault", "workspace", "edit", "problem", "descend", "settings", "rules", "bundle", "capability", "routed", "dossier", "infra", "logs", "asking", "renewal", "weight",
 ];
 
 /* ⚠️ `tone` carries TypeScript inline and needs the stripper. Every other guard

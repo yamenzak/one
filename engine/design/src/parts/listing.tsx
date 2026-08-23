@@ -39,14 +39,31 @@
  */
 
 import * as React from "react";
-import { Pagination, Table } from "@heroui/react";
+import { Pagination } from "@heroui/react";
 import { Await, Nothing, TableWaiting, type Loaded } from "./state.js";
+import type { ListingTableProps } from "./listing-table.js";
 import type { FaceOf } from "./face.js";
 import { Group, PersonRow } from "./surfaces.js";
 import { TextInput } from "./forms.js";
 import { glyphOf } from "../frame/shell.js";
 import { SPACE } from "../tokens/metrics.js";
 import { TYPE } from "../tokens/type.js";
+
+/**
+ * ⚠️ THE GRID ARRIVES WHEN ONE IS DRAWN — see `listing-table.tsx`. Naming
+ * `Table` here put HeroUI's table, the react-aria grid under it and
+ * `@internationalized/date` under that into every screen on every app, phone
+ * home screens included. Measured: 53 KB plus 29 KB of a date library, in the
+ * entry chunk, for three screens nobody opens first.
+ *
+ * ⚠️ AND THE CAST IS WHAT KEEPS THE ROW TYPE. `React.lazy` is typed for a
+ * concrete component and erases a type parameter on the way through, so without
+ * this the grid takes `unknown` rows — and `cols` would stop being checked
+ * against the thing they read, which is the one guarantee this component has.
+ */
+const Grid = React.lazy(() =>
+  import("./listing-table.js").then((m) => ({ default: m.ListingTable }))) as unknown as
+  <T>(props: ListingTableProps<T>) => React.ReactElement;
 
 export interface Col<T> {
   readonly id: string;
@@ -188,50 +205,22 @@ export function Listing<T>(
             ) : null}
 
             <div className={asRow ? "hidden md:block" : undefined}>
-            {/* ⚠️ `Table` is the frame and `Table.Content` is the table — the
-                sorting and row-action props live on Content, which is the
-                react-aria half. Putting them on the frame typechecks nothing
-                and does nothing, silently. */}
-            <Table>
-              <Table.ScrollContainer>
-                <Table.Content
-                  aria-label={label}
-                  sortDescriptor={order ? { column: order.id, direction: order.up ? "ascending" : "descending" } : undefined}
-                  onSortChange={(d) => setOrder({ id: String(d.column), up: d.direction === "ascending" })}
-                >
-              <Table.Header>
-                {cols.map((c, i) => (
-                  <Table.Column
-                    key={c.id}
-                    id={c.id}
-                    isRowHeader={i === 0}
-                    allowsSorting={c.by !== undefined}
-                    className={c.numeric ? "text-end" : undefined}
-                  >
-                    {c.label}
-                  </Table.Column>
-                ))}
-              </Table.Header>
-              <Table.Body>
-                {shown.map((row) => (
-                  <Table.Row
-                    key={rowKey(row)}
-                    onAction={onOpen ? () => onOpen(row) : undefined}
-                  >
-                    {cols.map((c) => (
-                      <Table.Cell
-                        key={c.id}
-                        className={c.numeric ? "text-end tabular-nums" : undefined}
-                      >
-                        {c.cell(row)}
-                      </Table.Cell>
-                    ))}
-                  </Table.Row>
-                ))}
-              </Table.Body>
-                </Table.Content>
-              </Table.ScrollContainer>
-            </Table>
+              {/* ⚠️ THE FALLBACK IS THE SAME SKELETON THE LOAD USES, so the
+                  wait for the chunk and the wait for the rows look like one
+                  wait rather than two different faults. */}
+              <React.Suspense
+                fallback={<TableWaiting cols={cols.length} rows={Math.min(pageSize, 6)} />}
+              >
+                <Grid
+                  rows={shown}
+                  cols={cols}
+                  rowKey={rowKey}
+                  label={label}
+                  onOpen={onOpen}
+                  order={order}
+                  onOrder={setOrder}
+                />
+              </React.Suspense>
             </div>
             {sorted.length > pageSize ? (
               <Paged page={at} pages={pages} count={sorted.length} pageSize={pageSize} onPage={setPage} />

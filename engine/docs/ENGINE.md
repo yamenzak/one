@@ -1015,6 +1015,7 @@ its own header, cited by other files, and doing nothing.
 | D55 | A product's colour is the product's, and one family commits | 0 |
 | D56 | A tab is told its build was replaced, and reloads when its reader says so | 0 |
 | D57 | A total is one ask, and a collection nobody may read is absent from it | 0 |
+| D58 | An expensive component has one home, and it is reached lazily | 0 |
 <!-- /generated -->
 
 ---

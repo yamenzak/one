@@ -96,8 +96,19 @@ const seen = new Map(CONSUMERS.map((f) => [f.slice(ENGINE.length + 1), readFileS
  */
 const drawnBy = (name) => {
   const tag = new RegExp(`<${name}[\\s/>]`);
+  /*
+    ⚠️ AND A COMPONENT BEHIND A LAZY BOUNDARY IS DRAWN UNDER ANOTHER NAME. The
+    expensive ones — a calendar, a colour picker, a table — are reached with
+    `React.lazy(() => import("./x.js").then((m) => ({ default: m.Grid })))` so
+    their weight stays out of the entry chunk (`weight.test.mjs`), and what the
+    JSX then says is `<Grid`. Matching the tag alone reported every one of them
+    as shipped and rendered by nothing — which is this guard failing on the fix
+    rather than on the fault, and the reading that would have sent somebody to
+    put them back.
+  */
+  const handed = new RegExp(`default:\\s*\\w+\\.${name}\\b`);
   for (const [where, src] of seen) {
-    if (tag.test(src)) return where;
+    if (tag.test(src) || handed.test(src)) return where;
   }
   return null;
 };

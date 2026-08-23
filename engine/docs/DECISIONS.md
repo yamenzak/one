@@ -1800,3 +1800,48 @@ records.
 scope or reach is written separately from the list it is a count of; one scope id
 for a mixed list of collections; or a permission-filtered answer that reports a
 withheld collection as empty.
+
+---
+
+## D58 — An expensive component has one home, and it is reached lazily
+
+**A phone spent twelve seconds on the opening curtain, and the cause was one
+import list.** `rendered/field.tsx` answers "a declared field becomes a control"
+for any kind, so it named every kind it could draw — and because the design
+system has ONE barrel, a calendar and a colour picker were downloaded, parsed and
+compiled before the curtain could be painted, on every visit to every app on this
+engine, including screens with no form on them at all. Attributed through the
+source map by emitted bytes, HeroUI's calendar alone was the largest single
+module in a 1,354 KB entry chunk, and the table was the largest one after it.
+
+**Splitting one at a time saves nothing, which is the part worth writing down.**
+`Listing`'s table was moved into a module of its own and the entry did not shrink
+by a kilobyte — because the sub-processor register and the plan comparison were
+still naming `Table` two directories away, and a bundler keeps what any reachable
+module names. A heavy component has to have EXACTLY ONE static importer or it
+effectively has none, and that one importer has to be reached by `import()`
+rather than by a plain import. Both halves are the rule; either alone is a file
+move. `scripts/weight.test.mjs` checks both, and found a third date surface in
+`forms.tsx` on its first run.
+
+**The list is named rather than measured.** A byte threshold read from a built
+bundle needs a build to run, answers differently per app, and moves whenever the
+library does. These are the components a source map showed to be worth their own
+round trip; adding one is a decision somebody makes in review.
+
+**The boundary is per control, never per form.** One `Suspense` around a form
+blanks every control on it — including the ones already rendered — for as long as
+one chunk takes to arrive, and the fallback is the control's own shape rather
+than a spinner, so nothing under it jumps when the chunk lands.
+
+**And a string render cannot see past a lazy boundary.** `renderToStaticMarkup`
+answers a suspended boundary with its fallback rather than starting the import,
+so a suite that asserts on rendered markup reads the skeleton and fails on the
+fix. `react-dom/static`'s `prerender` waits; a second pass with a tick between
+does not, and passes every assertion about LENGTH while asserting nothing.
+
+**Therefore never:** a generic renderer that statically names every variant it
+can draw; a second static importer of a component that has a lazy home; a home
+reached by a plain import; one suspense boundary standing for a whole form; or a
+markup assertion taken from a renderer that cannot resolve the component under
+test.

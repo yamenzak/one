@@ -17,13 +17,21 @@ import type {
 } from "@engine/kernel";
 import * as React from "react";
 import { UNLIMITED, overdue, resolve, sayDate, sayMoney, settableBy } from "@engine/kernel";
-import { Table } from "@heroui/react";
 import { Stack } from "../parts/arrange.js";
 import { AmountRow, Group, ToggleRow } from "../parts/surfaces.js";
 import type { FaceOf } from "../parts/face.js";
 import { SPACE } from "../tokens/metrics.js";
 import { Reveal } from "../parts/blocks.js";
 import { useShown } from "../parts/said.js";
+import { TableWaiting } from "../parts/state.js";
+
+/**
+ * ⚠️ THE COMPARISON'S TABLE ARRIVES WHEN THE CATALOGUE DRAWS ONE — see
+ * `listing-table.tsx`. The design system has one barrel, so a `Table` named here
+ * is a table in the entry chunk of every app, phone home screens included.
+ */
+const Grid = React.lazy(() =>
+  import("../parts/listing-table.js").then((m) => ({ default: m.PlainTable })));
 
 /*
   ⚠️ `FlagConsole` WAS HERE AND IS GONE, AND THE GUARD IS WHY. It drew a book of
@@ -159,32 +167,19 @@ export function Shelf({ plans, entitlements, current, given, onChoose }: ShelfPr
         want and are looking for the price.
       */}
       <Reveal label="Compare what each includes">
-        <Table>
-          <Table.ScrollContainer>
-            <Table.Content aria-label="What each plan includes">
-              <Table.Header>
-                <Table.Column id="what" isRowHeader>What</Table.Column>
-                {shown.map((plan) => (
-                  <Table.Column key={plan.id} id={plan.id} className="text-end">
-                    {plan.name}
-                  </Table.Column>
-                ))}
-              </Table.Header>
-              <Table.Body>
-                {keys.map(([key, def]) => (
-                  <Table.Row key={key}>
-                    <Table.Cell>{def.label}</Table.Cell>
-                    {shown.map((plan) => (
-                      <Table.Cell key={plan.id} className="text-end tabular-nums">
-                        {saying(plan.includes[key] ?? false)}
-                      </Table.Cell>
-                    ))}
-                  </Table.Row>
-                ))}
-              </Table.Body>
-            </Table.Content>
-          </Table.ScrollContainer>
-        </Table>
+        <React.Suspense fallback={<TableWaiting cols={shown.length + 1} rows={keys.length} />}>
+          <Grid
+            label="What each plan includes"
+            cols={[
+              { id: "what", label: "What" },
+              ...shown.map((plan) => ({ id: plan.id, label: plan.name, numeric: true })),
+            ]}
+            rows={keys.map(([key, def]) => ({
+              key,
+              cells: [def.label, ...shown.map((plan) => saying(plan.includes[key] ?? false))],
+            }))}
+          />
+        </React.Suspense>
       </Reveal>
     </Stack>
   );
