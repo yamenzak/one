@@ -2135,12 +2135,50 @@ jurisdiction is set, so sending the pair is a promise that reads as kept in the
 command and is not.
 
 **⚠️ AND IT DOES NOT MOVE WHAT ALREADY EXISTS.** The databases this deployment
-is running on were made before any of this and cannot be relocated. Fixing them
-means creating new ones in the right place and moving the workspaces across —
-which the cross-residency move already does — and until that happens the numbers
-above are what the product costs.
+is running on were made before any of this. A wrongly-placed SHARD is already
+solved — `op.tenant.move` carries a workspace to a correctly-placed one, one at a
+time, with nobody else affected. The DIRECTORY is the one that cannot be moved
+that way, and D65 is how it is.
 
 **Therefore never:** a `d1 create` without a placement; a placement written into
 a workflow rather than derived from the deployment's declaration; a jurisdiction
 and a location sent together; or a residency promise that lives only in a
 document.
+
+---
+
+## D65 — A copy is verified by counting rows, and the window it needs is read, not asserted
+
+**The directory cannot be moved the way a shard is.** There is one of it, every
+door reads it, and nothing can move a workspace off it — so relocating it is an
+export, an import and a rebind, taken while nothing is writing.
+
+**A copy taken from a live database is silently short.** Every row written after
+a table was read is absent, with no error anywhere, discovered weeks later as
+records that went missing. So the window is the maintenance switch — and the
+workflow REFUSES to proceed unless it reads `readonly` or `full` out of the live
+directory itself. An input saying maintenance is on is a claim by whoever typed
+it; the switch is the fact. This is the same shape as every other guard here:
+ask the system, never the operator.
+
+**And the import reports the wrong thing.** `d1 execute --file` prints the
+statements it ran, not the rows that landed — a truncated file, a failed
+`CREATE`, and every silent `INSERT` after it all exit 0. So the copy is verified
+by counting rows per table on both sides (`copied.mjs`), the table list comes
+from the SOURCE so a table missing entirely is a refusal rather than a silence,
+and `copied.test.mjs` feeds it each class of difference and requires the refusal.
+An exit code from a tool that does not measure the thing you care about is not
+verification.
+
+**The order is the safety, and it is: rehearse, copy, verify, bind, deploy,
+probe, THEN commit.** Rehearsing with nothing bound is what turns "how long will
+the deployment be down" from a guess into a measurement, on the real data, before
+anybody is waiting. Committing the id only after the deploy has answered `/health`
+is what stops the next ordinary push re-pointing the deployment at a database
+nobody has checked. **Nothing is ever deleted** — the source database untouched
+is the rollback, and a revert is the whole of it.
+
+**Therefore never:** a copy trusted because a command exited 0; a maintenance
+window taken on an operator's word; a new id committed before the deployment it
+points at has answered; or a source deleted in the same operation that replaced
+it.

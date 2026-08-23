@@ -7,6 +7,9 @@ property that makes it worth using.** [ENGINE.md](ENGINE.md) is what exists;
 this is everything a generator cannot derive. [COST.md](COST.md) is what it
 costs to run, with the arithmetic shown — read it before optimising anything for
 money, and before fearing a bill.
+[RELOCATING.md](RELOCATING.md) is the one runbook that moves live data: a
+database's place is fixed when it is created, so putting one somewhere else is a
+copy and a rebind, and the order of the steps is the whole safety of it.
 
 ⚠️ **THIS DOCUMENT IS WRITTEN FOR SOMEBODY WITH NO MEMORY OF WRITING IT.** That
 is not a style choice. The work is long, the context that holds it is finite, and

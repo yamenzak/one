@@ -22,13 +22,13 @@
  * workflow asks rather than deciding for itself.
  */
 
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { databases, placement, SOURCE } from "./bind-ids.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const FLOW = join(HERE, "..", "..", ".github", "workflows", "engine.yml");
+const FLOWS = join(HERE, "..", "..", ".github", "workflows");
 const RECONCILER = join(HERE, "..", "runtime", "src", "cloudflare.ts");
 
 let bad = 0;
@@ -69,19 +69,37 @@ for (const { name } of bound) {
   }
 }
 
-/* ⚠️ THE WORKFLOW ASKS RATHER THAN DECIDING. A hard-coded `--location` there is
-   a second answer to a question the deployment already declares, and the two
-   drift silently — the database is simply made in the wrong place, once. */
-const flow = readFileSync(FLOW, "utf8");
-if (!/bind-ids\.mjs --place/.test(flow)) {
-  fail("engine.yml creates a D1 without asking where it goes.\n"
-    + "       `wrangler d1 create` with no placement puts the records wherever the\n"
-    + "       runner is, and nothing can move them afterwards.");
+/*
+  ⚠️ EVERY WORKFLOW THAT MAKES ONE, NOT THE ONE THAT MADE THEM FIRST. This
+  checked `engine.yml` by name — and the whole finding is that a SECOND path
+  creating a database is how the rule gets lost. Naming one file would have let
+  the next workflow be exactly that, which is a guard writing its own bug.
+*/
+const flows = readdirSync(FLOWS)
+  .filter((f) => /\.ya?ml$/.test(f))
+  .map((f) => ({ name: f, text: readFileSync(join(FLOWS, f), "utf8") }))
+  .filter((f) => /wrangler d1 create/.test(f.text));
+
+if (!flows.length) {
+  fail("no workflow creates a D1 — this half of the guard would pass over nothing.\n"
+    + "       It matches `wrangler d1 create`, so a rename disables the check\n"
+    + "       rather than failing it.");
 }
-for (const [, flag] of flow.matchAll(/wrangler d1 create[^\n]*?(--(?:location|jurisdiction))/g)) {
-  fail(`engine.yml passes ${flag} to \`d1 create\` itself.\n`
-    + "       It must come from `--place`, or the workflow and the reconciler are\n"
-    + "       two answers to where a workspace's records live.");
+
+for (const { name, text } of flows) {
+  /* ⚠️ IT ASKS RATHER THAN DECIDING. A hard-coded flag is a second answer to a
+     question the deployment already declares, and the two drift silently — the
+     database is simply made in the wrong place, once, for ever. */
+  if (!/bind-ids\.mjs --place/.test(text)) {
+    fail(`${name} creates a D1 without asking where it goes.\n`
+      + "       `wrangler d1 create` with no placement puts the records wherever the\n"
+      + "       runner is, and nothing can move them afterwards.");
+  }
+  for (const [, flag] of text.matchAll(/wrangler d1 create[^\n]*?(--(?:location|jurisdiction))/g)) {
+    fail(`${name} passes ${flag} to \`d1 create\` itself.\n`
+      + "       It must come from `--place`, or this workflow and the reconciler are\n"
+      + "       two answers to where a workspace's records live.");
+  }
 }
 
 /* ⚠️ AND THE RECONCILER STILL KNOWS ITS HALF. This guard exists because the two
@@ -95,7 +113,8 @@ if (!/jurisdiction:\s*"eu"/.test(grew)) {
 
 if (!bad) {
   ok(`placed: ${bound.length} database(s), each resolving to a declared place`);
-  ok("agreed: the workflow asks, and the reconciler still sets its own");
+  ok(`agreed: ${flows.length} workflow(s) that create one ask, `
+    + "and the reconciler still sets its own");
 }
 
 console.log(bad
