@@ -29,6 +29,7 @@
 import * as React from "react";
 import { Button, Drawer, Dropdown, Label, Modal, Popover, Toast } from "@heroui/react";
 import { sayGate, useGate } from "../parts/gated.js";
+import { PRESENTED_PAD } from "../tokens/metrics.js";
 
 /* ------------------------------------------------------------------- tray --- */
 
@@ -125,9 +126,11 @@ export function Dialog({ trigger, title, children, actions }: {
  * ⚠️ AND THE BODY'S OWN TYPE IS ANSWERED BY `Page`, NOT OVERRIDDEN HERE. A modal
  * body is `text-sm text-muted` because it is usually a paragraph under a heading;
  * what goes in here is a whole page, and inheriting muted 14px would repaint
- * every unstyled word in the account centre. Reaching in with a `className` is a
- * restyle and D7 refuses it — correctly, because the fix belongs one level down:
- * a page states its own type rather than taking whatever contains it.
+ * every unstyled word in the account centre. Reaching in with a `className` to
+ * repaint it is a restyle and D7 refuses it — correctly, because the fix belongs
+ * one level down: a page states its own size, measure and INK rather than taking
+ * whatever contains it. What this slot does declare is the one thing a page
+ * cannot answer from inside — the container's own inset, as `PRESENTED_PAD`.
  */
 export function Over({ open, onClose, label, children }: {
   readonly open: boolean;
@@ -151,11 +154,10 @@ export function Over({ open, onClose, label, children }: {
               which is where somebody looks for it and which knows whether this
               is a dismiss or a step back. Two ways out is one too many. */}
           <Modal.Dialog aria-label={label} data-scroll="true">
-            {/* ⚠️ THE PART THAT SCROLLS, AND UNSTYLED — see the header. Its own
-                inset is a 3px focus-ring bleed rather than a gutter, so there is
-                nothing to turn off; the type it would otherwise lend is asserted
-                by `Page`, where a statement about a page belongs. */}
-            <Modal.Body>{children}</Modal.Body>
+            {/* ⚠️ THE PART THAT SCROLLS, AND ITS BLOCK INSET IS TURNED OFF —
+                a container presenting a whole page owes it no density of its
+                own. Which axis, and why only that one, is `PRESENTED_PAD`. */}
+            <Modal.Body className={PRESENTED_PAD}>{children}</Modal.Body>
           </Modal.Dialog>
         </Modal.Container>
       </Modal.Backdrop>

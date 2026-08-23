@@ -297,8 +297,15 @@ export function Page(
          product it sits inside a `Modal.Body`, which is `text-sm text-muted`
          because a modal body is usually a paragraph — so every unstyled word in
          the account centre came out muted and a step small. The baseline belongs
-         here, where "this is a page" is the claim being made. */
-      className={`min-h-dvh flex flex-col ${TYPE.body}`}
+         here, where "this is a page" is the claim being made.
+
+         ⚠️ AND THE INK IS HALF OF THAT CLAIM. `TYPE.body` is a size and a
+         measure and no colour, so a surrounding surface's `text-muted` still
+         wins for every word that does not state its own — the line under a
+         workspace's name comes out a grey it never asked for, while the name
+         beside it, which does state an ink, is right. A page's ink is the
+         page's, and it is stated here rather than assumed. */
+      className={`min-h-dvh flex flex-col ${TYPE.body} text-foreground`}
       {...own.attrs}
       /* ⚠️ THE APP'S COLOUR AND THE WORLD'S PROPERTIES, ON ONE ELEMENT AND IN
          THIS ORDER. The scene's `lit` slot is `var(--brand)`, so it has to

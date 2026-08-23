@@ -161,6 +161,20 @@ So the order is not `shell > ambience > chrome > layout`. It is
 **Page → (Shell | Layout) → Screen → components**, with ambience *inside* the
 Page and chrome *on top of* whatever floats.
 
+⚠️ **"EXACTLY ONE, ALWAYS" IS A CLAIM THE PAGE HAS TO MAKE, AND IT IS ABOUT THE
+INK AND THE TOP EDGE AS MUCH AS THE GROUND.** A page is presented over a product
+as often as it is routed to, and a presenting surface is a component with
+opinions: HeroUI's modal body is a paragraph's body, so it brings `text-muted`
+and three pixels of padding. Both arrive as symptoms nowhere near their cause —
+the padding is a strip of the dialog's own ground along the very top of the
+screen, which looks exactly like a hem that stops a few pixels short, and the ink
+repaints every word that states none of its own, so a workspace's name is right
+and the line under it is a dusty grey. The rule is the same one at both ends:
+**the surface contributes nothing (`p-0`) and the page states everything** — its
+ground, its type and its colour. `presented.seen` measures a real presentation
+and asserts the world starts at zero and the quiet line is written in the page's
+ink, not the surface's.
+
 ### The two crowns, and the one bar
 
 Chrome pins to an edge, and there are three pieces of it — **one component

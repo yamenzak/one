@@ -512,6 +512,23 @@ export const CROWN_HERO_PAD = "px-4 py-6" as const;
 export const SCREEN_TITLE_PAD = "pt-2 pb-4" as const;
 
 /**
+ * ⚠️ WHAT A SURFACE PRESENTING A WHOLE PAGE OWES IT: NOTHING ON THE AXIS THE
+ * LIBRARY DID NOT PAY FOR ITSELF. A modal body is a paragraph's container, so it
+ * carries three pixels of padding to keep a focus ring inside it from clipping,
+ * and offsets that on the sides with `margin-inline: -3px` — free there, three
+ * pixels at the top and bottom. What the frame puts in that slot is a `Page`: a
+ * floor that paints its world edge to edge, hems the top of it and holds every
+ * control in by its own gutter. A container's density around one of those is a
+ * strip of the container's ground above a world that is supposed to start at the
+ * top of the screen, and it reads as a hem that stops a few pixels short.
+ *
+ * ⚠️ THE BLOCK AXIS ONLY — `p-0` HERE IS A BUG, NOT A TIDIER VERSION. Removing
+ * the inline padding leaves the negative inline margin behind, and the body
+ * comes out six pixels wider than the dialog holding it.
+ */
+export const PRESENTED_PAD = "py-0" as const;
+
+/**
  * ⚠️ AN OPTICAL NUDGE INSIDE ONE COMPONENT, NAMED RATHER THAN INLINE. Four
  * pixels under a face that leads a card, eight above a card's own footer, and
  * the run under a timeline entry. None is a rhythm anything else can see — but
