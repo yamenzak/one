@@ -140,15 +140,64 @@ const timed = async (op: string, lag: number) => {
  * ⚠️ AND THE WARM-UP IS UNTIMED AND DISCARDED. Timing it would put the one-off
  * cost back into the number this is trying to isolate.
  */
-const spent = async (op: string) => {
-  await timed(op, FAST);
+/**
+ * ⚠️ AND A READING THAT CANNOT BE TRUE IS DISCARDED RATHER THAN REPORTED. Two
+ * timings imply a depth AND a fixed cost: `fast = d·FAST + F` and
+ * `slow = d·SLOW + F`, so `F = fast − d·FAST`. A NEGATIVE fixed cost is not a
+ * slow request, it is arithmetic saying the two readings did not measure the
+ * same thing — and that is exactly how this failed in CI twice, reporting depths
+ * of 9.5 and 10.7 off fast readings of 39 ms and 38 ms. Eight sequential
+ * twenty-millisecond holds cannot finish in thirty-eight.
+ *
+ * ⚠️ SO IT IS SAMPLED UNTIL IT AGREES WITH ITSELF, and gives up out loud. A
+ * shared runner deschedules a process mid-measurement; the answer to that is to
+ * measure again, not to widen the budget until the noise fits inside it. A
+ * budget raised to accommodate an invalid reading is a budget that has stopped
+ * being able to fail.
+ */
+const TRIES = 5;
+
+/**
+ * ⚠️ A LITTLE BELOW ZERO IS NOISE, NOT A BROKEN PAIR. Two timings of a cheap
+ * request land a millisecond or two either side of each other, so the implied
+ * fixed cost wobbles around zero and resampling on that is work for nothing.
+ * What is being caught is a reading that cannot be true at all — a fast run that
+ * finished in a fraction of the time its own depth requires, which comes out
+ * hundreds of milliseconds negative.
+ */
+const IMPOSSIBLE = -FAST / 2;
+
+const once = async (op: string) => {
   const fast = await timed(op, FAST);
   const slower = await timed(op, SLOW);
+  const deep = (slower.ms - fast.ms) / (SLOW - FAST);
   return {
     status: slower.status,
-    deep: (slower.ms - fast.ms) / (SLOW - FAST),
+    deep,
+    /* What the request costs BESIDES waiting — parsing, composing, the
+       scheduler. It cannot be less than nothing. */
+    fixed: fast.ms - deep * FAST,
     ms: `${fast.ms} ms at ${FAST}, ${slower.ms} ms at ${SLOW}`,
   };
+};
+
+const spent = async (op: string) => {
+  /* ⚠️ WARMED AND DISCARDED. The first call of an operation does work the second
+     does not — a lazily built cache, a memo that is empty once — and timing it
+     puts that one-off cost into the number this is trying to isolate. */
+  await timed(op, FAST);
+
+  let last = await once(op);
+  for (let n = 1; n < TRIES && last.fixed < IMPOSSIBLE; n += 1) last = await once(op);
+  if (last.fixed < IMPOSSIBLE) {
+    throw new Error(
+      `${op}: ${TRIES} readings all implied a negative fixed cost — the last was `
+      + `${last.ms}, which is ${last.deep.toFixed(1)} deep with ${last.fixed.toFixed(0)} ms `
+      + "of work outside the waiting. The pair did not measure the same request; "
+      + "this is the harness on a loaded machine, not a slow operation.",
+    );
+  }
+  return last;
 };
 
 describe("what a warm request costs", () => {
