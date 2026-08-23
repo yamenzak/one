@@ -208,6 +208,45 @@ const seedsFromStore = (src) => {
   if (!blind) ok(`seeded: all ${hooks.length} read hook(s) start from what the tab already holds`);
 }
 
+/* -------------------------------------- and a total is not fetched by list --- */
+
+{
+  /*
+    ⚠️ A LIST READ ASKED FOR ONE ROW IS A COUNT WEARING A LIST'S CLOTHES, and
+    until `totals.read` existed it was the only way to learn one. OneInventory's
+    home screen made three of them — `stock.list`, `product.list`,
+    `location.list`, each `limit: 1` — so three numbers cost three round trips,
+    each carrying identity, workspace, membership and standing to run a
+    `SELECT COUNT(*)`. That is what "opening it is slow" was made of.
+
+    ⚠️ AND THE SHAPE IS WHAT IS REFUSED, because the intent is unreadable
+    otherwise. Nothing in this repository asks a list for exactly one row for any
+    other reason: a screen wanting the newest record reads it by id, and one
+    wanting a page asks for a page. So `limit: 1` is the tell, and it is cheap to
+    write again by accident on the next home screen somebody builds.
+  */
+  const ONE = /\blimit:\s*(?:"1"|'1'|1)\s*[,}]/g;
+  let counted = 0;
+  let files = 0;
+  for (const dir of [...appDirs(), "one-space/src"]) {
+    for (const file of filesIn(dir)) {
+      files++;
+      const src = readFileSync(file, "utf8");
+      for (const [whole] of src.matchAll(ONE)) {
+        counted++;
+        fail(`${rel(file)}: asks a list for one row — \`${whole.trim()}\`.\n` +
+             "       That is a count, and `totals.read` answers every collection's at once,\n" +
+             "       with the same scope and reach filters the lists themselves carry.");
+      }
+    }
+  }
+  if (!files) {
+    fail("no app files found — this guard would pass over an empty list.");
+  } else if (!counted) {
+    ok(`counting: ${files} file(s), none reading a total by asking a list for one row`);
+  }
+}
+
 console.log(bad
   ? `\nasking: ${bad} finding(s) — a read nobody can name is a read paid for twice.`
   : `\nasking: every read names its question, and the answer is asked for once.`);

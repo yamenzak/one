@@ -94,14 +94,23 @@ function build() {
   const floor = new Set(floorOps.map((o) => o.id));
 
   /* One collection, so the five generated verbs are visible as five. */
-  const withCollection = extra(
+  const declaring = extra(
     bare({ collections: [thing({ title: field.text({ label: "Title", holds: "none" }) })] }),
     floor);
+  /*
+    ⚠️ AND WHAT ONE COLLECTION BUYS IS TWO DIFFERENT THINGS, so it is published
+    as two. Five operations arrive PER collection; `totals.read` arrives ONCE,
+    however many there are, because it answers all of them together. Counted as
+    one bucket the index says "+6 per collection", which is a documented lie that
+    grows with every product — six is what a one-collection app happens to get.
+  */
+  const withCollection = declaring.filter((o) => o.id.startsWith("thing."));
+  const onceWithCollection = declaring.filter((o) => !o.id.startsWith("thing."));
 
   const withMedia = extra(
     bare({ collections: [thing({ cover: field.media({ label: "Cover", holds: "none" }) })] }),
     floor)
-    .filter((o) => !withCollection.some((c) => c.id === o.id));
+    .filter((o) => !declaring.some((c) => c.id === o.id));
 
   const withVault = extra(bare({
     vault: {
@@ -153,6 +162,7 @@ function build() {
     operations: {
       always: floorOps.map(asOp),
       perCollection: withCollection.map(asOp),
+      onceWithCollection: onceWithCollection.map(asOp),
       withMediaField: withMedia.map(asOp),
       withVaultField: withVault.map(asOp),
     },

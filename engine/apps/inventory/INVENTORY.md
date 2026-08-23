@@ -326,25 +326,25 @@ container in `src/screens/live.tsx`, and rendered over a sample world by
 
 | Route | Name | Nav | Needs | Component | Container |
 |---|---|---|---|---|---|
-| `/` | Home | primary | `stock:read` | `screens/Home.tsx:113` | `screens/live.tsx:2005` |
-| `/stock` | Stock | primary | `stock:read` | `screens/Stock.tsx:92` | `screens/live.tsx:405` |
-| `/scan` | Scan | primary | `product:read` | `screens/Scan.tsx:125` | `screens/live.tsx:655` |
-| `/receive` | Receive | primary | `stock:move` | `screens/Receive.tsx:100` | `screens/live.tsx:776` |
-| `/count` | Count | primary | `stock:move` | `screens/Count.tsx:80` | `screens/live.tsx:929` |
-| `/work` | Work | primary | `process:read` | `screens/Work.tsx:65` | `screens/live.tsx:1336` |
-| `/thing` | A product | none | `product:read` | `screens/Thing.tsx:129` | `screens/live.tsx:459` |
-| `/where` | A location | none | `location:read` | `screens/Where.tsx:34` | `screens/live.tsx:606` |
-| `/item` | An item | none | `stock:read` | `screens/Item.tsx:84` | `screens/live.tsx:1086` |
-| `/kit` | A kit | none | `stock:read` | `screens/Kit.tsx:66` | `screens/live.tsx:1193` |
-| `/run` | A run | none | `process:read` | `screens/Run.tsx:73` | `screens/live.tsx:1393` |
-| `/case` | A job | none | `process:read` | `screens/Case.tsx:58` | `screens/live.tsx:1476` |
-| `/due` | Running out | secondary | `stock:read` | `screens/Due.tsx:79` | `screens/live.tsx:1536` |
-| `/labels` | Labels | secondary | `location:read` | `screens/Labels.tsx:248` | `screens/live.tsx:1643` |
-| `/reports` | Reports | none | `ledger:read` | `screens/Reports.tsx:84` | `screens/live.tsx:1604` |
-| `/ask` | Ask | secondary | `stock:read` | `screens/Ask.tsx:54` | `screens/live.tsx:1283` |
-| `/import` | Import | secondary | `product:write` | `screens/Import.tsx:131` | `screens/live.tsx:1770` |
-| `/suppliers` | Suppliers | secondary | `product:write` | `screens/Suppliers.tsx:77` | `screens/live.tsx:1841` |
-| `/start` | Getting started | secondary | `product:read` | `screens/Start.tsx:67` | `screens/live.tsx:1925` |
+| `/` | Home | primary | `stock:read` | `screens/Home.tsx:120` | `screens/live.tsx:2016` |
+| `/stock` | Stock | primary | `stock:read` | `screens/Stock.tsx:92` | `screens/live.tsx:413` |
+| `/scan` | Scan | primary | `product:read` | `screens/Scan.tsx:125` | `screens/live.tsx:663` |
+| `/receive` | Receive | primary | `stock:move` | `screens/Receive.tsx:100` | `screens/live.tsx:784` |
+| `/count` | Count | primary | `stock:move` | `screens/Count.tsx:80` | `screens/live.tsx:937` |
+| `/work` | Work | primary | `process:read` | `screens/Work.tsx:65` | `screens/live.tsx:1344` |
+| `/thing` | A product | none | `product:read` | `screens/Thing.tsx:129` | `screens/live.tsx:467` |
+| `/where` | A location | none | `location:read` | `screens/Where.tsx:34` | `screens/live.tsx:614` |
+| `/item` | An item | none | `stock:read` | `screens/Item.tsx:84` | `screens/live.tsx:1094` |
+| `/kit` | A kit | none | `stock:read` | `screens/Kit.tsx:66` | `screens/live.tsx:1201` |
+| `/run` | A run | none | `process:read` | `screens/Run.tsx:73` | `screens/live.tsx:1401` |
+| `/case` | A job | none | `process:read` | `screens/Case.tsx:58` | `screens/live.tsx:1484` |
+| `/due` | Running out | secondary | `stock:read` | `screens/Due.tsx:79` | `screens/live.tsx:1544` |
+| `/labels` | Labels | secondary | `location:read` | `screens/Labels.tsx:248` | `screens/live.tsx:1651` |
+| `/reports` | Reports | none | `ledger:read` | `screens/Reports.tsx:84` | `screens/live.tsx:1612` |
+| `/ask` | Ask | secondary | `stock:read` | `screens/Ask.tsx:54` | `screens/live.tsx:1291` |
+| `/import` | Import | secondary | `product:write` | `screens/Import.tsx:131` | `screens/live.tsx:1778` |
+| `/suppliers` | Suppliers | secondary | `product:write` | `screens/Suppliers.tsx:77` | `screens/live.tsx:1849` |
+| `/start` | Getting started | secondary | `product:read` | `screens/Start.tsx:67` | `screens/live.tsx:1933` |
 
 ### The surfaces that are not routes
 
@@ -374,6 +374,14 @@ waiting — and everything under it is one tap away with its own name on it. Sto
 was the root for as long as this product had four screens, which made the first
 thing anybody saw a page of rows they had to read to find out whether there was
 anything to do.
+
+**The three numbers in its hero are one request** — `totals.read`, which every
+app on the engine gets the moment it declares a collection. They were three list
+reads asked for one row each, because a list was the only thing on offer that
+knew a total: three round trips, each carrying identity, workspace, membership
+and standing, to run three `SELECT COUNT(*)`. A collection the reader may not
+open is left out of the answer rather than counted as nought, so a role built by
+hand without `product:read` gets the shelf figure with no caption under it.
 
 **Reports gave up its seat to it**, because most of its figures are on Home
 already, cut down to what a first screen holds: the recorded share, what left,

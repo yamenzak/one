@@ -480,6 +480,14 @@
         "permission": "thing:write"
       }
     ],
+    "onceWithCollection": [
+      {
+        "id": "totals.read",
+        "kind": "read",
+        "method": "GET",
+        "path": "/api/totals.read"
+      }
+    ],
     "withMediaField": [
       {
         "id": "media.upload",

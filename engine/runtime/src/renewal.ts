@@ -1,7 +1,7 @@
 /**
  * WHAT THIS DEPLOYMENT IS SERVING, SO A TAB CAN TELL THAT IT IS OLD.
  *
- * ⚠️ A SINGLE-PAGE APP LEFT OPEN NEVER LEARNS THAT IT WAS REPLACED. Nothing
+ * ⚠️ A SINGLE-PAGE APP LEFT OPEN NEVER LEARNS THAT IT WAS REPLACED (D56). Nothing
  * about a deploy reaches a browser that is already running: the bundle it
  * fetched is the bundle it keeps, for as long as the tab lives, which on a
  * phone is weeks. Every fix, every new screen and every corrected number ships

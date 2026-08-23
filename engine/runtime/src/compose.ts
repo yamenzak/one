@@ -39,6 +39,7 @@ import { mediaOps } from "./media-ops.js";
 import { moneyOps } from "./money-ops.js";
 import { aiOps } from "./ai-ops.js";
 import { searchOps } from "./search-ops.js";
+import { totalsOps } from "./totals-ops.js";
 import { noteGone, noteWritten } from "./search.js";
 import { centreOps } from "./centre-ops.js";
 import { progressOps } from "./progress.js";
@@ -445,6 +446,11 @@ export function compose(app: AppSpec): Composed {
   put(packageOps(app));
   put(settingOps(app));
   put(moneyOps(app));
+  /* ⚠️ THROUGH THE MERGE RATHER THAN BESIDE IT, BECAUSE `read` IS A CRUD VERB. A
+     collection called `tally` generates `tally.read` of its own, and the two
+     would silently be one — the count of everything answering at the address of
+     one record. `put` is what refuses that instead of resolving it. */
+  put(totalsOps(app));
   if (shadowed.length) {
     throw new Error(
       `${app.id}: the platform's ${shadowed.join(", ")} would replace an operation this app `

@@ -231,6 +231,7 @@ if (what === "guards") {
     ["ai-run", "the seam an operation generates through — values in, a metered answer out"],
     ["search", "what is findable: the ledger a write leaves, and the pass that carries it"],
     ["search-ops", "the find operation a searchable collection gets, with its boundary already in it"],
+    ["totals-ops", "how many of each thing there are, in one ask instead of one list read per number"],
     ["operator", "the deployment looking at itself"],
     ["deployment", "what is wrong with this deployment, asked at boot"],
     ["mcp", "the agent door"],
@@ -343,7 +344,8 @@ if (what === "guards") {
   };
 
   if (what === "surface") {
-    const { always, perCollection, withMediaField, withVaultField } = of_.operations;
+    const { always, perCollection, onceWithCollection, withMediaField, withVaultField } =
+      of_.operations;
     console.log(`**${always.length} operations for declaring nothing.** A roster, an inbox and its`);
     console.log("two-level policy, the workspace's brand, the package rail it sells with, its");
     console.log("settings, its bill, and the one bootstrap read every screen stands on.");
@@ -356,6 +358,12 @@ if (what === "guards") {
     console.log("remembered.");
     console.log("");
     table(perCollection);
+    console.log("");
+    console.log(`**+${onceWithCollection.length} once, however many collections there are** — the`);
+    console.log("counts a screen leads with. Asking a list for one row to read its total is");
+    console.log("three round trips for three numbers, and it was the only thing on offer.");
+    console.log("");
+    table(onceWithCollection);
     console.log("");
     console.log(`**+${withMediaField.length} the moment one field is a file.** Not before: three`);
     console.log("routes about files on a product that holds none answer \"no bucket\" for ever,");

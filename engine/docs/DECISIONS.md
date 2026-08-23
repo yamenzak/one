@@ -1735,3 +1735,68 @@ compositor-only and costs one promoted layer. Earned, and off both ways.
 world that reaches the page and not the things standing on it; a wash that treats
 every tier the same; a hue pre-mixed toward black before it reaches a surface; a
 band at full alpha where a heading is; or an animated layer under the dither.
+
+---
+
+## D56 — A tab is told its build was replaced, and reloads when its reader says so
+
+**A single-page app left open never learns that it was replaced.** Nothing about
+a deploy reaches a browser that is already running: the bundle it fetched is the
+bundle it keeps, for as long as the tab lives, which on a phone is weeks. Every
+fix and every corrected number ships to somebody who will not see it until they
+happen to reload — and the ones who do not are the people reporting bugs that
+were fixed a fortnight ago.
+
+**The version is the entry bundle's own name, so it cannot be wrong.** A build
+stamp handed to both halves is two facts that have to agree, and they disagree
+the first time somebody deploys one without the other. The worker reads
+`index.html` back through the SAME assets binding a browser would be served
+from, so the question and the answer are one thing. It is asked once per isolate
+— assets are immutable per deploy, and a new deploy is a new isolate.
+
+**It rides on an answer the browser is already waiting for.** A poll would be a
+request per tab per interval to learn something that only matters to somebody
+who is USING the product, and somebody who is using it is making requests
+already. The header goes on every platform answer; the door remembers the first
+value it was told and reports a change once.
+
+**And the page never reloads by itself.** A tab that replaced itself mid-sentence
+would take an unsaved form with it. What ships is a bar that says a new version
+is available, and a reload that happens when the reader presses it.
+
+**Therefore never:** a build stamp two halves have to keep in step; a poll for a
+version; a version read per request; a header set by mutating a `Response` that
+`fetch` produced; or a reload nobody asked for.
+
+---
+
+## D57 — A total is one ask, and a collection nobody may read is absent from it
+
+**A screen that leads with three numbers made three requests for them.** A list
+read answers its collection's whole count whatever page it hands back, so the
+only way to learn a total was to ask for one row and throw it away — three round
+trips, each carrying identity, workspace, membership and standing, to run three
+`SELECT COUNT(*)`. That is not a screen written badly; it was the only thing the
+surface offered, and it is a large part of what "opening it is slow" was made of.
+
+**`totals.read` is derived, like the five verbs beside it.** Every app with a
+collection has it, the counts go together rather than one after the other, and
+the filters are `list`'s own — so a hero saying four hundred over a screen
+showing twelve is not a thing that can happen. A person-scoped collection is
+counted against the PERSON: one id for a mixed list would show everybody
+everybody's total, and it would look like nothing but a larger number.
+
+**Its permission is `PUBLIC` because no fixed key could be right.** The answer
+differs per caller — somebody who may read products and not stock must get the
+products count rather than a refusal — so the gate admits any member and the
+caller's own keys decide the contents, collection by collection.
+
+**A collection they may not read is ABSENT, never nought.** "You have none" and
+"this is not yours to see" are different answers, and a screen handed the first
+cannot tell them apart; what it draws is a confident zero about somebody else's
+records.
+
+**Therefore never:** a total fetched by asking a list for one row; a count whose
+scope or reach is written separately from the list it is a count of; one scope id
+for a mixed list of collections; or a permission-filtered answer that reports a
+withheld collection as empty.

@@ -100,6 +100,14 @@ remembered.
 | `thing.update` | write | `thing:write` |
 | `thing.delete` | write | `thing:write` |
 
+**+1 once, however many collections there are** — the
+counts a screen leads with. Asking a list for one row to read its total is
+three round trips for three numbers, and it was the only thing on offer.
+
+| Operation | | Permission |
+|---|---|---|
+| `totals.read` | read | *the session* |
+
 **+4 the moment one field is a file.** Not before: three
 routes about files on a product that holds none answer "no bucket" for ever,
 which reads as broken rather than absent.
@@ -454,7 +462,7 @@ env or a binding.
 | `membership` | the roster and what each member may do | 16 | — |
 | `compose` | a manifest becomes a live surface of operations | 2 | — |
 | `serve` | the one path every request ends in — both doors | 6 | — |
-| `records` | the generated reads and writes behind a collection | 8 | — |
+| `records` | the generated reads and writes behind a collection | 9 | — |
 | `settings` | reading and writing a workspace's own switches | 5 | — |
 | `billing` | plans, subscriptions, the bill, the ladder | 16 | — |
 | `wallet` | OneWallet: the allowance, what was bought, and reserve → settle → release | 22 | — |
@@ -485,6 +493,7 @@ env or a binding.
 | `ai-run` | the seam an operation generates through — values in, a metered answer out | 2 | — |
 | `search` | what is findable: the ledger a write leaves, and the pass that carries it | 17 | — |
 | `search-ops` | the find operation a searchable collection gets, with its boundary already in it | 1 | — |
+| `totals-ops` | how many of each thing there are, in one ask instead of one list read per number | 2 | — |
 | `operator` | the deployment looking at itself | 4 | — |
 | `deployment` | what is wrong with this deployment, asked at boot | 1 | — |
 | `mcp` | the agent door | 1 | — |
@@ -507,7 +516,7 @@ env or a binding.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 9 | — |
 
-**455 of them**, 454 reached by something today.
+**458 of them**, 457 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 
@@ -1004,6 +1013,8 @@ its own header, cited by other files, and doing nothing.
 | D53 | The navigation is five destinations, and the chrome carries the rest | 8 |
 | D54 | Half a getting-started list is the workspace's and half is the person's | 0 |
 | D55 | A product's colour is the product's, and one family commits | 0 |
+| D56 | A tab is told its build was replaced, and reloads when its reader says so | 0 |
+| D57 | A total is one ask, and a collection nobody may read is absent from it | 0 |
 <!-- /generated -->
 
 ---

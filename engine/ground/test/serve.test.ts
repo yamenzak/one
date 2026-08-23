@@ -257,6 +257,10 @@ describe("what the manifest produced", () => {
          parameter — and nothing set it, so being alone meant an operator making
          a database by hand and remembering to move somebody onto it. */
       "POST /api/tenant.alone",
+      /* ⚠️ ONE ANSWER FOR EVERY COLLECTION'S COUNT, AND EVERY APP WITH A
+         COLLECTION HAS IT. A home screen leading with three numbers used to
+         make three list reads to get them. */
+      "GET /api/totals.read",
       /* ⚠️ AND THE VAULT'S EIGHT, BECAUSE THIS APP DECLARES A SPECIAL CATEGORY.
          An app that declares none gets none of them — a consent sheet with
          nothing on it reads as a product that asked and was told yes. */

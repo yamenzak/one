@@ -34,16 +34,23 @@ import {
 import type { Raised } from "@engine/kernel";
 import { INVENTORY } from "../index.js";
 
-/** What the workspace is holding, right now. */
+/**
+ * What the workspace is holding, right now.
+ *
+ * ⚠️ `null` IS "NOT THIS PERSON'S TO KNOW", THE SAME AS IN `Needs`. All three
+ * are separate read keys and the platform answers with the ones the caller
+ * holds — absent, never nought — so a role built by hand without `product:read`
+ * gets a figure with no caption rather than a confident "0 products".
+ */
 export interface Shelf {
   /**
    * ⚠️ LINES, NOT A QUANTITY. Three kilograms and two boxes do not add up to
    * five of anything, so the only number a mixed catalogue can put in one figure
    * is how many product-and-place rows have something on them.
    */
-  readonly lines: number;
-  readonly products: number;
-  readonly places: number;
+  readonly lines: number | null;
+  readonly products: number | null;
+  readonly places: number | null;
 }
 
 /**
@@ -190,8 +197,19 @@ export function Home({
           then={(shelf) => (
             <Hero
               eyebrow="On the shelf"
-              value={shelf.lines}
-              identifier={`${figures.grouped(shelf.products)}`
+              /* ⚠️ A DASH, NOT A NOUGHT, FOR A SHELF NOBODY GAVE THIS PERSON
+                 THE KEY TO. Zero is a fact about the workspace and this is a
+                 fact about the reader — and the two look identical in a figure
+                 this size. `count` goes with it: there is no number to run up
+                 to. */
+              value={shelf.lines ?? "—"}
+              count={shelf.lines !== null}
+              /* ⚠️ AND THE CAPTION IS DROPPED WHOLE RATHER THAN HALF-WRITTEN.
+                 "11 places" alone under a figure reads as what the figure is
+                 of, which it is not. */
+              identifier={shelf.products === null || shelf.places === null
+                ? undefined
+                : `${figures.grouped(shelf.products)}`
                 + `${shelf.products === 1 ? " product in " : " products in "}`
                 + `${figures.grouped(shelf.places)}`
                 + `${shelf.places === 1 ? " place" : " places"}`}

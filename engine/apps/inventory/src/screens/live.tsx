@@ -188,6 +188,14 @@ function useAsked<T>(
  */
 interface Page { readonly items: readonly Row[]; readonly total: number; readonly next: string | null }
 
+/**
+ * ⚠️ HOW MANY OF EACH, KEYED BY COLLECTION — and a collection this person may
+ * not read is ABSENT rather than nought (`totals-ops.ts`). Optional here for
+ * that reason: `?? null` at the reader is the difference between "you have none"
+ * and "this is not yours to see".
+ */
+interface Totals { readonly counts: Readonly<Record<string, number | undefined>> }
+
 function usePaged(run: (after: string | null) => Promise<Got<Page>>, on: readonly unknown[] = []) {
   const [of, set] = React.useState<Loaded<readonly Row[]>>(waiting());
   const [total, setTotal] = React.useState(0);
@@ -1998,9 +2006,12 @@ const EMPTY_REPORT: Reported = {
  * warehouse hand that something went wrong when nothing did. `null` travels
  * instead, and the screen leaves the row out.
  *
- * ⚠️ THE TOTALS ARE ASKED FOR WITH `limit: 1`. A list read answers its
- * collection's whole count whatever page it hands back (`records.ts`), so the
- * cheapest way to learn how many products there are is to ask for one of them.
+ * ⚠️ THE THREE TOTALS ARE ONE ASK, AND THE PLATFORM'S. They used to be three
+ * list reads with `limit: 1` — the cheapest way to learn a total when the only
+ * thing on offer is a list — which is three round trips, each carrying identity,
+ * workspace, membership and standing, to run three `SELECT COUNT(*)`.
+ * `totals.read` answers all of them at once and counts with the SAME filters the
+ * lists use, so the hero cannot disagree with the screen behind it (D57).
  */
 const HOME = (api: Door) => function HomeHere({ app, go }: Mounted) {
   const today = dayHere();
@@ -2010,15 +2021,20 @@ const HOME = (api: Door) => function HomeHere({ app, go }: Mounted) {
   );
   const may = React.useCallback((one: string) => held.has(one), [held]);
 
-  const lines = useAsked<Page>(api, "stock.list",{ limit: "1" });
-  const kinds = useAsked<Page>(api, "product.list",{ limit: "1" });
-  const places = useAsked<Page>(api, "location.list",{ limit: "1" });
+  const totals = useAsked<Totals>(api, "totals.read");
 
-  const shelf: Loaded<Shelf> = both(
-    both(lines.of, kinds.of, (a, b) => ({ lines: a.total, products: b.total })),
-    places.of,
-    (a, b) => ({ ...a, places: b.total }),
-  );
+  /* ⚠️ ABSENT IS NOT NOUGHT, AND THAT IS THE PLATFORM'S RULE ARRIVING HERE. A
+     collection this person may not read is missing from the answer rather than
+     counted as empty — so it travels as `null` and the hero leaves it out, the
+     same way the three lanes under it do. Every preset role holds all three
+     keys; a role somebody built by hand need not. */
+  const shelf: Loaded<Shelf> = totals.of.status === "ready"
+    ? ready({
+      lines: totals.of.data.counts.stock ?? null,
+      products: totals.of.data.counts.product ?? null,
+      places: totals.of.data.counts.location ?? null,
+    })
+    : totals.of as Loaded<Shelf>;
 
   /* ⚠️ THE SAME TWO ASKS THE EXPIRY SWEEP MAKES, so the number on this screen
      and the number in the notification cannot disagree. How many days counts as
@@ -2083,7 +2099,7 @@ const HOME = (api: Door) => function HomeHere({ app, go }: Mounted) {
       title={nameOf("/")}
       said={starts.of.status === "ready" ? starts.of.data.words.said : ""}
       of={shelf}
-      again={() => { lines.again(); kinds.again(); places.again(); }}
+      again={totals.again}
       needs={needs}
       moving={moving}
       /* ⚠️ BOTH AXES, AND `null` WHILE THE ANSWER IS STILL COMING. This read

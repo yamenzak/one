@@ -417,6 +417,55 @@ export async function list(
 }
 
 /**
+ * HOW MANY OF EACH, IN ONE ASK.
+ *
+ * ⚠️ A SCREEN THAT LEADS WITH THREE NUMBERS MADE THREE REQUESTS FOR THEM, and
+ * every one carried the platform's own preamble — identity, workspace,
+ * membership — to answer `SELECT COUNT(*)`. Measured on OneInventory's home
+ * screen that is three round trips and about nine queries for three integers,
+ * which is what "opening it is slow" is made of. The counts go together now,
+ * behind one request.
+ *
+ * ⚠️ IT IS `list`'s OWN `where`, DELIBERATELY SHARED. A count that scopes
+ * differently from the list it is a count OF is the worst kind of wrong: the
+ * hero says four hundred, the screen behind it shows twelve, and both are
+ * confident. Erasure scope and reach are the two that decide it, and they are
+ * read here exactly as they are there.
+ *
+ * ⚠️ AND A COLLECTION THE ASKER MAY NOT READ IS ABSENT, NEVER ZERO (D57). "You have
+ * none" and "this is not yours to see" are different answers, and a screen given
+ * the first cannot tell. Which is why the filtering is the CALLER's — this
+ * counts what it is handed.
+ *
+ * ⚠️ `scope` IS PER COLLECTION AND NOT ONE STRING, because the two scopes are
+ * two different values. A tenant's records answer to the workspace and a
+ * person's answer to the account, so a single id counted against a mixed list is
+ * a number that is right for some rows and zero for the rest — and zero is
+ * exactly what an empty collection looks like.
+ */
+export async function countAll(
+  db: Db, specs: readonly CollectionSpec[],
+  scope: (spec: CollectionSpec) => string,
+  reaching: (spec: CollectionSpec) => Reaching | null = () => null,
+): Promise<Readonly<Record<string, number>>> {
+  if (!specs.length) return {};
+  /* ⚠️ TOGETHER, NOT ONE AFTER THE OTHER — the same reason `list` races its own
+     count against its page. Awaited in order these are N round trips in a chain,
+     which is the number a warehouse phone feels (D36). `Db` has no `batch`, and
+     widening the contract for this would be a second way to ask a question every
+     other caller asks this way. */
+  const counted = await Promise.all(specs.map((spec) => {
+    const erase = eraseBy(spec);
+    const near = within(reaching(spec));
+    const where = `${erase ? `${column(erase.column)} = ?` : "1 = 1"}${near.sql}`;
+    return db.prepare(`SELECT COUNT(*) AS n FROM ${table(spec.id)} WHERE ${where}`)
+      .bind(...(erase ? [scope(spec)] : []), ...near.bound).first<{ n: number }>();
+  }));
+  return Object.fromEntries(specs.map((spec, i) => (
+    [spec.id, Number(counted[i]?.n ?? 0)])));
+}
+
+/**
  * REMOVE A RECORD, IN THE CALLER'S OWN SCOPE AND INSIDE THEIR REACH.
  *
  * ⚠️ IT LIVES HERE BECAUSE THE OTHER FOUR STATEMENTS DO. Written at the call
