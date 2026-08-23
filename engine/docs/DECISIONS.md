@@ -2093,3 +2093,54 @@ never read; a fact re-queried because it was passed as an id instead of as the
 row it came from; a step ordered after work it does not depend on; or a
 latency conclusion drawn from what a request computes rather than from how many
 times it waits.
+
+---
+
+## D64 — Where a database goes is declared once, and both paths that make one read it
+
+**Two paths create a database and only one of them knew the rule.** The
+reconciler that GROWS a shard sets `jurisdiction` from the residency, and says in
+writing that Cloudflare fixes it at creation — no edit, no migration, no ticket.
+The workflow that makes the FIRST databases called `wrangler d1 create` bare, so
+they landed wherever the runner happened to be, which for CI is another
+continent.
+
+**Measured, that is the whole of what is left of "slow".** With the icon (D60),
+the boot (D61), the preflight (D62) and the request depth (D63) all fixed, every
+operation is four to six sequential round trips at roughly 260 ms each against a
+worker spending nine milliseconds of CPU. Nothing computes; it is distance.
+
+**And the second consequence is not latency.** The deployment's own documents
+say, twice: records are stored in the region the workspace was created for, and
+stay there. A shard promised `eu` and created with no jurisdiction is a sentence
+somebody agreed to that nothing enforces.
+
+**Read replication is the wrong fix here, and that is worth writing down.** It
+would put replicas near the request and remove the distance — but D1's automatic
+mode places them across the whole network and takes no residency constraint, so
+turning it on for an EU shard would move EU records out of the EU and contradict
+the promise. Putting the PRIMARY in the right place is better on every axis:
+the same latency win, no replicas, no bookmarks, no stale reads, and the promise
+kept rather than worked around.
+
+**So placement is derived from one declaration and both paths read it.** `HOME`
+is where this deployment's records sit when nothing narrower was promised — a
+fact about where the people who use it are, declared beside `SHARDS` rather than
+defaulted inside a shell script, because a default nobody can see is one nothing
+can check. `bind-ids.mjs --place` answers with the flags for a given database:
+`--jurisdiction eu` for a shard promised EU residency, `--location <home>` for
+the directory, which is cross-region by nature — accounts, sessions, and which
+shard a workspace is on. Never both: Cloudflare ignores the hint when a
+jurisdiction is set, so sending the pair is a promise that reads as kept in the
+command and is not.
+
+**⚠️ AND IT DOES NOT MOVE WHAT ALREADY EXISTS.** The databases this deployment
+is running on were made before any of this and cannot be relocated. Fixing them
+means creating new ones in the right place and moving the workspaces across —
+which the cross-residency move already does — and until that happens the numbers
+above are what the product costs.
+
+**Therefore never:** a `d1 create` without a placement; a placement written into
+a workflow rather than derived from the deployment's declaration; a jurisdiction
+and a location sent together; or a residency promise that lives only in a
+document.

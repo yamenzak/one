@@ -1021,6 +1021,7 @@ its own header, cited by other files, and doing nothing.
 | D61 | A cold isolate is the ordinary case, so its boot is a latency budget | 0 |
 | D62 | The centre is asked for before the bundle, not after the session | 0 |
 | D63 | What a request waits for is measured, per operation, and budgeted | 0 |
+| D64 | Where a database goes is declared once, and both paths that make one read it | 0 |
 <!-- /generated -->
 
 ---

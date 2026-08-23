@@ -236,6 +236,30 @@ const SHARDS = [{ id: "eu-1", where: "eu" }] as const satisfies
   readonly { id: string; where: Residency }[];
 
 /**
+ * WHERE THIS DEPLOYMENT'S OWN RECORDS SIT WHEN NOTHING NARROWER WAS PROMISED.
+ *
+ * ⚠️ A DATABASE'S PLACE IS FIXED AT CREATION AND CANNOT BE CHANGED. Cloudflare
+ * offers no edit, no migration and no ticket — so one made with no hint lands
+ * wherever the thing that created it happened to be, which for a CI runner is
+ * another continent. Measured on this deployment before this was declared: every
+ * operation was four or five sequential round trips at ~260 ms each, against a
+ * worker spending nine milliseconds of CPU. Distance, not work.
+ *
+ * ⚠️ IT IS A DECLARATION RATHER THAN A DEFAULT IN A WORKFLOW, because it is a
+ * FACT ABOUT THIS DEPLOYMENT — where the people who use it are — and the same
+ * fact decides the directory's placement, the hint a new shard is made with, and
+ * what a guard can check the two against. A default hidden in a shell script is
+ * one nobody can see and nothing can compare.
+ *
+ * ⚠️ AND IT IS NOT A JURISDICTION. A shard whose residency is `eu` is made with
+ * `--jurisdiction eu`, which is a PROMISE and which Cloudflare says overrides a
+ * hint outright. This applies to the directory — cross-region by nature:
+ * accounts, sessions, and which shard a workspace is on — and to any shard
+ * promised nothing narrower.
+ */
+const HOME = "weur";
+
+/**
  * ⚠️ DERIVED, BECAUSE A SHARD *IS* A JURISDICTION. This was a second list beside
  * `SHARDS` — and two parallel lists is the pattern this repository keeps having
  * to fix: a shard added to one and forgotten in the other reports the wrong

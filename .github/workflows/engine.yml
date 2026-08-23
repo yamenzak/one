@@ -198,8 +198,18 @@ jobs:
           for name in $(node ../scripts/bind-ids.mjs --names); do
             id=$(printf '%s' "$list" | jq -r --arg n "$name" '.[]? | select(.name == $n) | .uuid' | head -1)
             if [ -z "$id" ]; then
-              echo "Creating D1 '$name'…"
-              pnpm exec wrangler d1 create "$name" >/dev/null
+              # ⚠️ WHERE IT GOES IS DECIDED AT CREATION AND NEVER AGAIN. Cloudflare
+              # offers no edit and no migration, so a bare `d1 create` puts the
+              # records wherever this runner happens to be — which is how a
+              # deployment serving Europe came to spend 260 ms on every round
+              # trip, and how a shard promised EU residency could be made without
+              # the promise. The reconciler that grows a shard has always set
+              # this; the flags come from the same declaration it reads, so the
+              # two paths cannot disagree. See `bind-ids.mjs --place`.
+              place=$(node ../scripts/bind-ids.mjs --place "$name")
+              echo "Creating D1 '$name' ($place)…"
+              # shellcheck disable=SC2086
+              pnpm exec wrangler d1 create "$name" $place >/dev/null
               id=$(pnpm exec wrangler d1 list --json 2>/dev/null | json_only \
                    | jq -r --arg n "$name" '.[]? | select(.name == $n) | .uuid' | head -1)
             fi
