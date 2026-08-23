@@ -2442,3 +2442,49 @@ was wrong.
 declared and not compared against; a decoder handed a frame whose size the device
 chose; or a diagnosis closed on the first cause found when the person reporting
 it can still reproduce the symptom.
+
+---
+
+## D70 — A design rule is a guard or it is not a rule
+
+**A skill file was read end to end** — seven prompt documents, ~340 KB, that
+constrain an agent generating premium UI. Its results are good and its structure
+is worth naming: read the reference, extract the signals, build against the
+extraction, diff the output. What it cannot do is hold. Its own README carries a
+table headed *"Agents drift back toward the mean over long conversations"* whose
+remedy is to reply *"you ignored the skill file."* That is the whole argument for
+the shape this repository already has: a rule that lives in a context window is a
+rule for as long as somebody keeps saying it.
+
+**Four of its rules were true, checkable, and absent here**, and each is a guard
+now rather than a paragraph:
+
+- `transition: all` names no properties, so it animates paint as well as
+  composite — and, worse, nobody can say what it covers, so it outlives the
+  feature it was written for. It had, by six weeks.
+- A hand-written `:hover` outside `@media (hover: hover)` is a state a touch
+  screen enters on tap and never leaves.
+- A timing function that is a CSS keyword is the curve nobody chose.
+- The size a chart sets is type, in a coordinate system the type guard could not
+  see. Seven sizes, three jobs.
+
+**Four of them were rejected, and the reasons are recorded so they are not
+re-argued.** An *animation coverage mandate* — "every visible element gets
+motion; a static element in an animated page is a dead pixel" — is the exact
+inverse of D-still-by-default, and the reader it serves is somebody browsing a
+hero rather than somebody working. A prescribed palette of warm off-whites and
+named display faces is one year's taste stated as law, and it produces the
+sameness it claims to fight. A quality gate the model fills in about its own work
+is not a gate. And nothing in it addresses an empty state, a refusal, a wait, or
+a second theme — which is most of what a working product is.
+
+**The one thing worth taking was not a rule at all: measure, then compare.** The
+type-scale reading exists because of it, and the first thing it measured found a
+package setting seven sizes for three jobs, in four files, every one of them
+defensible where it was written.
+
+**Therefore never:** a design rule stated only in prose when it could be checked;
+a quality gate whose verdict is self-reported; a palette or a typeface prescribed
+as a rule rather than chosen as a decision; a coverage mandate that spends motion
+on a screen somebody uses all day; or a guard scoped to the file the fault was
+found in.

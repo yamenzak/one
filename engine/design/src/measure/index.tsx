@@ -43,6 +43,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { build } from "vite";
 import type { Browser } from "playwright";
 import type { ReactNode } from "react";
+import { CONTRAST_FLOOR, contrast } from "@engine/kernel";
 import { runtimeCss } from "../frame/runtime.js";
 import { productCss } from "../tokens/theme.js";
 
@@ -297,6 +298,23 @@ export interface Geometry {
     readonly px: number; readonly weight: number;
     readonly count: number; readonly text: string;
   }[];
+  /**
+   * EVERY INK THE SCREEN SET, AND WHAT IT WAS SET ON.
+   *
+   * ⚠️ THE ONE THING A TOKEN CANNOT PROMISE. `--foreground` on `--surface` is a
+   * pair of names; what a reader gets is the pair after a `color-mix`, a theme
+   * and a workspace's own brand have each had a turn, and a brand is a value
+   * somebody typed. So the ratio is read off the rendered page rather than
+   * argued from the palette — which is the only place the answer exists.
+   *
+   * `on` is empty where nothing above the text paints at all. That is not a
+   * contrast failure, it is a different question: see `paints`.
+   */
+  readonly ink: readonly {
+    readonly ink: string; readonly on: string;
+    readonly px: number; readonly weight: number;
+    readonly count: number; readonly text: string;
+  }[];
 }
 
 /**
@@ -380,6 +398,83 @@ export const scaleOf = (type: Geometry["type"]): Scale => {
   return { sizes, commonest, pieces: type.reduce((n, one) => n + one.count, 0) };
 };
 
+/* ------------------------------------------------------------- the contrast --- */
+
+/**
+ * ⚠️ WCAG'S TWO FLOORS, AND THE SECOND IS NOT A CONCESSION. Large text carries
+ * more of its own weight — the strokes are thicker, so less contrast reads —
+ * which is why the standard sets 3 for it against 4.5 for body. Applying 4.5 to
+ * a 52px figure would force the hero of every screen to full ink, and full ink
+ * on a large mass is exactly what makes an interface look like a warning.
+ */
+export const READS = CONTRAST_FLOOR;
+export const READS_LARGE = 3;
+
+/** ⚠️ The standard's own definition of large: 24px, or 18.66px above semibold. */
+export const isLarge = (px: number, weight: number): boolean =>
+  px >= 24 || (px >= 18.66 && weight >= 700);
+
+const CHANNEL = /(-?[\d.]+)/g;
+
+/**
+ * ⚠️ ALPHA IS COMPOSITED RATHER THAN IGNORED, because half this palette is
+ * `color-mix` and a muted note is frequently an alpha of the foreground. Read as
+ * opaque, a 60%-alpha grey on a dark card reports the contrast of the grey —
+ * which is the number the token suggests and not the one anybody sees.
+ */
+const over = (
+  said: string, behind: readonly [number, number, number] | null,
+): [number, number, number] | null => {
+  const parts = [...said.matchAll(CHANNEL)].map((m) => Number(m[1]));
+  if (parts.length < 3) return null;
+  const [r, g, b] = parts as [number, number, number];
+  const a = parts.length > 3 ? parts[3]! : 1;
+  if (a >= 1) return [r, g, b];
+  if (!behind) return null;
+  return [
+    r * a + behind[0] * (1 - a), g * a + behind[1] * (1 - a), b * a + behind[2] * (1 - a),
+  ];
+};
+
+/** ⚠️ The kernel answers in hex, so this is the one conversion — see `contrastOf`. */
+const hex = ([r, g, b]: readonly [number, number, number]): string =>
+  `#${[r, g, b].map((c) => Math.round(c).toString(16).padStart(2, "0")).join("")}`;
+
+/**
+ * HOW READABLE ONE PIECE OF TEXT IS, OR `null` WHERE THE QUESTION DOES NOT APPLY.
+ *
+ * ⚠️ THE ARITHMETIC IS THE KERNEL'S, AND THAT IS THE POINT. `contrast` and
+ * `CONTRAST_FLOOR` already refuse a workspace whose own theme cannot be read
+ * (`refuseTheme`), and a second implementation here would be a second answer to
+ * one question — diverging in whichever direction nobody tests, which is how a
+ * workspace comes to be refused a pair the product itself ships. What is added
+ * here is the part the kernel cannot have: a colour is `oklch` on a page, over
+ * however many translucent layers, and none of that exists until a browser
+ * resolves it.
+ *
+ * ⚠️ `null` RATHER THAN A GUESS, AND THAT IS THE WHOLE CARE IN THIS FUNCTION. A
+ * transparent ink over a background nothing painted, a gradient, a colour spelled
+ * in a syntax this cannot parse — each is a case where a number could be produced
+ * and would be fiction. A reading that is sometimes invented is worse than one
+ * that is sometimes absent, because nothing downstream can tell which it got.
+ */
+export const contrastOf = (one: Geometry["ink"][number]): number | null => {
+  if (!one.ink) return null;
+  const behind = one.on ? over(one.on, null) : null;
+  if (!behind) return null;
+  const front = over(one.ink, behind);
+  if (!front) return null;
+  return contrast(hex(front), hex(behind));
+};
+
+/** ⚠️ One answer for every product — see `tooSmall` for why this is not an app's. */
+export const unreadable = (ink: Geometry["ink"]): Geometry["ink"] =>
+  ink.filter((one) => {
+    const ratio = contrastOf(one);
+    if (ratio === null) return false;
+    return ratio < (isLarge(one.px, one.weight) ? READS_LARGE : READS);
+  });
+
 /**
  * WHAT A SCREEN LAID OUT, AT ONE WIDTH.
  *
@@ -397,10 +492,15 @@ export const scaleOf = (type: Geometry["type"]): Scale => {
 export async function geometryOf(
   browser: Browser, what: ReactNode | Live, css: string,
   viewport: { width: number; height: number },
+  /* ⚠️ DARK BY DEFAULT AND NAMEABLE, because contrast is the one reading here
+     that differs between the two and a sweep that only ever asks one of them
+     checks half a product. Everything else — overflow, tap targets, the type
+     scale — is the same geometry in both. */
+  theme: "dark" | "light" = "dark",
 ): Promise<Geometry> {
   const page = await browser.newPage({ viewport });
   try {
-    await show(page, what, css, "dark");
+    await show(page, what, css, theme);
     await page.evaluate(() => new Promise((go) => requestAnimationFrame(() => go(null))));
     return await page.evaluate((width) => {
       const spill = Math.max(0, document.documentElement.scrollWidth - width);
@@ -473,6 +573,82 @@ export async function geometryOf(
          either would add a size to the count that nobody can see. A skeleton
          needs no exemption — it holds no text, so it never sets a size. */
       const sizes = new Map<string, { px: number; weight: number; count: number; text: string; area: number }>();
+      /* ⚠️ WHAT IS ACTUALLY BEHIND A PIECE OF TEXT, WHICH NOTHING DECLARES. A
+         token says `--foreground` on `--surface`; what a reader gets is whatever
+         the nearest ancestor that paints resolved to, after a `color-mix`, a
+         theme and a workspace's brand. So it is walked: up from the element
+         until something is not transparent, and the page's own ground if
+         nothing is.
+
+         ⚠️ THE SCENE IS DELIBERATELY NOT IN THIS. A ground is masked, pulled
+         down at the corners and receding under the reading column, so no single
+         colour describes it — sampling one would report a number that is right
+         nowhere. What a scene may do to contrast is bounded by it never being
+         the layer text sits directly on: the vignette exists so that a surface
+         is. Text with no painted ancestor at all is the case to look at, and it
+         is reported as such rather than guessed at. */
+      /* ⚠️ AND IT IS RESOLVED BY THE BROWSER, NOT PARSED. `getComputedStyle`
+         answers in the author's own colour space now — this palette is `oklch`
+         and `oklab` throughout — so a reader that assumed `rgb()` would take
+         `oklch(0.9911 0 0)` for red 0.99, green 0, blue 0, compute a luminance
+         near zero, and report white-on-black as a contrast of 1.00. It did,
+         on every screen, which is how convincing a wrong reading is.
+
+         A 1×1 canvas is the one thing that resolves any colour the browser can
+         parse into sRGB bytes, alpha included, without re-implementing CSS
+         Color 4 in a test harness. */
+      const pad = document.createElement("canvas");
+      pad.width = 1; pad.height = 1;
+      const pen = pad.getContext("2d", { willReadFrequently: true });
+      const srgb = (said: string): string | null => {
+        if (!pen || !said) return null;
+        pen.clearRect(0, 0, 1, 1);
+        pen.fillStyle = "#000";
+        pen.fillStyle = said;
+        /* ⚠️ An unparseable value leaves `fillStyle` at the previous one, which
+           is why it is set to a known colour first: black coming back for
+           anything that is not black is the signal it was not understood. */
+        if (pen.fillStyle === "#000000" && !/^(#000000|black|rgb\(0, 0, 0\))$/.test(said)) {
+          if (!/\b0\b.*\b0\b.*\b0\b/.test(said)) return null;
+        }
+        pen.fillRect(0, 0, 1, 1);
+        const [r, g, b, a] = pen.getImageData(0, 0, 1, 1).data;
+        return `rgba(${r}, ${g}, ${b}, ${(a ?? 255) / 255})`;
+      };
+      /* ⚠️ A TRANSLUCENT FILL IS A LAYER, NOT AN ANSWER AND NOT A MISS. Half the
+         surfaces in this palette are the foreground at ten percent — a chip, a
+         tile, the plate under a mark — so the first painted ancestor is
+         frequently something you can see through. Taking it as the background
+         reports the contrast of a colour nobody sees; skipping it reports the
+         card's, which is the same lie one layer down. Both are wrong by roughly
+         the amount that decides whether a reading passes.
+
+         So the layers are collected up to the first OPAQUE one and composited
+         down, which is what the compositor does. */
+      const paints = (el: Element): string | null => {
+        const stack: (readonly [number, number, number, number])[] = [];
+        for (let up: Element | null = el; up; up = up.parentElement) {
+          const fill = srgb(getComputedStyle(up).backgroundColor);
+          if (!fill) continue;
+          const bits = [...fill.matchAll(/(-?[\d.]+)/g)].map((m) => Number(m[1]));
+          if (bits.length < 4) continue;
+          const [r, g, b, a] = bits as [number, number, number, number];
+          if (a <= 0) continue;
+          stack.push([r, g, b, a] as const);
+          if (a >= 1) break;
+        }
+        const floor = stack[stack.length - 1];
+        if (!floor || floor[3] < 1) return null;
+        let [r, g, b] = floor;
+        for (let i = stack.length - 2; i >= 0; i -= 1) {
+          const [tr, tg, tb, ta] = stack[i]!;
+          r = tr * ta + r * (1 - ta);
+          g = tg * ta + g * (1 - ta);
+          b = tb * ta + b * (1 - ta);
+        }
+        return `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, 1)`;
+      };
+      const inks = new Map<string, { ink: string; on: string; px: number; weight: number; count: number; text: string }>();
       for (const el of Array.prototype.slice.call(document.querySelectorAll("body *")) as Element[]) {
         const own = Array.prototype.slice.call(el.childNodes)
           .filter((n: ChildNode) => n.nodeType === 3 && (n.textContent ?? "").trim())
@@ -501,6 +677,12 @@ export async function geometryOf(
           held.count += 1;
           if (area > held.area) { held.area = area; held.text = own.slice(0, 40); }
         }
+        const ink = srgb(style.color) ?? "";
+        const on = paints(el) ?? "";
+        const pair = `${ink}|${on}|${px}|${weight}`;
+        const seen = inks.get(pair);
+        if (!seen) inks.set(pair, { ink, on, px, weight, count: 1, text: own.slice(0, 40) });
+        else seen.count += 1;
       }
       /* ⚠️ `Array.from`, NOT `slice.call`. A Map's `values()` is an iterator with
          no `length`, so `Array.prototype.slice.call` on it returns an empty
@@ -509,7 +691,8 @@ export async function geometryOf(
         .map((s: { px: number; weight: number; count: number; text: string }) =>
           ({ px: s.px, weight: s.weight, count: s.count, text: s.text }))
         .sort((a: { px: number }, b: { px: number }) => b.px - a.px);
-      return { spill, worst, targets, cut, type };
+      const ink = Array.from(inks.values());
+      return { spill, worst, targets, cut, type, ink };
     }, viewport.width);
   } finally {
     await page.close();

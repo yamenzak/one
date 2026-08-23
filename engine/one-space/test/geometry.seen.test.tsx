@@ -24,7 +24,7 @@ import { chromium, type Browser } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   DESK, ENOUGH_TO_RANK, PHONE, SCALE_CEILING,
-  geometryOf, mounted, scaleOf, stylesheet, tooSmall,
+  contrastOf, geometryOf, isLarge, mounted, scaleOf, stylesheet, tooSmall, unreadable,
 } from "@engine/design/measuring";
 import { GROUND } from "@engine/ground";
 
@@ -95,6 +95,26 @@ describe("the type on a screen", () => {
           .toBeGreaterThan(scale.commonest);
       }
     }, 30_000);
+  }
+});
+
+/*
+  ⚠️ AND EVERY WORD IN THE FRAME CAN BE READ, IN BOTH THEMES. The crown, the hem
+  and the bar are the half of every screen a product cannot opt out of, so a
+  shortfall there is a shortfall on every screen in every product at once.
+*/
+describe("everything in the frame can be read", () => {
+  for (const route of ROUTES) {
+    for (const theme of ["dark", "light"] as const) {
+      it(`in ${theme}: ${route}`, async () => {
+        const seen = await geometryOf(browser, { code, route }, css, PHONE, theme);
+        const short = unreadable(seen.ink);
+        expect(short, short.map((one) =>
+          `"${one.text}" is ${contrastOf(one)?.toFixed(2)}:1 at ${one.px}px/${one.weight}`
+          + ` (needs ${isLarge(one.px, one.weight) ? 3 : 4.5}) — ${one.ink} on ${one.on}`)
+          .join("; ")).toEqual([]);
+      }, 30_000);
+    }
   }
 });
 

@@ -390,7 +390,14 @@ export function CompositionBar({ describes, data, unit = "", suffix = "" }: {
                 style={{ background: colours[i] }}
               />
               {d.label}
-              <span className="tabular-nums" style={{ color: QUIET }}>
+              {/* ⚠️ THE TEXT TOKEN, NOT THE CHART'S DE-EMPHASIS ONE. `QUIET` is
+                  26% of the foreground and it is for a MARK — a dot-plot's
+                  connector, a series that is not the subject — where being
+                  barely there is the whole job. On a number somebody reads it
+                  measured 2.31:1 in dark and 1.75 in light, which is the value
+                  in a legend being the least legible thing on the panel. A
+                  quiet number is `TYPE.note`'s ink; a quiet mark is `QUIET`. */}
+              <span className={`tabular-nums ${TYPE.note}`}>
                 {unit}{say.compact(d.value)}{suffix}
               </span>
             </li>

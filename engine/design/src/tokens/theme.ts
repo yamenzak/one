@@ -59,6 +59,35 @@ export const productCss = (hue: string): string => `:root {\n  --brand: ${hue};\
  * it takes the ink a quiet line takes. The toned chips are untouched — being
  * louder than the neutral is the whole of their job.
  */
+/**
+ * ⚠️ AND A TONED SOFT CHIP IS THE ONE PLACE THE LIBRARY PAINTS BOTH HALVES, so
+ * it is the one place `data-ink` cannot reach. Measured in light: a success chip
+ * is `rgb(43,119,69)` on its own `rgb(188,215,201)` fill — **3.58:1** at 12px,
+ * which is the smallest type in the product on the shortest contrast in it. The
+ * library already pulls its own soft foreground toward the text colour and does
+ * not pull it far enough; this composes with that value rather than replacing
+ * it, so their tuning survives and only the shortfall is made up. Written as a
+ * REPLACEMENT it came out at 2.24 — worse than the fault, because `--success` is
+ * the fill's colour and `--success-soft-foreground` was already the considered
+ * one.
+ *
+ * ⚠️ LIGHT ONLY, AND ON `body` FOR THE SELF-REFERENCE REASON BELOW. Dark
+ * measures above the floor on every toned chip.
+ */
+const TONED_CHIPS = `
+:root {
+  --accent-soft-ink: color-mix(in oklab, var(--accent-soft-foreground) 72%, var(--foreground));
+  --success-soft-ink: color-mix(in oklab, var(--success-soft-foreground) 72%, var(--foreground));
+  --warning-soft-ink: color-mix(in oklab, var(--warning-soft-foreground) 72%, var(--foreground));
+  --danger-soft-ink: color-mix(in oklab, var(--danger-soft-foreground) 72%, var(--foreground));
+}
+:root:not([data-theme="dark"]) body {
+  --accent-soft-foreground: var(--accent-soft-ink);
+  --success-soft-foreground: var(--success-soft-ink);
+  --warning-soft-foreground: var(--warning-soft-ink);
+  --danger-soft-foreground: var(--danger-soft-ink);
+}`;
+
 const NEUTRAL_CHIP = `
 .chip--default.chip--soft { color: var(--muted); }`;
 
@@ -83,11 +112,73 @@ const NEUTRAL_CHIP = `
  * the figure — so the attribute goes on the thing that says it. `neutral` has no
  * rule on purpose: it is the ink the row already has.
  */
-export const TONE_CSS = `
-[data-ink="info"] { color: var(--accent); }
-[data-ink="success"] { color: var(--success); }
-[data-ink="warning"] { color: var(--warning); }
-[data-ink="danger"] { color: var(--danger); }
+/**
+ * ⚠️ AND A TONE AS INK IS NOT THE SAME VALUE AS A TONE AS A FILL, WHICH IS THE
+ * WHOLE OF THIS BLOCK. The library's `--warning` is tuned to be a surface with
+ * white on it; used as INK on a card it is amber on near-white, and measured in
+ * a browser that is **1.94:1** — against a floor of 4.5. The sentence it was
+ * carrying on the screen where it was found read "It may be flammable liquid,
+ * serious eye damage". `--danger` measured 3.39 in light and 3.65 in dark, on
+ * every expiry date, every recall and every shortfall in the product.
+ *
+ * ⚠️ SO THE INK IS THE TONE PULLED TOWARD THE TEXT COLOUR, and it is expressed
+ * as a mix rather than as a value for two reasons. A hand-picked hex is a colour
+ * that stops matching the day the library retunes its palette — and it would
+ * need to be picked TWICE, because the direction is opposite in the two themes.
+ * `--foreground` is near-black in light and near-white in dark, so one
+ * expression darkens where it must darken and lightens where it must lighten.
+ *
+ * ⚠️ THE FILLS ARE UNTOUCHED. A danger BUTTON wants the library's own strong
+ * colour with white on it, and pulling that toward the foreground would break
+ * the contrast in the other direction. What is overridden here is the ink
+ * channel and nothing else.
+ *
+ * ⚠️ AND THE PERCENTAGES ARE NOT TASTE — they are the smallest pull that clears
+ * the floor on the worst surface each tone actually lands on, read off the
+ * rendered page. `contrast.seen.test.tsx` is what says they still do.
+ */
+const INK_PULL = { info: 65, success: 50, warning: 45, danger: 55 } as const;
+
+/**
+ * ⚠️ AND THE QUIET INK ITSELF IS SHORT, WHICH IS THE ONE THAT IS EVERYWHERE.
+ * `--muted` carries every second line, every hint and every caption in the
+ * product. Measured: **3.46:1** on the page's own ground in light, and
+ * **3.83:1** on a raised surface in dark. Neither was visible from a palette —
+ * each clears the floor on the surfaces it is usually looked at on and misses it
+ * on one that is used less often, which is exactly the shape a reviewer cannot
+ * catch.
+ *
+ * ⚠️ TWO NAMES, AND THAT IS NOT STYLE — A CUSTOM PROPERTY MAY NOT REFERENCE
+ * ITSELF. `--muted: … var(--muted) …` is a cycle wherever it is written,
+ * INCLUDING on a descendant that also declares it: the browser does not fall
+ * back to the inherited value, it throws the property away entirely, and
+ * `color: var(--muted)` lands on the initial colour. Written that way it
+ * measured PURE BLACK on every light surface — passing contrast triumphantly
+ * while destroying the one distinction the token exists to draw. The reading is
+ * what caught it; nothing else could have.
+ *
+ * So `--quiet-ink` is computed at `:root`, where `var(--muted)` still means the
+ * library's own value, and `--muted` is re-pointed at it one element down.
+ *
+ * ⚠️ AND `--field-placeholder` HAS TO BE RE-POINTED TOO, because it is
+ * `var(--muted)` resolved at `:root` — before the override, permanently. It is
+ * the only other token in the library's sheet defined that way, and it is what a
+ * picker says before anybody has chosen: "Choose one", measured at 3.83 in dark
+ * and 4.05 in light. A sweep over one product would have missed it; the frame
+ * sweep is what has a picker on it.
+ */
+const QUIET_INK = `
+:root {
+  --quiet-ink: color-mix(in oklab, var(--muted) 68%, var(--foreground));
+}
+:root body { --muted: var(--quiet-ink); --field-placeholder: var(--quiet-ink); }`;
+
+export const TONE_CSS = `${QUIET_INK}
+[data-ink="info"] { color: color-mix(in oklab, var(--accent) ${INK_PULL.info}%, var(--foreground)); }
+[data-ink="success"] { color: color-mix(in oklab, var(--success) ${INK_PULL.success}%, var(--foreground)); }
+[data-ink="warning"] { color: color-mix(in oklab, var(--warning) ${INK_PULL.warning}%, var(--foreground)); }
+[data-ink="danger"] { color: color-mix(in oklab, var(--danger) ${INK_PULL.danger}%, var(--foreground)); }
+${TONED_CHIPS}
 ${NEUTRAL_CHIP}`;
 
 /* -------------------------------------------------------------------- sky --- */

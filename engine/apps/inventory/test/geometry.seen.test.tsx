@@ -36,7 +36,7 @@ import { chromium, type Browser } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   DESK, ENOUGH_TO_RANK, FINGER, PHONE, SCALE_CEILING,
-  geometryOf, mounted, scaleOf, stylesheet, tooSmall,
+  contrastOf, geometryOf, isLarge, mounted, scaleOf, stylesheet, tooSmall, unreadable,
 } from "@engine/design/measuring";
 import { INVENTORY_ROUTES } from "../src/screens/index.js";
 
@@ -123,6 +123,38 @@ describe("the type on every screen", () => {
   }
 });
 
+/*
+  ⚠️ AND EVERY WORD ON EVERY SCREEN CAN BE READ, IN BOTH THEMES. This is the
+  third pixel fact after spacing and type, and it is the one a palette cannot
+  promise: a token says `--warning` on `--surface`, and what a reader gets is
+  that pair after a `color-mix`, a theme and a workspace's own brand have each
+  had a turn.
+
+  ⚠️ IT FOUND SIXTY-ONE. The worst was the library's amber used as INK on a
+  card — **1.94:1**, on the sentence "It may be flammable liquid, serious eye
+  damage" — and the widest was `--muted` in light at 3.46, which is every second
+  line, every hint and every caption in the product, on every screen. Both had
+  shipped since the palette was written, and neither is visible to anybody who
+  works in dark.
+
+  ⚠️ BOTH THEMES, SEPARATELY, BECAUSE THEY FAIL DIFFERENTLY AND ONE OF THEM IS
+  THE ONE NOBODY LOOKS AT. Dark had one fault class; light had four.
+*/
+describe("everything on a screen can be read", () => {
+  for (const route of INVENTORY_ROUTES) {
+    for (const theme of ["dark", "light"] as const) {
+      it(`in ${theme}: ${route}`, async () => {
+        const seen = await geometryOf(browser, { code, route }, css, PHONE, theme);
+        const short = unreadable(seen.ink);
+        expect(short, short.map((one) =>
+          `"${one.text}" is ${contrastOf(one)?.toFixed(2)}:1 at ${one.px}px/${one.weight}`
+          + ` (needs ${isLarge(one.px, one.weight) ? 3 : 4.5}) — ${one.ink} on ${one.on}`)
+          .join("; ")).toEqual([]);
+      }, 30_000);
+    }
+  }
+});
+
 /* --------------------------------------------------------------- controls --- */
 
 /*
@@ -173,6 +205,17 @@ describe("the measurements bite", () => {
     const scale = scaleOf(seen.type);
     expect(scale.pieces).toBeGreaterThanOrEqual(ENOUGH_TO_RANK);
     expect(scale.sizes[0]).toBe(scale.commonest);
+  }, 30_000);
+
+  /* ⚠️ AND THE CONTRAST READING SHOWN FAILING, on a pair nobody would ship and
+     every reading here would have to catch. */
+  it("sees text nobody can read", async () => {
+    const seen = await geometryOf(
+      browser,
+      <div style={{ background: "#f4f4f4", color: "#b8b8b8", padding: 8 }}>Barely there</div>,
+      css, PHONE,
+    );
+    expect(unreadable(seen.ink)).toHaveLength(1);
   }, 30_000);
 
   /* ⚠️ AND IT DOES NOT FIRE ON WIDE CONTENT THAT SCROLLS ITSELF, which is the

@@ -951,6 +951,9 @@ its own header, cited by other files, and doing nothing.
 | `the-head-is-the-crown-and-there-is-one` | D53 | a hand-rolled header beside the one that has slots — which is what the Shell's own was for months, and why it scrolled away, wore a separator and drew its controls at three heights |
 | `the-foot-is-a-navigation-or-an-act` | D53 | 180px of an 844px phone in two objects with a gap between them, and a content column reserving room for one — so the last row sits under the other at every scroll position |
 | `a-screens-actions-are-capped-where-the-row-is` | D53 | a third action dropped by whichever component runs out of room first — a control somebody put there on purpose, gone with nothing said |
+| `every-screens-type-is-a-scale-with-a-top` | D70 | a screen assembled out of locally defensible type choices — nine sizes, none of them wrong, and no scale; or a page whose largest type is the size of everything else, where the reader's eye has nowhere to land |
+| `everything-on-a-screen-can-be-read` | D70 | ink under the contrast floor — a status colour tuned as a fill used as text, at 1.94:1 on the sentence naming a chemical hazard; a de-emphasis grey on a number; a quiet line on the one surface it does not clear. None of it visible from the palette, and none of it visible to anybody working in dark |
+| `everything-in-the-frame-can-be-read` | D70 | a shortfall in the crown, the hem or the bar — the half of every screen a product cannot opt out of, so one fault there is a fault on every screen in every product at once |
 <!-- /generated -->
 
 ### And how well each decision is defended
@@ -1027,6 +1030,7 @@ its own header, cited by other files, and doing nothing.
 | D67 | The tab's store is bounded, and stops being trusted when it stops being datable | 0 |
 | D68 | A tab switch is not a journey, and only the journey still running may land | 0 |
 | D69 | Nothing reads the camera with the thread a person is waiting on | 0 |
+| D70 | A design rule is a guard or it is not a rule | 3 |
 <!-- /generated -->
 
 ---

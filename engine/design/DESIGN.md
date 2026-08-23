@@ -649,6 +649,35 @@ page's height. Both are `motion`'s.
 ⚠️ **AND A TRANSITION IS THE ARRIVAL, NOT A FOURTH THING ON TOP OF IT.** See
 below: while a page is travelling, nothing inside it arrives separately.
 
+### How often it is done decides how much it may move
+
+**The three kinds say what may move. This says how much, and the variable is not
+importance — it is repetition.** The same half-second is a moment on a screen
+somebody sees once and a tax on a control they press forty times a day, and the
+second one is how an interface comes to feel slow while every individual
+animation is defensible.
+
+| How often | What it may have | Where |
+|---|---|---|
+| **Constantly** — a destination, a back arrow, a keyboard shortcut, the one act at the foot | **Nothing.** Speed is the experience. | the bar, the crown |
+| **Often** — a row opening, a value changing, a control settling under a finger | The shortest curve there is: `DURATION.instant` or `quick` | rows, switches, fields |
+| **Sometimes** — a sheet, a drawer, a page, a confirmation | The vocabulary's own pace: `moderate`, `page` | overlays, travel |
+| **Once, or nearly** — a door, an opening, the first screen of a workspace | The long one, `stately`, and an impression is the point | the doors |
+| **Never, by anybody** — a ground breathing | `breath`, paced so that nobody catches it happening | the scene |
+
+⚠️ **THE TOP ROW IS THE ONE THAT GETS ARGUED WITH, AND IT IS ALREADY ENFORCED IN
+THREE PLACES.** A tab switch is `lateral` and runs no transition (`moving`); the
+bar is ink rather than a surface that could animate its fill (`chrome`); and
+ambient motion is earned rather than assumed (`states`). They were three separate
+findings and this is the one sentence under all three, which is the only reason
+it is written down rather than being a fourth guard: what it forbids is already
+refused, and a rule stated twice is a rule that can disagree with itself.
+
+⚠️ **AND "IMPORTANT" IS NOT THE AXIS.** Deleting a workspace is the most
+consequential thing in the product and its confirmation is a sheet like any
+other; pressing Stock is trivial and must be instantaneous. Consequence buys a
+refusal that is hard to pass, not a curve that is slow to watch.
+
 ### Going from one screen to the next
 
 **Two mechanisms, and no screen declares either.** The ROUTE decides direction:
@@ -1027,7 +1056,42 @@ Before a screen is done, look at a screenshot of it at phone width and answer:
 
 ## 8. Where the rules are enforced
 
-Some of this is guarded and some is judgement. What is checked today:
+### The failures, by name
+
+⚠️ **A FAULT WITH NO NAME IS ONE NOBODY CAN RAISE IN REVIEW.** Every row below is
+something this product actually shipped, and each was invisible for the same
+reason: no single instance of it looks wrong. Naming one makes it sayable — "that
+is a Carnival" ends an argument that "each of these animations is fine" cannot.
+
+⚠️ **AND EVERY ROW HAS A GUARD.** That is the entry condition, not a coincidence.
+A catalogue of remembered incidents is a wall of text that ages into folklore; a
+catalogue where each line names the check that would fail is an index into the
+gate. If a fault here matters and nothing checks it, the row does not go in — the
+guard does.
+
+| The failure | What it looks like | Caught by |
+|---|---|---|
+| **The Accretion** | Nine sizes of type on one page. Every one named a role; together they are not a scale. | `motion`, and the type reading in the browser sweeps |
+| **The Flat** | The largest thing on the screen is the size of everything else, so the eye has nowhere to land. | the type reading |
+| **The Faint** | Ink nobody can read: a status colour tuned to be a fill used as text, a de-emphasis grey on a number, a quiet line on the one surface it does not clear. | `geometry.seen` |
+| **The Sprawl** | A card whose first row sits twice as far down as every other card's; two sections that run together. | `rhythm`, `metrics` |
+| **The Second Answer** | Two components that both build a card, two files that both decide a colour, two places that decide which way a move goes. | `cards`, `ground`, `moving`, `travel` |
+| **The Private Number** | A padding, a gap, a duration or a font size chosen in the file that happened to need one. | `metrics`, `motion` |
+| **The Carnival** | Motion that is individually defensible and collectively a jungle: four entrances at once, a sparkle on everything. | `motion`, `states` |
+| **The Unstoppable** | A keyframe outside the library's machinery, so it keeps moving for somebody who asked it to stop. | `motion` |
+| **The Sticky Hover** | A hover state a touch screen enters on tap and never leaves. | `hand` |
+| **The Vague Transition** | `transition: all` — animating whatever happens to change, and outliving the feature it was written for. | `hand` |
+| **The Confident Empty** | A failed load rendered as "nothing here yet"; `[]` shown as fact before the answer arrives. | `states`, `asking` |
+| **The Silent Save** | A write that fails into nothing, or a control left showing a value the server refused. | `problem` |
+| **The Bare Key** | `eu`, `no_tenant`, `owner` printed where a place, a reason or a role was meant. | `present`, `tone` |
+| **The Wall** | A paragraph under a control, explaining what the control should have said. | `tone` |
+| **The Unreachable** | A capability built, wired, and mounted by nothing — tables applied, no route, every suite green. | `reached`, `showcase`, `surface` |
+| **The Unmarked Mark** | A registered glyph drawn by a screen itself, or one animated because it could be. | `glyphs` |
+| **The Dead Attribute** | A `data-` attribute stamped on markup that no selector, variant or query reads. | `attrs` |
+
+### What is checked today
+
+Some of this is guarded and some is judgement:
 
 <!-- generated: node scripts/enforced.mjs -->
 - `asking` — every read goes through the door, which holds one answer per question.

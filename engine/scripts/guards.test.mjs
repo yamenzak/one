@@ -250,5 +250,55 @@ for (const rel of [...walk("scripts"), ...walk("kernel/src"), ...walk("runtime/s
 }
 if (!hidden) ok(`legible: ${read} source file(s), none holding a character nothing renders`);
 
+/* ------------------------------------------------------- the failure names --- */
+
+/**
+ * ⚠️ THE CATALOGUE IN DESIGN.md §8 NAMES A GUARD PER FAULT, AND THAT IS ITS
+ * ENTRY CONDITION. A named failure with no check behind it is folklore: it reads
+ * as covered, nothing covers it, and the row survives every renaming of the
+ * thing that used to catch it. So every guard the table cites has to be one the
+ * gate actually runs, and a guard that is retired takes its rows with it.
+ *
+ * ⚠️ READ OUT OF THE TABLE RATHER THAN LISTED HERE. A second copy of the names
+ * would be the same drift one file over.
+ */
+const CATALOGUE = readFileSync(join(ENGINE, "design/DESIGN.md"), "utf8");
+const table = /### The failures, by name([\s\S]*?)\n### /.exec(CATALOGUE);
+if (!table) {
+  fail(`design/DESIGN.md: no failure catalogue to check — if it is gone, drop this on purpose.`);
+} else {
+  const rows = [...table[1].matchAll(/^\|\s\*\*(.+?)\*\*\s\|.*\|(.*)\|\s*$/gm)];
+  const runs = new Set(
+    [...readFileSync(join(ENGINE, "scripts/gate.mjs"), "utf8")
+      .matchAll(/"([a-z-]+)"/g)].map((m) => m[1]),
+  );
+  /**
+   * ⚠️ AND A ROW MAY CITE THE BROWSER LANE, WHICH THE GATE DELIBERATELY DOES NOT
+   * RUN (D49). Contrast is a rendered fact — a token pair after a `color-mix`, a
+   * theme and a workspace's brand — so the only thing that can check it is a
+   * page in a real browser, and refusing that citation would push a whole class
+   * of fault back into prose.
+   */
+  const browserChecks = new Set(
+    [...walk("design/test"), ...walk("one-space/test"), ...walk("apps")]
+      .filter((p) => /\.seen\.test\.[jt]sx?$/.test(p))
+      .map((p) => p.split("/").pop().replace(/\.seen\.test\..*$/, "")),
+  );
+  let unbacked = 0;
+  for (const [, name, cited] of rows) {
+    for (const [, guard] of cited.matchAll(/`([a-z-]+)(?:\.seen)?`/g)) {
+      if (runs.has(guard) || (/\.seen`/.test(cited) && browserChecks.has(guard))) continue;
+      unbacked++;
+      fail(`design/DESIGN.md: "${name}" cites \`${guard}\`, which nothing runs.\n` +
+        `       A named failure with no check behind it reads as covered and is not.`);
+    }
+  }
+  if (!rows.length) {
+    fail(`design/DESIGN.md: the failure catalogue has no rows — see the header there.`);
+  } else if (!unbacked) {
+    ok(`catalogue: ${rows.length} named failure(s), every one citing a check that runs`);
+  }
+}
+
 console.log(`\nguards: ${live.length} live, ${owed.length} owed, every promise accounted for.`);
 process.exit(bad ? 1 : 0);
