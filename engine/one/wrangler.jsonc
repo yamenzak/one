@@ -112,16 +112,16 @@
   "d1_databases": [
     {
       "binding": "DIRECTORY",
-      "database_name": "one-directory",
+      "database_name": "one-directory-g2",
       // ⚠️ A PLACEHOLDER UNTIL PROVISIONING WRITES THE REAL ONE. A deploy with
       // this id in place would bind a database that does not exist and answer
       // every request 500 — so nothing ships until it is replaced.
-      "database_id": "2e42d7a5-7c5d-4300-aacd-d09246ba7130"
+      "database_id": "318c5306-474f-4a4a-9a23-c88d9a0907da"
     },
     {
       "binding": "SHARD_EU_1",
-      "database_name": "one-shard-eu-1",
-      "database_id": "afe4e35c-bf44-48ff-b43e-c55b913efcda"
+      "database_name": "one-shard-eu-1-g2",
+      "database_id": "3600b1de-4646-465c-b7e9-ba21be4839f2"
     }
   ],
 
