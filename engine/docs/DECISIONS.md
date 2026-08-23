@@ -2348,3 +2348,51 @@ says when this changed.
 invalidation moved from the operation to the call site; a store with no bound; a
 revalidation that fires every held key at once; or a wake-up rule that cannot
 tell being away from looking away.
+
+---
+
+## D68 — A tab switch is not a journey, and only the journey still running may land
+
+**Reported as: navigation takes several taps, then goes stubborn, and the bar
+behaves oddly.** Two lines caused all of it, and they made each other worse.
+
+**Every tap on the bar ran a hierarchical push.** `wayTo` had no answer for a
+sibling — `/inventory/stock` → `/inventory/scan` is neither a prefix of the other
+and both are two deep — so it fell through to `forward`: a full
+`startViewTransition` at `DURATION.page`, on the move somebody makes dozens of
+times an hour, to say something they already know. They pressed the thing that is
+now lit.
+
+**And the duration is not the worst of it.** The tree is swapped inside the
+transition's callback while the browser goes on showing a picture of the screen
+being left — so for the whole animation a tap lands on the NEW screen's controls
+under the OLD screen's image. Speeding the animation up would not fix that: the
+mismatch is the mechanism, not the pace.
+
+**The second tap corrupted the first journey.** Every call registered its own
+tidy-up on its own `finished`, and an interrupted transition REJECTS — so
+pressing again made the abandoned promise settle immediately and the tidy-up ran
+in the middle of the journey that replaced it: the direction stripped off the
+root mid-animation, every held animation finished early. The more somebody
+pressed, the worse it got, which is precisely how it was described.
+
+**So a lateral move has an answer of its own, and it is instant.** A push earns
+its transition — it says where a record came from and how to get back. A move
+between two addresses under one parent has nothing to say, so it says it
+immediately. It takes the same lane as a browser with no view transitions and a
+person who asked for less motion: one path for "change the screen, now", so the
+fast case cannot rot while the decorated one is maintained.
+
+**⚠️ THE SAME PARENT, NOT MERELY THE SAME DEPTH.** `/space/console/keys` and
+`/space/w/acme` are both two segments deep and are not siblings. Giving that a
+tab switch's silence would take the one move that genuinely changes place and
+make it invisible.
+
+**And the back gesture agrees with the tap.** The addresses decide laterality;
+the history step decides direction. Answered from the step alone, the same move
+was silent one way and animated the other.
+
+**Therefore never:** a repeated move paced like a rare one; a screen swapped
+under a picture of the screen it replaced, for longer than a frame; a
+cleanup registered per attempt rather than per current attempt; a second caller
+of `startViewTransition`; or a second place that decides which way a move goes.

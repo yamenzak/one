@@ -1048,6 +1048,7 @@ Some of this is guarded and some is judgement. What is checked today:
 - `keeping` — a content-hashed asset is kept; the document that names it is not.
 - `metrics` — one source for every measurement: no screen picks its own padding, gap or tap target, and a pressable row has a floor under it.
 - `motion` — one set of curves and roles, reduced motion answered both ways, and no pinned element whose travel changes the page's height.
+- `moving` — a tab switch is not a journey; only the journey still running may land.
 - `placed` — where records sit is declared, checked, and never a default in a script.
 - `present` — one formatter, one store, and every reader is the person reading.
 - `problem` — every refusal comes from a catalogue, and one naming an input is rendered on that input.
