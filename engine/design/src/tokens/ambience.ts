@@ -267,27 +267,13 @@ const hemStop = (pct: number): string =>
  * flat at both ends and steepest in the middle: it leaves the solid part without
  * a seam and arrives at nothing without one either.
  *
- * ⚠️ AND THE COUNT IS DERIVED FROM THE LENGTH, BECAUSE WHAT AN EYE FINDS IS THE
- * KINK AT A JOIN AND NOT THE STEP ACROSS IT. Between two stops the browser
- * interpolates LINEARLY, so what is drawn is a polyline and every stop is a
- * change of slope — and that change goes as `1 / (steps × fade)`. A fixed count
- * therefore bands twice as hard the moment the fade is halved, which is the one
- * thing shortening the hem must not cost. Holding the PRODUCT constant keeps
- * every join the size it is today at any length the falloff is given.
- *
- * ⚠️ AND THE NUMBER IS NOT TASTE — it is the product that reproduces the worst
- * join this curve has ever been shipped with, 10.4 points per rem², measured
- * across the stops rather than reasoned about. `scene.test.mjs` re-measures it
- * on the emitted gradient, so a shorter fade with the count left alone fails
- * there rather than on somebody's screen.
+ * ⚠️ AND THE STEP SIZE IS THE POINT, NOT THE COUNT. Eight stops over a long fade
+ * and three over a short one are the same curve at different resolutions; what
+ * shows a join is a big jump between neighbours. Measured across this curve the
+ * widest is 18 points, in the middle, where the eye is least able to find it.
  */
-const WALK = 52;
-
 const hemStops = (hold: number, fade: number): string => {
-  /* ⚠️ AND EIGHT IS A FLOOR, NOT THE ANSWER. Below that the polyline stops
-     resembling a smoothstep at all — the flat ends are the half of this curve
-     that keeps the solid part and the far end from each showing a line. */
-  const steps = Math.max(8, Math.round(WALK / fade));
+  const steps = 8;
   return Array.from({ length: steps + 1 }, (_, i) => {
     const t = i / steps;
     return `${hemStop(+(100 * (1 - t * t * (3 - 2 * t))).toFixed(1))} `
@@ -386,13 +372,10 @@ const hem = (edge: "top" | "bottom") => {
     ⚠️ AND IT RAN TOO FAR. At 4.25 + 8.5 the vignette dissolved 204px of an 844px
     phone to hold one 64px row legible — a quarter of the screen, which stops
     reading as the ground thickening into an edge and starts reading as the page
-    fading out. At 4.25 + 2.75 it is 112px: the 68 the crown stands on, and 44
-    of falloff, which is the shortest run that still arrives at nothing without
-    an edge — and it does so because `hemStops` walks it at twice the resolution
-    rather than at the same count over half the distance.
+    fading out.
   */
   const hold = HEM_HOLD;
-  const fade = 2.75;
+  const fade = 5.5;
   /*
     ⚠️ AND IT OVERSHOOTS THE EDGE IT HEMS, WHICH IS NOT PADDING — IT IS THE FIX
     FOR A GAP. A hem rides a `sticky` row, and a sticky row does not always end
