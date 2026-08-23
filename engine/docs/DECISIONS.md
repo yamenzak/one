@@ -2201,7 +2201,21 @@ real deployment: 36 tables were refused outright. Statements carry no such limit
 statement, which is the shape already read. A union there is a verification that
 stops working as the schema grows, which is precisely when it matters most.
 
+**⚠️ AND A REHEARSAL THAT REHEARSES THE EASY HALF IS NOT A REHEARSAL.** The
+relocation copied, verified, wrote the id — and then `wrangler deploy` failed on
+a missing `one-space/dist`, at the end of a maintenance window, over something
+with no connection to the database at all. An `assets.directory` is a filesystem
+path rather than a package dependency, so nothing in the workspace graph connects
+a deploy to the build it needs; the workflow simply never built it. Copying is
+the step with a rollback behind it. Deploying is the step with nobody able to
+work until it lands — so it is built first, in both phases, before anything
+touches Cloudflare, and the rehearsal now runs `deploy --dry-run` so every way
+the last step can fail is found while nothing is bound and nobody is held.
+`shipping.test.mjs` fails on a workflow that deploys the worker without building
+what it serves, and on a rehearsal that stops proving the deploy.
+
 **Therefore never:** a copy trusted because a command exited 0; a maintenance
 window taken on an operator's word; a new id committed before the deployment it
 points at has answered; a source deleted in the same operation that replaced it;
-or a tool's output redirected somewhere a failure cannot be read from.
+a tool's output redirected somewhere a failure cannot be read from; or a
+rehearsal that leaves the step with a person waiting on it untried.

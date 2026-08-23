@@ -59,6 +59,18 @@ jobs:
       - run: pnpm install --frozen-lockfile
         working-directory: .
 
+      # ⚠️ BEFORE ANYTHING TOUCHES CLOUDFLARE, AND IN BOTH PHASES. The worker
+      # serves `engine/one-space/dist` through its `assets` binding, and an
+      # `assets.directory` is a filesystem path rather than a package dependency
+      # — so nothing in the graph connects a deploy to the build it needs. Left
+      # out, `wrangler deploy` fails on a missing directory at the END of the
+      # sequence: the copy taken, the id written, the deployment in maintenance
+      # and a person waiting on a failure that had nothing to do with any of it.
+      # Built here, that is a red run in twenty seconds with nothing bound.
+      - name: Build the Hub
+        run: pnpm turbo run build --filter=@engine/space
+        working-directory: .
+
       # ⚠️ THE SWITCH IS READ, NOT ASKED ABOUT. An input saying "yes I turned
       # maintenance on" is a promise; this is the deployment's own answer, out of
       # the database about to be copied.
@@ -125,6 +137,20 @@ jobs:
       # proved the export, the import and the comparison against the live data
       # and told you how long the window is — which is the only honest way to
       # know before the deployment is down.
+      # ⚠️ A REHEARSAL THAT ONLY REHEARSES THE COPY IS NOT A REHEARSAL. The copy
+      # is the part with a rollback; the DEPLOY is the part with a person waiting
+      # on it, and it is the one that failed — on a missing assets directory, at
+      # the end of a maintenance window, over something that had nothing to do
+      # with the database. A dry run resolves the config, the bindings and the
+      # assets without shipping anything, so every way the last step can fail is
+      # found while nothing is bound and nobody is held.
+      - name: Prove the deploy would work
+        if: inputs.phase == 'rehearse'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: pnpm exec wrangler deploy --dry-run
+
       - name: What a rehearsal leaves behind
         if: inputs.phase == 'rehearse'
         run: |
