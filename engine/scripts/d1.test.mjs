@@ -96,11 +96,25 @@ else ok("multi: every statement's rows are read, not the first's");
 /* ------------------------------------------------------------- the names --- */
 
 /* ⚠️ A TABLE NAME IS QUOTED AS AN IDENTIFIER. `order` and `group` are words
-   SQLite reserves, and an unquoted one is a syntax error mid-way through a
-   36-way UNION — which fails the whole verification over a naming choice. */
+   SQLite reserves, and an unquoted one is a syntax error that fails the whole
+   verification over a naming choice. */
 const sql = countsFor(["order", "plain"]);
 if (!sql.includes('FROM "order"')) fail(`counts: a reserved table name is not quoted: ${sql}`);
 else ok("counts: table names are quoted as identifiers");
+
+/**
+ * ⚠️ AND IT IS ONE STATEMENT PER TABLE. D1 refuses a compound SELECT past a
+ * ceiling well under the table count of a real deployment — 36 was rejected with
+ * `too many terms in compound SELECT`. A union here is a verification that stops
+ * working as the schema grows, so the shape is asserted rather than trusted.
+ */
+const wide = countsFor(Array.from({ length: 60 }, (_, i) => `t${i}`));
+if (/UNION/i.test(wide)) {
+  fail("counts: builds a compound SELECT. D1 refuses one past a few dozen terms,\n"
+    + "     so this fails on exactly the databases worth verifying.");
+} else if (wide.split(";").filter((s) => s.trim()).length !== 60) {
+  fail(`counts: 60 tables produced ${wide.split(";").filter((s) => s.trim()).length} statement(s).`);
+} else ok("counts: 60 tables, 60 statements, no compound SELECT");
 
 /* ------------------------------------------------- and it runs end to end --- */
 

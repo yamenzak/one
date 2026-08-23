@@ -64,11 +64,21 @@ export function answer({ code, stdout, stderr }) {
   return { rows: rowsIn(said) };
 }
 
-/** One count per table, from the table list the database itself reports. */
+/**
+ * One count per table, from the table list the database itself reports.
+ *
+ * ⚠️ SEPARATE STATEMENTS, NEVER ONE `UNION ALL`. SQLite caps the terms in a
+ * compound SELECT and D1's ceiling is well under the number of tables a real
+ * deployment has — 36 was refused outright with `too many terms in compound
+ * SELECT`. Statements have no such limit (the import beside this one runs 365 of
+ * them), and `--json` answers one result per statement, which is the shape
+ * `rowsIn` already flattens. A union here is a verification that stops working
+ * as the schema grows, which is the moment it is most needed.
+ */
 export const countsFor = (names) =>
   names
-    .map((n) => `SELECT ${JSON.stringify(n)} AS t, COUNT(*) AS n FROM ${JSON.stringify(n)}`)
-    .join(" UNION ALL ");
+    .map((n) => `SELECT ${JSON.stringify(n)} AS t, COUNT(*) AS n FROM ${JSON.stringify(n)};`)
+    .join("\n");
 
 /* ------------------------------------------------------------------- run --- */
 

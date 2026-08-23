@@ -2194,6 +2194,13 @@ and every query against one is refused — so a table list built without excludi
 them is broken on every database, always. That exclusion now lives in exactly one
 place, and `d1.test.mjs` fails on a workflow that writes its own list beside it.
 
+**And the counts are separate statements, never one `UNION ALL`.** SQLite caps
+the terms in a compound SELECT and D1's ceiling is under the table count of a
+real deployment: 36 tables were refused outright. Statements carry no such limit
+— the import beside this one runs 365 — and `--json` answers one result per
+statement, which is the shape already read. A union there is a verification that
+stops working as the schema grows, which is precisely when it matters most.
+
 **Therefore never:** a copy trusted because a command exited 0; a maintenance
 window taken on an operator's word; a new id committed before the deployment it
 points at has answered; a source deleted in the same operation that replaced it;
