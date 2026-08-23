@@ -481,13 +481,22 @@ export const BAND_PAD = "py-6" as const;
  * never air above.
  *
  * ⚠️ BOTH NUMBERS ARE RUNGS OF `SPACE`, WHICH IS WHAT MAKES IT THE SAME SYSTEM.
- * `roomy` above and `airy` below — the same two steps a page's own stack uses,
- * so a hero is separated from the first section by the widest gap the product
- * has plus that stack's own, and the answer to "why this much" is a rung rather
- * than a number somebody liked. It matches `TITLE_PAD` exactly, because a title
- * card and a hero are the same block on two kinds of screen.
+ * `airy` at both ends — the same step a page's own stack uses, so a hero is
+ * separated from the first section by the widest gap the product has plus that
+ * stack's own, and the answer to "why this much" is a rung rather than a number
+ * somebody liked. The BOTTOM matches `TITLE_PAD` exactly, because a title card
+ * and a hero are the same block on two kinds of screen.
+ *
+ * ⚠️ AND THE TOP IS THE SAME RUNG RATHER THAN THE ONE BELOW IT, BECAUSE OF WHAT
+ * IS ABOVE IT. A title card arrives under its own name; a hero arrives under the
+ * crown, and the crown is a control on a veil rather than a line of type — so
+ * the number lands against 64px of chrome and a hem, and a rung that reads as
+ * air under a heading reads as a figure pushed up against the bar. Only the top
+ * is free here: the ladder guard asks the two blocks agree BELOW, which is where
+ * a difference would give the product a roomier home page than its own detail
+ * pages.
  */
-export const HERO_PAD = "pt-6 pb-10" as const;
+export const HERO_PAD = "pt-10 pb-10" as const;
 
 /**
  * ⚠️ ONE THIRD DOWN, NOT HALF — the optical centre of a door screen. A sign-in

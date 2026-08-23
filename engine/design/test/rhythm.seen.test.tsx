@@ -21,7 +21,7 @@
 import { chromium, type Browser } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
-  ActionRow, Group, NavRow, Reveal, Screen, Stack,
+  ActionRow, Balance, Group, NavRow, Reveal, Screen, Stack,
 } from "../src/index.js";
 import { PHONE, html, pageFor, stylesheet } from "../src/measure/index.js";
 
@@ -267,5 +267,71 @@ describe("a disclosure inside a card", () => {
       expect(seen.slack, "no inset between the disclosure and its own trigger").toBe(0);
       expect(seen.cardBottom - seen.foldBottom, "the card's own inset, once").toBe(ROW_PAD);
     } finally { await page.close(); }
+  });
+});
+
+/**
+ * THE ONE NUMBER A SCREEN IS ABOUT, AND THE AIR AROUND IT.
+ *
+ * ⚠️ A HERO IS THE ONLY BLOCK THAT ARRIVES UNDER THE CROWN RATHER THAN UNDER A
+ * HEADING, AND THAT DECIDES ITS TOP. Everything else on a page is introduced by
+ * type; a hero is introduced by 64px of chrome standing on a veil, so the rung
+ * that reads as air under a section title reads as a figure pushed up against
+ * the bar. It takes the widest rung above as well as below.
+ *
+ * ⚠️ AND WHAT IS UNDER IT IS A DIFFERENT KIND OF THING, NOT A FOURTH LINE OF THE
+ * CAPTION. Eyebrow, figure and identifier are one thing said three ways and sit
+ * tight; a row of quick actions is what to DO about the number, and at the same
+ * gap two sections take from each other the eye reads a run of four.
+ *
+ * ⚠️ MEASURED, BECAUSE THE CLASS BEING PRESENT IS NOT THE PADDING BEING THERE.
+ * The harness reads the SHIPPED stylesheet, so a rung nothing had used yet is a
+ * class on the element computing to zero — `pt-10` did exactly that, and the
+ * markup, the token and every source guard all looked right.
+ */
+describe("the one number a screen is about", () => {
+  /** ⚠️ `SPACE.airy` — the widest rung. Above the block, and inside it. */
+  const AIRY = 40;
+
+  const hero = async () => {
+    const page = await browser.newPage({ viewport: { width: PHONE.width, height: PHONE.height } });
+    try {
+      await page.setContent(pageFor(html(
+        <Balance
+          eyebrow="On the shelf"
+          figure={<span data-figure="true">66</span>}
+          identifier="214 products in 11 places"
+          under={<div data-under="true">acts</div>}
+        />,
+      ), css));
+      return await page.evaluate(() => {
+        const box = (sel: string) => {
+          const el = document.querySelector(sel);
+          if (!el) return null;
+          const r = el.getBoundingClientRect();
+          return { top: Math.round(r.top), bottom: Math.round(r.bottom) };
+        };
+        const block = document.querySelector("[data-figure]")?.closest("div")?.parentElement;
+        return {
+          /* The whole block's own top inset — the gap the crown stands in. */
+          padTop: Math.round(parseFloat(getComputedStyle(
+            document.querySelector("[data-figure]")!.closest(".text-center")!).paddingTop)),
+          said: block ? Math.round(block.getBoundingClientRect().bottom) : null,
+          under: box("[data-under]"),
+        };
+      });
+    } finally { await page.close(); }
+  };
+
+  it("stands off the chrome above it by the widest rung", async () => {
+    const seen = await hero();
+    expect(seen.padTop, "the figure block's top inset — zero means the rung reached the "
+      + "markup and not the stylesheet, so rebuild the SPA before believing it").toBe(AIRY);
+  });
+
+  it("separates what to do about the number from the number itself", async () => {
+    const seen = await hero();
+    expect(seen.under!.top - seen.said!, "the acts sit at a section's distance from the "
+      + "caption, so the eye reads a run of four rather than a figure and its acts").toBe(AIRY);
   });
 });

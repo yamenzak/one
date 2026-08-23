@@ -156,7 +156,14 @@ export function Balance({ eyebrow, figure, identifier, under }: {
     /* ⚠️ TWO GROUPS, NOT ONE RUN. The eyebrow, the figure and the identifier are
        ONE thing and belong tight together; whatever is under them is a separate
        thing and needs air. Spacing them all identically is what made the
-       quick-actions read as a fourth line of the caption. */
+       quick-actions read as a fourth line of the caption.
+
+       ⚠️ AND THE GAP IS `airy`, THE WIDEST RUNG, BECAUSE WHAT IS UNDER A HERO IS
+       A DIFFERENT KIND OF THING RATHER THAN A FURTHER LINE OF IT. At `roomy` the
+       acts sit at the same distance from the caption as two sections sit from
+       each other, so the eye reads a run of four rather than a figure and then
+       what to do about it. This is the only gap the block has between its two
+       halves, so it is the whole of that separation. */
     /* ⚠️ THE HALO, BECAUSE THIS IS THE ONE BLOCK THAT SITS DIRECTLY ON A WORLD.
        Every other figure in the product is inside a card and already on a
        surface; a home screen's number is on the ground itself, and a hard bright
@@ -165,7 +172,7 @@ export function Balance({ eyebrow, figure, identifier, under }: {
        doubles the contrast at every edge — and it resolves to `none` where there
        is no scene, which is why this needs no condition. */
     <div
-      className={`flex flex-col items-center ${SPACE.roomy} ${HERO_PAD} text-center`}
+      className={`flex flex-col items-center ${SPACE.airy} ${HERO_PAD} text-center`}
       style={{ textShadow: ON_SCENE }}
     >
       <div className={`flex flex-col items-center ${SPACE.tight}`}>

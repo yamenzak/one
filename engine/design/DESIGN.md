@@ -959,9 +959,28 @@ nothing looked decided — and the answer to "why this much" was nobody. Whether
 hero has *enough* air is taste and will move again; that its air is a step of the
 same ladder is structure, and `metrics.test.mjs` asks only the second question.
 
-⚠️ **And a hero and a title card take the SAME rung**, because they are one block
-on two kinds of screen. Two numbers for one idea is how a product ends up with a
-roomier home page than its own detail pages for no reason anybody chose.
+⚠️ **And a hero and a title card take the SAME rung BELOW**, because they are one
+block on two kinds of screen. Two numbers for one idea is how a product ends up
+with a roomier home page than its own detail pages for no reason anybody chose.
+
+⚠️ **ABOVE, only a hero has a question to answer, and the answer is `airy` too.**
+A title card arrives under its own name; a hero arrives under the crown — 64px of
+control standing on a veil rather than a line of type — so the rung that reads as
+air beneath a heading reads as a figure pushed up against the bar. It is the one
+place the two blocks differ, and it is the top alone.
+
+⚠️ **And what is UNDER a hero takes the widest rung as well** — a row of quick
+actions is what to *do* about the number, not a fourth line of its caption. At
+`roomy` it sits at the distance two sections take from each other and the eye
+reads a run of four. Eyebrow, figure and identifier stay tight: they are one
+thing said three ways.
+
+⚠️ **All three are measured in a browser** (`rhythm.seen.test.tsx`), because the
+class being present is not the padding being there. The harness reads the
+*shipped* stylesheet, so a rung nothing had used yet is a class on the element
+computing to zero — which is exactly what `pt-10` did, with the markup, the token
+and every source guard all looking right. Rebuild the SPA before believing a
+spacing measurement.
 
 ---
 
