@@ -147,14 +147,53 @@ depth.
   reads through the glyphs sitting on it. So a hem that runs too far is shortened
   by shortening the FADE; shortening the solid part is a legibility bug wearing a
   taste fix's clothes.
-- **What decides whether it reads as a vignette or as a panel is the fade's
-  STEEPNESS, not its length.** This was a length ratio for a while (the fade at
-  least 1.8× the hold) and the proxy got in the way the first time the real
-  requirement changed: asked to shorten a vignette dissolving a quarter of a
-  phone, the only number the rule would let move was the one set by legibility.
-  Two bounds replace it — the fade is never shorter than the hold, and nowhere
-  does the veil lose more than **2% of its strength per pixel**. The shape that
-  was refused (76px solid, 56px fade) fails both, at a peak slope of 2.7%/px.
+- **It is 68px solid and 44px of falloff — 112px in all**, plus 64px of
+  overshoot that paints nothing (see below). The solid part is the crown's own
+  height; the falloff is the only half anyone may retune.
+- **Three things are wanted that cannot all be had, and that is why the falloff
+  is bounded by a LENGTH after twice being bounded by something cleverer.** The
+  veil is opaque behind the controls; it arrives at nothing; and it is short.
+  Fix the first two and the steepness is arithmetic — a smoothstep from 100 to 0
+  peaks at `1.5 / length` — so a bound on the slope and a bound on the length are
+  one bound written twice, and the slope version reads as a perceptual law while
+  being a length in disguise. Two shapes of it are worth knowing before moving it
+  again:
+  - a **ratio** (fade ≥ 1.8× hold) left only the SOLID part free, which is the
+    half set by legibility, so it blocked the first real request to shorten the
+    vignette;
+  - **`fade ≥ hold` plus 2%/px** — the first compares what a person sees to what
+    the controls hide, and the second was fitted BETWEEN TWO SAMPLES (1.7
+    passing, 2.7 refused) rather than measured against an eye. It forbids every
+    falloff under 75px, i.e. a 13px cut off 88, which is no answer at all to a
+    vignette somebody has looked at and called long.
+- **So the floor is what the hem is FOR: a line of text dissolves over more than
+  its own height.** Content does not stop at a floating bar — it arrives at the
+  control's edge and is sliced by it, and a falloff shorter than a line is a
+  slice with a soft edge, because the top of a line and the bottom of it are then
+  at very different strengths. `text-base leading-relaxed` is 26px, the floor is
+  one and a half of those, and the falloff is 44px — 1.7 lines.
+  `chrome.seen.test.tsx`, on a real phone viewport.
+- **The whole run is capped too**: `hold + fade` may not pass 10rem, or it stops
+  reading as the ground thickening into an edge and starts reading as the page
+  fading out. At 4.25 + 8.5 it dissolved 204px of an 844px phone to hold one 64px
+  row legible. `scene.test.mjs`.
+- **And BANDING is a different question, answered somewhere else on purpose.** A
+  short gradient bands LESS, not more — quantisation shows where a step spans
+  several pixels, which is the long case. What a short one risks is the JOINS
+  between its stops: a CSS gradient interpolates **linearly**, so a curve written
+  as N stops is drawn as a polyline and every stop is a change of slope. What an
+  eye finds is that change, not the step across it, and its size goes as
+  `1 / (steps × fade)`. So the stop COUNT is derived from the falloff's length
+  rather than fixed — halve it and it takes twice the stops, and the joins stay
+  exactly as findable as they were. `scene.test.ts` re-measures the emitted
+  gradient at both ends against 10.4 points per rem², the worst join this curve
+  has shipped with.
+  - ⚠️ **A bound on the STEP SIZE is the check that passes the edit it exists to
+    refuse.** Halving the falloff with the count left alone holds every step at
+    18 points and doubles every kink, to 19.6 — a step bound reports green on it.
+  - ⚠️ **And folding the two questions into one number is how the LENGTH came to
+    be defended by an argument about banding.** They are independent: one is how
+    far the veil runs, the other is how finely the curve is walked over it.
 - **Both ends are one geometry, and both overshoot the edge they hem.** A hem
   rides a `sticky` row, and a sticky row does not always end up flush with the
   screen: at the head it sits at its FLOW position, below whatever the page

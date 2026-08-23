@@ -155,21 +155,36 @@ describe("the bar, at the addresses a deployment uses", () => {
     sitting on it. A photographic vignette is solid at the frame's edge too, so
     the solid part is not the fault.
 
-    ⚠️ WHAT MAKES A FADE FINDABLE IS ITS STEEPNESS, NOT ITS LENGTH, and for a
-    long time this asserted the length — a fade at least 1.8× the hold. That is a
-    proxy, and a proxy is what gets in the way when the real requirement changes:
-    asked to shorten a vignette that dissolved a quarter of a phone, the only
-    number the guard would allow down was the SOLID part, which is the one number
-    set by legibility rather than by taste. Two bounds replace it, and both are
-    read off the painted stops:
+    ⚠️ AND THREE THINGS ARE WANTED THAT CANNOT ALL BE HAD, WHICH IS WHY THE
+    BOUND HERE IS A LENGTH AGAIN AFTER TWICE BEING SOMETHING CLEVERER. The veil
+    is opaque behind the controls (legibility, not taste); it arrives at nothing
+    (or it is a bar); and it is short. Fix the first two and the steepness is
+    ARITHMETIC — a smoothstep from 100 to 0 peaks at `1.5 / length` — so a bound
+    on the slope and a bound on the length are the same bound written twice, and
+    the slope version reads as a perceptual law while being a length in disguise.
 
-      · the fade is never shorter than the hold (a lip on a slab), and
-      · no part of it loses more than 2% of the veil's strength per pixel.
+    ⚠️ TWO EARLIER SHAPES OF THIS BOUND ARE WORTH KNOWING BEFORE MOVING IT AGAIN.
+    A ratio (fade ≥ 1.8× hold) blocked the first real request to shorten the
+    vignette by leaving only the SOLID part free, which is the half set by
+    legibility. Then `fade ≥ hold` plus 2%/px: the first compares what a person
+    sees to what the controls hide, and the second was fitted BETWEEN TWO
+    SAMPLES — 1.7 passing, 2.7 refused — rather than measured against an eye, and
+    it forbids every fade under 75px, which is a 13px cut off 88 and no answer at
+    all to a vignette somebody has looked at and called long.
 
-    The refused shape fails both — 56px of fade under 76px of hold, and a peak
-    slope of 2.7%/px. The shape before it and the shape now both pass on 1.1 and
-    1.7. The steepness bound is what the eye actually finds, so it is the one
-    that stays true when the geometry is retuned again.
+    ⚠️ SO THE FLOOR IS WHAT THE HEM IS FOR: A LINE OF TEXT DISSOLVES OVER MORE
+    THAN ITS OWN HEIGHT. Content does not stop at a floating bar — it arrives at
+    the control's edge and is SLICED by it, and a fade shorter than a line is a
+    slice with a soft edge, because the top of a line and the bottom of it are
+    then at very different strengths. `text-base leading-relaxed` is 26px, the
+    floor is one and a half of those, and the falloff is 44px — 1.7 lines.
+
+    ⚠️ AND BANDING IS ANSWERED SOMEWHERE ELSE, ON PURPOSE. A short gradient bands
+    LESS, not more: quantisation shows where a step spans several pixels, which
+    is the long case. What a short one risks is the JOINS between its stops, and
+    `scene.test.ts` measures those off the emitted gradient at both ends. Neither
+    question belongs to the other, and folding them into one number is how the
+    length came to be defended by an argument about banding.
   */
   it("hems solid behind the controls, and fades too gently to find", async () => {
     const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
@@ -203,25 +218,18 @@ describe("the bar, at the addresses a deployment uses", () => {
     expect(behind.every((s) => s.alpha > 0.99),
       "the veil is not solid where the nav's controls sit").toBe(true);
 
-    /* ⚠️ AND THE FADE IS AT LEAST AS LONG AS THE SOLID PART. Below that the
-       shape is a slab with a lip whatever its slope, because the solid part is
-       then the thing with the length and the fade is its edge treatment. */
+    /* ⚠️ AND A LINE OF TEXT TAKES MORE THAN ITS OWN HEIGHT TO DISSOLVE. That is
+       the whole job: content arrives at a floating control's edge and is SLICED
+       by it, and a falloff shorter than a line is a slice with a soft edge —
+       the top of a line at full strength and the bottom of it at nothing. One
+       and a half lines is the floor; below it the two ends of one word are at
+       visibly different strengths. `text-base leading-relaxed` is 26px. */
+    const LINE = 26;
     const held = Math.max(...stops!.filter((s) => s.alpha > 0.99).map((s) => s.at));
     const run = Math.max(...stops!.map((s) => s.at));
-    expect(run - held, `holds ${held}px and fades ${run - held} — a fade shorter `
-      + "than the hold is a slab with a lip").toBeGreaterThanOrEqual(held);
-
-    /* ⚠️ AND NOWHERE DOES IT FALL FAST ENOUGH TO SHOW ITS OWN SLOPE. This is the
-       bound that actually decides whether a vignette reads as a vignette: the
-       eye finds a gradient by the RATE it changes at, so the same total fade is
-       invisible spread out and a band when it is not. Read off the painted stops
-       rather than the source, because what a browser interpolates between them
-       is the only version anybody sees. */
-    const slope = stops!.slice(1).map((s, i) => (
-      Math.abs(s.alpha - stops![i]!.alpha) / Math.max(1, s.at - stops![i]!.at)));
-    expect(Math.max(...slope), `the veil loses ${(Math.max(...slope) * 100).toFixed(1)}% `
-      + "of its strength per pixel at its steepest — steep enough to find as a band")
-      .toBeLessThanOrEqual(0.02);
+    expect(run - held, `holds ${held}px and fades ${(run - held).toFixed(0)} — `
+      + `under ${1.5 * LINE}px a line of text is sliced rather than dissolved, whatever `
+      + "the softness of the cut").toBeGreaterThanOrEqual(1.5 * LINE);
 
     expect(stops!.at(-1)!.alpha, "the veil never reaches nothing").toBe(0);
   });

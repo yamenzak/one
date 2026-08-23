@@ -285,3 +285,60 @@ describe("the ambience engine's own motion", () => {
     expect(held.field.length).toBeGreaterThan(moving.field.length * 0.5);
   });
 });
+
+/**
+ * THE HEM'S FALLOFF, MEASURED OFF THE GRADIENT IT ACTUALLY EMITS.
+ *
+ * ⚠️ WHAT SHOWS A JOIN IS THE KINK AT IT, NOT THE STEP ACROSS IT. A CSS gradient
+ * interpolates LINEARLY between its stops, so a curve written as N stops is
+ * drawn as a polyline and every stop is a change of slope. The eye finds the
+ * change, not the stop — which is why a bound on the step size is the wrong
+ * check and passes the exact edit this exists to refuse: halving the fade with
+ * the count left alone keeps every step at 18 points and doubles every kink.
+ *
+ * ⚠️ AND THE CEILING IS A MEASUREMENT, NOT A PREFERENCE. It is the worst join
+ * this curve has shipped with, at the length it shipped at. A falloff of any
+ * length may be chosen; what may not change is how findable its joins are.
+ */
+describe("the hem's falloff", () => {
+  /** Every stop of one hem, as {opacity %, distance rem}, in order. */
+  const stops = (edge: "top" | "bottom") => {
+    const css = ambienceStylesheet();
+    const rule = new RegExp(`\\[data-hem="${edge}"\\]::before \\{[\\s\\S]*?\\n\\}`).exec(css);
+    const gradient = /background: linear-gradient\(([\s\S]*?)\);/.exec(rule?.[0] ?? "")?.[1] ?? "";
+    return [...gradient.matchAll(/([\d.]+)%,\s*transparent\)\s+([\d.]+)rem/g)]
+      .map((m) => ({ pct: Number(m[1]), rem: Number(m[2]) }));
+  };
+
+  /* ⚠️ 10.4 points per rem², and it is where the curve is steepest in the
+     middle. Raising this number is raising the amount of banding allowed. */
+  const FINDABLE = 10.4;
+
+  for (const edge of ["top", "bottom"] as const) {
+    it(`arrives at nothing with no join an eye can find, at the ${edge}`, () => {
+      const at = stops(edge);
+      expect(at.length, "the falloff's stops are gone — the regex or the shape moved")
+        .toBeGreaterThan(4);
+      expect(at[0]?.pct, "the falloff starts somewhere other than fully opaque").toBe(100);
+      expect(at.at(-1)?.pct, "the falloff arrives somewhere other than nothing").toBe(0);
+
+      /* The slope of each drawn segment, in points of opacity per rem. */
+      const slopes = at.slice(1).map((stop, i) =>
+        (at[i]!.pct - stop.pct) / (stop.rem - at[i]!.rem));
+      const worst = Math.max(...slopes.slice(1).map((m, i) => Math.abs(m - slopes[i]!)));
+      expect(worst, `the worst join is ${worst.toFixed(1)} points per rem², over the `
+        + `${FINDABLE} this curve is drawn at — a shorter falloff needs MORE stops, not the `
+        + `same count over less distance`).toBeLessThanOrEqual(FINDABLE);
+    });
+  }
+
+  /* ⚠️ AND THE TWO ENDS ARE ONE SHAPE, which is the other half of `hem` being
+     one function: a top and a foot tuned apart is what it replaced. */
+  it("is the same falloff at both ends", () => {
+    const from = (edge: "top" | "bottom") => {
+      const at = stops(edge);
+      return at.map((stop) => `${stop.pct}@${+(stop.rem - at[0]!.rem).toFixed(2)}`);
+    };
+    expect(from("top")).toEqual(from("bottom"));
+  });
+});
