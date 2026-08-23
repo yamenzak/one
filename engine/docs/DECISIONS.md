@@ -1928,3 +1928,53 @@ a number somewhere a test can read; a sampling rate held constant while the thin
 being sampled changes size; a deterministic picture recomputed per request; or a
 resolution step inside a loop that is invariant across it. And when a page is
 slow, look at what the server spends before looking again at what it sends.
+
+---
+
+## D61 — A cold isolate is the ordinary case, so its boot is a latency budget
+
+**Seven requests, 2.2 to 2.7 seconds each, 9 to 13 milliseconds of CPU between
+them.** With the icon fixed (D60) the live trace shows no computation anywhere:
+99% of the wall time is waiting, and the durations are nearly identical across
+requests that do completely different work. Uniform latency over varied work is
+the signature of a fixed cost, and the fixed cost is `boot`.
+
+**An isolate is evicted after seconds of quiet, so "cold" is not the first visit
+— it is most of them.** A burst of requests from one screen opening is spread
+across several isolates, each paying `boot` in full, and every `/api/*` request
+waits for it. What it pays for is learning that nothing has changed: the schema
+modules are stamped and already applied, the resource ledger is settled. The
+work is right; the number of times it goes to a database in sequence is the
+whole cost.
+
+**Measured on a settled database it was five sequential waves and ten
+statements, and four of them bought nothing:**
+
+- `CREATE TABLE IF NOT EXISTS _schema` stood in front of a read that already
+  tolerated the table being absent — a whole round trip, on every cold isolate
+  for the life of a version, to make a table that is there. Reading first and
+  creating in the `catch` costs a never-booted database one extra trip, once.
+- The directory and the shards this deployment ships with were migrated one
+  after the other. Neither waits for the other and neither ever did. The shards
+  the reconciler has *grown* genuinely cannot join them — finding out which
+  exist is a read of the directory — but those are the exception, not the rule.
+- `SELECT * FROM resource ORDER BY name` went out twice: once to find grown
+  shards and again inside `settleBindings`, which read it for itself. That
+  function's own comment says "one read of the ledger"; it was true inside the
+  function and false across the boot.
+- `settings` — the deployment's keys and its price catalogue — is the very next
+  thing every request asks for, and it was read after the boot rather than
+  beside it. It holds its answer for a moment, so starting it during the boot
+  costs nothing and removes a wave from the request that follows.
+
+**Two waves and seven statements now, and it is a budget rather than a
+measurement.** `engine/one/test/cold-cost.test.ts` boots a fresh module registry
+against an already-settled database — which is exactly what a deployment's
+second and every later isolate meets — and counts what crosses the wire and how
+much of it waits. Each of the four savings fails it on its own if reverted.
+
+**Therefore never:** a boot step that blocks a request and could have run beside
+another; a table read twice in one request because each caller reads for itself;
+a `CREATE TABLE IF NOT EXISTS` in front of a read that already handles the table
+being absent; or a latency conclusion drawn from what a request computes rather
+than from how many times it waits.

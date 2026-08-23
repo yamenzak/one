@@ -1322,7 +1322,27 @@ const boot = (env: Env): Promise<void> => {
   */
   booted ??= (async () => {
     const directory = env.DIRECTORY as unknown as Db;
-    const applied = [...await applySchema(directory, DIRECTORY_MODULES)];
+    const shardModules = [
+      ...Object.values(APPS).map((make) => schemaFor(make())),
+      ...SHARD_MODULES,
+    ];
+    /*
+      ⚠️ THE DIRECTORY AND THE SHARDS THIS DEPLOYMENT SHIPS WITH, TOGETHER —
+      neither waits for the other and neither ever did, but they were awaited in
+      turn. A settled database answers `applySchema` in two round trips, so
+      doing that twice in sequence is four waits where two would do, on every
+      cold isolate, in front of every operation.
+
+      ⚠️ THE GROWN ONES CANNOT JOIN THEM, and that is not an oversight. Which
+      shards the reconciler has built is a row in the directory, so finding out
+      is itself a trip — and it can only be taken once the directory's own
+      schema is there to be read. The shards in `SHARDS` are known at build
+      time, which is exactly what makes them free to start with.
+    */
+    const applied = [...(await Promise.all([
+      applySchema(directory, DIRECTORY_MODULES),
+      ...SHARDS.map(({ id }) => applySchema(shardFor(env as never, id), shardModules)),
+    ])).flat()];
     /*
       ⚠️ EVERY SHARD IN `SHARDS`, NOT ONE NAMED BINDING. This read
       `env.SHARD_EU_1` while `SHARDS` drove registration, so the second shard
@@ -1339,18 +1359,31 @@ const boot = (env: Env): Promise<void> => {
       A deployment that ran out of room refused signups with the shard it had
       just built sitting empty beside it.
     */
-    const placeable = [
-      ...SHARDS,
-      ...grownShards(await resources(directory), env as never)
-        .filter((g) => !SHARDS.some((s) => s.id === g.id))
-        .map((g) => ({ id: g.id, where: g.where as Residency })),
-    ];
-    for (const { id } of placeable) {
-      applied.push(...await applySchema(shardFor(env as never, id), [
-        ...Object.values(APPS).map((make) => schemaFor(make())),
-        ...SHARD_MODULES,
-      ]));
-    }
+    /*
+      ⚠️ READ ONCE, USED TWICE. `settleBindings` reads the same table, and
+      letting it do so put a second `SELECT * FROM resource` on the boot path
+      one wave after this one.
+
+      ⚠️ AND BESIDE WHAT THE FIRST REQUEST IS ABOUT TO ASK FOR ANYWAY. `settings`
+      reads the deployment's keys and its price catalogue, holds them for a
+      moment, and is the very next thing every request wants — so starting it
+      here costs the boot nothing (it runs beside the ledger) and takes a whole
+      wave off the request that follows. It cannot be started any earlier: both
+      of these read tables the schema above is there to guarantee.
+    */
+    const [ledger] = await Promise.all([
+      resources(directory),
+      settings(env, directory, Date.now()),
+    ]);
+    const grown = grownShards(ledger, env as never)
+      .filter((g) => !SHARDS.some((s) => s.id === g.id))
+      .map((g) => ({ id: g.id, where: g.where as Residency }));
+    const placeable = [...SHARDS, ...grown];
+    /* ⚠️ Only the grown ones are left to apply — the shipped shards went out
+       beside the directory above. Together, for the same reason. */
+    applied.push(...(await Promise.all(
+      grown.map(({ id }) => applySchema(shardFor(env as never, id), shardModules)),
+    )).flat());
     /*
       ⚠️ THE SHARD THIS DEPLOYMENT BINDS IS DECLARED AT BOOT, IDEMPOTENTLY. The
       directory places every new workspace on a registered shard — with no row,
@@ -1397,8 +1430,10 @@ const boot = (env: Env): Promise<void> => {
       this one is running that version. Nothing else in the system knows the
       difference between "we asked for it" and "it is there".
     */
-    /* ⚠️ ONE READ OF THE RESOURCE LEDGER, NOT TWO — see `settleBindings`. */
-    const settled = await settleBindings(directory, env);
+    /* ⚠️ ONE READ OF THE RESOURCE LEDGER FOR THE WHOLE BOOT, not one per
+       question — the rows found the grown shards above and settle the bindings
+       here. Letting each read for itself is a round trip nobody can see. */
+    const settled = await settleBindings(directory, env, ledger);
     for (const said of settled.said) console.log(`[boot] ${said}`);
     live = settled.live;
 

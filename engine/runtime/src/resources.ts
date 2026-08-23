@@ -429,13 +429,23 @@ export async function apply(deps: ApplyDeps): Promise<Reconciled> {
  * so making the caller wait for a second read to admit it would be a resource
  * that works and reads as absent for one isolate.
  */
+/**
+ * ⚠️ AND THE LEDGER IS A PARAMETER, BECAUSE THE BOOT HAS ALREADY READ IT. The
+ * paragraph above is about the two reads INSIDE this function; the boot that
+ * calls it reads the same table one wave earlier to find the shards the
+ * reconciler has grown, so merging those two left a third. Measured on a settled
+ * database, `SELECT * FROM resource ORDER BY name` went out twice, one after the
+ * other, before any request could be answered — a whole round trip, on every
+ * cold isolate, for bytes the caller was holding.
+ */
 export async function settleBindings(
-  db: Db, env: Readonly<Record<string, unknown>>, now = new Date(),
+  db: Db, env: Readonly<Record<string, unknown>>,
+  rows?: readonly ResourceRow[], now = new Date(),
 ): Promise<{ readonly said: readonly string[]; readonly live: ReadonlyMap<string, unknown> }> {
   const said: string[] = [];
   const live = new Map<string, unknown>();
 
-  for (const row of await resources(db)) {
+  for (const row of rows ?? await resources(db)) {
     const held = env[row.binding];
     /* ⚠️ `bound` means asked for and not yet confirmed; an isolate that can SEE
        the binding is the only thing that can confirm it. */

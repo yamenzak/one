@@ -205,7 +205,6 @@ export function columnsIn(module: SchemaModule): Record<string, Record<string, s
 }
 
 export async function applySchema(db: Db, modules: SchemaModules): Promise<readonly Applied[]> {
-  await db.exec(MARKER.replace(/\n/g, " "));
   const out: Applied[] = [];
 
   /*
@@ -221,12 +220,25 @@ export async function applySchema(db: Db, modules: SchemaModules): Promise<reado
     table is small by construction — one row per module this deployment has ever
     applied — so reading all of it costs what reading one of them did.
   */
+  /*
+    ⚠️ THE READ COMES FIRST AND THE TABLE IS MADE ONLY IF IT IS NOT THERE. This
+    began with `CREATE TABLE IF NOT EXISTS _schema` in front of it, which on a
+    settled database is a whole round trip that does nothing — and a settled
+    database is what every cold isolate meets for the rest of a version's life.
+    The read already had to tolerate the table being absent, so asking first
+    costs the never-booted database one extra trip, once, and costs every other
+    boot nothing at all.
+  */
   const seenAll = new Map<string, string>();
   try {
     const rows = await db.prepare(`SELECT id, stamp FROM _schema`)
       .all<{ id: string; stamp: string }>();
     for (const row of rows.results) seenAll.set(row.id, row.stamp);
-  } catch { /* a database that has never booted — every module is new */ }
+  } catch {
+    /* A database that has never booted — every module is new, and the table
+       every stamp below is written to has to exist before the first one is. */
+    await db.exec(MARKER.replace(/\n/g, " "));
+  }
 
   for (const module of modules) {
     const stamp = stampOf(module);

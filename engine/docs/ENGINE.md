@@ -1018,6 +1018,7 @@ its own header, cited by other files, and doing nothing.
 | D58 | An expensive component has one home, and it is reached lazily | 0 |
 | D59 | A content-hashed asset is kept; the document that names it is not | 0 |
 | D60 | A worker's one thread is a shared resource, and drawing is what spends it | 0 |
+| D61 | A cold isolate is the ordinary case, so its boot is a latency budget | 0 |
 <!-- /generated -->
 
 ---
