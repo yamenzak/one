@@ -163,7 +163,23 @@ export async function owedBy(
     readonly canBind?: boolean;
   } = {},
 ): Promise<readonly Owed[]> {
-  const all = await acceptancesOf(db, accountId);
+  /*
+    ⚠️ BOTH READS AT ONCE, BECAUSE NEITHER ANSWERS THE OTHER. What this person
+    has agreed to and what the workspace has agreed to are two rows sets keyed by
+    two different things; the workspace's was asked for only after the person's
+    had come back, which is a second round trip on the request the opening
+    curtain waits for. `canBind` is known before either — it is the caller's, not
+    a fact in these tables.
+
+    ⚠️ AND THE WORKSPACE'S IS STILL ASKED OF NOBODY ELSE. Its acceptances are the
+    workspace's, whichever hand gave them, so a colleague invited later is not
+    stopped by a signature they could not have provided — the query simply does
+    not go out for them.
+  */
+  const [all, workspace] = await Promise.all([
+    acceptancesOf(db, accountId),
+    at.tenantId && at.canBind ? acceptedFor(db, at.tenantId) : Promise.resolve(null),
+  ]);
   const out: Owed[] = [];
 
   const say = (d: DocumentDef, appId: string | null): Owed => ({
@@ -179,11 +195,10 @@ export async function owedBy(
   if (at.tenantId) {
     const here = all.filter((a) => a.tenantId === at.tenantId);
     /* ⚠️ ASKED OF THE WORKSPACE, ANSWERED BY WHOEVER CAN BIND IT — and asked of
-       nobody else. Its acceptances are the workspace's, whichever hand gave
+       nobody else — see the read above. Its acceptances are the workspace’s,
        them, so a colleague invited later is not stopped by a signature they
        could not have provided. */
-    if (at.canBind) {
-      const workspace = await acceptedFor(db, at.tenantId);
+    if (workspace) {
       for (const d of outstanding(deployment, workspace, "tenant")) out.push(say(d, null));
     }
 

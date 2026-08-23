@@ -1554,10 +1554,17 @@ const handler = async (env: Env) => {
    * NOTHING ELSE. The account centre and the setup door have none, and an
    * agreement asked there is the person's own.
    */
-  const tenantAtDoor = async (door: Door): Promise<TenantId | null> =>
-    door.kind === "tenant" && door.slug
-      ? ((await tenantBySlug(directory, door.slug))?.id as TenantId | undefined) ?? null
-      : null;
+  /**
+   * ⚠️ THE WORKSPACE AND ITS SHARD, WHICH IS ALL `placeOf` EVER WANTED. It
+   * answered with `tenant.id` alone and `placeOf` read the same row back by that
+   * id to find out which shard it was on — a whole round trip, in series, for
+   * bytes the caller had just been handed.
+   */
+  const tenantAtDoor = async (door: Door): Promise<{ id: TenantId; db: Db } | null> => {
+    if (door.kind !== "tenant" || !door.slug) return null;
+    const row = await tenantBySlug(directory, door.slug);
+    return row ? { id: row.id as TenantId, db: shardOf(row) } : null;
+  };
 
   /**
    * WHERE SOMEBODY IS, FOR THE PURPOSE OF AN AGREEMENT — resolved ONCE, and read
@@ -1568,17 +1575,29 @@ const handler = async (env: Env) => {
    * asks the same question to draw itself; if they disagree by one document,
    * the person presses everything they are shown and stays shut out with
    * nothing left to press.
+   *
+   * ⚠️ AND IT WAS THREE ROUND TRIPS IN A ROW, TWO OF WHICH WERE ALREADY IN HAND.
+   * `me.who` is the request the opening curtain waits on and it was the deepest
+   * one in the product — ten sequential waves, measured — because this read the
+   * tenant back by an id its caller had just looked up, then asked for the
+   * membership and the live apps one after the other. The workspace and its
+   * shard travel together now, and the two reads under them want nothing from
+   * each other.
+   *
+   * ⚠️ AND IT TAKES A SHARD RATHER THAN A ROW, so the caller that already HAS
+   * one — every operation, through `Located` — hands it over instead of paying
+   * for a lookup to rediscover it.
    */
-  const placeOf = async (accountId: AccountId, tenantId: TenantId | null) => {
-    if (!tenantId) return {};
-    const tenant = await tenantById(directory, tenantId);
-    if (!tenant) return {};
-    const member = await memberFor(shardOf(tenant), tenantId, accountId);
-    /* ⚠️ Only what is ON is asked about: an agreement demanded for a product
-       nobody can reach is a wall with nothing behind it. */
-    const apps = await liveAppsOfTenant(directory, tenantId);
+  const placeOf = async (accountId: AccountId, at: { id: TenantId; db: Db } | null) => {
+    if (!at) return {};
+    const [member, apps] = await Promise.all([
+      memberFor(at.db, at.id, accountId),
+      /* ⚠️ Only what is ON is asked about: an agreement demanded for a product
+         nobody can reach is a wall with nothing behind it. */
+      liveAppsOfTenant(directory, at.id),
+    ]);
     return {
-      tenantId,
+      tenantId: at.id,
       /* ⚠️ Only whoever runs the workspace is asked for the workspace's own
          agreement — see `owedBy`. */
       canBind: member?.platformRole === "owner",
@@ -1970,7 +1989,26 @@ const handler = async (env: Env) => {
     */
     owed: async (who, located) => who.accountId
       ? owedBy(directory, who.accountId as never, LEGAL.documents,
-        await placeOf(who.accountId as never, located.tenantId as never))
+        /*
+          ⚠️ NOTHING IS READ HERE, AND THAT IS THE POINT. Every fact the wall
+          needs about where somebody is standing has already crossed the wire on
+          this request: `Located` carries the workspace and the products it has
+          switched on, and the identity carries the roster row it resolved
+          permissions from. Asking `placeOf` for them again was two round trips
+          in front of every operation in the product — measured as wave two of
+          four on an ordinary read — for values one line above it.
+
+          ⚠️ IT IS STILL THE SAME RESOLUTION THE SCREEN GETS. `placeOf` remains
+          for the account centre, which has no workspace resolved and must look
+          one up; what must agree is the ANSWER, and both build the same three
+          fields from the same rows.
+        */
+        {
+          tenantId: located.tenantId as never,
+          canBind: who.platformRole === "owner",
+          apps: Object.fromEntries(located.apps
+            .map((id) => [id, APPS[id]?.().documents ?? {}] as const)),
+        })
       : [],
     /* ⚠️ THE SAME BOOK `owed` NAMES, so the consent screen's list and the text
        behind each row cannot be about different documents. Serving it is what
@@ -2018,6 +2056,10 @@ const handler = async (env: Env) => {
            for it would be paid by every request in every product to answer a
            question most of them never ask. */
         ...(member ? { reach: member.reach } : {}),
+        /* ⚠️ AND SO IS THE OFFICE, FOR THE SAME REASON AND AGAINST THE SAME
+           MISTAKE. The wall asks whether this hand can bind the workspace; it
+           was answering by reading this row a second time. */
+        platformRole: member?.platformRole ?? null,
       };
     },
   });

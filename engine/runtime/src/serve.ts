@@ -106,6 +106,16 @@ export interface Who {
    * the default and every membership that predates the column.
    */
   readonly reach?: ReachBook;
+  /**
+   * ⚠️ WHICH OFFICE THEY HOLD IN THIS WORKSPACE, FROM THE ROSTER ROW THE
+   * IDENTITY ALREADY READ. It is one column of a row every request has in hand,
+   * and the wall asked for it by querying the same table again — a whole round
+   * trip, in front of every operation, for a value one line above it. Absent is
+   * "not a member here", which is the safe direction: it can only withhold the
+   * workspace's own agreement, never demand one from somebody who cannot give
+   * it.
+   */
+  readonly platformRole?: string | null;
 }
 
 const NONE: ReadonlySet<string> = new Set();
@@ -1088,8 +1098,12 @@ export async function performOperation(
        see `bucketOf`. Absent is a deployment that stores no files. */
     bucket: wiring.bucketOf?.(located) ?? null,
     /* ⚠️ THE SAME ANSWER THE DISPATCH USES — one call, so the switch a person is
-       offered and the channel a note is sent on cannot disagree. */
-    channels: await availableChannels(wiring),
+       offered and the channel a note is sent on cannot disagree.
+
+       ⚠️ AND IT IS ASKED RATHER THAN AWAITED HERE. Answering costs two
+       sequential round trips (the mailer's configuration, then the push
+       keypair) and one operation in the product reads it — see `PlatformCtx`. */
+    channels: () => availableChannels(wiring),
     origin: at.origin,
     slug: at.slug,
     /* ⚠️ THE DEPLOYMENT'S CATALOGUE, so a handler about to price something reads

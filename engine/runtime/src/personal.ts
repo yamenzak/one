@@ -637,21 +637,33 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
           arrive after the screen, and the one moment it is worth saying is the
           moment they land with nothing.
         */
+        /*
+          ⚠️ THE WALL STARTS HERE, NOT AFTER THE WORKSPACES. What somebody still
+          owes an agreement to needs their account and the door they are standing
+          at, and neither is a fact in any of the reads below — but it was asked
+          last, so it waited for the whole walk over every workspace they belong
+          to before its own three round trips began. Measured, that was the
+          difference between four waves and ten on the read the opening curtain
+          waits for.
+        */
+        const owing = deps.owed ? deps.owed(ctx) : Promise.resolve([]);
         const [face, tenants, gifts] = await Promise.all([
           accountFace(ctx.directory, accountId),
           tenantsOf(ctx.directory, accountId),
           giftsFor(ctx.directory, ctx.email ?? ""),
         ]);
         const belongs = await Promise.all(tenants.map(async (t) => {
-          /* ⚠️ WHAT IS ON, NOT WHAT WAS EVER ON. This is a person's own list of
-             where they can go; a product switched off keeps its records and its
-             tables (see `Enablement`) and must not appear as somewhere to go. */
-          const apps = await liveAppsOfTenant(ctx.directory, t.id);
-          /* ⚠️ TOGETHER, BECAUSE THEY ARE THE SAME SHARD AND NEITHER FEEDS THE
-             OTHER. Awaited one after the other this walk would cost two round
-             trips per workspace on the read every door makes at boot; run
-             concurrently it costs one query's latency however many there are. */
-          const [member, unseen, sub] = await Promise.all([
+          /* ⚠️ TOGETHER, BECAUSE THEY ARE THE SAME WORKSPACE AND NONE FEEDS
+             ANOTHER. Awaited in turn this walk would cost a round trip each per
+             workspace on the read every door makes at boot; run concurrently it
+             costs one query's latency however many there are — and `apps` was
+             outside this group, which made it a wave of its own in front. */
+          const [apps, member, unseen, sub] = await Promise.all([
+            /* ⚠️ WHAT IS ON, NOT WHAT WAS EVER ON. This is a person's own list
+               of where they can go; a product switched off keeps its records
+               and its tables (see `Enablement`) and must not appear as
+               somewhere to go. */
+            liveAppsOfTenant(ctx.directory, t.id),
             memberFor(ctx.shardOf(t), t.id, accountId),
             unseenCount(ctx.shardOf(t), t.id, accountId),
             /* ⚠️ AND WHAT IT IS ON, ASKED RATHER THAN READ. The subscription
@@ -734,7 +746,7 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
             a moment and then loses it, and every write behind it refuses with a
             status the screen has no reason to expect.
           */
-          owed: deps.owed ? await deps.owed(ctx) : [],
+          owed: await owing,
         };
       },
     },

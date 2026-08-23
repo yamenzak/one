@@ -2030,3 +2030,57 @@ who is asking; or a page whose first wave is smaller than the set of questions
 every visit starts with. And the pairing is checked, not assumed — the page's
 keys and the door's collector are read out of the real `index.html`, because
 either half works alone and disagreeing is silent.
+
+---
+
+## D63 — What a request waits for is measured, per operation, and budgeted
+
+**Nine seconds became five, and then the per-request cost was the whole story.**
+With the icon fixed (D60), the boot flattened (D61) and the centre preflighted
+(D62), the opening is two waves rather than three — and each of them was still
+taking well over two seconds against nine milliseconds of CPU. Depth, not work.
+
+**`me.who` was the deepest request in the product, at ten sequential waves.** It
+is also the one the blank curtain waits for: no door, no screen and no shell can
+be chosen until it answers. Four things made it ten:
+
+- **The wall was resolved last.** What somebody still owes an agreement to needs
+  their account and the hostname they are standing at, and neither is a fact in
+  any read above it — but it was asked after the whole walk over every workspace
+  they belong to, so its own three round trips began six waves in.
+- **The workspace was looked up by slug and then read back by id.** The row was
+  in the caller's hand; only its shard was wanted from it, and that is on the row.
+- **The membership and the live apps were awaited one after the other**, and the
+  live-apps read sat alone in front of the per-workspace group it belongs in.
+- **The two acceptance reads were serial.** What a person has agreed to and what
+  a workspace has agreed to are keyed by different things and neither answers the
+  other; `canBind` — the only reason to ask the second — is the caller's, known
+  before either.
+
+**Two waves now.** Everything but the session lookup goes out at once.
+
+**And an ordinary read went from six waves to three**, on two findings that are
+about the platform rather than any product:
+
+- **The notification channels cost two sequential round trips on every request,
+  and one operation in the deployment reads them.** Answering "what can this
+  deployment deliver on" reads the mail configuration and then the push keypair;
+  it was resolved while BUILDING the context, so every list, every screen and
+  every save paid for it. It is asked now, not handed over.
+- **The wall re-read the roster row the identity had just resolved permissions
+  from, and the app list `Located` was already carrying.** `platformRole` is one
+  column of a row every request has in hand — the same argument the identity
+  already makes, in writing, about `reach`.
+
+**The shape a request should have, and the reason the budget is per operation:**
+everything the door needs at once, then the wall, then the operation's own work.
+Three waves for a read, two for the identity. `engine/one/test/request-cost.test.ts`
+holds those ceilings against the real worker with a real workspace behind the
+real legal wall, and asserts a floor beside them — a budget is met perfectly by a
+request that reads nothing.
+
+**Therefore never:** a value resolved while building a context that most callers
+never read; a fact re-queried because it was passed as an id instead of as the
+row it came from; a step ordered after work it does not depend on; or a
+latency conclusion drawn from what a request computes rather than from how many
+times it waits.

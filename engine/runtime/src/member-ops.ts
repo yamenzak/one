@@ -120,8 +120,16 @@ export interface PlatformCtx extends Ctx {
    * from it. The two of them had `["inbox", "email", "push"]` written out in the
    * page, so a workspace could switch on a channel nothing could send, and the
    * only symptom is somebody waiting for an email that was never attempted.
+   *
+   * ⚠️ ASKED, NOT HANDED OVER, BECAUSE ANSWERING IT COSTS TWO ROUND TRIPS AND
+   * ONE OPERATION IN THE PRODUCT READS IT. The mailer's `live()` reads the
+   * deployment's mail configuration and the pusher's reads its keypair, one
+   * after the other — so resolving this while BUILDING the context put two
+   * sequential waits in front of every list, every screen and every save, for a
+   * field only the notification settings screen has ever looked at. Measured on
+   * a real read: waves four and five of six.
    */
-  readonly channels: readonly Channel[];
+  readonly channels: () => Promise<readonly Channel[]>;
   /**
    * ⚠️ THE ORIGIN THIS REQUEST ARRIVED AT, AND ITS SLUG, so a page somebody is
    * sent AWAY to knows how to send them back. A constant here would return an EU
@@ -492,7 +500,7 @@ export function memberOps(app: AppSpec): Readonly<Record<string, Resolved>> {
           : {},
         /* ⚠️ THE CHANNELS COME WITH THE POLICY, because a switch is only worth
            drawing for a channel something can send on — see `PlatformCtx`. */
-        available: ctx.channels,
+        available: await ctx.channels(),
       })),
 
     /*
