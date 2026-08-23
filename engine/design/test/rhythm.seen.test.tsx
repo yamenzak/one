@@ -21,7 +21,7 @@
 import { chromium, type Browser } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
-  ActionRow, Balance, Group, NavRow, Reveal, Screen, Stack,
+  ActionRow, Balance, Group, Hero, HeroWaiting, NavRow, QuickActions, Reveal, Screen, Stack,
 } from "../src/index.js";
 import { PHONE, html, pageFor, stylesheet } from "../src/measure/index.js";
 
@@ -335,5 +335,81 @@ describe("the one number a screen is about", () => {
     const seen = await hero();
     expect(seen.under!.top - seen.said!, "the acts sit at a section's distance from the "
       + "caption, so the eye reads a run of four rather than a figure and its acts").toBe(AIRY);
+  });
+});
+
+/**
+ * THE HERO'S PLACEHOLDER IS THE HERO, IN ANOTHER MODE.
+ *
+ * ⚠️ THE ONLY QUESTION A SKELETON HAS TO ANSWER IS "DOES ANYTHING MOVE WHEN THE
+ * CONTENT LANDS", and it is a question about two heights, so it is asked as one.
+ * What it replaced was a drawing written beside the component — `h-3 w-24` over
+ * `h-10 w-40`, left-aligned, no padding, no caption, no acts — against a block
+ * that is centred, 64px padded and 270px tall. Right vocabulary, wrong drawing.
+ *
+ * ⚠️ AND THE CIRCLE IS THE ONE COPY IN THE SYSTEM, so it is the one thing
+ * measured twice. A `Skeleton` cannot BE a `Button`, so its diameter is stated
+ * (`QUICK_CIRCLE`) rather than shared — and a stated measurement nobody checks
+ * is exactly what a drifting skeleton is made of.
+ */
+describe("the hero's placeholder", () => {
+  const both = async () => {
+    const page = await browser.newPage({ viewport: { width: PHONE.width, height: PHONE.height } });
+    try {
+      const acts = [1, 2, 3, 4].map((i) => (
+        { id: `a${i}`, label: "Receive", icon: <span>+</span>, onDo: () => {} }));
+      await page.setContent(pageFor(html(
+        <>
+          <div data-real="true">
+            <Hero
+              eyebrow="On the shelf"
+              value={66}
+              identifier="214 products in 11 places"
+              under={<QuickActions actions={acts} />}
+            />
+          </div>
+          <div data-bones="true"><HeroWaiting acts={4} /></div>
+        </>,
+      ), css));
+      return await page.evaluate(() => {
+        const box = (sel: string) => {
+          const el = document.querySelector(sel);
+          return el ? Math.round(el.getBoundingClientRect().height) : null;
+        };
+        const round = (sel: string) => {
+          const el = document.querySelector(sel);
+          return el ? Math.round(el.getBoundingClientRect().width) : null;
+        };
+        return {
+          real: box("[data-real]"),
+          bones: box("[data-bones]"),
+          realCircle: round("[data-real] button"),
+          /* ⚠️ FOUND BY WHERE IT SITS, NEVER BY WHAT IT MEASURES. Two selectors
+             were wrong before this one and each was wrong in a way that reads
+             like the defect: `[class*="skeleton"]` took the eyebrow's 96px bar,
+             and `.size-11` encoded the value under test — so changing the
+             diameter made the circle UNFINDABLE and the failure said "null",
+             which is a test that can see absence and never a wrong number. The
+             column is `w-16` and the circle is its first child. */
+          boneCircle: round("[data-bones] .w-16 > :first-child"),
+        };
+      });
+    } finally { await page.close(); }
+  };
+
+  it("stands exactly as tall as the block it stands in for", async () => {
+    const seen = await both();
+    expect(seen.real, "the real hero did not render").toBeGreaterThan(200);
+    expect(seen.bones, `the placeholder is ${seen.bones}px against the hero's ${seen.real} — `
+      + "whatever the difference, it is how far the number jumps when the content lands")
+      .toBe(seen.real);
+  });
+
+  it("draws its circles at the diameter the real control takes", async () => {
+    const seen = await both();
+    expect(seen.realCircle, "no quick action rendered").toBeGreaterThan(0);
+    expect(seen.boneCircle, `a bone circle is ${seen.boneCircle}px against the control's `
+      + `${seen.realCircle} — \`QUICK_CIRCLE\` is the one copy in this system and it has drifted`)
+      .toBe(seen.realCircle);
   });
 });

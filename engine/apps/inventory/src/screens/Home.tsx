@@ -26,7 +26,7 @@
  */
 
 import {
-  Await, ChartPanel, ChartWaiting, FigureWaiting, Group, Guide, Hero, LineChart, NavRow,
+  Await, ChartPanel, ChartWaiting, FigureWaiting, Group, Guide, Hero, HeroWaiting, LineChart, NavRow,
   NoteRow, Num,
   QuickActions, Screen, Section, SeeAll, Stack, Stat, StatRow, glyphOf,
   useFigures, useGate, type Loaded,
@@ -184,7 +184,7 @@ export function Home({
         */}
         <Await
           of={of}
-          waiting={<FigureWaiting />}
+          waiting={<HeroWaiting acts={acts.length} />}
           again={again}
           then={(shelf) => (
             <Hero

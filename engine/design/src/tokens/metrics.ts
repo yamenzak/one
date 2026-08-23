@@ -238,6 +238,19 @@ export const CROWN_SIZE = "lg" as const;
 export const CROWN_CHIP = "flex h-11 items-center rounded-full px-4" as const;
 
 /**
+ * ⚠️ `lg`'s BOX AGAIN, FOR THE ONE THING THAT CANNOT SHARE THE CONTROL: ITS
+ * PLACEHOLDER. Everywhere else in this system a component's bones are drawn from
+ * the component's own element, so the two cannot disagree — but the diameter of
+ * an icon-only `Button` belongs to the LIBRARY's stylesheet, and a `Skeleton` is
+ * not a `Button`. That leaves one copy, which is one more than the rule allows,
+ * so it is named here rather than written at the call site and
+ * `rhythm.seen.test.tsx` measures the placeholder against the real control in a
+ * browser. A copy nobody checks is what a drifting skeleton IS; a copy something
+ * measures is a fact.
+ */
+export const QUICK_CIRCLE = "size-11" as const;
+
+/**
  * ⚠️ AIR UNDER A PAGE TITLE, AND ONLY UNDER IT. A screen's name and the first
  * section heading below it are both left-aligned words at similar weight, so
  * with only a stack gap between them the eye reads them as one list — and on a

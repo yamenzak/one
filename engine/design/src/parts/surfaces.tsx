@@ -31,7 +31,8 @@ import type { Tone } from "@engine/kernel";
 import { sayMoneyParts } from "@engine/kernel";
 import { TYPE } from "../tokens/type.js";
 import {
-  CARD_OTHERS, CARD_ROWS, CONTROL_SHARE, CROWN_SIZE, HEAD_GAP, ICON, INSET, LEAD, NUDGE, ROW, SPACE,
+  CARD_OTHERS, CARD_ROWS, CONTROL_SHARE, CROWN_SIZE, HEAD_GAP, ICON, INSET, LEAD, NUDGE,
+  QUICK_CIRCLE, ROW, SPACE,
   TILE,
 } from "../tokens/metrics.js";
 import type { Inset } from "../tokens/metrics.js";
@@ -987,6 +988,10 @@ export function QuickActions({ actions }: {
     readonly icon: React.ReactNode; readonly onDo: () => void;
   }[];
 }) {
+  /* ⚠️ THE CLUSTER'S OWN CONTAINER AND THE COLUMN'S OWN WIDTH, so a placeholder
+     cannot wrap at a different point than the row it stands in. What it cannot
+     share is the circle — see `QUICK_CIRCLE`. */
+  const bones = useBones();
   return (
     /* ⚠️ Four must FIT a phone. At 80px wide with a 24px gap they came to 392px
        against 390 available, so the fourth wrapped to its own line — which reads
@@ -997,8 +1002,22 @@ export function QuickActions({ actions }: {
     <div className={`flex flex-wrap items-start justify-center ${SPACE.snug}`}>
       {actions.slice(0, 4).map((a) => (
         <div key={a.id} className={`flex w-16 flex-col items-center ${SPACE.tight}`}>
-          {/* no-hint: the label is a sibling under the circle, so a tooltip
-              would float the same word an inch above where it already is. */}
+          {bones
+            ? (
+              <>
+                {/* ⚠️ THE CIRCLE'S OWN DIAMETER, NAMED ONCE. A bar guessed at
+                    `size-10` beside a `lg` button is 4px short, four times over,
+                    and the row under it lands high — so the size comes from the
+                    same token the control takes. */}
+                <Skeleton className={`${QUICK_CIRCLE} rounded-full`} />
+                <span className={`${TYPE.note} w-full text-center`}>
+                  <Skeleton className="block h-[1lh] w-full rounded-full" />
+                </span>
+              </>
+            )
+            : (
+          /* no-hint: the label is a sibling under the circle, so a tooltip
+             would float the same word an inch above where it already is. */
           <Button
             /* ⚠️ `isIconOnly` MAKES IT A CIRCLE. Without it a `Button` is
                `w-fit px-4`, so a 22px glyph comes out in a 54×44 lozenge — four
@@ -1028,7 +1047,8 @@ export function QuickActions({ actions }: {
             aria-label={a.label}
             onPress={a.onDo}
           >{a.icon}</Button>
-          <span className={`${TYPE.note} text-center`}>{a.label}</span>
+              )}
+          {bones ? null : <span className={`${TYPE.note} text-center`}>{a.label}</span>}
         </div>
       ))}
     </div>

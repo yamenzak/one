@@ -594,7 +594,23 @@ ever changes.
 
 - **The count is the one thing bones cannot know**, so it is the only thing
   passed as data. What is IN each item is the component's business; how many
-  there are is the caller's.
+  there are is the caller's — and so is PRESENCE, where a slot changes the
+  height: a hero with no eyebrow is 20px shorter, so `HeroWaiting` takes
+  `eyebrow` and `identifier` as booleans and nothing else.
+- ⚠️ **A hero is the sharpest case, and it was the wrong drawing.** The block is
+  64px of padding above, 40 below, a `vast` gap between its two halves, three
+  lines at three roles and a row of `lg` circles — about 270px of a phone in six
+  measurements. What stood in for it was `h-3 w-24` over `h-10 w-40`,
+  left-aligned, with no padding, no caption and no acts. `HeroWaiting` renders
+  the real `Balance` and the real `QuickActions` under `Waiting` instead, so
+  there is nothing to keep in step, and `rhythm.seen.test.tsx` asserts the two
+  heights are **equal** — whatever their difference is, it is how far the number
+  jumps when the content lands.
+- ⚠️ **One measurement in the system is genuinely copied, and it is measured
+  twice because of that.** A `Skeleton` cannot BE a `Button`, so the diameter of
+  a quick action's circle is stated (`QUICK_CIRCLE`) rather than shared. A stated
+  measurement nobody checks is exactly what a drifting skeleton is made of, so a
+  browser compares the placeholder against the real control.
 - **A screen's placeholder is then composition, not a drawing.** Wrapping a real
   tree in `Waiting` gives back that tree's layout with every leaf as bones — the
   spacing, the widths and the wrapping are the screen's own, which is exactly

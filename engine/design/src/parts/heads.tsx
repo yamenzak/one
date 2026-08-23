@@ -13,10 +13,25 @@
  */
 
 import * as React from "react";
+import { Skeleton } from "@heroui/react";
 import { TYPE } from "../tokens/type.js";
 import { HEAD_GAP, HERO_PAD, SPACE, TITLE_PAD } from "../tokens/metrics.js";
 import { ON_SCENE } from "../tokens/ambience.js";
+import { useBones } from "./bones.js";
 
+/**
+ * ⚠️ A BAR IS `1lh`, AND THE THREE BELOW ARE WRITTEN OUT RATHER THAN SHARED. The
+ * height of a placeholder for a line of type is the LINE BOX it stands in — a
+ * fixed `h-3` under `TYPE.note` and `h-10` under `TYPE.display` are both wrong,
+ * and wrong by a different amount at every size, so a block drawn out of them
+ * lands somewhere other than where its content will. `1lh` is the computed line
+ * of whatever element encloses it, so a bar cannot disagree with its role.
+ *
+ * ⚠️ AND A `Bar` HELPER TAKING A WIDTH IS WHAT THIS REPLACED, because it puts an
+ * interpolation on a library component's `className` — which `heroui.test.mjs`
+ * cannot read and therefore refuses, correctly: a class it cannot resolve is a
+ * class that might be a colour. Three literals are three checkable claims.
+ */
 /* ------------------------------------------------------------------ heads --- */
 
 /**
@@ -152,6 +167,13 @@ export function Balance({ eyebrow, figure, identifier, under }: {
   readonly identifier?: React.ReactNode;
   readonly under?: React.ReactNode;
 }) {
+  /* ⚠️ THE BLOCK'S OWN ELEMENT, ITS OWN PADDING AND ITS OWN TWO GAPS — bars
+     instead of words, and nothing else different. A placeholder written beside
+     this one would be a second copy of `HERO_PAD`, of `vast` and of `airy`, and
+     the three of them are 168px of a phone: get any one wrong and the number
+     lands somewhere other than where its bar was. Sharing the element rather
+     than the measurements is what makes that impossible rather than unlikely. */
+  const bones = useBones();
   return (
     /* ⚠️ TWO GROUPS, NOT ONE RUN. The eyebrow, the figure and the identifier are
        ONE thing and belong tight together; whatever is under them is a separate
@@ -176,10 +198,25 @@ export function Balance({ eyebrow, figure, identifier, under }: {
       style={{ textShadow: ON_SCENE }}
     >
       <div className={`flex flex-col items-center ${SPACE.tight}`}>
-        {eyebrow ? <span className={TYPE.note}>{eyebrow}</span> : null}
-        <div className="flex items-baseline justify-center">{figure}</div>
+        {eyebrow ? <span className={TYPE.note}>{bones ? <Skeleton className="block h-[1lh] w-24 rounded-full" /> : eyebrow}</span> : null}
+        {/* ⚠️ THE FIGURE'S OWN BOX AND ITS OWN ROLE. A bar sized in `px` beside a
+            `display` figure is a bar that stops matching the first time the
+            scale moves; inside the span that carries the role, `1lh` IS the line
+            it stands in. `Hero` passes its figure already wearing `TYPE.display`,
+            so the bones branch has to wear it too or the block is 40px short. */}
+        <div className="flex items-baseline justify-center">
+          {bones
+            ? (
+              <span className={TYPE.display}>
+                <Skeleton className="block h-[1lh] w-28 rounded-full" />
+              </span>
+            )
+            : figure}
+        </div>
         {identifier ? (
-          <span className={`${TYPE.note} flex items-center ${SPACE.tight}`}>{identifier}</span>
+          <span className={`${TYPE.note} flex items-center ${SPACE.tight}`}>
+            {bones ? <Skeleton className="block h-[1lh] w-44 rounded-full" /> : identifier}
+          </span>
         ) : null}
       </div>
       {under}

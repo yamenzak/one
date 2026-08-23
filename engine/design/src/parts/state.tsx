@@ -31,7 +31,8 @@ import { EMPTY_PAD, EMPTY_READ, NUDGE, PAD, ROW, SPACE } from "../tokens/metrics
 import { ARRIVE } from "../tokens/motion.js";
 import { Waiting, blanks } from "./bones.js";
 import { whoFace } from "./face.js";
-import { Group, NavRow, TileGrid } from "./surfaces.js";
+import { Group, NavRow, QuickActions, TileGrid } from "./surfaces.js";
+import { Balance } from "./heads.js";
 
 /* ----------------------------------------------------------------- loaded --- */
 
@@ -418,6 +419,51 @@ export function RowsWaiting({ rows = 3, lead = true }: {
           <NavRow key={b.id} label={SOME} under={SOME} face={lead ? BONE_FACE : undefined} />
         ))}
       </Group>
+    </Waiting>
+  );
+}
+
+/**
+ * THE ONE NUMBER A SCREEN IS ABOUT, WAITING — AND IT IS THE REAL BLOCK.
+ *
+ * ⚠️ COMPOSITION, NOT A DRAWING, WHICH IS THE WHOLE POINT OF `Waiting`. A hero
+ * is 64px of padding above, 40 below, a `vast` gap between its two halves, three
+ * lines at three roles and a row of `lg` circles — six measurements, ~270px of a
+ * phone. Written out here as bars it would be six chances to be wrong, and every
+ * one of them moves the number when the content lands. Rendering the REAL
+ * `Balance` and the REAL `QuickActions` under `Waiting` gives back their layout
+ * with the leaves as bones, so there is nothing to keep in step.
+ *
+ * ⚠️ WHAT IS PASSED IS PRESENCE AND COUNT, AND NOTHING ELSE. The slots decide
+ * whether a line exists, not what it says — a hero with no eyebrow is 20px
+ * shorter, so it is the caller's to state — and `acts` is the count, which is
+ * the one thing bones cannot know (`bones.tsx`).
+ */
+export function HeroWaiting(
+  { eyebrow = true, identifier = true, acts = 0 }: {
+    readonly eyebrow?: boolean;
+    readonly identifier?: boolean;
+    readonly acts?: number;
+  },
+) {
+  return (
+    <Waiting>
+      <Balance
+        eyebrow={eyebrow ? SOME : undefined}
+        /* ⚠️ A NODE THAT IS NEVER RENDERED — under `Waiting`, `Balance` draws its
+           own bar in its own `display` box. What this decides is nothing; the
+           prop is required because a hero without a figure is not a hero. */
+        figure={SOME}
+        identifier={identifier ? SOME : undefined}
+        under={acts > 0
+          ? (
+            <QuickActions
+              actions={blanks(acts).map((b) => (
+                { id: b.id, label: SOME, icon: null, onDo: NOTHING }))}
+            />
+          )
+          : undefined}
+      />
     </Waiting>
   );
 }
