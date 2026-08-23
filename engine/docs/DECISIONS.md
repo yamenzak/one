@@ -2396,3 +2396,49 @@ was silent one way and animated the other.
 under a picture of the screen it replaced, for longer than a frame; a
 cleanup registered per attempt rather than per current attempt; a second caller
 of `startViewTransition`; or a second place that decides which way a move goes.
+
+---
+
+## D69 — Nothing reads the camera with the thread a person is waiting on
+
+**D68 fixed the transition and the navigation was still stubborn**, which is the
+useful part of this entry: a diagnosis that is right about one cause can be
+completely wrong about the cause somebody is actually feeling. The recording that
+proved it was taken three minutes after the fix shipped — the tab even reloaded
+onto the new build on camera — and the Scan screen still held for four and a half
+seconds through five presses.
+
+**The scanner read as fast as the phone could manage, for as long as the screen
+was open.** The loop awaited its previous decode — which is what stopped it
+queueing up, and is exactly why it read as careful — and then asked for the next
+animation frame immediately. A decode of a full-resolution frame is tens of
+milliseconds on a phone; back to back, that is the main thread.
+
+**And the symptom was never a slow scanner.** It was everything else queueing
+behind it. A tap on the nav paints its ripple from the compositor and then sits
+there, because the handler that would answer it cannot run. On the recording the
+press marks are visible on the bar, one after another, while the screen does not
+change — and the camera indicator in the status bar goes out at the exact moment
+the next screen finally appears.
+
+**So a decode has a cadence somebody chose: eight a second.** That is not a
+compromise. A person points a phone at a label and holds it there; the code is in
+frame for a second at least, which is eight chances. Sixty was never about
+reading sooner — it was about nobody having chosen a number.
+
+**And the frame handed to the decoder has a size.** Unasked, a phone gives the
+sensor's full picture: four times the pixels and four times the work per read,
+for a barcode legible at a fraction of it. The cadence caps how OFTEN; the size
+caps how MUCH, and a decode that overruns its own gap makes the cadence a wish.
+
+**⚠️ THIS IS D60 ONE THREAD OVER.** Drawing is what spends a worker's only
+thread; decoding is what spends a phone's. That one was found because the CPU
+figure was in a log somebody could read. This one had nowhere to show up at all —
+no metric, no error, no failing test — which is why the rule is a guard rather
+than a paragraph, and why it asks of EVERY decode loop rather than the one that
+was wrong.
+
+**Therefore never:** a loop that runs as fast as the device allows; a cadence
+declared and not compared against; a decoder handed a frame whose size the device
+chose; or a diagnosis closed on the first cause found when the person reporting
+it can still reproduce the symptom.

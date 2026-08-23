@@ -186,8 +186,18 @@ function useCamera(paused: boolean, video: React.RefObject<HTMLVideoElement | nu
     void navigator.mediaDevices.getUserMedia({
       /* ⚠️ THE BACK CAMERA, AND `ideal` RATHER THAN `exact`. A laptop has only a
          front one, and `exact` fails outright there — which turns "scanning
-         works, just with the wrong lens" into "no camera". */
-      video: { facingMode: { ideal: "environment" } },
+         works, just with the wrong lens" into "no camera".
+
+         ⚠️ AND A SIZE, BECAUSE THE DECODER IS GIVEN WHATEVER ARRIVES. Unasked, a
+         phone hands over the sensor's full frame — four times the pixels of this
+         and four times the work per read, for a barcode that is legible at a
+         fraction of it. `ideal` again: a camera that cannot do this size gives
+         its nearest instead of failing. */
+      video: {
+        facingMode: { ideal: "environment" },
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+      },
       audio: false,
     }).then((got) => {
       if (dropped) { got.getTracks().forEach((t) => { t.stop(); }); return; }
@@ -228,6 +238,31 @@ function useCamera(paused: boolean, video: React.RefObject<HTMLVideoElement | nu
 /* ------------------------------------------------------------------- watch --- */
 
 /**
+ * HOW OFTEN A FRAME IS ACTUALLY DECODED.
+ *
+ * ⚠️ THE LOOP AWAITED ITS PREVIOUS DECODE AND THEN ASKED FOR THE NEXT FRAME
+ * IMMEDIATELY, which is not one frame at a time so much as ALL OF THEM, for as
+ * long as the screen is open. A decode of a full-resolution frame is tens of
+ * milliseconds on a phone, so back to back it is the main thread — and the
+ * symptom is not a slow scanner. It is that every OTHER thing the page has to do
+ * queues behind it: a tap on the nav paints its ripple from the compositor and
+ * then sits there, because the handler that would answer it cannot run. Reported
+ * as navigation needing several presses and the app going stubborn, which is
+ * exactly what it was.
+ *
+ * ⚠️ AND EIGHT A SECOND IS NOT A COMPROMISE. A person points a phone at a label
+ * and holds it there; the code is in frame for a second at least, which is eight
+ * chances. Sixty was never about reading sooner — it was about nobody having
+ * chosen a number.
+ *
+ * ⚠️ THE SAME FAULT AS THE ICON, ONE THREAD OVER (D60). Drawing is what spends a
+ * worker's only thread; decoding is what spends a phone's.
+ */
+const A_SECOND = 1000;
+const READS_PER_SECOND = 8;
+const GAP = A_SECOND / READS_PER_SECOND;
+
+/**
  * ⚠️ ONE DETECTOR FOR THE LIFE OF THE SURFACE, and one frame at a time. Built
  * per frame it is a decoder constructed thirty times a second; run without
  * awaiting the previous frame it queues work faster than the phone finishes it,
@@ -254,10 +289,17 @@ function useReading(
     let frame = 0;
     let stopped = false;
 
+    /* ⚠️ WHEN THE LAST DECODE RAN, so the loop can skip a frame rather than
+       stop and restart. Waking on the frame and doing nothing costs a
+       comparison; a timer instead would drift away from paint and go on firing
+       in a tab nobody is looking at, which `requestAnimationFrame` does not. */
+    let read = 0;
+
     const look = async () => {
       if (stopped) return;
       const at = video.current;
-      if (at && at.readyState >= 2) {
+      if (at && at.readyState >= 2 && Date.now() - read >= GAP) {
+        read = Date.now();
         try {
           const found = await detector.detect(at);
           const code = found[0]?.rawValue ?? "";

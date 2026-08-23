@@ -1052,6 +1052,7 @@ Some of this is guarded and some is judgement. What is checked today:
 - `placed` — where records sit is declared, checked, and never a default in a script.
 - `present` — one formatter, one store, and every reader is the person reading.
 - `problem` — every refusal comes from a catalogue, and one naming an input is rendered on that input.
+- `reading` — a decode is paced; the thread that answers a tap is not spent reading.
 - `renewal` — a deploy reaches a browser that is already open.
 - `rhythm` — one rhythm per container, and a screen's is the DOM's rather than a walk over React children.
 - `scene` — seeded, compositor-only, masked rather than washed, sized by area, bound rather than built.

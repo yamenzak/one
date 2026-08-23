@@ -1026,6 +1026,7 @@ its own header, cited by other files, and doing nothing.
 | D66 | The first paint has a weight, and nothing joins the first wait unbudgeted | 0 |
 | D67 | The tab's store is bounded, and stops being trusted when it stops being datable | 0 |
 | D68 | A tab switch is not a journey, and only the journey still running may land | 0 |
+| D69 | Nothing reads the camera with the thread a person is waiting on | 0 |
 <!-- /generated -->
 
 ---
