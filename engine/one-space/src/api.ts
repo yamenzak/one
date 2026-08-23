@@ -209,6 +209,24 @@ const early = (key: string): Promise<Response | null> | null => {
   return flying;
 };
 
+/**
+ * ⚠️ EVERY PREFLIGHT WAS TAKEN BEFORE THERE WAS A SESSION, so a sign-in makes
+ * all of them wrong at once. `me.who`'s is read at boot and never outlives
+ * anything; the centre's is read by the first screen that wants it, which on
+ * this door is AFTER somebody has signed in — so its answer would be the 401
+ * the page got while nobody was here, and `call` reads a 401 on an operation
+ * outside `NOT_AN_EXPIRY` as an expired session. Somebody would sign in and be
+ * signed straight back out, once, with the cookie already set.
+ *
+ * ⚠️ AND IT IS EVERY KEY RATHER THAN THE ONE THAT BITES. What makes a preflight
+ * stale is not which operation it is, it is when it was asked — before the
+ * session existed. Naming the exception is how the next one added to the page
+ * inherits the bug.
+ */
+const forgetEarly = (): void => {
+  delete (globalThis as { __one?: unknown }).__one;
+};
+
 const readProblem = async (res: Response): Promise<Problem> => {
   try {
     const body = await res.json() as { problem?: Problem };
@@ -304,6 +322,8 @@ async function call<T>(
       not work rather than as a missing line.
     */
     if (id === "centre.view") learn(value);
+    /* ⚠️ THE MOMENT EVERY PREFLIGHT BECAME WRONG — see `forgetEarly`. */
+    if (id === "me.session") forgetEarly();
     /*
       ⚠️ ONCE, AND ONLY WHERE THE OPERATION DECLARED ONE. Silence is what an
       operation that has said nothing means; a default the platform invented

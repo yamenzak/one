@@ -1978,3 +1978,55 @@ another; a table read twice in one request because each caller reads for itself;
 a `CREATE TABLE IF NOT EXISTS` in front of a read that already handles the table
 being absent; or a latency conclusion drawn from what a request computes rather
 than from how many times it waits.
+
+---
+
+## D62 — The centre is asked for before the bundle, not after the session
+
+**Three round trips deep, and the middle one was waiting for an answer it does
+not need.** With the icon fixed (D60) and the boot flattened (D61), the live
+trace and a screen recording line up frame for frame: `/health` and `me.who`
+leave together and `me.who` takes 4.1s; `centre.view` and `inbox.list` leave
+only then and take 2.2s; the screen's own seven reads leave only then and take
+2.7s. Nine seconds, of which four are a blank curtain and two and a half are
+skeletons — over twelve requests that spent nine milliseconds of CPU between
+them.
+
+**The barrier was structural, not deliberate.** `Product` is the only thing that
+reads the centre, and `pickScreen` does not render it until `me.who` has said
+somebody is here. So the request carrying every manifest in the deployment could
+not leave the browser until a whole round trip had already been spent — and the
+screen behind it could not start until that one landed. Nothing in the code says
+"wait"; the wait is a consequence of where a hook is mounted, which is exactly
+the kind of cost no assertion about a value can see.
+
+**The centre wants nothing from the session and nothing from the door.** It is a
+read of the deployment's own manifests, authorised by the cookie the browser
+already holds. So it joins the preflight in `index.html` (D-preflight, task 177)
+rather than the render: an inline script that runs as the parser reaches it,
+before the browser has finished fetching the bundle. Three questions now leave
+in one wave, and the round trip overlaps the download instead of following it.
+
+**It is asked on every door, including the ones with no centre to read.** Which
+door this is comes from `/health`, and waiting to find out would put back the
+wave this removes — the browser must never classify its own hostname (D17). The
+signpost and the setup door pay one refused request beside two they were making
+anyway, and it costs them no wait at all.
+
+**And a sign-in throws every preflight away, which this change made necessary.**
+`me.who`'s preflight is read at boot and never outlives anything. The centre's
+is read by the first screen that wants it — which on a workspace door is AFTER
+somebody has signed in. Kept, its answer is the 401 the page got while nobody
+was here, and `call` reads a 401 outside `NOT_AN_EXPIRY` as an expired session:
+somebody would sign in and be signed straight back out, once, with the cookie
+already set. What makes a preflight stale is not which operation it is, it is
+that it was asked before the session existed — so the whole store goes, and
+naming the exception would be how the next key added to the page inherits the
+bug.
+
+**Therefore never:** a read placed where it happens to be mounted rather than
+where its dependencies actually are; a preflight answer kept across a change of
+who is asking; or a page whose first wave is smaller than the set of questions
+every visit starts with. And the pairing is checked, not assumed — the page's
+keys and the door's collector are read out of the real `index.html`, because
+either half works alone and disagreeing is silent.

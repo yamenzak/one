@@ -22,12 +22,29 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
 
-    <!-- ⚠️ THE TWO QUESTIONS EVERY VISIT STARTS WITH, ASKED BEFORE THE BUNDLE
-         HAS ARRIVED. Which door this is and who is here are what decide the
-         first screen, and nothing in the page can be drawn without them — so
-         asked from the application they were asked AFTER several hundred
-         kilobytes of JavaScript had been downloaded, parsed and run. Two waits,
-         end to end, for answers that could have been travelling the whole time.
+    <!-- ⚠️ THE THREE QUESTIONS EVERY VISIT STARTS WITH, ASKED BEFORE THE BUNDLE
+         HAS ARRIVED. Which door this is, who is here, and what this deployment
+         holds are what decide the first screen, and nothing in the page can be
+         drawn without them — so asked from the application they were asked AFTER
+         several hundred kilobytes of JavaScript had been downloaded, parsed and
+         run. Three waits, end to end, for answers that could have been
+         travelling the whole time.
+
+         ⚠️ AND THE CENTRE WAS WORSE THAN THAT: IT WAITED FOR AN ANSWER IT DOES
+         NOT NEED. The only thing that reads it is not rendered until `me.who`
+         has said somebody is here, so the request carrying every manifest in the
+         deployment did not leave until a whole round trip had already been
+         spent — and the screen behind it then started its own reads. Measured
+         live on a phone: 4.1s, then 2.2s, then 2.7s. Three waves, nine seconds,
+         over requests that spent nine milliseconds of CPU between them. The
+         centre wants nothing from the session and nothing from the door; it is
+         authorised by the cookie the browser already has.
+
+         ⚠️ IT IS ASKED ON EVERY DOOR, INCLUDING THE ONES WITH NO CENTRE TO READ.
+         Which door this is comes from `/health`, and waiting to find out would
+         put back the wave this removes — the browser must never classify its own
+         hostname (D17). The signpost and the setup door pay one refused request,
+         beside two they were making anyway, and it costs them no wait at all.
 
          ⚠️ AN INLINE SCRIPT, BECAUSE THAT IS THE ONLY THING THAT RUNS THIS
          EARLY. A module script is deferred by definition; this executes as the
@@ -46,7 +63,11 @@
             return fetch(url, { credentials: "same-origin" })
               .catch(function () { return null; });
           };
-          window.__one = { "health": ask("/health"), "me.who": ask("/api/me.who") };
+          window.__one = {
+            "health": ask("/health"),
+            "me.who": ask("/api/me.who"),
+            "centre.view": ask("/api/centre.view"),
+          };
         } catch (e) {}
       })();
     </script>
