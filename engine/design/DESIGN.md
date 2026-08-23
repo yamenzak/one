@@ -1047,6 +1047,7 @@ Some of this is guarded and some is judgement. What is checked today:
 - `motion` — one set of curves and roles, reduced motion answered both ways, and no pinned element whose travel changes the page's height.
 - `present` — one formatter, one store, and every reader is the person reading.
 - `problem` — every refusal comes from a catalogue, and one naming an input is rendered on that input.
+- `renewal` — a deploy reaches a browser that is already open.
 - `rhythm` — one rhythm per container, and a screen's is the DOM's rather than a walk over React children.
 - `scene` — seeded, compositor-only, masked rather than washed, sized by area, bound rather than built.
 - `shape` — every screen declares one, the shape places the action, and no screen draws its own crown or pins its own dock.

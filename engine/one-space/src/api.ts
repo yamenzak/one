@@ -54,6 +54,35 @@ let onExpired: (() => void) | null = null;
 export const whenSessionExpires = (run: () => void): void => { onExpired = run; };
 
 /**
+ * ⚠️ A TAB LEFT OPEN NEVER LEARNS THAT IT WAS REPLACED, and nothing about a
+ * deploy reaches one that is already running. The runtime stamps every answer
+ * with the entry bundle it would serve NOW (`VERSION_HEADER`); the first one
+ * this tab sees is what it is running, and any answer that disagrees means a
+ * newer version is out there.
+ *
+ * ⚠️ IT COMPARES WHAT IT WAS TOLD, NEVER A NUMBER OF ITS OWN. A version
+ * compiled into the bundle is a second fact that has to agree with the served
+ * one, and the day somebody deploys the worker without the page they disagree —
+ * so every tab is told to reload, for ever, over nothing.
+ *
+ * ⚠️ AND IT SAYS SO ONCE. A second announcement of the same thing is a product
+ * nagging somebody who has already decided to finish what they were doing.
+ */
+let running: string | null = null;
+let onRenewed: (() => void) | null = null;
+let told = false;
+export const whenRenewed = (run: () => void): void => { onRenewed = run; };
+
+const noticed = (res: Response): void => {
+  const said = res.headers.get("x-one-version");
+  if (!said) return;
+  running ??= said;
+  if (said === running || told) return;
+  told = true;
+  onRenewed?.();
+};
+
+/**
  * ⚠️ THE SIGN-IN LANE IS EXEMPT, and it has to be: a wrong code answers 401, and
  * treating that as an expiry would sign somebody out of the screen they are
  * signing in on. `me.who` is exempt for a different reason — it is what the
@@ -258,6 +287,11 @@ async function call<T>(
     }
     return { ok: false, problem: unreachable() };
   }
+
+  /* ⚠️ BEFORE THE BRANCHES, so a refusal reports the version too — a deployment
+     somebody is mid-way through is exactly when a browser is likeliest to be
+     holding the old half. */
+  noticed(res);
 
   if (res.ok) {
     const value = await res.json() as T;

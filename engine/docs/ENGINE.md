@@ -503,10 +503,11 @@ env or a binding.
 | `cloudflare` | the one door out to the account — create, destroy, and add a binding | 11 | — |
 | `storage` | files: the object, the row that knows its key, and the erasure of both | 7 | — |
 | `move` | a workspace's records change shard — the only way its jurisdiction can | 9 | — |
+| `renewal` | what this deployment is serving, so a tab running an old build finds out | 3 | — |
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 9 | — |
 
-**452 of them**, 451 reached by something today.
+**455 of them**, 454 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 

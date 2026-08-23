@@ -26,6 +26,7 @@ import {
 import {
   DIRECTORY_MODULES, SHARD_MODULES,
   NOBODY, accountOfToken, addShard, applySchema, appsOfTenant, bearerFrom, acceptanceScope,
+  servedVersion, stamped,
   liveAppsOfTenant,
   deploymentFaults, effectivePlans, grownShards, healthOf, isPlatformPath, locator,
   resources,
@@ -2131,7 +2132,18 @@ export default {
         console.error("[boot]", why);
         return unavailable("boot");
       }
-      return (await handler(env))(request);
+      /*
+        ⚠️ THE VERSION RIDES THE ANSWER SOMEBODY IS ALREADY WAITING FOR. A tab
+        left open never learns it was replaced — the bundle it fetched is the
+        bundle it keeps, so a fix ships to somebody who will not see it until
+        they happen to reload. Stamping every platform answer means the browser
+        finds out while it is being used, and costs no request to do it.
+      */
+      const [answer, version] = await Promise.all([
+        (await handler(env))(request),
+        servedVersion(env.ASSETS, request.url),
+      ]);
+      return stamped(answer, version);
     }
 
     /*

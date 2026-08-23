@@ -22,9 +22,10 @@
 
 import * as React from "react";
 import {
-  NoticeHost, Opening,
+  NoticeHost, Opening, Renewal,
 } from "@engine/design";
 
+import { whenRenewed } from "./api.js";
 import { OPENING_LINES } from "./opening.js";
 import { useSession } from "./session.js";
 import { useTravel } from "./nav.js";
@@ -176,13 +177,13 @@ export function App() {
     `Agreements` is where it is offered.
   */
   if (screen === "agreements" && me && me !== "nobody") {
-    return <><NoticeHost /><Agreements owed={me.owed ?? []} /></>;
+    return <><NoticeHost /><Renewed /><Agreements owed={me.owed ?? []} /></>;
   }
 
   /* ⚠️ The OneSpace is the whole page here: the account door and the operator door
      have nothing underneath, so it is handed no way out. */
   if (screen === "space") {
-    return <><NoticeHost /><OneSpace path={path} onGo={go} onClose={null} /></>;
+    return <><NoticeHost /><Renewed /><OneSpace path={path} onGo={go} onClose={null} /></>;
   }
 
   /* ⚠️ A workspace's own address is the PRODUCT, with OneSpace pulled over it —
@@ -190,7 +191,7 @@ export function App() {
   if (screen === "product") {
     return (
       <>
-        <NoticeHost />
+        <NoticeHost /><Renewed />
         <Product
           path={beneath}
           onGo={go}
@@ -204,7 +205,30 @@ export function App() {
     );
   }
 
-  /* ⚠️ `NoticeHost` mounts ONCE, beside whichever frame renders — two hosts
+  /**
+ * ⚠️ MOUNTED WHEREVER `NoticeHost` IS, AND FOR THE SAME REASON: once, beside
+ * whichever frame renders, so every product and every door gets it without
+ * anybody wiring it. A tab left open never learns it was replaced — the door
+ * notices, this offers the reload, and no app had to know.
+ *
+ * ⚠️ `location.reload()` RATHER THAN A ROUTE CHANGE. What is stale is the
+ * BUNDLE, so navigating inside it re-runs the same code; only a document load
+ * fetches the new one.
+ */
+function Renewed() {
+  const [ready, setReady] = React.useState(false);
+  const [later, setLater] = React.useState(false);
+  React.useEffect(() => { whenRenewed(() => setReady(true)); }, []);
+  return (
+    <Renewal
+      shown={ready && !later}
+      onReload={() => { window.location.reload(); }}
+      onLater={() => setLater(true)}
+    />
+  );
+}
+
+/* ⚠️ `NoticeHost` mounts ONCE, beside whichever frame renders — two hosts
      would show every notice twice, which reads as a fault in the thing being
      announced. */
   /*
@@ -235,7 +259,7 @@ export function App() {
   if (screen === "ground" && ground && Ground) {
     return (
       <>
-        <NoticeHost />
+        <NoticeHost /><Renewed />
         <React.Suspense fallback={null}><Ground route={ground} /></React.Suspense>
       </>
     );
@@ -314,10 +338,10 @@ export function App() {
     );
   }
 
-  if (screen === "signpost" && where) return <><NoticeHost /><Signpost where={where} /></>;
-  if (screen === "sign-in") return <><NoticeHost /><SignIn lead={LEAD[face ?? ""]} /></>;
+  if (screen === "signpost" && where) return <><NoticeHost /><Renewed /><Signpost where={where} /></>;
+  if (screen === "sign-in") return <><NoticeHost /><Renewed /><SignIn lead={LEAD[face ?? ""]} /></>;
   if (screen === "new-workspace" && where) {
-    return <><NoticeHost /><NewWorkspace where={where} /></>;
+    return <><NoticeHost /><Renewed /><NewWorkspace where={where} /></>;
   }
 
   /*
