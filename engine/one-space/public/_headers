@@ -1,0 +1,27 @@
+# WHAT A BROWSER MAY KEEP, AND FOR HOW LONG.
+#
+# ⚠️ A CONTENT-HASHED FILE WAS BEING REVALIDATED ON EVERY VISIT. Cloudflare's
+# static assets default to `public, max-age=0, must-revalidate` for everything,
+# and this deployment took the default — so a phone opening the product asked
+# the server about all eighteen hashed files in `/assets/` before it could run
+# any of them: the entry bundle, the stylesheet, five Geist weights, three
+# Onest, and every lazily-loaded chunk. Eighteen conditional round trips, on
+# every visit, for ever, and every one of them answered "yes, still the same".
+#
+# ⚠️ THE HASH IN THE NAME IS THE WHOLE POINT. Vite writes the content's
+# fingerprint into the filename, so `index-Bf05fZYn.js` cannot change meaning:
+# a new build is a new NAME, referenced from a fresh `index.html`. A file that
+# cannot change is a file there is nothing to ask about, and `immutable` is how
+# a browser is told not to ask — not even on a reload, which is the one case
+# `max-age` alone does not cover and the one the person filming was doing.
+#
+# ⚠️ AND THE DOCUMENT IS DELIBERATELY NOT IN HERE. `index.html` names which
+# hashed files this deploy uses, so caching it would pin a browser to the
+# previous build's names — the mechanism in `runtime/renewal.ts` reads that same
+# document to report which version is being served. It keeps the default, which
+# is to revalidate: one round trip, on a 5 KB file, that is the only thing
+# standing between somebody and the current build. `sw.js` is unhashed for the
+# same reason and keeps the same treatment.
+
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable

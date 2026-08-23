@@ -1043,6 +1043,7 @@ Some of this is guarded and some is judgement. What is checked today:
 - `glyphs` — every mark in the registry is animated or deliberately still, and no screen draws a registered mark itself.
 - `ground` — no borders, no shadows, one monochrome interface and one coloured data.
 - `heroui` — no component is restyled — layout utilities and tokens only.
+- `keeping` — a content-hashed asset is kept; the document that names it is not.
 - `metrics` — one source for every measurement: no screen picks its own padding, gap or tap target, and a pressable row has a floor under it.
 - `motion` — one set of curves and roles, reduced motion answered both ways, and no pinned element whose travel changes the page's height.
 - `present` — one formatter, one store, and every reader is the person reading.

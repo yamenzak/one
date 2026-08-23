@@ -1845,3 +1845,41 @@ can draw; a second static importer of a component that has a lazy home; a home
 reached by a plain import; one suspense boundary standing for a whole form; or a
 markup assertion taken from a renderer that cannot resolve the component under
 test.
+
+---
+
+## D59 — A content-hashed asset is kept; the document that names it is not
+
+**Eighteen conditional round trips, on every visit, all answered "still the
+same".** Cloudflare's static assets default to `public, max-age=0,
+must-revalidate` for everything they serve, and this deployment took the
+default — so a phone opening the product asked the server about every hashed
+file in `/assets/` before it could run any of them: the entry bundle, the
+stylesheet, five Geist weights, three Onest, and every lazily-loaded chunk.
+Measured on the live deployment.
+
+**It is the failure that survives every other fix, which is why it is written
+down rather than merely corrected.** Twenty-five per cent came off the entry
+chunk (D58) and the person watching noticed nothing, because what they were
+paying was not the bundle's SIZE — it was a round trip per file before any of it
+could start. A smaller bundle does not remove a request. Only telling the browser
+to keep the answer does.
+
+**The hash in the name is the whole argument.** Vite writes the content's
+fingerprint into the filename, so `index-Bf05fZYn.js` cannot change meaning: a
+new build is a new NAME, referenced from a fresh `index.html`. A file that cannot
+change is a file there is nothing to ask about. `immutable` is how a browser is
+told not to ask even on a RELOAD, which `max-age` alone does not cover — and a
+reload is exactly what somebody does when a page feels slow.
+
+**And the document is the one thing that must never be kept.** `index.html`
+names which hashed files this deploy uses, so caching it pins a browser to the
+previous build's names — a deploy that then reaches nobody, which is worse than
+the slowness and far harder to see. It is also what `renewal.ts` reads to report
+the version being served (D56). One revalidated round trip on a 5 KB file is the
+whole mechanism by which anybody ever gets a new build.
+
+**Therefore never:** a content-hashed asset served with the platform's default
+cache headers; a long `max-age` without `immutable` beside it; a rule that keeps
+`index.html`, `/` or `/*`; or a performance conclusion drawn from bundle size
+without checking what a browser is asked to fetch before it can start.
