@@ -49,7 +49,25 @@ import { DURATION, EASE } from "../tokens/motion.js";
  * that travels back is going UP, and that is what the crown's arrow, the phone's
  * gesture and the browser's button all do.
  */
-export type Way = "forward" | "back";
+/**
+ * ⚠️ AND A THIRD, BECAUSE A TAB SWITCH IS NOT A JOURNEY. Moving between two of
+ * the five destinations is the most repeated act in the product — and it was
+ * answered "forward", so every tap on the bar ran a full view transition at
+ * `DURATION.page`. Nearly half a second, on the move somebody makes dozens of
+ * times an hour, to say something they already know: they pressed the thing that
+ * is now lit.
+ *
+ * ⚠️ AND THE COST IS NOT ONLY THE WAIT. The tree is swapped inside the
+ * transition's callback while the browser goes on showing a picture of the
+ * screen being left — so for the whole of that animation a tap lands on the NEW
+ * screen's controls under the OLD screen's image. That is the "I pressed it and
+ * something else happened" that no amount of speeding the animation up would
+ * fix, because the mismatch is the mechanism rather than the duration.
+ *
+ * A push earns its transition: it says where a record came from and how to get
+ * back. A lateral move has nothing to say, so it says it instantly.
+ */
+export type Way = "forward" | "back" | "lateral";
 
 /**
  * ⚠️ WHICH FAMILY THE PAGE IS STANDING ON, READ OFF THE DOM RATHER THAN PASSED
@@ -125,11 +143,34 @@ const land = (root: HTMLElement): void => {
  * "before" picture has to be taken while the old screen is still on the page,
  * which is only possible if the swap happens inside.
  */
+/**
+ * ⚠️ WHICH JOURNEY IS THE CURRENT ONE. Every call used to register its own
+ * `land` on its own `finished` — and an interrupted transition REJECTS, so a
+ * second press made the first promise settle at once and `land` ran in the
+ * middle of the second journey: `data-travel` and `data-world` stripped off the
+ * root while the new screen was still animating against them, and every held
+ * animation on the page finished early. The more somebody pressed, the worse it
+ * got, which is exactly how it was reported.
+ */
+let journey = 0;
+
 export function travel(way: Way, change: () => void): void {
   const root = typeof document === "undefined" ? null : document.documentElement;
   const start = (document as unknown as WithTransition | undefined)?.startViewTransition;
-  if (!root || typeof start !== "function" || still()) { change(); return; }
 
+  /*
+    ⚠️ A LATERAL MOVE IS COMMITTED HERE AND NOWHERE ELSE — see `Way`. It takes
+    the same lane as a browser that has no view transitions and a person who has
+    asked for less motion, which is the point: all three are "change the screen,
+    now", and having one path for them means the fast case cannot rot while the
+    decorated one is maintained.
+  */
+  if (!root || typeof start !== "function" || still() || way === "lateral") {
+    change();
+    return;
+  }
+
+  const mine = ++journey;
   const from = worldNow();
   root.setAttribute("data-travel", way);
 
@@ -144,11 +185,12 @@ export function travel(way: Way, change: () => void): void {
     root.setAttribute("data-world", worldNow() === from ? "same" : "new");
   });
 
-  /* ⚠️ CLEARED WHATEVER HAPPENS. A transition that is interrupted — somebody
-     navigating again mid-flight — rejects rather than resolves, and an
-     attribute left behind would put the last direction's animation on the next
-     screen that mounted. */
-  void run.finished.catch(() => undefined).then(() => land(root));
+  /* ⚠️ CLEARED WHATEVER HAPPENS, BUT ONLY BY THE JOURNEY STILL UNDER WAY. An
+     interrupted transition rejects, so without the check the one that was
+     abandoned would tidy up after the one that replaced it. */
+  void run.finished.catch(() => undefined).then(() => {
+    if (mine === journey) land(root);
+  });
 }
 
 /* ------------------------------------------------------------------- css --- */

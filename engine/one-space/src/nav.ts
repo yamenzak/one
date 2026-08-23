@@ -67,20 +67,33 @@ const tidy = (path: string): string => path.replace(/\/+$/, "") || "/";
  * about the history stack distinguishes it. Going to something inside the
  * current address is going DOWN.
  *
- * ⚠️ AND A SIBLING TRAVELS FORWARD. Moving between two screens at the same depth
- * is somebody choosing to go somewhere, not somebody retreating; the only thing
- * that reads as backward is leaving a level, which the first two tests already
- * caught. Shallower-but-unrelated is the one genuinely ambiguous case and it is
+ * ⚠️ AND A SIBLING IS LATERAL, WHICH IS THE MOVE THIS PRODUCT IS MADE OF. Two
+ * addresses under one parent are the five destinations in the bar, or two
+ * records in one collection — somewhere somebody goes and comes back from all
+ * day. It answered "forward", so every tap on the bar ran a view transition
+ * paced for a hierarchical push: `DURATION.page`, during which the tree is
+ * already the new screen while the browser shows a picture of the old one. See
+ * `Way`.
+ *
+ * ⚠️ SHALLOWER-BUT-UNRELATED IS THE ONE GENUINELY AMBIGUOUS CASE and it is
  * answered as back, because in this product it is always a jump out of an area.
  */
 export const wayTo = (from: string, to: string): Way => {
   const a = tidy(from);
   const b = tidy(to);
-  if (a === b) return "forward";
+  if (a === b) return "lateral";
   if (a.startsWith(`${b}/`)) return "back";
   if (b.startsWith(`${a}/`)) return "forward";
-  const depth = (p: string) => p.split("/").filter(Boolean).length;
-  return depth(b) < depth(a) ? "back" : "forward";
+
+  /* ⚠️ THE SAME PARENT, NOT MERELY THE SAME DEPTH. `/inventory/stock` and
+     `/settings/plan` are both two deep and are not siblings — that is a jump
+     between areas, and giving it a tab switch's silence would lose the one
+     move in the product that genuinely changes place. */
+  const up = (p: string) => p.slice(0, p.lastIndexOf("/"));
+  const parts = (p: string) => p.split("/").filter(Boolean).length;
+  if (parts(a) === parts(b) && up(a) === up(b)) return "lateral";
+
+  return parts(b) < parts(a) ? "back" : "forward";
 };
 
 /**
@@ -112,10 +125,25 @@ export function useTravel(): Travel {
     }
   }
 
+  /* ⚠️ WHERE THE TAB IS, READABLE FROM A LISTENER REGISTERED ONCE. `read` is
+     installed on mount and must not be re-installed per address — a listener
+     that is removed and added on every navigation misses the event that arrives
+     between the two. */
+  const now = useRef(path);
+  now.current = path;
+
   useEffect(() => {
     const read = () => {
       const to = stepOf();
-      const way: Way = to < at.current ? "back" : "forward";
+      /* ⚠️ THE ADDRESSES DECIDE LATERALITY; THE STEP NUMBER DECIDES DIRECTION.
+         Only the history entry knows whether this was back or forward, and only
+         the two paths know whether there is a level between them — so a back
+         gesture between two siblings is as instant as pressing the bar, and
+         leaving a record still travels. Answered from the step alone, the same
+         move was silent one way and animated the other. */
+      const way: Way = wayTo(now.current, location.pathname) === "lateral"
+        ? "lateral"
+        : to < at.current ? "back" : "forward";
       at.current = to;
       travel(way, () => setPath(location.pathname));
     };

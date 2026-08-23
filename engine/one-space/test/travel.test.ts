@@ -27,9 +27,23 @@ describe("which way", () => {
   /* ⚠️ A SIBLING IS FORWARD. Moving from one console screen to the next is
      somebody choosing to go somewhere, not retreating from where they were —
      and there is no third animation, so it has to be one of the two. */
-  it("goes forward between two screens at the same depth", () => {
-    expect(wayTo("/space/console/keys", "/space/console/switches")).toBe("forward");
-    expect(wayTo("/space/w/acme/people", "/space/w/acme/money")).toBe("forward");
+  /* ⚠️ A SIBLING IS LATERAL, AND THIS ASSERTED "FORWARD" FOR AS LONG AS THERE
+     WAS A NAV BAR. Two addresses under one parent are the five destinations, or
+     two records in a collection — the move somebody makes dozens of times an
+     hour. Answered as a push it ran a view transition at `DURATION.page` on
+     every tap, during which the tree is already the next screen while the
+     browser shows a picture of the last one. See `Way`. */
+  it("moves laterally between two screens under one parent", () => {
+    expect(wayTo("/space/console/keys", "/space/console/switches")).toBe("lateral");
+    expect(wayTo("/space/w/acme/people", "/space/w/acme/money")).toBe("lateral");
+    expect(wayTo("/inventory/stock", "/inventory/scan")).toBe("lateral");
+  });
+
+  /* ⚠️ THE SAME DEPTH IS NOT THE SAME PARENT. Two areas two segments deep are
+     not siblings, and giving that a tab switch's silence would take the one
+     move that genuinely changes place and make it invisible. */
+  it("still travels between two areas at the same depth", () => {
+    expect(wayTo("/space/console/keys", "/space/w/acme")).not.toBe("lateral");
   });
 
   /* ⚠️ SHALLOWER BUT UNRELATED IS BACK, and in this product it always is: the
@@ -43,7 +57,9 @@ describe("which way", () => {
      redirect, a pasted link and a share sheet, and untidied it makes going
      nowhere read as going one level deeper. */
   it("reads a trailing slash as the same address", () => {
-    expect(wayTo("/space/console/", "/space/console")).toBe("forward");
+    /* ⚠️ Going nowhere is lateral: there is no level between an address and
+       itself, so there is nothing for a transition to say. */
+    expect(wayTo("/space/console/", "/space/console")).toBe("lateral");
     expect(wayTo("/space/console", "/space/console/ai/")).toBe("forward");
     expect(wayTo("/space/console/ai/", "/space/console/")).toBe("back");
   });
