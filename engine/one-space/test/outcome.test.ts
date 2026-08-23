@@ -122,3 +122,49 @@ describe("a write that worked", () => {
     expect(said).toHaveLength(0);
   });
 });
+
+/**
+ * ⚠️ AND SOMETHING HAS TO INSTALL THE HANDLER, WHICH NOTHING ABOVE CHECKS. Every
+ * test in this file installs its own, so all of them pass over an application
+ * that installs none — the door is proven and the wiring is not. That is not a
+ * hypothetical: a scripted edit removed `whenWritten` from `data.tsx` and
+ * typecheck, the whole engine suite and all 72 gate guards stayed green, with
+ * every save in the product silent and every list a write changed a round trip
+ * out of date.
+ *
+ * ⚠️ SO IT IS ASSERTED THROUGH THE DOOR RATHER THAN BY LOOKING FOR THE CALL.
+ * What proves an installer ran is a held answer disappearing when a write says
+ * it is stale — nothing else in the tab can do that, and no test here may
+ * install a handler of its own or it replaces the one under test.
+ */
+describe("what installs it", () => {
+  it("is installed by importing the centre, without anybody wiring it", async () => {
+    const mod = await import("../src/api.js");
+    /* The book, so the door knows what `note.publish` says. */
+    answer = () => ({ status: 200, body: centre });
+    await mod.api.get("centre.view");
+
+    answer = () => ({ status: 200, body: { notes: [] } });
+    await mod.api.get("note.list");
+    expect(mod.known("note.list"), "the read was not held").toBeDefined();
+
+    /* ⚠️ IMPORTED AND NOTHING ELSE. No provider, no mount, no call — the install
+       is at module scope precisely so no screen has to remember it. */
+    await import("../src/centre/data.js");
+
+    answer = () => ({ status: 200, body: { ok: true } });
+    await mod.api.post("note.publish", { id: "n1" });
+
+    expect(mod.known("note.list"),
+      "a write said this was stale and nothing dropped it — is anything installed?")
+      .toBeUndefined();
+    /*
+      ⚠️ THE TIME IS THE TRANSFORM'S, NOT THE ASSERTION'S. Importing the centre
+      pulls React and the whole design system through the transformer, which is
+      two seconds on a quiet machine and past vitest's five-second default under
+      a parallel workspace run — a timeout on a file whose subject is what a
+      write invalidates, which reads as the fault it is looking for and is not.
+      `cold.test.ts` carries the same note for the same reason.
+    */
+  }, 60_000);
+});
