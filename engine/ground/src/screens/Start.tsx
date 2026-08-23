@@ -34,7 +34,8 @@ export function Start({ title, raised, counts, held, onGo }: {
    * What has been raised, on both axes — the workspace's for a step done once
    * for everybody, this person's for a step each pair of hands takes.
    */
-  readonly raised: Raised;
+  /** ⚠️ `null` until the answer is back — see `Guide`. Empty is a claim. */
+  readonly raised: Raised | null;
   /** How many times each, for a milestone that waits for ten. */
   readonly counts: Readonly<Record<string, number>>;
   readonly held: ReadonlySet<string>;

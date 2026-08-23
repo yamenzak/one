@@ -1924,7 +1924,7 @@ const START = (api: Door) => function StartHere({ app, go }: Mounted) {
          these lists, so handing it step ids would tick nothing and look correct.
          ⚠️ AND BOTH AXES SEPARATELY — a workspace step is anybody's to have
          done, a person step is only this person's. */
-      raised={{ workspace: Object.keys(got?.counts ?? {}), person: got?.mine ?? [] }}
+      raised={got ? { workspace: Object.keys(got.counts), person: got.mine } : null}
       counts={got?.counts ?? {}}
       /*
         ⚠️ WHILE IT IS LOADING, EVERYTHING IS "ALREADY SAID". `[]` would draw
@@ -2061,11 +2061,14 @@ const HOME = (api: Door) => function HomeHere({ app, go }: Mounted) {
       again={() => { lines.again(); kinds.again(); places.again(); }}
       needs={needs}
       moving={moving}
-      /* ⚠️ BOTH AXES, AND WHILE THE ANSWER IS STILL COMING NEITHER IS RAISED.
-         Empty lists mean "nothing done yet", which draws the whole checklist for
-         a beat and then takes most of it away — so the section is held back
-         until `guide.view` lands, which is what `left` above already decides. */
-      raised={{ workspace: Object.keys(got?.counts ?? {}), person: got?.mine ?? [] }}
+      /* ⚠️ BOTH AXES, AND `null` WHILE THE ANSWER IS STILL COMING. This read
+         `Object.keys(got?.counts ?? {})`, so a workspace that had not answered
+         yet was indistinguishable from one that had done nothing: the card drew
+         every step under a confident "0 of 3 done" and then took most of it away
+         — and the comment here said the section was held back, which `Guide`
+         had no way to do because it was handed two empty lists. It takes `null`
+         now and draws nothing until it knows. */
+      raised={got ? { workspace: Object.keys(got.counts), person: got.mine } : null}
       held={held}
       onGo={go}
       onReceive={() => go("/receive")}

@@ -326,7 +326,7 @@ container in `src/screens/live.tsx`, and rendered over a sample world by
 
 | Route | Name | Nav | Needs | Component | Container |
 |---|---|---|---|---|---|
-| `/` | Home | primary | `stock:read` | `screens/Home.tsx:112` | `screens/live.tsx:359` |
+| `/` | Home | primary | `stock:read` | `screens/Home.tsx:113` | `screens/live.tsx:359` |
 | `/stock` | Stock | primary | `stock:read` | `screens/Stock.tsx:92` | `screens/live.tsx:359` |
 | `/scan` | Scan | primary | `product:read` | `screens/Scan.tsx:125` | `screens/live.tsx:561` |
 | `/receive` | Receive | primary | `stock:move` | `screens/Receive.tsx:100` | `screens/live.tsx:561` |

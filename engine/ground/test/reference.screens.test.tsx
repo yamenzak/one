@@ -142,6 +142,25 @@ describe("everything ground declares reaches a screen", () => {
     for (const step of steps) expect(out).toContain(step.label);
   });
 
+  /*
+    ⚠️ AN EMPTY LIST IS "NOTHING DONE" AND `null` IS "NOT ASKED YET", AND THE
+    CARD MUST NOT SAY THE FIRST WHILE IT MEANS THE SECOND. It did: the screen
+    read `Object.keys(got?.counts ?? {})`, so before `guide.view` came back the
+    checklist drew every step under a confident "0 of N done" — a claim about a
+    workspace nobody had checked, on the one block of the home screen that
+    appeared instantly precisely because it was not waiting for anything.
+
+    ⚠️ AND IT DRAWS NOTHING RATHER THAN BONES, on purpose. A step that is done
+    disappears, so the row count is a function of the answer — the case
+    `bones.tsx` names as the one a placeholder cannot stand in for.
+  */
+  it("says nothing at all until it knows what has been done", () => {
+    const steps = Object.values(GROUND.guide ?? {});
+    const out = html(<Guide book={GROUND.guide ?? {}} raised={null} held={OWNER} onGo={() => {}} />);
+    expect(out, "a checklist drawn before its answer is a count nobody checked").toBe("");
+    for (const step of steps) expect(out).not.toContain(step.label);
+  });
+
   it("draws every primary destination it declared", () => {
     const primary = primaryOf(GROUND.screens);
     const out = html(

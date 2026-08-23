@@ -77,7 +77,8 @@ export function Start({ title, said, raised, counts, already, held, onGo }: {
    * What has actually been done — the events that tick a step, on both axes.
    * A setup step is the workspace's; learning to scan is each person's.
    */
-  readonly raised: Raised;
+  /** ⚠️ `null` until the answer is back — see `Guide`. Empty is a claim. */
+  readonly raised: Raised | null;
   /** How many times each, for a milestone that waits for fifty. */
   readonly counts: Readonly<Record<string, number>>;
   /**

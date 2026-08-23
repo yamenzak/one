@@ -27,13 +27,31 @@ import { Group, NavRow, NoteRow } from "../parts/surfaces.js";
 
 export interface GuideProps {
   readonly book: GuideBook;
-  /** What the workspace has ever done, and what this person has. */
-  readonly raised: Raised;
+  /**
+   * What the workspace has ever done, and what this person has.
+   *
+   * ⚠️ `null` IS "NOT KNOWN YET", AND IT IS NOT THE SAME AS "NOTHING DONE". Both
+   * arrive as empty lists from a screen that has not had its answer back, and a
+   * checklist cannot tell them apart — so it drew every step untick ed under a
+   * confident "0 of 3 done" for the length of a round trip, on a workspace that
+   * might be two thirds finished. A count is a claim; this is the one shape that
+   * lets the caller say it has not checked.
+   */
+  readonly raised: Raised | null;
   readonly held: ReadonlySet<string>;
   readonly onGo: (route: string) => void;
 }
 
 export function Guide({ book, raised, held, onGo }: GuideProps) {
+  /*
+    ⚠️ NOTHING UNTIL IT IS KNOWN, AND DELIBERATELY NOT BONES. A placeholder is
+    right where the SHAPE is the component's and only the content is coming; here
+    the row count is a function of the answer — a step that is done disappears —
+    so a skeleton drawn before it lands is a block of the wrong length, which is
+    the jump a skeleton exists to prevent arriving by way of the fix
+    (`bones.tsx`). What stands in for a block whose size is data is `recall`.
+  */
+  if (!raised) return null;
   const left = remaining(book, raised, held);
   const done = progressOf(book, raised, held);
 

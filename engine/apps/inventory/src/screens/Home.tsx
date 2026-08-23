@@ -93,7 +93,8 @@ export interface HomeProps {
    */
   readonly moving: Loaded<Moving> | null;
   /** The checklist, on both axes — a setup step is the workspace's, a first scan is theirs. */
-  readonly raised: Raised;
+  /** ⚠️ `null` until the answer is back — see `Guide`. Empty is a claim. */
+  readonly raised: Raised | null;
   readonly held: ReadonlySet<string>;
   /** Where a step sends them. The guide's links are routes. */
   readonly onGo: (route: string) => void;
