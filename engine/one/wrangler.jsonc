@@ -116,7 +116,7 @@
       // ⚠️ A PLACEHOLDER UNTIL PROVISIONING WRITES THE REAL ONE. A deploy with
       // this id in place would bind a database that does not exist and answer
       // every request 500 — so nothing ships until it is replaced.
-      "database_id": "5ed31d36-67f4-4970-a658-276eb6322c93"
+      "database_id": "2e42d7a5-7c5d-4300-aacd-d09246ba7130"
     },
     {
       "binding": "SHARD_EU_1",

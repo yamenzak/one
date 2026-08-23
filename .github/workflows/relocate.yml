@@ -43,6 +43,17 @@ on:
 
 concurrency: relocate-one
 
+# ⚠️ THE LAST STEP WRITES TO THE REPOSITORY, so the job needs to be allowed to.
+# Without this the default token is read-only and the push is refused 403 — after
+# the copy, after the deploy, after the boot check, with the deployment already
+# LIVE on the new database and the repository still naming the old one. The next
+# ordinary push then re-deploys the old id and silently moves the deployment back
+# onto a database that has been out of service since the window. The relocation
+# succeeded and the record of it did not, which is the worst of the two halves to
+# lose.
+permissions:
+  contents: write
+
 jobs:
   relocate:
     runs-on: ubuntu-latest

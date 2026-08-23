@@ -75,7 +75,27 @@ if (!/wrangler deploy --dry-run/.test(runbook)) {
     + "     half that failed.");
 } else ok("rehearsal: the deploy is proved with nothing bound");
 
+/**
+ * ⚠️ AND A WORKFLOW THAT COMMITS MUST BE ALLOWED TO. The default token is
+ * read-only, so a `git push` at the end of a sequence is refused 403 — after the
+ * copy, after the deploy, after the boot check, with the deployment already LIVE
+ * on the new database and the repository still naming the old one. The next
+ * ordinary push then re-deploys the old id and moves the deployment back onto a
+ * database that has been out of service since the window. The work succeeded and
+ * the record of it did not.
+ */
+const pushing = files.filter((f) => /git push/.test(readFileSync(join(FLOWS, f), "utf8")));
+const unwritable = pushing.filter((f) =>
+  !/permissions:\s*(\n\s+[a-z-]+:.*)*\n\s+contents:\s*write/.test(readFileSync(join(FLOWS, f), "utf8")));
+if (!pushing.length) {
+  fail("no workflow pushes to the repository. Either that moved or this guard is\n"
+    + "     looking for something nothing does.");
+} else if (unwritable.length) {
+  fail(`${unwritable.join(", ")}: pushes to the repository without \`contents: write\`.\n`
+    + "     The default token is read-only, so the push is refused after the work is done.");
+} else ok(`writing: ${pushing.length} workflow(s) push, each allowed to`);
+
 console.log(bad
   ? `\nshipping: ${bad} failure(s).`
-  : "\nshipping: what the worker serves is built before it ships, and a rehearsal tries the deploy.");
+  : "\nshipping: what ships is built, the deploy is rehearsed, and a workflow that commits may.");
 process.exit(bad ? 1 : 0);

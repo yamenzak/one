@@ -1145,7 +1145,7 @@ that names no stage, so this list cannot grow by forgetting.
 <!-- generated: node scripts/inventory.mjs deployment -->
 | Binding | Resource | |
 |---|---|---|
-| `DIRECTORY` | `5ed31d36-67f4-4970-a658-276eb6322c93` | live |
+| `DIRECTORY` | `2e42d7a5-7c5d-4300-aacd-d09246ba7130` | live |
 | `SHARD_EU_1` | `afe4e35c-bf44-48ff-b43e-c55b913efcda` | live |
 
 **Every binding names a resource that exists.**
