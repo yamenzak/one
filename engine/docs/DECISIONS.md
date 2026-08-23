@@ -2178,7 +2178,23 @@ is what stops the next ordinary push re-pointing the deployment at a database
 nobody has checked. **Nothing is ever deleted** — the source database untouched
 is the rollback, and a revert is the whole of it.
 
+**⚠️ AND A TOOL THAT PUTS ITS ERRORS WHERE ITS ANSWERS GO MAKES EVERY CALLER
+SILENT.** `wrangler d1 execute --json` writes refusals to stdout, and every
+caller captures that stream — into a shell variable, into a file, through a
+pipe. So the first rehearsal exported, imported and then failed the VERIFICATION
+step with exit 1 and an empty log: the reason had been captured into the file it
+was meant to fill. A failure nobody can read is worse than no check at all,
+because it reads as "something went wrong somewhere" and invites a re-run.
+`d1.mjs` is the one asker; it reads both streams and prints the refusal with the
+query that caused it.
+
+**The query it refused was one that cannot succeed anywhere.** Every D1 database
+carries internal tables under `_cf_`; `sqlite_master` lists them like any other
+and every query against one is refused — so a table list built without excluding
+them is broken on every database, always. That exclusion now lives in exactly one
+place, and `d1.test.mjs` fails on a workflow that writes its own list beside it.
+
 **Therefore never:** a copy trusted because a command exited 0; a maintenance
 window taken on an operator's word; a new id committed before the deployment it
-points at has answered; or a source deleted in the same operation that replaced
-it.
+points at has answered; a source deleted in the same operation that replaced it;
+or a tool's output redirected somewhere a failure cannot be read from.

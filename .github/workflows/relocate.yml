@@ -69,12 +69,9 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
-          mode=$(pnpm exec wrangler d1 execute one-directory --remote --json \
-            --command "SELECT mode FROM maintenance WHERE id = 'the'" \
-            | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{
-                const a=JSON.parse(s.slice(s.indexOf("[")));
-                const r=(Array.isArray(a)?a:[a]).flatMap(o=>o?.results??[]);
-                process.stdout.write(String(r[0]?.mode ?? "off"));})')
+          mode=$(node ../scripts/d1.mjs one-directory \
+            "SELECT mode FROM maintenance WHERE id = 'the'" \
+            | node -pe 'JSON.parse(require("fs").readFileSync(0,"utf8"))[0].results[0]?.mode ?? "off"')
           echo "maintenance is: $mode"
           if [ "$mode" != "readonly" ] && [ "$mode" != "full" ]; then
             echo "::error::The deployment is still accepting writes. Turn maintenance on"
@@ -115,18 +112,12 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
-          # ⚠️ THE LIST IS THE SOURCE'S OWN. A table added tomorrow is counted
-          # because it is there, not because somebody remembered it here.
-          sql=$(pnpm exec wrangler d1 execute one-directory --remote --json \
-            --command "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'" \
-            | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{
-                const a=JSON.parse(s.slice(s.indexOf("[")));
-                const r=(Array.isArray(a)?a:[a]).flatMap(o=>o?.results??[]);
-                process.stdout.write(r.map(x=>`SELECT ${JSON.stringify(x.name)} AS t, COUNT(*) AS n FROM "${x.name}"`).join(" UNION ALL "));})')
+          # ⚠️ THE LIST IS EACH DATABASE'S OWN, and `d1.mjs` is what asks — a
+          # table added tomorrow is counted because it is there, D1's internal
+          # tables are left out because they cannot be counted at all, and a
+          # refused query is PRINTED rather than captured into the file.
           for db in one-directory "${{ inputs.target }}"; do
-            pnpm exec wrangler d1 execute "$db" --remote --json --command "$sql" \
-              | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(s.slice(s.indexOf("["))))' \
-              > "/tmp/counts-$db.json"
+            node ../scripts/d1.mjs --counts "$db" > "/tmp/counts-$db.json"
           done
           node ../scripts/copied.mjs /tmp/counts-one-directory.json "/tmp/counts-${{ inputs.target }}.json"
 
@@ -148,12 +139,9 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
-          id=$(pnpm exec wrangler d1 list --json \
-            | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{
-                const a=JSON.parse(s.slice(s.indexOf("[")));
-                const one=a.find(r=>r.name===process.argv[1]);
-                process.stdout.write(one ? one.uuid : "");})' "${{ inputs.target }}")
-          [ -n "$id" ] || { echo "::error::Cannot read back the new database id."; exit 1; }
+          list=$(pnpm exec wrangler d1 list --json) || { echo "$list"; exit 1; }
+          id=$(printf '%s' "$list" | node -pe 's=require("fs").readFileSync(0,"utf8");(JSON.parse(s.slice(s.indexOf("["))).find(r=>r.name===process.argv[1])||{}).uuid??""' "${{ inputs.target }}")
+          [ -n "$id" ] || { echo "::error::Cannot read back the new database id. wrangler said:"; echo "$list"; exit 1; }
           # ⚠️ THE BINDING KEEPS ITS NAME. `DIRECTORY` is what every module reads;
           # only the id behind it moves, so nothing in the worker knows this
           # happened — which is what makes it revertible by one more commit.

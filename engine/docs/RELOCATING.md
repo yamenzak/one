@@ -71,6 +71,10 @@ and it is the only honest way to know it before the deployment is down. It also
 proves the export, the import and the comparison work at all — which are the
 three things that could fail while everybody is waiting.
 
+Measured on this deployment, first rehearsal: **6.7 seconds** end to end —
+101 KB exported, 365 statements imported, 36 tables. The window is short enough
+that the slow part of step 2 is a person clicking Maintenance twice.
+
 The copy it leaves behind is a real, verified database in the right place. Delete
 it, or keep it and reuse the name.
 
