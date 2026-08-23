@@ -181,6 +181,40 @@ for (const file of SOURCES) {
 if (!sizes) ok(`type: no screen picks its own size or weight`);
 
 /**
+ * ⚠️ AND THE SAME RULE ONE COORDINATE SYSTEM OVER. A chart's labels are `<text>`
+ * in an SVG viewBox, so a Tailwind class on one is a size in the wrong units —
+ * which is why they were written as inline numbers, and why the check above
+ * could not see them. Measured with `Geometry.type`, the package was setting
+ * SEVEN sizes for THREE jobs: 7, 8 and 9 for a label, 20 and 22 for the number
+ * in a ring. Every one was defensible where it was written.
+ */
+/**
+ * ⚠️ EVERY SOURCE, NOT JUST THE CHART PACKAGE. An app drawing its own SVG has
+ * the same units and the same temptation, and a guard scoped to where the fault
+ * was found is a guard the next instance walks around. A label printed in
+ * MILLIMETRES is a third coordinate system and stays legal — it is sized against
+ * paper rather than against a screen, and it names its unit.
+ */
+let inline = 0;
+for (const file of SOURCES) {
+  if (!/\.tsx$/.test(rel(file))) continue;
+  const src = strip(readFileSync(file, "utf8"));
+  for (const [, what] of src.matchAll(/fontSize:\s*(\d+)/g)) {
+    inline++;
+    fail(`${rel(file)}: draws type at ${what}, in units nothing else can see.\n` +
+      `       Name a role: \`CHART_TYPE.label\`, \`.dense\`, \`.centre\`.`);
+  }
+}
+const chartRoles = [...readFileSync(join(ENGINE, "design/src/tokens/type.ts"), "utf8")
+  .matchAll(/export const CHART_TYPE = \{([\s\S]*?)\n\} as const;/g)]
+  .flatMap((m) => [...m[1].matchAll(/^\s{2}(\w+):\s*\d+/gm)].map((r) => r[1]));
+if (!chartRoles.length) {
+  fail(`type.ts: no \`CHART_TYPE\` — the sizes a chart sets have no scale to name.`);
+} else if (!inline) {
+  ok(`chart type: ${chartRoles.join(", ")}, and none of ${SOURCES.length} sources writes a size.`);
+}
+
+/**
  * ⚠️ THE SCALE HAS A TOP, AND FOR A WHILE IT DID NOT. `title` and `figure` were
  * both `text-2xl`, so the number a whole screen was built around rendered at
  * exactly the size of the heading above it, and every hero read as a slightly

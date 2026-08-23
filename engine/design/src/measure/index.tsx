@@ -276,6 +276,27 @@ export interface Geometry {
   readonly cut: readonly {
     readonly text: string; readonly by: number; readonly where: string;
   }[];
+  /**
+   * EVERY SIZE OF TYPE THE SCREEN ACTUALLY SET, LOUDEST FIRST.
+   *
+   * ⚠️ THE ONE RULE ABOUT TYPE THAT NO STATIC CHECK CAN SEE. `motion` refuses a
+   * screen that writes its own `text-2xl`, and `ranks` proves the three heading
+   * roles come out as three sizes — both read source, and neither can answer
+   * "how many different sizes are on this page". That number is what separates a
+   * screen with a typographic system from one assembled out of defensible local
+   * decisions: nine sizes on one page is not a scale, whoever owns each of them.
+   *
+   * ⚠️ AND IT IS ONE ENTRY PER SIZE, NOT PER ELEMENT. What is under test is the
+   * SET — a list of forty rows at one size is a scale of one, and reporting forty
+   * of them would make every list look like the fault.
+   *
+   * `text` is a sample from the largest element at that size, so a failure names
+   * something somebody can find on the screen rather than a number.
+   */
+  readonly type: readonly {
+    readonly px: number; readonly weight: number;
+    readonly count: number; readonly text: string;
+  }[];
 }
 
 /**
@@ -301,6 +322,63 @@ export const INSIDE_A_CONTROL = ["tag__remove-button", "search-field__clear-butt
 export const tooSmall = (targets: Geometry["targets"]): Geometry["targets"] =>
   targets.filter((t) => t.height < FINGER
     && !INSIDE_A_CONTROL.some((one) => t.kind.includes(one)));
+
+/**
+ * ⚠️ HOW MANY SIZES A SCREEN MAY SET, AND IT IS A CEILING RATHER THAN A TARGET.
+ * `TYPE` publishes fifteen roles and no screen wears them all: measured across
+ * the proving ground, a screen sets three sizes and a dense one sets six. Seven
+ * is the first number no screen in this deployment reaches — which is what makes
+ * it an assertion about drift rather than about the design.
+ *
+ * ⚠️ SIZES, NOT SIZE-AND-WEIGHT PAIRS. Three weights at 16px is `label`, `group`
+ * and `body` doing their jobs; three SIZES between 14 and 20 is a screen that
+ * picked. The pair count runs about half again as high and says less.
+ */
+export const SCALE_CEILING = 7;
+
+/**
+ * ⚠️ HOW MUCH TEXT A SCREEN NEEDS BEFORE "IT HAS NO HIERARCHY" MEANS ANYTHING.
+ * An empty state is four lines — a mark, a sentence, a hint and one button — and
+ * the largest of them IS the message, so asking it to outrank a body it does not
+ * have reports a fault on the one screen in the system that is correct by
+ * construction. Measured: OneInventory's `/where` on an empty location comes back
+ * with four elements at four sizes, which is a scale, and it failed the top.
+ */
+export const ENOUGH_TO_RANK = 8;
+
+/** What one screen's type amounts to: the sizes it set, and whether it has a top. */
+export interface Scale {
+  /** Every distinct size, loudest first. */
+  readonly sizes: readonly number[];
+  /** The size the most elements on the screen wear — the screen's body. */
+  readonly commonest: number;
+  /** How many elements set type at all — see `ENOUGH_TO_RANK`. */
+  readonly pieces: number;
+}
+
+/**
+ * ⚠️ ONE READING FOR EVERY PRODUCT, FOR THE REASON `tooSmall` GIVES: an app that
+ * counted for itself would be a second answer to what a scale is, and the first
+ * one to count pairs instead of sizes reports a page full of faults nobody can
+ * act on.
+ */
+export const scaleOf = (type: Geometry["type"]): Scale => {
+  const sizes = [...new Set(type.map((t) => t.px))].sort((a, b) => b - a);
+  /* ⚠️ PER SIZE, NOT PER SIZE-AND-WEIGHT. Three weights at 16px are `label`,
+     `group` and `body`, and counting them apart splits a screen's body three
+     ways — which is how the loudest thing comes to look commonest. */
+  const worn = new Map<number, number>();
+  for (const one of type) worn.set(one.px, (worn.get(one.px) ?? 0) + one.count);
+  /* ⚠️ A TIE GOES TO THE SMALLER SIZE, because a body is the quiet half of one.
+     Resolved the other way, a screen with one heading and one line of prose
+     reports the heading as its body and fails a rule it passes. */
+  let commonest = 0;
+  let most = 0;
+  for (const [px, count] of [...worn].sort((a, b) => a[0] - b[0])) {
+    if (count > most) { most = count; commonest = px; }
+  }
+  return { sizes, commonest, pieces: type.reduce((n, one) => n + one.count, 0) };
+};
 
 /**
  * WHAT A SCREEN LAID OUT, AT ONE WIDTH.
@@ -384,7 +462,54 @@ export async function geometryOf(
               : "",
           };
         });
-      return { spill, worst, targets, cut };
+      /* ⚠️ THE ELEMENT THAT SETS THE TYPE, NOT EVERY ANCESTOR OF IT. A card holds
+         a heading and four rows: asking the card what size it is answers with
+         whatever it inherits, and the page comes out with one size per nesting
+         level. Only an element with a direct text node of its own is setting
+         type anybody reads.
+
+         ⚠️ AND AN INVISIBLE ONE IS NOT ON THE SCREEN. A screen-reader label is
+         clipped to a pixel on purpose and a curtain is `visibility: hidden`;
+         either would add a size to the count that nobody can see. A skeleton
+         needs no exemption — it holds no text, so it never sets a size. */
+      const sizes = new Map<string, { px: number; weight: number; count: number; text: string; area: number }>();
+      for (const el of Array.prototype.slice.call(document.querySelectorAll("body *")) as Element[]) {
+        const own = Array.prototype.slice.call(el.childNodes)
+          .filter((n: ChildNode) => n.nodeType === 3 && (n.textContent ?? "").trim())
+          .map((n: ChildNode) => (n.textContent ?? "").trim())
+          .join(" ");
+        if (!own) continue;
+        /* ⚠️ NOT A CHART'S OWN LABELS. SVG text is sized in the viewBox's units,
+           so its computed size is not the size anybody sees — a chart drawn at
+           320 units into a 390-pixel column renders its 8 at nearly 10. Counting
+           them here would mix two coordinate systems into one number and make it
+           mean nothing. What a chart may set is `CHART_TYPE`, and `motion`
+           refuses any other size in source. */
+        if (el.closest("svg")) continue;
+        const style = getComputedStyle(el);
+        if (style.visibility === "hidden" || style.display === "none") continue;
+        if (style.clipPath && style.clipPath !== "none") continue;
+        const box = el.getBoundingClientRect();
+        if (!box.width || !box.height) continue;
+        const px = Math.round(parseFloat(style.fontSize));
+        const weight = Number(style.fontWeight) || 400;
+        const key = `${px}/${weight}`;
+        const held = sizes.get(key);
+        const area = box.width * box.height;
+        if (!held) sizes.set(key, { px, weight, count: 1, text: own.slice(0, 40), area });
+        else {
+          held.count += 1;
+          if (area > held.area) { held.area = area; held.text = own.slice(0, 40); }
+        }
+      }
+      /* ⚠️ `Array.from`, NOT `slice.call`. A Map's `values()` is an iterator with
+         no `length`, so `Array.prototype.slice.call` on it returns an empty
+         array — silently, on every screen, which reads as a page with no type. */
+      const type = Array.from(sizes.values())
+        .map((s: { px: number; weight: number; count: number; text: string }) =>
+          ({ px: s.px, weight: s.weight, count: s.count, text: s.text }))
+        .sort((a: { px: number }, b: { px: number }) => b.px - a.px);
+      return { spill, worst, targets, cut, type };
     }, viewport.width);
   } finally {
     await page.close();

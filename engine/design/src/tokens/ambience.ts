@@ -859,9 +859,20 @@ export function ambienceStylesheet(): string {
     `  background-color: color-mix(in oklab,`,
     `    var(--surface-tertiary) 72%, var(--scene-veil, var(--surface-tertiary))) !important;`,
     `}`,
-    `[data-chrome="true"]:hover {`,
-    `  background-color: color-mix(in oklab,`,
-    `    var(--surface-tertiary) 90%, var(--scene-veil, var(--surface-tertiary))) !important;`,
+    /*
+      ⚠️ AND THE HOVER IS FOR A POINTER THAT CAN HOVER, WHICH IS NOT EVERY ONE. A
+      touch screen has no hover state to leave: the browser fires one on tap and
+      the element keeps it until something else is tapped, so a chip somebody
+      pressed stays a shade brighter than the four beside it for as long as they
+      read the screen — a fixed bar wearing a selection nobody made. Every hover
+      HeroUI draws is already inside this query; a hand-written rule is the only
+      place the product can get it wrong, and this was the only one.
+    */
+    `@media (hover: hover) and (pointer: fine) {`,
+    `  [data-chrome="true"]:hover {`,
+    `    background-color: color-mix(in oklab,`,
+    `      var(--surface-tertiary) 90%, var(--scene-veil, var(--surface-tertiary))) !important;`,
+    `  }`,
     `}`,
     /*
       THE LIGHT LANDS ON THE THINGS STANDING IN IT.
@@ -1075,10 +1086,5 @@ export function ambienceStylesheet(): string {
     */
     `[style*="--icon"] > svg { width: var(--icon); height: var(--icon); }`,
     `[style*="--icon"] > svg { stroke-width: 1.75; }`,
-    /* ⚠️ THE ISLAND'S COLLAPSE, AS A RULE RATHER THAN AN INLINE STYLE. It shrinks
-       when its labels go to `sr-only`, and an inline `style` on the component
-       would beat every branding token it otherwise answers to. */
-    `[data-island="true"] { transition: all var(--default-transition-duration) var(--ease-out-fluid); }`,
-    `@media (prefers-reduced-motion: reduce) { [data-island="true"] { transition: none; } }`,
   ].join("\n");
 }

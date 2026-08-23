@@ -22,7 +22,10 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium, type Browser } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { DESK, PHONE, geometryOf, mounted, stylesheet, tooSmall } from "@engine/design/measuring";
+import {
+  DESK, ENOUGH_TO_RANK, PHONE, SCALE_CEILING,
+  geometryOf, mounted, scaleOf, stylesheet, tooSmall,
+} from "@engine/design/measuring";
 import { GROUND } from "@engine/ground";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -62,6 +65,37 @@ describe("a screen inside the frame", () => {
     const small = tooSmall(seen.targets);
     expect(small, small.map((t) => `"${t.text}" is ${t.height}px tall`).join(", ")).toEqual([]);
   }, 30_000);
+});
+
+/*
+  ⚠️ AND THE TYPE ON IT IS A SCALE RATHER THAN AN ACCRETION. Every other check in
+  this file is about one element being in the wrong place; this one is about the
+  screen as a whole, and it is the one thing that separates a page somebody
+  designed from a page assembled out of locally defensible decisions. Nothing
+  else can ask it: `motion` refuses a screen that writes its own `text-2xl`, and
+  a screen that names eight ROLES breaks no rule at all.
+
+  ⚠️ AND A TOP, WHICH IS THE OTHER HALF. A screen where the largest type is the
+  size everything else is has no hierarchy — the reader's eye has nowhere to land
+  and every element is equally important, which is the same as none being.
+*/
+describe("the type on a screen", () => {
+  for (const route of ROUTES) {
+    it(`is a scale with a top: ${route}`, async () => {
+      const seen = await at(route, PHONE);
+      const scale = scaleOf(seen.type);
+      expect(scale.sizes.length,
+        `${route} sets ${scale.sizes.length} sizes — ${scale.sizes.join(", ")}px`)
+        .toBeLessThanOrEqual(SCALE_CEILING);
+      /* ⚠️ ONLY WHERE THERE IS A BODY TO OUTRANK — see `ENOUGH_TO_RANK`. */
+      if (scale.pieces >= ENOUGH_TO_RANK) {
+        expect(scale.sizes[0] ?? 0,
+          `${route}'s largest type is ${scale.sizes[0]}px and most of its `
+          + `${scale.pieces} pieces are ${scale.commonest}px — nothing outranks the body`)
+          .toBeGreaterThan(scale.commonest);
+      }
+    }, 30_000);
+  }
 });
 
 /*

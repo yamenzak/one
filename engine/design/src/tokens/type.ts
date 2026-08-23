@@ -164,6 +164,45 @@ export const TYPE = {
   code: "font-mono text-sm tracking-tight",
 } as const;
 
+/**
+ * THE THREE SIZES A CHART SETS, IN SVG USER UNITS.
+ *
+ * ⚠️ A NUMBER RATHER THAN A CLASS, BECAUSE SVG TEXT IS SIZED IN THE VIEWBOX'S
+ * UNITS. Every chart here draws into a 320-unit box and scales to the column, so
+ * a Tailwind size on an `<svg>` label is a size in the wrong coordinate system —
+ * which is why these were written inline in the first place.
+ *
+ * ⚠️ AND THAT IS EXACTLY WHY THEY DRIFTED. `TYPE` covers the DOM and nothing
+ * covered this, so each chart picked the number that fitted the space it had:
+ * measured, the package was setting SEVEN sizes — 7, 8, 9, 13, 20 and 22 —
+ * across four files, for three jobs. Nothing was broken and no reviewer could
+ * name the fault, which is the failure this whole file exists to prevent, one
+ * coordinate system over.
+ *
+ * ⚠️ THEY WERE FOUND BY MEASURING RATHER THAN BY READING. `Geometry.type`
+ * reports every size a rendered screen actually set; the reports screen came
+ * back with sixteen, against four to seven everywhere else. A static check
+ * cannot ask that question — the sizes are inline styles on `<text>` elements
+ * that are individually defensible.
+ */
+export const CHART_TYPE = {
+  /** Every name, tick and category on a chart. `clipTo` already assumes it. */
+  label: 8,
+  /**
+   * ⚠️ WHERE A GRID OF MANY COLUMNS LEAVES NO ROOM FOR `label`. One exemption,
+   * held by the heat map's column headings, which are as many as the data has.
+   */
+  dense: 7,
+  /**
+   * ⚠️ THE ONE NUMBER INSIDE A RING, and both rings take the same one. A gauge
+   * shows a percentage (four characters at most) and a donut shows a compact
+   * total (which can be six), so the fit is decided by the longer of the two —
+   * sized separately, the same component at two sizes reads as a bug on a screen
+   * holding both.
+   */
+  centre: 20,
+} as const;
+
 export type Role = keyof typeof TYPE;
 
 export const ROLES = Object.keys(TYPE) as readonly Role[];

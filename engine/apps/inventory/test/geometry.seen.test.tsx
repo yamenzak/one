@@ -34,7 +34,10 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium, type Browser } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { DESK, FINGER, PHONE, geometryOf, mounted, stylesheet, tooSmall } from "@engine/design/measuring";
+import {
+  DESK, ENOUGH_TO_RANK, FINGER, PHONE, SCALE_CEILING,
+  geometryOf, mounted, scaleOf, stylesheet, tooSmall,
+} from "@engine/design/measuring";
 import { INVENTORY_ROUTES } from "../src/screens/index.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -93,6 +96,33 @@ describe("every control somebody has to hit", () => {
   }
 });
 
+/*
+  ⚠️ AND THE TYPE IS A SCALE, WHICH IS THE ONE THING ABOUT A SCREEN RATHER THAN
+  ABOUT AN ELEMENT ON IT. Every check above finds one thing in the wrong place;
+  this one asks whether the page was designed. A screen naming eight roles breaks
+  no rule anywhere — `motion` refuses a screen that writes `text-2xl` and has
+  nothing to say about one that reaches for a different role per block — and the
+  result is a page where nothing is emphatic because everything is.
+*/
+describe("the type on every screen", () => {
+  for (const route of INVENTORY_ROUTES) {
+    it(`is a scale with a top: ${route}`, async () => {
+      const seen = await at(route, PHONE);
+      const scale = scaleOf(seen.type);
+      expect(scale.sizes.length,
+        `${route} sets ${scale.sizes.length} sizes — ${scale.sizes.join(", ")}px`)
+        .toBeLessThanOrEqual(SCALE_CEILING);
+      /* ⚠️ ONLY WHERE THERE IS A BODY TO OUTRANK — see `ENOUGH_TO_RANK`. */
+      if (scale.pieces >= ENOUGH_TO_RANK) {
+        expect(scale.sizes[0] ?? 0,
+          `${route}'s largest type is ${scale.sizes[0]}px and most of its `
+          + `${scale.pieces} pieces are ${scale.commonest}px — nothing outranks the body`)
+          .toBeGreaterThan(scale.commonest);
+      }
+    }, 30_000);
+  }
+});
+
 /* --------------------------------------------------------------- controls --- */
 
 /*
@@ -115,6 +145,34 @@ describe("the measurements bite", () => {
       browser, <span role="button" style={{ display: "block", height: 20, width: 20 }}>x</span>,
       css, PHONE);
     expect(seen.targets.filter((t) => t.height < FINGER)).toHaveLength(1);
+  }, 30_000);
+
+  /* ⚠️ THE SCALE CHECK SHOWN FAILING, BOTH WAYS. A page of eight sizes and a
+     page where the largest type is the size of everything else are the two
+     shapes the rule is about, and a reading that passed either would be a
+     reading of nothing. */
+  it("sees a page with no scale", async () => {
+    const seen = await geometryOf(
+      browser,
+      <div>{[11, 13, 15, 17, 19, 21, 23, 25].map((px) => (
+        <p key={px} style={{ fontSize: px }}>A line</p>
+      ))}</div>,
+      css, PHONE,
+    );
+    expect(scaleOf(seen.type).sizes.length).toBeGreaterThan(SCALE_CEILING);
+  }, 30_000);
+
+  it("sees a page with no top", async () => {
+    const seen = await geometryOf(
+      browser,
+      <div>{["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"].map((word) => (
+        <p key={word} style={{ fontSize: 16 }}>{word}</p>
+      ))}</div>,
+      css, PHONE,
+    );
+    const scale = scaleOf(seen.type);
+    expect(scale.pieces).toBeGreaterThanOrEqual(ENOUGH_TO_RANK);
+    expect(scale.sizes[0]).toBe(scale.commonest);
   }, 30_000);
 
   /* ⚠️ AND IT DOES NOT FIRE ON WIDE CONTENT THAT SCROLLS ITSELF, which is the

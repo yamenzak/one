@@ -397,20 +397,3 @@ export function Island({ items, here, onGo, act, only }: {
     </nav>
   );
 }
-
-/**
- * ⚠️ WHICH WAY SOMEBODY IS GOING, NOT WHETHER THEY ARE MOVING. The first version
- * of this collapsed the nav while ANY scrolling was happening and restored it
- * when it stopped — so the labels flickered back on every pause, and reading
- * halfway down a page meant watching the bar breathe. Direction is the signal
- * people actually give: going DOWN is reading, and the nav is in the way; coming
- * back UP is looking for it.
- *
- * ⚠️ AND IT UNFOLDS AT THE TOP WHATEVER THE DIRECTION. Arriving at the head of a
- * page with the labels still folded from the last scroll is a nav that remembers
- * something the person does not.
- *
- * ⚠️ THE THRESHOLD IS NOT DECORATION. Without it a one-pixel jitter — a rubber
- * band, a focus scroll, a fixed element resizing — flips the direction, and the
- * bar folds and unfolds on its own while nobody touches anything.
- */

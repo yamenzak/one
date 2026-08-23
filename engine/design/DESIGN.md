@@ -1044,6 +1044,7 @@ Some of this is guarded and some is judgement. What is checked today:
 - `gates` — a gate the kernel can apply is never handed a constant — every input the check reads is resolved per request.
 - `glyphs` — every mark in the registry is animated or deliberately still, and no screen draws a registered mark itself.
 - `ground` — no borders, no shadows, one monochrome interface and one coloured data.
+- `hand` — hand-written CSS names the properties it animates, gates hover on a pointer that hovers, and takes its curve from the library.
 - `heroui` — no component is restyled — layout utilities and tokens only.
 - `keeping` — a content-hashed asset is kept; the document that names it is not.
 - `metrics` — one source for every measurement: no screen picks its own padding, gap or tap target, and a pressable row has a floor under it.

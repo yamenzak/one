@@ -22,7 +22,7 @@
  */
 
 import * as React from "react";
-import { TYPE } from "../tokens/type.js";
+import { CHART_TYPE, TYPE } from "../tokens/type.js";
 import { SPACE } from "../tokens/metrics.js";
 import { MOTION } from "../tokens/motion.js";
 import {
@@ -81,7 +81,7 @@ function Frame({ describes, y, rules = true, children, under }: FrameProps) {
       {/*
         ⚠️ IT SCALES, AND IT STOPS SCALING — the second half was missing. A 320
         unit-wide viewBox stretched across a 1180px panel is a 3.7× zoom on
-        EVERYTHING in it, so the axis labels declared at `fontSize: 8` rendered
+        EVERYTHING in it, so the axis labels declared at `CHART_TYPE.label` rendered
         at thirty pixels: larger than the panel's own title, on a chart whose
         title was the thing meant to be read first. Two panels of the same chart
         then had type at two sizes depending on how wide their column happened
@@ -108,7 +108,7 @@ function Frame({ describes, y, rules = true, children, under }: FrameProps) {
                   <text
                     x={PAD.left - 6} y={at + 3} textAnchor="end"
                     className={TYPE.note} fill="currentColor"
-                    style={{ fontSize: 8 }}
+                    style={{ fontSize: CHART_TYPE.label }}
                   >
                     {say.compact(t)}
                   </text>
@@ -313,7 +313,7 @@ export function ColumnChart({ describes, data, subject }: {
                 should be turned sideways, and cutting says so. */}
             <text
               x={i * step + step / 2} y={PLOT.h + 12} textAnchor="middle"
-              className={TYPE.note} fill="currentColor" style={{ fontSize: 8 }}
+              className={TYPE.note} fill="currentColor" style={{ fontSize: CHART_TYPE.label }}
             >
               {clipTo(d.label, step)}
             </text>
@@ -365,9 +365,9 @@ export function BarChart({ describes, data, subject }: {
                   the bars, where it reads as a mark rather than as a word. */}
               <text
                 x={0} y={i * step + step / 2 + 3}
-                className={TYPE.note} fill="currentColor" style={{ fontSize: 9 }}
+                className={TYPE.note} fill="currentColor" style={{ fontSize: CHART_TYPE.label }}
               >
-                {clipTo(d.label, NAMES - 6, 9)}
+                {clipTo(d.label, NAMES - 6)}
               </text>
               <path
                 {...draw}
@@ -381,7 +381,7 @@ export function BarChart({ describes, data, subject }: {
                   axis — and here the first of those is enough. */}
               <text
                 x={NAMES + w + 6} y={i * step + step / 2 + 3}
-                className={TYPE.note} fill="currentColor" style={{ fontSize: 9 }}
+                className={TYPE.note} fill="currentColor" style={{ fontSize: CHART_TYPE.label }}
               >
                 {say.compact(d.value)}
               </text>
@@ -437,7 +437,7 @@ export function StackedChart({ describes, groups, series }: {
           })}
           <text
             x={gi * step + step / 2} y={PLOT.h + 12} textAnchor="middle"
-            className={TYPE.note} fill="currentColor" style={{ fontSize: 8 }}
+            className={TYPE.note} fill="currentColor" style={{ fontSize: CHART_TYPE.label }}
           >
             {g}
           </text>
@@ -477,7 +477,7 @@ export function DivergingChart({ describes, data }: {
                 should be turned sideways, and cutting says so. */}
             <text
               x={i * step + step / 2} y={PLOT.h + 12} textAnchor="middle"
-              className={TYPE.note} fill="currentColor" style={{ fontSize: 8 }}
+              className={TYPE.note} fill="currentColor" style={{ fontSize: CHART_TYPE.label }}
             >
               {clipTo(d.label, step)}
             </text>
@@ -508,7 +508,7 @@ export function DumbbellChart({ describes, data }: {
           const mid = i * step + step / 2;
           return (
             <g key={d.label}>
-              <text x={0} y={mid + 3} className={TYPE.note} fill="currentColor" style={{ fontSize: 9 }}>
+              <text x={0} y={mid + 3} className={TYPE.note} fill="currentColor" style={{ fontSize: CHART_TYPE.label }}>
                 {d.label}
               </text>
               <line
@@ -570,7 +570,7 @@ export function HeatmapChart({ describes, rows, columns, values, signed = false 
         <title>{describes}</title>
         {rows.map((r, ri) => (
           <g key={r}>
-            <text x={0} y={ri * ch + 10} className={TYPE.note} fill="currentColor" style={{ fontSize: 8 }}>
+            <text x={0} y={ri * ch + 10} className={TYPE.note} fill="currentColor" style={{ fontSize: CHART_TYPE.label }}>
               {r}
             </text>
             {columns.map((c, ci) => {
@@ -593,7 +593,7 @@ export function HeatmapChart({ describes, rows, columns, values, signed = false 
         {columns.map((c, ci) => (
           <text
             key={c} x={40 + ci * cw + cw / 2} y={rows.length * ch + 10}
-            textAnchor="middle" className={TYPE.note} fill="currentColor" style={{ fontSize: 7 }}
+            textAnchor="middle" className={TYPE.note} fill="currentColor" style={{ fontSize: CHART_TYPE.dense }}
           >
             {c}
           </text>

@@ -33,7 +33,7 @@
  */
 
 import * as React from "react";
-import { TYPE } from "../tokens/type.js";
+import { CHART_TYPE, TYPE } from "../tokens/type.js";
 import { SPACE } from "../tokens/metrics.js";
 import { GRID, QUIET, assign, seriesColour } from "./palette.js";
 import { arcPath, arcs, compact } from "./scale.js";
@@ -136,7 +136,7 @@ export function Ring({ label, value, limit, unit = "", suffix = "", severity = t
         />
         <text
           x={MID} y={MID + 2} textAnchor="middle" dominantBaseline="middle"
-          className={TYPE.figure} fill="currentColor" style={{ fontSize: 22 }}
+          className={TYPE.figure} fill="currentColor" style={{ fontSize: CHART_TYPE.centre }}
         >
           {pct}
           <tspan className={TYPE.minor}>%</tspan>
@@ -276,7 +276,7 @@ export function DonutChart({ describes, data, unit = "", suffix = "", total: tot
         ))}
         <text
           x={MID} y={MID + 2} textAnchor="middle" dominantBaseline="middle"
-          className={TYPE.figure} fill="currentColor" style={{ fontSize: 20 }}
+          className={TYPE.figure} fill="currentColor" style={{ fontSize: CHART_TYPE.centre }}
         >
           {totalLabel ?? `${unit}${say.compact(total)}${suffix}`}
         </text>
