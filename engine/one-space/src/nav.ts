@@ -52,7 +52,7 @@ export interface Travel {
   readonly path: string;
   /** Where the page under OneSpace is — never a OneSpace address. */
   readonly beneath: string;
-  readonly go: (path: string) => void;
+  readonly go: (path: string, way?: Way) => void;
 }
 
 /** ⚠️ Trailing slashes removed, or `/space/` and `/space` are two places. */
@@ -153,9 +153,13 @@ export function useTravel(): Travel {
 
   /* ⚠️ Pushed rather than replaced, so back goes up one level rather than out
      of the surface — OneSpace's own depth IS browser history. */
-  const go = useCallback((next: string) => {
+  /* ⚠️ A CALLER MAY SAY WHICH WAY, AND ONE DOES. Whether a move is between
+     DESTINATIONS is a fact about the manifest — `nav: "primary"` — not about the
+     two addresses, and the bar is the only thing holding both. Everything else
+     leaves it out and gets the answer the paths give. */
+  const go = useCallback((next: string, said?: Way) => {
     if (next === location.pathname) return;
-    const way = wayTo(location.pathname, next);
+    const way = said ?? wayTo(location.pathname, next);
     at.current += 1;
     history.pushState({ n: at.current } satisfies Step, "", next);
     travel(way, () => setPath(next));

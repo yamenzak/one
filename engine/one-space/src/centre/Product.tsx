@@ -21,6 +21,7 @@ import {
   Await, Band, Crown, Face, Layout, Opening, Shell, Spacer, TYPE, placeFace, whoFace,
 } from "@engine/design";
 import type { ScreenSpec } from "@engine/kernel";
+import type { Way } from "@engine/design";
 import { Button } from "@heroui/react";
 import { OPENING_LINES } from "../opening.js";
 import { useSession } from "../session.js";
@@ -31,7 +32,11 @@ import { parseStop, shellAt } from "./route.js";
 
 export function Product({ path, onGo, onOpenSpace, onOpenInbox }: {
   readonly path: string;
-  readonly onGo: (path: string) => void;
+  /* ⚠️ IT CARRIES A WAY, because the bar knows something the addresses do not
+     — see `ShellProps.onGo`. A product's home is its ROOT, so `/inventory` →
+     `/inventory/stock` reads as parent-to-child to any rule written over paths,
+     and the most common move in the product got a hierarchical push. */
+  readonly onGo: (path: string, way?: Way) => void;
   readonly onOpenSpace: () => void;
   readonly onOpenInbox: () => void;
 }) {

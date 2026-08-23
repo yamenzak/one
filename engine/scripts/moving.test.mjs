@@ -77,10 +77,18 @@ if (!/let journey = 0/.test(travel) || !/mine === journey/.test(travel)) {
 /* ------------------------------------------------------- who decides it --- */
 
 /**
- * ⚠️ ONE PLACE ANSWERS "WHICH WAY", and it is the addresses. A second decision
- * anywhere — a prop on a link, a flag on a screen — is a way for one move to be
- * lateral from the bar and a push from a row, which is the class of fault the
- * whole travel mechanism exists to remove.
+ * ⚠️ THE ADDRESSES ANSWER "WHICH WAY", WITH ONE STATED EXCEPTION — and the
+ * exception is the correction. Whether a move is between DESTINATIONS is a fact
+ * about the manifest (`nav: "primary"`), not about two paths: a product's home is
+ * its ROOT, so `/inventory` → `/inventory/stock` reads as parent-to-child to any
+ * rule written over addresses. Every move to or from Home therefore kept its
+ * hierarchical push after the sibling case was fixed — which is half of all
+ * navigation, and is what was reported the second time.
+ *
+ * ⚠️ SO THE BAR SAYS SO, AND ONLY THE BAR MAY. It holds destinations and nothing
+ * else, which makes it the one place that knows; a screen or a row passing a way
+ * would be the drift this whole mechanism exists to remove. Asserted as: exactly
+ * one file may hand `travel` a way it did not compute.
  */
 if (!/export const wayTo/.test(nav)) {
   fail("nav.ts no longer exports `wayTo` — this guard is reading for a shape\n"
@@ -127,6 +135,21 @@ if (!files.length) {
     + "       transition of its own. `travel` is the one place that decides when the\n"
     + "       screen freezes, and the second place will not have the guard.");
 } else ok(`one caller: ${files.length} source file(s), only \`travel\` freezes the screen`);
+
+/* ⚠️ AND THE EXCEPTION IS EXACTLY ONE FILE. `Shell` wraps both navs once, so the
+   bar and the desktop rail cannot come to disagree about what pressing the same
+   five things means — and nothing else in the tree may declare a way. */
+const SHELL = join(ENGINE, "design", "src", "frame", "shell.tsx");
+const declaring = files.filter((f) => /onGo\([^)]*"lateral"\)/.test(readFileSync(f, "utf8")));
+if (!declaring.length) {
+  fail("nothing declares a move as lateral, so the bar is back to whatever the\n"
+    + "       addresses say — and a product's home is its root, so every move to or\n"
+    + "       from it is a hierarchical push.");
+} else if (declaring.length > 1 || declaring[0] !== SHELL) {
+  fail(`${declaring.map((f) => f.slice(ENGINE.length + 1)).join(", ")}: declares a way.\n`
+    + "       Only the shell may, and once for both navs — a screen or a row saying\n"
+    + "       which way it goes is twenty places that can disagree.");
+} else ok("exception: only the shell declares a move lateral, once for both navs");
 
 console.log(bad
   ? `\nmoving: ${bad} finding(s) — a tap costs more than it should.`

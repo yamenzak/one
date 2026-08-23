@@ -38,6 +38,7 @@ import {
 } from "../parts/marks.js";
 import { Page } from "./page.js";
 import { Island } from "./chrome.js";
+import type { Way } from "./travel.js";
 import {
   Crown, CrownSocketProvider, crownFor, type CrownClaim, type Foot, type Slot,
 } from "./crown.js";
@@ -310,7 +311,16 @@ export interface ShellProps {
    */
   readonly kind?: Kind;
   readonly crown: CrownInfo;
-  readonly onGo: (route: string) => void;
+  /**
+   * ⚠️ IT MAY SAY WHICH WAY, AND THE BAR IS WHY. Whether a move is between
+   * DESTINATIONS is a fact about the manifest — `nav: "primary"` — and not about
+   * the two addresses: a product's home lives at its root, so `/inventory` →
+   * `/inventory/stock` reads as parent-to-child to any rule written over paths,
+   * and got a hierarchical push on the most common move in the product. The bar
+   * contains destinations and nothing else, so it is the one place that knows,
+   * and it says so rather than leaving a router to infer it. See `Way`.
+   */
+  readonly onGo: (route: string, way?: Way) => void;
   readonly onSwitchApp?: (appId: string) => void;
   readonly onOpenInbox?: () => void;
   /**
@@ -379,6 +389,13 @@ export function Shell(props: ShellProps) {
     screens, hue, here, held, flags, kind, crown,
     onGo, onSwitchApp, onOpenInbox, onOpenSpace, children,
   } = props;
+
+  /* ⚠️ EVERY PRESS ON EITHER NAV IS A MOVE BETWEEN DESTINATIONS, because that
+     is the whole of what either nav holds. Wrapped once here rather than at the
+     two call sites, so the bar and the rail cannot come to disagree about what
+     pressing the same five things means. */
+  const goSideways = React.useCallback(
+    (route: string) => { onGo(route, "lateral"); }, [onGo]);
 
   const mine = reachable(screens, held, flags, kind);
   /*
@@ -488,7 +505,7 @@ export function Shell(props: ShellProps) {
           <Island
             only="phone"
             here={here}
-            onGo={onGo}
+            onGo={goSideways}
             items={inBar.map((s) => ({
               id: s.id, label: s.label, route: s.route, icon: glyphOf(s.icon ?? s.id),
             }))}
@@ -605,7 +622,7 @@ export function Shell(props: ShellProps) {
                   aria-current={isHere ? "page" : undefined}
                   data-here={isHere ? "true" : undefined}
                   className={`w-full justify-start ${SPACE.tight} ${ROW.free}`}
-                  onPress={() => onGo(s.route)}
+                  onPress={() => goSideways(s.route)}
                 >
                   {/* ⚠️ THE GLYPH THE BAR ALREADY DRAWS. The rail was words only,
                       so a destination was a mark on a phone and a word on a
