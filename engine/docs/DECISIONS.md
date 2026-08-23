@@ -2250,3 +2250,47 @@ a tool's output redirected somewhere a failure cannot be read from; a rehearsal
 that leaves the step with a person waiting on it untried; a database addressed by
 a name this operation changes; or a name that claims a regime nothing created it
 under.
+
+---
+
+## D66 — The first paint has a weight, and nothing joins the first wait unbudgeted
+
+**Today's arc ended at two seconds from fourteen, and every fix left a
+measurement behind except two.** The icon has a drawing budget, the cold boot a
+trip budget, the cache headers a guard, the preflight a test, the placement a
+guard. Two things were fixed and then left free to come back:
+
+**Nothing weighed the bundle.** `bundle.test.mjs` is structural — no page imports
+a product, each product is a chunk of its own — and every word of that stays true
+of a build that has since gained half a megabyte in the entry. A megabyte of
+schema validator came out of that exact chunk (D58) and the person watching
+noticed nothing, because nothing said what it had cost or what it may cost again.
+`weight.test.ts` budgets what `index.html` itself blocks on: one module, one
+stylesheet, **gzipped and raw**. They are different costs — gzip is the wait on a
+slow connection, raw is what a phone parses before the first frame and it does
+not compress.
+
+**And the budget follows the build down.** A ceiling left far above what is
+actually shipped stops being a ceiling: it absorbs the next regression in silence
+and only bites long after the commit that caused it. Slack is capped, so making
+the bundle smaller and NOT tightening the number is itself a failure.
+
+**Nothing tied the depth budgets to the preflight.** Five operations are measured
+against a real worker (D63), hand-listed. The preflight is the critical path *by
+definition* — those requests leave before a byte of JavaScript has run and nothing
+can be drawn until they answer (D62) — so a fourth question added tomorrow would
+join the wait with no ceiling at all. That is the exact state `me.who` was found
+in at ten round trips deep, with every suite green. `awaited.test.mjs` reads both
+lists from the files that actually ship and actually run, and fails on a question
+nobody budgeted. It measures nothing itself; it asks whether a measurement
+exists, which is the question a list of five cannot ask about a sixth.
+
+**`health` is the one exemption and it states its reason** — it answers from the
+request's own hostname and touches no database, so a round-trip budget over it
+would measure nothing. The exemption is re-checked against the page every run, so
+it cannot be inherited by whatever takes the name next.
+
+**Therefore never:** a performance fix without a number that fails when it comes
+back; a structural check standing in for a weight; a ceiling left so far above
+the build that it absorbs a regression instead of reporting it; or a request on
+the first-paint path whose depth nobody stated.

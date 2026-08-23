@@ -1023,6 +1023,7 @@ its own header, cited by other files, and doing nothing.
 | D63 | What a request waits for is measured, per operation, and budgeted | 0 |
 | D64 | Where a database goes is declared once, and both paths that make one read it | 0 |
 | D65 | A copy is verified by counting rows, and the window it needs is read, not asserted | 0 |
+| D66 | The first paint has a weight, and nothing joins the first wait unbudgeted | 0 |
 <!-- /generated -->
 
 ---

@@ -1032,6 +1032,7 @@ Some of this is guarded and some is judgement. What is checked today:
 <!-- generated: node scripts/enforced.mjs -->
 - `asking` — every read goes through the door, which holds one answer per question.
 - `attrs` — every `data-` attribute the markup stamps is read by a selector, a Tailwind variant or a DOM query.
+- `awaited` — what a person waits for is measured per operation, and nothing joins that wait unbudgeted.
 - `cards` — only `surfaces.tsx` builds a `<Card`, and every one names `CARD_ROWS`, so a card's inset is one number rather than a component's opinion.
 - `chrome` — one crown, one foot, and nothing else pinned to an edge — the head carries slots, the foot carries the navigation or the one act.
 - `copied` — a copy is the same database only when every table says so.

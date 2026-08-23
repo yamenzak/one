@@ -162,7 +162,9 @@ describe("what a warm request costs", () => {
     was already carrying, and two more were the notification channels, which
     cost a round trip each and which one operation in the product reads.
   */
-  for (const [op, deep] of [["totals.read", 6], ["guide.view", 7], ["centre.view", 8], ["inbox.list", 8]] as const) {
+  const BUDGETED = [["totals.read", 6], ["guide.view", 7], ["centre.view", 8], ["inbox.list", 8]] as const;
+
+  for (const [op, deep] of BUDGETED) {
     it(`answers ${op} ${deep} round trips deep`, async () => {
       const at = await spent(op);
       expect(at.status).toBe(200);
