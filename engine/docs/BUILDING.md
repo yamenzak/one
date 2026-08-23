@@ -291,6 +291,7 @@ covered.
 | A FIELD reaching nothing | `declarations` | a manifest sets it, the type accepts it, and the capability it names does not exist — no module to mount and no schema to apply, so nothing anywhere goes red |
 | A capability reaching nothing | `capability` | tables applied on every deploy, a store with tests over it, a document describing the feature, and no address anybody could reach it at |
 | A capability reaching no route | `access`, `services` | tables applied, a store bound, dispatch sites writing rows, no route to reach any of it |
+| A capability reaching no PRODUCT | `asking` | the platform solves something for its own screens, an app is handed neither the fix nor a way to reach it, and writes the defect again — forty-five reads with no cache, no coalescing and a blank on every mount, while `useLoad` two directories away had held its answers since the day it was written |
 | Two answers to one question | `rules`, `edit`, `problem` | a lane working out for itself what the kernel already decides |
 | A grammar breaking quietly | `heroui`, `metrics`, `states`, `shape`, `descend`, `edit` | a screen that typechecks, renders, looks finished and reads as a filing cabinet |
 | A name nobody mapped | `face`, `space` | a neutral circle in a list where every other row has a shape |

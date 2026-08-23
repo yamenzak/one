@@ -61,6 +61,14 @@ export interface Door {
     { ok: true; value: T } | { ok: false; problem: Problem }>;
   post<T>(op: string, input?: unknown): Promise<
     { ok: true; value: T } | { ok: false; problem: Problem }>;
+  /**
+   * ⚠️ WHAT THIS TAB HAS ALREADY BEEN TOLD, SYNCHRONOUSLY. The door holds one
+   * answer per operation-and-input; this is how a screen seeds its first render
+   * from it instead of painting a skeleton over something already known. A
+   * product that cannot ask this question has no way to avoid blanking, which
+   * is what "every navigation takes time" actually is.
+   */
+  known<T>(op: string, input?: Record<string, string>): T | undefined;
 }
 
 /** What a mounted screen is handed — see `AppScreen` in OneSpace. */
@@ -94,22 +102,60 @@ type Got<T> = { ok: true; value: T } | { ok: false; problem: Problem };
  * and a FAILED load draws the same thing. `waiting()` has no data to seed it
  * with, which is what makes that unwriteable rather than discouraged.
  */
-function useAsked<T>(run: () => Promise<Got<T>>, on: readonly unknown[] = []) {
-  const [of, set] = React.useState<Loaded<T>>(waiting());
+/**
+ * ⚠️ THE OPERATION IS THE KEY, WHICH IS WHY THERE IS NO DEPENDENCY ARRAY. This
+ * took a THUNK — `() => api.get("stock.list", { limit })` — and a list of things
+ * to watch, and a thunk is opaque: nothing outside it can say what was asked, so
+ * nothing could hold the answer, share it with the next screen that wants the
+ * same list, or know that two blocks mounting together want one request. Naming
+ * the operation and its input makes all three fall out, and it deletes the deps
+ * array as well — the input IS what changed.
+ *
+ * ⚠️ AND IT SEEDS FROM WHAT THE DOOR ALREADY HOLDS. `React.useState(waiting())`
+ * is what this was, on every mount, so every navigation blanked the screen and
+ * waited a round trip to redraw what the browser had painted a second earlier —
+ * measured on a phone as several seconds of nothing per tap, which reads as the
+ * app being slow rather than as it having thrown away the answer. It shows what
+ * it has and catches up; the request still goes out and replaces it.
+ *
+ * ⚠️ `null` IS "DO NOT ASK", for a read behind a permission or one whose subject
+ * is not chosen yet. `otherwise` is what such a screen shows — an EMPTY thing
+ * rather than a wait, because "you may not read this" is an answer.
+ */
+function useAsked<T>(
+  api: Door, id: string | null, input?: Record<string, string>, otherwise?: T,
+) {
   const [tick, again] = React.useReducer((n: number) => n + 1, 0);
+  /* ⚠️ ONE STRING, SO THE EFFECT WATCHES THE QUESTION RATHER THAN THE OBJECT. An
+     input literal is a new object every render, so an effect keyed on it re-runs
+     for ever — a request loop nobody sees until they read the network tab. */
+  const key = id === null ? null : `${id}?${new URLSearchParams(input ?? {}).toString()}`;
+
+  const seed = (): Loaded<T> => {
+    if (id === null) return otherwise === undefined ? waiting() : ready(otherwise);
+    const had = api.known<T>(id, input);
+    return had === undefined ? waiting() : ready(had);
+  };
+  const [of, set] = React.useState<Loaded<T>>(seed);
 
   React.useEffect(() => {
     let live = true;
-    set(waiting());
-    void run().then((got) => {
+    /* ⚠️ ONLY WHERE THERE IS NOTHING TO SHOW. Blanking over an answer already in
+       hand is the reload this exists to end. */
+    set((was) => (was.status === "ready" ? was : seed()));
+    if (id === null) return () => { live = false; };
+    void api.get<T>(id, input).then((got) => {
       if (!live) return;
-      set(got.ok ? ready(got.value) : trouble(got.problem));
+      /* ⚠️ A FAILED REFRESH OVER DATA WE HAVE IS NOT A REFUSAL SCREEN — the same
+         rule every polling surface in this repository follows. */
+      if (got.ok) set(ready(got.value));
+      else if (api.known<T>(id, input) === undefined) set(trouble(got.problem));
     });
     return () => { live = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tick, ...on]);
+  }, [key, tick]);
 
-  return { of, again };
+  return { of, again: again as () => void };
 }
 
 /**
@@ -186,8 +232,8 @@ function useWorld(api: Door) {
      the nav and to name a line, and both are bounded by what a plan sells. */
   const stock = usePaged((after) => api.get<Page>("stock.list",
     after ? { after } : {}));
-  const places = useAsked<{ items: readonly Row[] }>(() => api.get("location.list"));
-  const kinds = useAsked<{ items: readonly Row[] }>(() => api.get("product.list"));
+  const places = useAsked<{ items: readonly Row[] }>(api, "location.list");
+  const kinds = useAsked<{ items: readonly Row[] }>(api, "product.list");
 
   const again = React.useCallback(() => {
     stock.again(); places.again(); kinds.again();
@@ -420,15 +466,14 @@ const THING = (api: Door) => function ThingHere({ go, at }: Mounted) {
     it is — or, west of Greenwich, current for another few hours after it is not.
   */
   const today = dayHere();
-  const dated = useAsked<{ items: readonly Row[] }>(
-    () => api.get("batch.due", { product: id, today }), [id, today]);
+  const dated = useAsked<{ items: readonly Row[] }>(api, "batch.due",{ product: id, today });
   /* ⚠️ THE WHOLE HISTORY, FILTERED HERE — see the DEFER above. The generated
      list cannot be asked for one product's movements. */
-  const history = useAsked<{ items: readonly Row[] }>(() => api.get("ledger.list"));
+  const history = useAsked<{ items: readonly Row[] }>(api, "ledger.list");
   /* ⚠️ ASKED FOR EVERY PRODUCT AND USED BY TWO RUNGS, for the same reason. Which
      of them this product has is decided below, from its own rung. */
-  const items = useAsked<{ items: readonly Row[] }>(() => api.get("unit.list"));
-  const kits = useAsked<{ items: readonly Row[] }>(() => api.get("kit.list"));
+  const items = useAsked<{ items: readonly Row[] }>(api, "unit.list");
+  const kits = useAsked<{ items: readonly Row[] }>(api, "kit.list");
 
   const places = world.places.status === "ready" && world.stock.status === "ready"
     ? placesOf(world.places.data.items, world.stock.data.items)
@@ -615,7 +660,7 @@ const SCAN = (api: Door) => function ScanHere({ go }: Mounted) {
      codes somebody was only checking. */
   const [guess, setGuess] = React.useState<Loaded<Guess | null>>(ready(null));
   const [busy, setBusy] = React.useState(false);
-  const kinds = useAsked<{ items: readonly Row[] }>(() => api.get("product.list"));
+  const kinds = useAsked<{ items: readonly Row[] }>(api, "product.list");
 
   const resolve = React.useCallback((raw: string) => {
     setLast(raw);
@@ -898,13 +943,10 @@ const COUNT = (api: Door) => function CountHere() {
     ? placesOf(world.places.data.items, world.stock.data.items)
     : [];
 
-  const tallies = useAsked<{ items: readonly Row[] }>(
-    () => api.get("tally.list"), [session]);
+  const tallies = useAsked<{ items: readonly Row[] }>(api, "tally.list");
   const differences = useAsked<{ items: readonly Row[] }>(
-    () => (session
-      ? api.get("count.differences", { count: session })
-      : Promise.resolve({ ok: true as const, value: { items: [] } })),
-    [session]);
+    api, session ? "count.differences" : null,
+    session ? { count: session } : undefined, { items: [] });
 
   const named = new Map(
     world.kinds.status === "ready"
@@ -942,7 +984,7 @@ const COUNT = (api: Door) => function CountHere() {
     count table already holds — and the two would disagree the first time a close
     half failed.
   */
-  const sessions = useAsked<{ items: readonly Row[] }>(() => api.get("count.list"));
+  const sessions = useAsked<{ items: readonly Row[] }>(api, "count.list");
   const lastCounted: Record<string, string> = {};
   if (sessions.of.status === "ready") {
     for (const row of sessions.of.data.items) {
@@ -1045,14 +1087,13 @@ const ITEM = (api: Door) => function ItemHere({ go, at }: Mounted) {
   const id = at[0] ?? "";
   const today = dayHere();
   const world = useWorld(api);
-  const items = useAsked<{ items: readonly Row[] }>(() => api.get("unit.list"));
-  const history = useAsked<{ items: readonly Row[] }>(() => api.get("ledger.list"));
+  const items = useAsked<{ items: readonly Row[] }>(api, "unit.list");
+  const history = useAsked<{ items: readonly Row[] }>(api, "ledger.list");
   /* ⚠️ THE STANDING IS THE OPERATION'S, NOT THIS FILE'S. How many days counts as
      "soon" for a service is a setting a person on the floor cannot read, so a
      container working it out here would hard-code a number or show everybody the
      same wrong answer. */
-  const dated = useAsked<{ items: readonly Row[] }>(
-    () => api.get("unit.due", { today }), [today]);
+  const dated = useAsked<{ items: readonly Row[] }>(api, "unit.due",{ today });
 
   const places = world.places.status === "ready" && world.stock.status === "ready"
     ? placesOf(world.places.data.items, world.stock.data.items)
@@ -1153,12 +1194,10 @@ const KIT = (api: Door) => function KitHere({ go, at }: Mounted) {
   const id = at[0] ?? "";
   const today = dayHere();
   const world = useWorld(api);
-  const kits = useAsked<{ items: readonly Row[] }>(() => api.get("kit.list"));
+  const kits = useAsked<{ items: readonly Row[] }>(api, "kit.list");
   const checked = useAsked<{ members: readonly Row[]; short: readonly Row[] }>(
-    () => (id
-      ? api.get("kit.check", { kit: id })
-      : Promise.resolve({ ok: true as const, value: { members: [], short: [] } })),
-    [id]);
+    api, id ? "kit.check" : null, id ? { kit: id } : undefined,
+    { members: [], short: [] });
 
   const places = world.places.status === "ready" && world.stock.status === "ready"
     ? placesOf(world.places.data.items, world.stock.data.items)
@@ -1248,7 +1287,7 @@ const ASK = (api: Door) => function AskHere() {
   /* ⚠️ HOW MANY LINES THE WORKSPACE HOLDS, so the screen can say when the
      answer read fewer. A bound nobody is told about is "you have none" over a
      shelf that has some. */
-  const stock = useAsked<{ items: readonly Row[] }>(() => api.get("stock.list"));
+  const stock = useAsked<{ items: readonly Row[] }>(api, "stock.list");
 
   const ask = (question: string) => {
     setLast(question);
@@ -1296,9 +1335,9 @@ const verdictOf = (v: unknown): Covered["verdict"] =>
  */
 const WORK = (api: Door) => function WorkHere({ go }: Mounted) {
   const today = dayHere();
-  const runs = useAsked<{ items: readonly Row[] }>(() => api.get("process.list"));
-  const jobs = useAsked<{ items: readonly Row[] }>(() => api.get("job.list"));
-  const items = useAsked<{ items: readonly Row[] }>(() => api.get("process-item.list"));
+  const runs = useAsked<{ items: readonly Row[] }>(api, "process.list");
+  const jobs = useAsked<{ items: readonly Row[] }>(api, "job.list");
+  const items = useAsked<{ items: readonly Row[] }>(api, "process-item.list");
 
   const inRun = new Map<string, number>();
   if (items.of.status === "ready") {
@@ -1355,9 +1394,9 @@ const RUN = (api: Door) => function RunHere({ go, at }: Mounted) {
   const id = at[0] ?? "";
   const today = dayHere();
   const [busy, setBusy] = React.useState(false);
-  const runs = useAsked<{ items: readonly Row[] }>(() => api.get("process.list"));
-  const items = useAsked<{ items: readonly Row[] }>(() => api.get("process-item.list"));
-  const batches = useAsked<{ items: readonly Row[] }>(() => api.get("batch.list"));
+  const runs = useAsked<{ items: readonly Row[] }>(api, "process.list");
+  const items = useAsked<{ items: readonly Row[] }>(api, "process-item.list");
+  const batches = useAsked<{ items: readonly Row[] }>(api, "batch.list");
   const world = useWorld(api);
 
   const row = runs.of.status === "ready"
@@ -1438,12 +1477,9 @@ const CASE = (api: Door) => function CaseHere({ go, at }: Mounted) {
   const id = at[0] ?? "";
   const today = dayHere();
   const [busy, setBusy] = React.useState(false);
-  const jobs = useAsked<{ items: readonly Row[] }>(() => api.get("job.list"));
+  const jobs = useAsked<{ items: readonly Row[] }>(api, "job.list");
   const trace = useAsked<{ items: readonly Row[] }>(
-    () => (id
-      ? api.get("job.trace", { job: id })
-      : Promise.resolve({ ok: true as const, value: { items: [] } })),
-    [id]);
+    api, id ? "job.trace" : null, id ? { job: id } : undefined, { items: [] });
 
   const row = jobs.of.status === "ready"
     ? jobs.of.data.items.find((r) => text(r.id) === id)
@@ -1499,10 +1535,8 @@ const CASE = (api: Door) => function CaseHere({ go, at }: Mounted) {
  */
 const DUE = (api: Door) => function DueHere({ go }: Mounted) {
   const today = dayHere();
-  const dated = useAsked<{ items: readonly Row[] }>(
-    () => api.get("batch.due", { today }), [today]);
-  const serviced = useAsked<{ items: readonly Row[] }>(
-    () => api.get("unit.due", { today }), [today]);
+  const dated = useAsked<{ items: readonly Row[] }>(api, "batch.due",{ today });
+  const serviced = useAsked<{ items: readonly Row[] }>(api, "unit.due",{ today });
 
   const rows: Loaded<readonly Dated[]> = dated.of.status === "ready"
     ? ready(dated.of.data.items.map((row): Dated => ({
@@ -1576,8 +1610,7 @@ const REPORTS = (api: Door) => function ReportsHere({ go }: Mounted) {
   const from = React.useMemo(
     () => dayPlus(today as Day, -(SPAN_DAYS[span] - 1)), [today, span]);
 
-  const said = useAsked<Reported>(
-    () => api.get("stock.report", { from, to: today }), [from, today]);
+  const said = useAsked<Reported>(api, "stock.report",{ from, to: today });
 
   return (
     <Reports
@@ -1615,8 +1648,8 @@ const LABELS = (api: Door) => function LabelsHere() {
   const [busy, setBusy] = React.useState(false);
 
   const world = useWorld(api);
-  const items = useAsked<{ items: readonly Row[] }>(() => api.get("unit.list"));
-  const kits = useAsked<{ items: readonly Row[] }>(() => api.get("kit.list"));
+  const items = useAsked<{ items: readonly Row[] }>(api, "unit.list");
+  const kits = useAsked<{ items: readonly Row[] }>(api, "kit.list");
 
   const places = world.places.status === "ready" && world.stock.status === "ready"
     ? placesOf(world.places.data.items, world.stock.data.items)
@@ -1745,7 +1778,7 @@ const IMPORT = (api: Door) => function ImportHere() {
   /* ⚠️ THE WORKSPACE'S OWN WORDS ON THE MAPPING LABELS. A clinic mapping a
      column called "Shelf" is mapping somebody else's product — and the vocabulary
      is asked for rather than copied here, so it cannot drift from `words.ts`. */
-  const starts = useAsked<{ words: { place: string } }>(() => api.get("product.start"));
+  const starts = useAsked<{ words: { place: string } }>(api, "product.start");
   const place = starts.of.status === "ready" ? starts.of.data.words.place : "Location";
 
   const fields = React.useMemo(() => MAPPABLE.map((one) => (
@@ -1806,9 +1839,9 @@ const IMPORT = (api: Door) => function ImportHere() {
  * steps. It is the one fact that says whether a row is still worth keeping.
  */
 const SUPPLIERS = (api: Door) => function SuppliersHere() {
-  const rows = useAsked<{ items: readonly Row[] }>(() => api.get("supplier.list"));
-  const kinds = useAsked<{ items: readonly Row[] }>(() => api.get("product.list"));
-  const lead = useAsked<{ leadDays: number }>(() => api.get("product.start"));
+  const rows = useAsked<{ items: readonly Row[] }>(api, "supplier.list");
+  const kinds = useAsked<{ items: readonly Row[] }>(api, "product.list");
+  const lead = useAsked<{ leadDays: number }>(api, "product.start");
   const [editing, setEditing] = React.useState<SupplierLine | null>(null);
   const [busy, setBusy] = React.useState(false);
 
@@ -1899,8 +1932,8 @@ const START = (api: Door) => function StartHere({ app, go }: Mounted) {
      mapped here: a container turning `clinic` into a sentence would be a second
      copy of the vocabulary, drifting from `words.ts` the day a profile is
      added. */
-  const starts = useAsked<{ words: { said: string } }>(() => api.get("product.start"));
-  const far = useAsked<Far>(() => api.get("guide.view"));
+  const starts = useAsked<{ words: { said: string } }>(api, "product.start");
+  const far = useAsked<Far>(api, "guide.view");
   const got = far.of.status === "ready" ? far.of.data : null;
 
   /* ⚠️ ONE CALL PER MILESTONE, ONCE, AND THE SCREEN DOES NOT WAIT FOR IT. The
@@ -1977,9 +2010,9 @@ const HOME = (api: Door) => function HomeHere({ app, go }: Mounted) {
   );
   const may = React.useCallback((one: string) => held.has(one), [held]);
 
-  const lines = useAsked<Page>(() => api.get("stock.list", { limit: "1" }));
-  const kinds = useAsked<Page>(() => api.get("product.list", { limit: "1" }));
-  const places = useAsked<Page>(() => api.get("location.list", { limit: "1" }));
+  const lines = useAsked<Page>(api, "stock.list",{ limit: "1" });
+  const kinds = useAsked<Page>(api, "product.list",{ limit: "1" });
+  const places = useAsked<Page>(api, "location.list",{ limit: "1" });
 
   const shelf: Loaded<Shelf> = both(
     both(lines.of, kinds.of, (a, b) => ({ lines: a.total, products: b.total })),
@@ -1991,18 +2024,12 @@ const HOME = (api: Door) => function HomeHere({ app, go }: Mounted) {
      and the number in the notification cannot disagree. How many days counts as
      "soon" is a setting a person on the floor cannot read, which is why the
      arithmetic is the operation's rather than this file's. */
-  const dated = useAsked<{ items: readonly Row[] }>(
-    () => api.get("batch.due", { today }), [today]);
-  const serviced = useAsked<{ items: readonly Row[] }>(
-    () => api.get("unit.due", { today }), [today]);
+  const dated = useAsked<{ items: readonly Row[] }>(api, "batch.due",{ today });
+  const serviced = useAsked<{ items: readonly Row[] }>(api, "unit.due",{ today });
   const sessions = useAsked<{ items: readonly Row[] }>(
-    () => (may("count:write")
-      ? api.get("count.list")
-      : Promise.resolve({ ok: true as const, value: { items: [] } })));
+    api, may("count:write") ? "count.list" : null, undefined, { items: [] });
   const runs = useAsked<{ items: readonly Row[] }>(
-    () => (may("process:read")
-      ? api.get("process.list")
-      : Promise.resolve({ ok: true as const, value: { items: [] } })));
+    api, may("process:read") ? "process.list" : null, undefined, { items: [] });
 
   /*
     ⚠️ WAITING IS NOT ZERO, AND NEITHER IS FORBIDDEN. A count still in flight
@@ -2033,9 +2060,7 @@ const HOME = (api: Door) => function HomeHere({ app, go }: Mounted) {
      the wrong period is one nobody can catch by looking. */
   const from = React.useMemo(() => dayPlus(today as Day, -29), [today]);
   const report = useAsked<Reported>(
-    () => (may("ledger:read")
-      ? api.get("stock.report", { from, to: today })
-      : Promise.resolve({ ok: true as const, value: EMPTY_REPORT })), [from, today]);
+    api, may("ledger:read") ? "stock.report" : null, { from, to: today }, EMPTY_REPORT);
 
   const moving: Loaded<Moving> | null = may("ledger:read")
     ? (report.of.status === "ready"
@@ -2049,8 +2074,8 @@ const HOME = (api: Door) => function HomeHere({ app, go }: Mounted) {
       : report.of as Loaded<Moving>)
     : null;
 
-  const starts = useAsked<{ words: { said: string } }>(() => api.get("product.start"));
-  const far = useAsked<Far>(() => api.get("guide.view"));
+  const starts = useAsked<{ words: { said: string } }>(api, "product.start");
+  const far = useAsked<Far>(api, "guide.view");
   const got = far.of.status === "ready" ? far.of.data : null;
 
   return (

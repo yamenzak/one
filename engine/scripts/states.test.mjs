@@ -485,6 +485,33 @@ if (!unmarked) ok(`marks: every empty state wears its own noun, not the neutral 
   }
 }
 
+
+/**
+ * ⚠️ THE INITIALISER, RESOLVED THROUGH ONE NAME. What has to draw on the store
+ * is the FIRST render — an effect that seeds afterwards has already painted a
+ * skeleton over the answer. Both checks below asked whether the hook mentioned
+ * `known` anywhere, which the body does in three places, so a hook whose
+ * initialiser had been changed back to `waiting()` passed: the guard agreed with
+ * the defect it exists to catch. This reads the argument to `useState<Loaded<T>>`
+ * and, where that argument is a name, the declaration it stands for.
+ */
+const seedsFromStore = (src) => {
+  /* ⚠️ THE SINGLE-LINE FORM FIRST. Tried the other way round, the multi-line
+     alternative runs `[\s\S]*?` on to the next `\n  );` ANYWHERE below — which,
+     handed a slice that ran to the end of the file, swallowed the whole hook and
+     found `known` in the effect. The guard then agreed with the mutation it was
+     written to catch, which is the one outcome a guard must not have. */
+  const call = /useState<Loaded<T>>\(([^;\n]*?)\);/.exec(src)
+    ?? /useState<Loaded<T>>\(([\s\S]*?)\n\s*\}?\);/.exec(src);
+  const arg = (call?.[1] ?? "").trim();
+  if (!arg) return false;
+  if (/\bknown</.test(arg)) return true;
+  const name = /^([A-Za-z_$][\w$]*)$/.exec(arg)?.[1];
+  if (!name) return false;
+  const decl = new RegExp(`const ${name}\\b[\\s\\S]*?\\n  \\};`).exec(src)?.[0] ?? "";
+  return /\bknown</.test(decl);
+};
+
 /* ---------------------------------------------------------------- re-read --- */
 
 /**
@@ -497,6 +524,13 @@ if (!unmarked) ok(`marks: every empty state wears its own noun, not the neutral 
  * ⚠️ AND THE CACHE IS THE OTHER HALF. Without one, every navigation — going BACK
  * included — draws the skeleton and waits, so the product feels slow even where
  * the request is fast.
+ *
+ * ⚠️ THIS ASKED FOR A `held` MAP INSIDE THE HOOK, WHICH IS THE MECHANISM AND NOT
+ * THE RULE. The store moved to the DOOR, where the key already is, so that a
+ * product mounted beside these screens gets it too — and a guard naming the
+ * implementation reported the fix as the fault. What it asks now is the
+ * property: that the hook draws on what the tab already holds. `asking.test.mjs`
+ * is where the store itself is checked.
  */
 {
   const data = readFileSync(join(ENGINE, "one-space/src/centre/data.tsx"), "utf8");
@@ -509,15 +543,15 @@ if (!unmarked) ok(`marks: every empty state wears its own noun, not the neutral 
     fail(`one-space/src/centre/data.tsx: no useLoad to check — every screen's
        loading state comes through it, so a parser that cannot find it is
        checking nothing.`);
-  } else if (!/held\.set\(/.test(hook) || !/held\.has\(/.test(hook)) {
-    fail(`one-space/src/centre/data.tsx: useLoad keeps no answer, so every
-       navigation redraws the skeleton and waits on a round trip to show what
-       the browser had just painted.`);
+  } else if (!seedsFromStore(hook)) {
+    fail(`one-space/src/centre/data.tsx: useLoad draws nothing from what the tab
+       already holds, so every navigation redraws the skeleton and waits on a
+       round trip to show what the browser had just painted.`);
   } else if (/set\(waiting\(\)\)/.test(hook)) {
     fail(`one-space/src/centre/data.tsx: useLoad blanks to \`waiting\` on a
        re-read. A save then replaces the list under the control somebody just
        used with a skeleton, which is what reads as the page reloading.`);
-  } else if (!/was\.status === "ready" \? was/.test(hook)) {
+  } else if (!/was\.status === "ready"[^\n]*\bwas\b/.test(hook)) {
     fail(`one-space/src/centre/data.tsx: useLoad no longer holds a ready answer
        across a re-read — see above.`);
   } else {

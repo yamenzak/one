@@ -293,9 +293,79 @@ async function call<T>(
   return { ok: false, problem: problem_ };
 }
 
+/* ------------------------------------------------------------- one asking --- */
+
+/**
+ * WHAT THIS TAB HAS ALREADY BEEN TOLD, AND WHAT IT IS IN THE MIDDLE OF ASKING.
+ *
+ * ⚠️ IT IS THE DOOR'S BECAUSE THE KEY IS THE DOOR'S. An answer is identified by
+ * the operation and its input and by nothing else, and this is the one place
+ * both are in hand — so a cache anywhere above it is a second key for one
+ * question, which is how two screens reading the same collection came to make
+ * two requests for it and hold two copies that could disagree.
+ *
+ * ⚠️ AND `flight` IS THE HALF THAT SAVES THE DATABASE RATHER THAN THE PHONE.
+ * Answers held only help a SECOND visit; coalescing helps the first, because a
+ * screen mounting three blocks that each want the catalogue is three identical
+ * queries arriving within a frame of each other. They share the promise now, so
+ * the workspace is asked once.
+ *
+ * ⚠️ PER TAB, AND THAT IS WHY NOTHING HERE IS INVALIDATED ON SIGN-OUT BY HAND. A
+ * reload is what ends a session and a reload is what empties this.
+ */
+const answers = new Map<string, unknown>();
+const flight = new Map<string, Promise<Answer<unknown>>>();
+
+/**
+ * ⚠️ SYNCHRONOUS, WHICH IS THE WHOLE POINT. A hook that has to await its own
+ * cache renders `waiting` for a frame first, and a frame of skeleton over an
+ * answer the tab already holds is the blank navigation this exists to end.
+ */
+export const known = <T>(id: string, input?: Record<string, string>): T | undefined =>
+  answers.get(keyOf(id, input)) as T | undefined;
+
+/**
+ * ⚠️ WHAT A WRITE MADE UNTRUE. Without an id every answer goes, which is what a
+ * sign-out or a workspace switch means; with one, every input of that operation
+ * — a list narrowed four ways is four keys and one write invalidates all of them.
+ */
+export const forget = (id?: string): void => {
+  if (!id) { answers.clear(); return; }
+  for (const key of [...answers.keys()]) {
+    if (key === id || key.startsWith(`${id}?`)) answers.delete(key);
+  }
+};
+
 export const api = {
-  get: <T>(id: string, input?: Record<string, string>): Promise<Answer<T>> =>
-    call<T>(id, "GET", input),
+  /**
+   * ⚠️ ONE ASKING PER QUESTION IN FLIGHT, AND THE ANSWER KEPT. Both are here
+   * rather than in a hook — see `answers`. A GET is idempotent by construction
+   * (the runtime routes reads this way), so two callers wanting the same thing
+   * at the same moment want the same request.
+   *
+   * ⚠️ A REFUSAL IS NOT KEPT. Holding "it failed" would answer the retry with
+   * the failure, which is a product that cannot recover from one dropped packet
+   * until somebody reloads it.
+   */
+  get: <T>(id: string, input?: Record<string, string>): Promise<Answer<T>> => {
+    const key = keyOf(id, input);
+    const already = flight.get(key);
+    if (already) return already as Promise<Answer<T>>;
+    const asking = call<T>(id, "GET", input).then((got) => {
+      if (got.ok && got.stale === undefined) answers.set(key, got.value);
+      return got;
+    }).finally(() => { flight.delete(key); });
+    flight.set(key, asking as Promise<Answer<unknown>>);
+    return asking;
+  },
+  /**
+   * ⚠️ ON THE DOOR AS WELL AS BESIDE IT, because a product is handed this
+   * object and nothing else. A cache reachable only by `import` is a cache the
+   * platform's own screens get and every app writes again — which is what
+   * happened, at forty-five call sites.
+   */
+  known,
+
   /** ⚠️ `contentType` only for BYTES — see `call`. JSON needs none. */
   post: <T>(id: string, input?: unknown, as?: { readonly contentType: string }): Promise<Answer<T>> =>
     call<T>(id, "POST", input, as?.contentType),

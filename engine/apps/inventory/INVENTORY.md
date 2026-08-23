@@ -326,25 +326,25 @@ container in `src/screens/live.tsx`, and rendered over a sample world by
 
 | Route | Name | Nav | Needs | Component | Container |
 |---|---|---|---|---|---|
-| `/` | Home | primary | `stock:read` | `screens/Home.tsx:113` | `screens/live.tsx:359` |
-| `/stock` | Stock | primary | `stock:read` | `screens/Stock.tsx:92` | `screens/live.tsx:359` |
-| `/scan` | Scan | primary | `product:read` | `screens/Scan.tsx:125` | `screens/live.tsx:561` |
-| `/receive` | Receive | primary | `stock:move` | `screens/Receive.tsx:100` | `screens/live.tsx:561` |
-| `/count` | Count | primary | `stock:move` | `screens/Count.tsx:80` | `screens/live.tsx:731` |
-| `/work` | Work | primary | `process:read` | `screens/Work.tsx:65` | `screens/live.tsx:1244` |
-| `/thing` | A product | none | `product:read` | `screens/Thing.tsx:129` | `screens/live.tsx:359` |
-| `/where` | A location | none | `location:read` | `screens/Where.tsx:34` | `screens/live.tsx:413` |
-| `/item` | An item | none | `stock:read` | `screens/Item.tsx:84` | `screens/live.tsx:884` |
-| `/kit` | A kit | none | `stock:read` | `screens/Kit.tsx:66` | `screens/live.tsx:1044` |
-| `/run` | A run | none | `process:read` | `screens/Run.tsx:73` | `screens/live.tsx:1244` |
-| `/case` | A job | none | `process:read` | `screens/Case.tsx:58` | `screens/live.tsx:1297` |
-| `/due` | Running out | secondary | `stock:read` | `screens/Due.tsx:79` | `screens/live.tsx:1354` |
-| `/labels` | Labels | secondary | `location:read` | `screens/Labels.tsx:248` | `screens/live.tsx:1437` |
-| `/reports` | Reports | none | `ledger:read` | `screens/Reports.tsx:84` | `screens/live.tsx:1437` |
-| `/ask` | Ask | secondary | `stock:read` | `screens/Ask.tsx:54` | `screens/live.tsx:1152` |
-| `/import` | Import | secondary | `product:write` | `screens/Import.tsx:131` | `screens/live.tsx:1610` |
-| `/suppliers` | Suppliers | secondary | `product:write` | `screens/Suppliers.tsx:77` | `screens/live.tsx:1737` |
-| `/start` | Getting started | secondary | `product:read` | `screens/Start.tsx:67` | `screens/live.tsx:1737` |
+| `/` | Home | primary | `stock:read` | `screens/Home.tsx:113` | `screens/live.tsx:2005` |
+| `/stock` | Stock | primary | `stock:read` | `screens/Stock.tsx:92` | `screens/live.tsx:405` |
+| `/scan` | Scan | primary | `product:read` | `screens/Scan.tsx:125` | `screens/live.tsx:655` |
+| `/receive` | Receive | primary | `stock:move` | `screens/Receive.tsx:100` | `screens/live.tsx:776` |
+| `/count` | Count | primary | `stock:move` | `screens/Count.tsx:80` | `screens/live.tsx:929` |
+| `/work` | Work | primary | `process:read` | `screens/Work.tsx:65` | `screens/live.tsx:1336` |
+| `/thing` | A product | none | `product:read` | `screens/Thing.tsx:129` | `screens/live.tsx:459` |
+| `/where` | A location | none | `location:read` | `screens/Where.tsx:34` | `screens/live.tsx:606` |
+| `/item` | An item | none | `stock:read` | `screens/Item.tsx:84` | `screens/live.tsx:1086` |
+| `/kit` | A kit | none | `stock:read` | `screens/Kit.tsx:66` | `screens/live.tsx:1193` |
+| `/run` | A run | none | `process:read` | `screens/Run.tsx:73` | `screens/live.tsx:1393` |
+| `/case` | A job | none | `process:read` | `screens/Case.tsx:58` | `screens/live.tsx:1476` |
+| `/due` | Running out | secondary | `stock:read` | `screens/Due.tsx:79` | `screens/live.tsx:1536` |
+| `/labels` | Labels | secondary | `location:read` | `screens/Labels.tsx:248` | `screens/live.tsx:1643` |
+| `/reports` | Reports | none | `ledger:read` | `screens/Reports.tsx:84` | `screens/live.tsx:1604` |
+| `/ask` | Ask | secondary | `stock:read` | `screens/Ask.tsx:54` | `screens/live.tsx:1283` |
+| `/import` | Import | secondary | `product:write` | `screens/Import.tsx:131` | `screens/live.tsx:1770` |
+| `/suppliers` | Suppliers | secondary | `product:write` | `screens/Suppliers.tsx:77` | `screens/live.tsx:1841` |
+| `/start` | Getting started | secondary | `product:read` | `screens/Start.tsx:67` | `screens/live.tsx:1925` |
 
 ### The surfaces that are not routes
 
