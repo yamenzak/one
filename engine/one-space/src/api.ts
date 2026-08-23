@@ -371,6 +371,82 @@ const answers = new Map<string, unknown>();
 const flight = new Map<string, Promise<Answer<unknown>>>();
 
 /**
+ * ⚠️ AND IT IS BOUNDED, BECAUSE NOTHING ELSE EMPTIES IT. `forget` runs when a
+ * write says an answer is untrue; nothing runs when an answer is merely old and
+ * unwanted. A long session moving through workspaces, lists and narrowings keeps
+ * every one of them — each a whole payload — for as long as the tab is open,
+ * and on a phone that is memory a background tab gets killed for.
+ *
+ * ⚠️ OLDEST OUT, WHICH A `Map` GIVES FOR FREE: insertion order is iteration
+ * order, and deleting before setting moves a key to the end. Recency is kept by
+ * the FETCH rather than by `known`, and that is deliberate — `known` is read
+ * during render, where reordering a store is a side effect nobody expects. It
+ * costs nothing here: `useLoad` asks again on every mount, so a screen being
+ * revisited re-remembers its own key on the way in, and the key evicted is the
+ * one no screen has asked for longest.
+ *
+ * ⚠️ EVICTING IS NOT LOSING. The next ask fetches it again, exactly as a first
+ * visit does. The cap trades one round trip on a rarely-revisited screen for a
+ * bound on memory, which is the right way round.
+ */
+const KEEP = 64;
+
+const keep = (key: string, value: unknown): void => {
+  answers.delete(key);
+  answers.set(key, value);
+  while (answers.size > KEEP) {
+    const oldest = answers.keys().next();
+    if (oldest.done) break;
+    answers.delete(oldest.value);
+  }
+};
+
+/**
+ * WHEN A TAB COMES BACK, WHAT IT HOLDS IS OLD.
+ *
+ * ⚠️ A TAB LEFT OPEN IS THE ORDINARY CASE, not an edge one — a phone locked in a
+ * pocket, a laptop shut, a tab behind eleven others. It comes back showing
+ * whatever was true when it was last looked at, confidently, with nothing saying
+ * how old that is; the only thing that refreshes it is navigating somewhere that
+ * happens to re-ask.
+ *
+ * ⚠️ SO THE ANSWERS ARE DROPPED, NOT REFETCHED. Refetching from here would fire
+ * every held key at once the moment a tab is focused — a thundering herd on the
+ * one thing that just woke up — and most of those answers are for screens
+ * nobody is looking at. Dropping them costs nothing: the screen that IS mounted
+ * re-asks on its next render and everything else is fetched if and when it is
+ * wanted again.
+ *
+ * ⚠️ AND ONLY AFTER LONG ENOUGH TO MATTER. Every tab switch is a
+ * `visibilitychange`, so dropping on each one would make an alt-tab a refetch of
+ * the visible screen — the cost of a stale answer for ninety seconds is nothing,
+ * and the cost of re-reading on every glance is a round trip a person watches.
+ *
+ * ⚠️ WATCHED, NEVER POLLED, exactly as `online` is above: the browser says when
+ * this changed, and `runaway.test.mjs` refuses a timer that asks.
+ */
+const AWAY_MS = 90_000;
+let hidAt = 0;
+
+if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") { hidAt = Date.now(); return; }
+    if (hidAt && Date.now() - hidAt >= AWAY_MS) answers.clear();
+    hidAt = 0;
+  });
+}
+
+/**
+ * ⚠️ A RECONNECTION IS THE SAME CLAIM. Everything held was read on the other
+ * side of an outage of unknown length, so it is exactly as datable as an answer
+ * from a tab that has been shut — and `online` fires only when the state
+ * CHANGED, so this cannot repeat while a connection is merely poor.
+ */
+if (typeof globalThis.addEventListener === "function") {
+  globalThis.addEventListener("online", () => { answers.clear(); });
+}
+
+/**
  * ⚠️ SYNCHRONOUS, WHICH IS THE WHOLE POINT. A hook that has to await its own
  * cache renders `waiting` for a frame first, and a frame of skeleton over an
  * answer the tab already holds is the blank navigation this exists to end.
@@ -406,7 +482,7 @@ export const api = {
     const already = flight.get(key);
     if (already) return already as Promise<Answer<T>>;
     const asking = call<T>(id, "GET", input).then((got) => {
-      if (got.ok && got.stale === undefined) answers.set(key, got.value);
+      if (got.ok && got.stale === undefined) keep(key, got.value);
       return got;
     }).finally(() => { flight.delete(key); });
     flight.set(key, asking as Promise<Answer<unknown>>);

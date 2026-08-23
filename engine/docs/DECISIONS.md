@@ -2294,3 +2294,57 @@ it cannot be inherited by whatever takes the name next.
 back; a structural check standing in for a weight; a ceiling left so far above
 the build that it absorbs a regression instead of reporting it; or a request on
 the first-paint path whose depth nobody stated.
+
+---
+
+## D67 — The tab's store is bounded, and stops being trusted when it stops being datable
+
+**The question this settles is whether to add a query library, and the answer is
+no.** Keeping an answer, coalescing two callers who want it at once, invalidating
+it when a write makes it untrue, and revalidating it when it gets old are the
+four things one would be for. Three were already the door's, and one of them is
+better than the library's: **invalidation is DECLARED by the operation**
+(`outcome.invalidates`), so a write says what it made untrue and the door forgets
+it. A library would move that to every mutation call site, where forgetting one
+is silent — which is the failure this repository is a catalogue of.
+
+**And a second store is a real cost, not a hypothetical one.** `data.tsx` used to
+keep a `Map` keyed exactly the way the door keys a request: two caches for one
+question, reachable only from the screens that imported that page, so a product
+mounted beside them got neither and paid for every answer again on every
+navigation. Adding a library either puts a third store in or means rewriting the
+door onto it, and neither buys anything that is not already there.
+
+**What WAS missing is the fourth thing, and it is small.**
+
+**The store only ever grew.** `forget` runs when a write says an answer is
+untrue; nothing ran when an answer was merely old and unwanted. A long session
+across workspaces, lists and narrowings held every payload for the life of the
+tab — on a phone, memory a background tab is killed for, with nothing reporting
+it. It is capped at 64 now, oldest out, which a `Map` gives for free: insertion
+order is iteration order. Recency is kept by the FETCH rather than by the read,
+deliberately — `known` is called during render, where reordering a store is a
+side effect nobody expects, and it costs nothing because a revisit re-asks and
+re-remembers on the way in.
+
+**And a tab left open came back confident.** A phone locked in a pocket, a laptop
+shut, a tab behind eleven others: it returned showing what was true when it was
+last looked at, with nothing saying how old that was. The answers are now DROPPED
+on returning after 90 seconds away, and on reconnecting.
+
+**Dropped, never refetched, and that distinction is the whole design.**
+Refetching on focus would fire every held key at once at the moment a tab wakes —
+a thundering herd on the thing that just came back, mostly for screens nobody is
+looking at. Dropping costs nothing: the mounted screen re-asks on its next
+render and everything else is fetched if and when it is wanted.
+
+**⚠️ AND NINETY SECONDS IS THE POINT, NOT A DETAIL.** Every tab switch is a
+`visibilitychange`, so dropping on each one turns a glance at another window into
+a refetch of the visible screen — a round trip a person watches, for an answer
+that was seconds old. Watched, never polled, exactly as `online` is: the browser
+says when this changed.
+
+**Therefore never:** a client cache added beside the door's rather than in it;
+invalidation moved from the operation to the call site; a store with no bound; a
+revalidation that fires every held key at once; or a wake-up rule that cannot
+tell being away from looking away.

@@ -1024,6 +1024,7 @@ its own header, cited by other files, and doing nothing.
 | D64 | Where a database goes is declared once, and both paths that make one read it | 0 |
 | D65 | A copy is verified by counting rows, and the window it needs is read, not asserted | 0 |
 | D66 | The first paint has a weight, and nothing joins the first wait unbudgeted | 0 |
+| D67 | The tab's store is bounded, and stops being trusted when it stops being datable | 0 |
 <!-- /generated -->
 
 ---
@@ -1146,8 +1147,8 @@ that names no stage, so this list cannot grow by forgetting.
 <!-- generated: node scripts/inventory.mjs deployment -->
 | Binding | Resource | |
 |---|---|---|
-| `DIRECTORY` | `2e42d7a5-7c5d-4300-aacd-d09246ba7130` | live |
-| `SHARD_EU_1` | `afe4e35c-bf44-48ff-b43e-c55b913efcda` | live |
+| `DIRECTORY` | `318c5306-474f-4a4a-9a23-c88d9a0907da` | live |
+| `SHARD_EU_1` | `3600b1de-4646-465c-b7e9-ba21be4839f2` | live |
 
 **Every binding names a resource that exists.**
 
