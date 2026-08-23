@@ -25,23 +25,27 @@ it (DECISIONS.md D64). This document is about the databases that already exist.
 
 ---
 
-## 2. Shards do not use the relocation workflow
+## 2. A shard has two routes, and the deployment's size picks one
 
-**A workspace moves shard to shard through `op.tenant.move`**, which already
-exists and is careful: it holds that one workspace read-only while it copies,
-derives the table list from the erasure ledger rather than a list somebody wrote,
-and deletes nothing from the source until a later drain. Nobody else is
-affected, and it is one workspace at a time.
-
-So for a shard:
+**`op.tenant.move` carries ONE workspace to a correctly-placed shard**, holding
+only that workspace read-only, deriving the table list from the erasure ledger
+rather than a list somebody wrote, and deleting nothing until a later drain.
+Nobody else is affected and there is no window at all.
 
 1. Add a correctly-placed shard to `SHARDS` in `engine/one/src/index.ts`.
 2. Push. Provisioning creates it — with `--jurisdiction eu` where the residency
    says so, because the workflow asks rather than deciding.
-3. Move workspaces onto it from the operator console, one at a time.
-4. Leave the old shard in place until the drain has run and you are satisfied.
+3. Move workspaces onto it from the console, one at a time.
+4. Retire the old shard once it is empty.
 
-There is no downtime in any of that, and no step below applies to it.
+**This workflow relocates the shard itself**, in a window, and keeps its id: the
+shard stays `eu-1`, the binding stays `SHARD_EU_1`, and no workspace's
+`shard_id` changes — so the directory is untouched.
+
+Take the move when the deployment is busy enough that a window costs something,
+or when only some workspaces need to travel. Take the relocation when you are
+already holding a window and the whole shard is in the wrong place — which is
+the case a bare `d1 create` leaves behind, and the reason both exist.
 
 ---
 
@@ -57,13 +61,30 @@ missing. The maintenance switch is what closes that window, and the workflow
 refuses to proceed without it by *reading the switch* rather than trusting an
 input.
 
+### You name the BINDING, never the database
+
+`DIRECTORY` and `SHARD_EU_1` are what the worker reads and they never change; a
+database's NAME changes every time it is relocated. So the workflow takes
+bindings, reads the id each one is bound to, and derives the new name itself —
+`one-directory-g2`, `one-shard-eu-1-g2`.
+
+**That is not tidiness.** A name typed by a person claims something: the first
+one chosen here was `one-directory-eu`, which reads as a jurisdiction the
+directory deliberately does not have. Cloudflare is explicit that a location hint
+"does not set a jurisdiction" — so the name asserted a regime the database was
+never created under, and the dashboard correctly said `Jurisdiction: None`. `-g2`
+says the one true thing: which copy this is.
+
+Several bindings can go in one window, comma-separated. Every copy is verified
+before any of them is bound, and there is one deploy at the end.
+
 ### Rehearse first — no maintenance, nothing bound
 
-Actions → **Relocate the directory** → `phase: rehearse`, and a target name that
-does not exist yet.
+Actions → **Relocate a database** → `phase: rehearse`, and the bindings.
 
-It exports the live directory, creates the new database in the declared place,
-imports, and compares every table's row count. It binds nothing.
+It exports each live database **by the id the worker is bound to**, creates the
+new one in the declared place, imports, and compares every table's row count. It
+binds nothing.
 
 What the rehearsal is for is **the number at the end**: how long the export and
 import actually took on your data. That is the length of the window in step 2,
@@ -83,7 +104,7 @@ it, or keep it and reuse the name.
 
 1. **Operator console → Maintenance → `readonly`** (or `full`). Reads are still
    served; writes are refused. Nobody is signed out.
-2. Actions → **Relocate the directory** → `phase: relocate`, same target name.
+2. Actions → **Relocate a database** → `phase: relocate`, same bindings.
    It reads the maintenance switch out of the live directory and stops if the
    deployment is still accepting writes.
 3. It exports, creates, imports, and **compares every table row for row**. A
@@ -91,7 +112,11 @@ it, or keep it and reuse the name.
    statements it ran, not the rows that landed — a truncated file, a failed
    `CREATE` and the silent `INSERT`s after it all exit 0, which is why the
    comparison exists and why `copied.test.mjs` proves it still refuses.
-4. It writes the new id into the binding, deploys, and probes `/health`.
+4. It writes the new **name and id** into each binding, deploys once, and probes
+   `/health`. Both together: a rebind that wrote only the id would leave the
+   config naming a database that is no longer the live one, and `wrangler d1`
+   resolves a name against the account — so every command typed from that config,
+   this workflow's own next copy included, would reach the superseded one.
 5. It commits the id **only after the deploy answered**. Committing first would
    make the next ordinary push re-point the deployment at a database nobody has
    verified.

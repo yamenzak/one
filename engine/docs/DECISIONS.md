@@ -2214,8 +2214,39 @@ the last step can fail is found while nothing is bound and nobody is held.
 `shipping.test.mjs` fails on a workflow that deploys the worker without building
 what it serves, and on a rehearsal that stops proving the deploy.
 
+**⚠️ AND A RELOCATION IS ADDRESSED BY BINDING, WRITES BOTH HALVES, AND NAMES ITS
+OWN TARGET.** Three faults, all of them the same fault:
+
+- **The name is what this invalidates**, so it cannot be what identifies the
+  subject. `DIRECTORY` and `SHARD_EU_1` are what the worker reads and never
+  change; the database's name changes every time. A copy taken from the
+  *configured name* is taken from whichever database that name still resolves to
+  — which after one relocation is the superseded one. The source is the bound
+  **id**.
+- **A rebind writes the name AND the id.** Writing only the id left the config
+  saying `one-directory` while the live database was `one-directory-eu`, and
+  `wrangler d1 <anything> <name>` resolves against the account — so every command
+  typed from that config reached a database that had been out of service since
+  the window, with no error anywhere.
+- **The operator does not choose the name.** Asked for one, a person picks
+  something meaningful, and the first pick was `one-directory-eu` — which reads
+  as a jurisdiction the directory deliberately does not have. Cloudflare's
+  documentation is explicit that a location hint "does not set a jurisdiction",
+  so the name claimed a regime the database was never created under and the
+  dashboard correctly disagreed with it. `-g2` says the only true thing: which
+  copy this is. The generation is stripped before placement, because
+  `one-shard-eu-1-g2` is the same shard and a placement rule reading the name
+  whole would refuse the very copy being made to correct a placement.
+
+**Several databases go in one window, and none is bound until all are verified.**
+A rebind per database with a deploy each would leave the deployment briefly
+reading a new directory and an old shard, which is a state nothing is designed
+for and nothing tests.
+
 **Therefore never:** a copy trusted because a command exited 0; a maintenance
 window taken on an operator's word; a new id committed before the deployment it
 points at has answered; a source deleted in the same operation that replaced it;
-a tool's output redirected somewhere a failure cannot be read from; or a
-rehearsal that leaves the step with a person waiting on it untried.
+a tool's output redirected somewhere a failure cannot be read from; a rehearsal
+that leaves the step with a person waiting on it untried; a database addressed by
+a name this operation changes; or a name that claims a regime nothing created it
+under.

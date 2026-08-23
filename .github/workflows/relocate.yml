@@ -25,7 +25,7 @@
 # ⚠️ AND IT NEVER DELETES THE OLD ONE. A relocation that emptied the source is
 # unrecoverable the moment the copy turns out to have been wrong, and "the copy
 # was wrong" is a thing you learn afterwards or not at all.
-name: Relocate the directory
+name: Relocate a database
 
 on:
   workflow_dispatch:
@@ -36,9 +36,19 @@ on:
         default: rehearse
         type: choice
         options: [rehearse, relocate]
-      target:
-        description: "Name for the new database. Must not already exist."
+      # ⚠️ BINDINGS, NOT DATABASE NAMES, AND THE NEW NAME IS NOT ASKED FOR.
+      # `DIRECTORY` and `SHARD_EU_1` are what the worker reads and they never
+      # change, while a database's NAME changes every time it is relocated — so
+      # addressing this by name is addressing it by the one thing this workflow
+      # invalidates. And a name typed by a person is a name that claims
+      # something: the first one chosen here was `one-directory-eu`, which reads
+      # as a jurisdiction the directory deliberately does not have (Cloudflare:
+      # a location hint "does not set a jurisdiction"). `-g2` says the one true
+      # thing — which copy this is.
+      bindings:
+        description: "Which bindings to relocate, comma-separated (e.g. DIRECTORY,SHARD_EU_1)"
         required: true
+        default: DIRECTORY,SHARD_EU_1
         type: string
 
 concurrency: relocate-one
@@ -84,7 +94,9 @@ jobs:
 
       # ⚠️ THE SWITCH IS READ, NOT ASKED ABOUT. An input saying "yes I turned
       # maintenance on" is a promise; this is the deployment's own answer, out of
-      # the database about to be copied.
+      # the database about to be copied — and asked of the ID the worker is
+      # actually bound to, never of a name in the config that a past relocation
+      # may already have superseded.
       - name: Refuse to copy a database that is still being written to
         if: inputs.phase == 'relocate'
         env:
@@ -92,7 +104,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
-          mode=$(node ../scripts/d1.mjs one-directory \
+          mode=$(node ../scripts/d1.mjs "$(node ../scripts/bind-ids.mjs --id DIRECTORY)" \
             "SELECT mode FROM maintenance WHERE id = 'the'" \
             | node -pe 'JSON.parse(require("fs").readFileSync(0,"utf8"))[0].results[0]?.mode ?? "off"')
           echo "maintenance is: $mode"
@@ -103,51 +115,54 @@ jobs:
             exit 1
           fi
 
-      # ⚠️ THE PLACE COMES FROM THE DECLARATION, exactly as provisioning's does —
-      # a flag typed here would be the second answer this whole round removed.
-      - name: Create the new database where the declaration says it goes
+      # ⚠️ EVERY DATABASE IS COPIED AND VERIFIED BEFORE ANY OF THEM IS BOUND.
+      # One window, several databases, and a difference found in the second one
+      # must not leave the first already rebound — so this step only records what
+      # it made, and `--rebind` happens once, after all of them passed.
+      #
+      # ⚠️ THE SOURCE IS THE BOUND ID, NEVER THE CONFIGURED NAME. `wrangler d1`
+      # resolves a name against the account, so a config whose name is one
+      # relocation behind sends the copy to the superseded database — which is
+      # exactly what a second run would have done.
+      #
+      # ⚠️ AND THE PLACE COMES FROM THE DECLARATION, as provisioning's does. A
+      # flag typed here would be the second answer this whole round removed.
+      - name: Copy each one, and check it is the same database
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
-          place=$(node ../scripts/bind-ids.mjs --place one-directory)
-          echo "Creating '${{ inputs.target }}' ($place)…"
-          # shellcheck disable=SC2086
-          pnpm exec wrangler d1 create "${{ inputs.target }}" $place
+          : > /tmp/relocated
+          for binding in $(echo "${{ inputs.bindings }}" | tr ',' ' '); do
+            from=$(node ../scripts/bind-ids.mjs --id "$binding")
+            to=$(node ../scripts/bind-ids.mjs --next "$binding")
+            place=$(node ../scripts/bind-ids.mjs --placeof "$binding")
+            echo "::group::$binding — $from → $to ($place)"
 
-      - name: Copy it
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          set -euo pipefail
-          pnpm exec wrangler d1 export one-directory --remote --output /tmp/one-directory.sql
-          wc -c /tmp/one-directory.sql
-          pnpm exec wrangler d1 execute "${{ inputs.target }}" --remote --file /tmp/one-directory.sql
+            # shellcheck disable=SC2086
+            pnpm exec wrangler d1 create "$to" $place
 
-      # ⚠️ ROW BY ROW, TABLE BY TABLE. `d1 execute --file` reports the statements
-      # it ran, not the rows that landed — a truncated file, a failed CREATE and
-      # the silent INSERTs after it all exit 0. See `copied.mjs`.
-      - name: Check it is the same database
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          set -euo pipefail
-          # ⚠️ THE LIST IS EACH DATABASE'S OWN, and `d1.mjs` is what asks — a
-          # table added tomorrow is counted because it is there, D1's internal
-          # tables are left out because they cannot be counted at all, and a
-          # refused query is PRINTED rather than captured into the file.
-          for db in one-directory "${{ inputs.target }}"; do
-            node ../scripts/d1.mjs --counts "$db" > "/tmp/counts-$db.json"
+            pnpm exec wrangler d1 export "$from" --remote --output "/tmp/$binding.sql"
+            wc -c "/tmp/$binding.sql"
+            pnpm exec wrangler d1 execute "$to" --remote --file "/tmp/$binding.sql"
+
+            # ⚠️ The list is each database's own, and `d1.mjs` is what asks — a
+            # table added tomorrow is counted because it is there, D1's internal
+            # tables are left out because they cannot be counted at all, and a
+            # refused query is PRINTED rather than captured into the file.
+            node ../scripts/d1.mjs --counts "$from" > "/tmp/from-$binding.json"
+            node ../scripts/d1.mjs --counts "$to"   > "/tmp/to-$binding.json"
+            node ../scripts/copied.mjs "/tmp/from-$binding.json" "/tmp/to-$binding.json"
+
+            list=$(pnpm exec wrangler d1 list --json) || { echo "$list"; exit 1; }
+            uuid=$(printf '%s' "$list" | node -pe 's=require("fs").readFileSync(0,"utf8");(JSON.parse(s.slice(s.indexOf("["))).find(r=>r.name===process.argv[1])||{}).uuid??""' "$to")
+            [ -n "$uuid" ] || { echo "::error::Cannot read back the id of $to. wrangler said:"; echo "$list"; exit 1; }
+            echo "$binding $to $uuid" >> /tmp/relocated
+            echo "::endgroup::"
           done
-          node ../scripts/copied.mjs /tmp/counts-one-directory.json "/tmp/counts-${{ inputs.target }}.json"
+          echo "Copied and verified:"; cat /tmp/relocated
 
-      # ⚠️ A REHEARSAL STOPS HERE, HOLDING A REAL COPY IN THE RIGHT PLACE. It has
-      # proved the export, the import and the comparison against the live data
-      # and told you how long the window is — which is the only honest way to
-      # know before the deployment is down.
       # ⚠️ A REHEARSAL THAT ONLY REHEARSES THE COPY IS NOT A REHEARSAL. The copy
       # is the part with a rollback; the DEPLOY is the part with a person waiting
       # on it, and it is the one that failed — on a missing assets directory, at
@@ -162,27 +177,36 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: pnpm exec wrangler deploy --dry-run
 
+      # ⚠️ A REHEARSAL STOPS HERE, HOLDING REAL COPIES IN THE RIGHT PLACES. It
+      # has proved the export, the import and the comparison against the live
+      # data, and told you how long the window is — which is the only honest way
+      # to know before the deployment is down.
       - name: What a rehearsal leaves behind
         if: inputs.phase == 'rehearse'
         run: |
-          echo "::notice::Rehearsed. '${{ inputs.target }}' is a verified copy in the"
-          echo "::notice::declared place and NOTHING is bound to it. Delete it, or"
-          echo "::notice::re-run with phase=relocate under maintenance to bind it."
+          echo "::notice::Rehearsed. Every copy below is real, verified and in the"
+          echo "::notice::declared place, and NOTHING is bound to any of them."
+          echo "::notice::Delete them, then re-run with phase=relocate under"
+          echo "::notice::maintenance."
+          cat /tmp/relocated
 
-      - name: Bind it and ship
+      # ⚠️ ALL OF THEM, THEN ONE DEPLOY. A rebind per database with a deploy each
+      # would leave the deployment briefly reading a new directory and an old
+      # shard, which is a state nothing here is designed for and nothing tests.
+      - name: Bind them and ship
         if: inputs.phase == 'relocate'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
-          list=$(pnpm exec wrangler d1 list --json) || { echo "$list"; exit 1; }
-          id=$(printf '%s' "$list" | node -pe 's=require("fs").readFileSync(0,"utf8");(JSON.parse(s.slice(s.indexOf("["))).find(r=>r.name===process.argv[1])||{}).uuid??""' "${{ inputs.target }}")
-          [ -n "$id" ] || { echo "::error::Cannot read back the new database id. wrangler said:"; echo "$list"; exit 1; }
-          # ⚠️ THE BINDING KEEPS ITS NAME. `DIRECTORY` is what every module reads;
-          # only the id behind it moves, so nothing in the worker knows this
-          # happened — which is what makes it revertible by one more commit.
-          node ../scripts/bind-ids.mjs one-directory "$id"
+          # ⚠️ THE BINDING KEEPS ITS NAME. `DIRECTORY` and `SHARD_EU_1` are what
+          # every module reads; only the database behind them moves, so nothing
+          # in the worker knows this happened — which is what makes it
+          # revertible by one more commit.
+          while read -r binding name uuid; do
+            node ../scripts/bind-ids.mjs --rebind "$binding" "$name" "$uuid"
+          done < /tmp/relocated
           node ../scripts/bind-ids.mjs --ready
           pnpm exec wrangler deploy
 
@@ -197,14 +221,14 @@ jobs:
       # what the next ordinary deploy will use; committing it before the deploy
       # worked would make the next push to main quietly re-point the deployment
       # at a database nobody has verified.
-      - name: Remember which database this is now
+      - name: Remember which databases these are now
         if: inputs.phase == 'relocate'
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add wrangler.jsonc
-          git commit -m "One: the directory moved to ${{ inputs.target }}" || exit 0
+          git commit -m "One: relocated ${{ inputs.bindings }}" || exit 0
           git push
 
       - name: What is still to do

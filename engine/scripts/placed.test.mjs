@@ -25,7 +25,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { databases, placement, SOURCE } from "./bind-ids.mjs";
+import { baseName, databases, nextName, placement, SOURCE } from "./bind-ids.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FLOWS = join(HERE, "..", "..", ".github", "workflows");
@@ -90,7 +90,12 @@ for (const { name, text } of flows) {
   /* ⚠️ IT ASKS RATHER THAN DECIDING. A hard-coded flag is a second answer to a
      question the deployment already declares, and the two drift silently — the
      database is simply made in the wrong place, once, for ever. */
-  if (!/bind-ids\.mjs --place/.test(text)) {
+  /* ⚠️ BOTH ASKING FORMS, NAMED. `--place <database_name>` is provisioning's,
+     which knows only a name; `--placeof <BINDING>` is the relocation's, which
+     must survive the name changing under it. A pattern matching one as a prefix
+     of the other passes for the wrong reason, and a guard that is right by
+     accident is one nobody notices going wrong. */
+  if (!/bind-ids\.mjs --place(of)?\s/.test(text)) {
     fail(`${name} creates a D1 without asking where it goes.\n`
       + "       `wrangler d1 create` with no placement puts the records wherever the\n"
       + "       runner is, and nothing can move them afterwards.");
@@ -115,6 +120,75 @@ if (!bad) {
   ok(`placed: ${bound.length} database(s), each resolving to a declared place`);
   ok(`agreed: ${flows.length} workflow(s) that create one ask, `
     + "and the reconciler still sets its own");
+}
+
+/* ------------------------------------------------- the name and the id --- */
+
+/**
+ * ⚠️ A RELOCATION THAT WRITES THE ID AND NOT THE NAME LEAVES THE CONFIG NAMING A
+ * DATABASE THAT IS NO LONGER THE LIVE ONE. `wrangler d1 <anything> <name>`
+ * resolves against the account, so every command typed from that config reaches
+ * the SUPERSEDED database and answers from it with no error — including the
+ * relocation's own copy step, which would then take its next copy from a
+ * database that has been out of service since the last window. It happened: the
+ * directory was relocated to `one-directory-eu` and the config went on saying
+ * `one-directory`.
+ */
+if (!/--rebind/.test(readFileSync(join(HERE, "bind-ids.mjs"), "utf8"))) {
+  fail("bind-ids.mjs offers no `--rebind`, so a relocation can only write the id.\n"
+    + "       The config then names a database that is not the live one.");
+} else ok("rebind: a relocated database's name is written beside its id");
+
+/**
+ * ⚠️ READ WITH THE COMMENTS STRIPPED, because the first version of this did not
+ * and every check passed on the prose above the command. A workflow explaining
+ * why it uses `--rebind` satisfied a guard asking whether it does — which is a
+ * guard that can only ever agree with the file it is reading.
+ */
+const commands = readFileSync(join(FLOWS, "relocate.yml"), "utf8")
+  .split("\n").filter((l) => !/^\s*#/.test(l)).join("\n");
+
+if (!/bind-ids\.mjs --rebind /.test(commands)) {
+  fail("relocate.yml binds without `--rebind`, so the config keeps the old name\n"
+    + "       while the id moves — and every `wrangler d1` command typed against that\n"
+    + "       config then reaches the superseded database.");
+} else ok("rebind: relocate.yml writes the name beside the id");
+
+/**
+ * ⚠️ AND THE COPY'S SOURCE IS THE ID. Asking only whether `--id` appears
+ * ANYWHERE passes on a workflow that reads the id for one thing and exports a
+ * hard-coded name for another — which is the version that would silently copy
+ * the superseded database. So the export's own argument is what is checked.
+ */
+const exports_ = [...commands.matchAll(/wrangler d1 export\s+(\S+)/g)].map((m) => m[1]);
+const literal = exports_.filter((a) => !a.startsWith('"$') && !a.startsWith("$"));
+if (!exports_.length) {
+  fail("relocate.yml exports nothing — this check would pass over no copy at all.");
+} else if (literal.length) {
+  fail(`relocate.yml exports from a literal name: ${literal.join(", ")}.\n`
+    + "       `wrangler d1` resolves a name against the account, so after one\n"
+    + "       relocation that name is the superseded database and the copy is of it.");
+} else if (!/from=\$\(node [^)]*bind-ids\.mjs --id /.test(commands)) {
+  fail("relocate.yml exports from a variable that does not come from `--id`.\n"
+    + "       The bound id is the only thing that names the database the worker reads.");
+} else ok(`source: ${exports_.length} copy source(s), each the bound id`);
+
+/**
+ * ⚠️ AND THE GENERATION IS NOT PART OF A SHARD'S IDENTITY. `one-shard-eu-1-g2`
+ * is the same shard relocated; read whole it matches no declared shard, so
+ * `placement` throws — refusing to place the very copy being made to correct a
+ * placement. Asserted against `placement` itself, not against the naming helpers,
+ * because it is `placement` that decides where the records go.
+ */
+try {
+  const flags = placement("one-shard-eu-1-g2", said);
+  if (flags[0] !== "--jurisdiction") {
+    fail(`a relocated EU shard would be created with ${flags.join(" ")}.\n`
+      + "       The copy made to put records in the EU would land outside it.");
+  } else ok("generation: a relocated shard is still placed as the shard it is");
+} catch (why) {
+  fail(`placement refuses a relocated shard: ${(why && why.message) || why}\n`
+    + "       The generation is not part of the shard's id — strip it before deciding.");
 }
 
 console.log(bad
