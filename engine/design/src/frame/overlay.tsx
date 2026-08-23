@@ -284,7 +284,13 @@ export function Menu({ trigger, items }: {
               textValue={item.label}
               isDisabled={item.disabled}
               onAction={item.onDo}
-              className={item.tone === "danger" ? "text-danger" : undefined}
+              /* ⚠️ `data-ink`, NEVER `text-danger`. The attribute is the one
+                 tone channel (`TONE_CSS`), and it carries the ink the contrast
+                 reading tuned; the utility class is the library's raw fill
+                 colour, which measured 3.39:1 in light and 3.65 in dark on the
+                 surfaces this menu opens over. Two ways to say danger is two
+                 different reds on one screen, and only one of them is legible. */
+              {...(item.tone === "danger" ? { "data-ink": "danger" } : {})}
             >
               {item.icon}
               <Label>{item.label}</Label>

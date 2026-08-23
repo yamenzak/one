@@ -25,6 +25,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { appDirs } from "./lib/trees.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ENGINE = join(HERE, "..");
@@ -50,11 +51,26 @@ const WRITES_PROBLEMS = /\bretryable:/;
   screen cannot become exempt by being renamed.
 */
 const ENGINE_ITSELF = "kernel/src/problem.ts";
-const isCatalogue = (src) => /:\s*ProblemCatalog\b/.test(src);
+/**
+ * ⚠️ AN APP DECLARES ITS CATALOGUE INSIDE ITS MANIFEST, under `problems:`, and
+ * it is typed structurally rather than annotated — so looking only for the type
+ * name reported OneInventory's whole catalogue as forty hand-built refusals the
+ * day this guard was widened to cover apps. Both spellings are declarations; a
+ * screen can wear neither.
+ */
+const isCatalogue = (src) =>
+  /:\s*ProblemCatalog\b/.test(src) || /^\s{2}problems:\s*\{/m.test(src);
 
+/**
+ * ⚠️ AND EVERY APP, DERIVED RATHER THAN LISTED. A product is where a refusal is
+ * most likely to be re-worded — it is the tree with the most screens and the
+ * least platform context — and a hand-kept list here means app #3 is exempt on
+ * the day it is registered, silently, which is the shape every other widened
+ * guard in this repository was widened to fix.
+ */
 const ROOTS = [
   "kernel/src", "runtime/src", "design/src", "one-space/src", "one/src",
-  "ground/src",
+  "ground/src", ...appDirs(),
 ];
 
 const strays = [];
@@ -155,6 +171,11 @@ for (const [at, src] of sources) {
   if (at === ENGINE_ITSELF) continue;
   for (const [code, want] of CODES) {
     for (const m of src.matchAll(new RegExp(`"${code.replace(".", "\\.")}"`, "g"))) {
+      /* ⚠️ A `fails:` LIST NAMES A CODE, IT DOES NOT RAISE ONE. An operation
+         declares which refusals it may answer with — that is what the agent
+         surface and the docs read — and treating the declaration as a raise
+         asked every one of them for values nothing is interpolating. */
+      if (/\bfails:\s*\[[^\]]*$/.test(src.slice(Math.max(0, m.index - 400), m.index))) continue;
       const window = src.slice(m.index, m.index + 300);
       const missing = want.filter((t) => !new RegExp(`\\b${t}\\s*[:,}]`).test(window));
       if (missing.length) dry.push(`${at} raises ${code} without {${missing.join("}, {")}}`);
@@ -166,6 +187,58 @@ if (dry.length) {
   fail(`values: ${dry.join("; ")} — the token reaches the screen as a literal brace`);
 } else {
   ok(`values: every raise of the ${CODES.size} interpolated code(s) supplies its values`);
+}
+
+/* ------------------------------------------------------------ the drawing --- */
+
+/**
+ * ⚠️ AND A REFUSAL IS DRAWN BY ONE THING, WHICH IS THE HALF THE CHECKS ABOVE DO
+ * NOT ASK. They cover CONSTRUCTION — that a code comes from a catalogue and its
+ * sentence is filled. Nothing covered DISPLAY, so a control could obey every one
+ * of them and still put the words on the screen itself.
+ *
+ * ⚠️ `PickFile` HAD, FOR A YEAR. It wrote its own three sentences in the file
+ * that draws it and painted them `text-danger` — so a file rejected in the
+ * browser read in different words, in a different tone and in a different colour
+ * from the same file rejected by the server one layer up. The colour was the
+ * one the contrast reading later measured at 3.39:1.
+ *
+ * ⚠️ THE TELL IS A RAW TONE UTILITY. `text-danger` and its siblings are the
+ * library's FILL colours; as ink they are short of the floor, and `data-ink` is
+ * the channel that carries the tuned value. A screen reaching for the class is a
+ * screen that has decided to say something itself.
+ */
+const TONE_UTILITY = /className=[^\n]*\btext-(danger|warning|success)\b/;
+const drawn = [];
+for (const [at, src] of sources) {
+  const bare = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
+  if (TONE_UTILITY.test(bare)) drawn.push(at);
+}
+if (drawn.length) {
+  fail(`ink: ${drawn.join(", ")} paint a tone with a utility class.\n` +
+    `       \`text-danger\` is the library's FILL colour and it is under the contrast\n` +
+    `       floor as ink. Stamp \`data-ink="danger"\` — one channel, tuned once.`);
+} else {
+  ok(`ink: no screen paints a tone with a utility class`);
+}
+
+/**
+ * ⚠️ AND `Trouble` IS THE ONLY THING THAT DRAWS ONE. It is where the tone
+ * becomes a status, where `retryable` decides whether a retry is offered at all,
+ * and where the reference is shown — three decisions the kernel already took. A
+ * second renderer is a second answer to each of them.
+ */
+const RENDERER = "design/src/parts/state.tsx";
+const others = sources
+  .filter(([at]) => at !== RENDERER)
+  .filter(([, src]) => /<Alert\b/.test(src.replace(/\/\*[\s\S]*?\*\//g, "")));
+if (others.length) {
+  fail(`drawn: ${others.map(([at]) => at).join(", ")} draw an Alert of their own.\n` +
+    `       \`Trouble\` is the one renderer — it maps the tone to a status, offers a\n` +
+    `       retry only where \`retryable\` says so, and shows the reference. Three\n` +
+    `       decisions the kernel already took, and a second Alert re-takes all of them.`);
+} else {
+  ok(`drawn: one renderer for every refusal, in ${RENDERER}`);
 }
 
 console.log(bad ? `\nproblem: ${bad} problem(s).` : "\nproblem: green.");

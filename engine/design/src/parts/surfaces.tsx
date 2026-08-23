@@ -696,8 +696,13 @@ export function ActionRow({ icon, face, label, under, onDo, tone = "neutral" }: 
       className={`justify-start ${ROW.free} ${ROW.wrap} ${ROW.flush} ${ROW.press} ${ROW.tap}`}
       onPress={onDo}
     >
+      {/* ⚠️ `data-ink`, NEVER `text-danger` — see `TONE_CSS`. The utility is the
+          library's raw fill colour and it is short of the contrast floor as ink;
+          the attribute is the channel that was tuned against every surface a
+          row lands on. */}
       <span
-        className={`flex w-full items-center ${ROW.gap} ${ROW.pad} ${ROW.tap}${tone === "danger" ? " text-danger" : ""}`}
+        className={`flex w-full items-center ${ROW.gap} ${ROW.pad} ${ROW.tap}`}
+        {...(tone === "danger" ? { "data-ink": "danger" } : {})}
       >
         <Lead icon={icon} face={face} />
         <Body label={label} under={under} />

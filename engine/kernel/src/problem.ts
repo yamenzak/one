@@ -160,6 +160,34 @@ export const PLATFORM_PROBLEMS: ProblemCatalog = {
     title: "Not enough credits",
     detail: "This costs {cost} and there are {balance} left.",
   },
+  /*
+    ⚠️ THE THREE A FILE PICKER CAN ANSWER WITHOUT ASKING THE SERVER, and they
+    are in the catalogue for the same reason every other refusal is: the control
+    used to write its own three sentences, in the file that draws it, painted in
+    a raw danger class — so the wording, the tone and the colour were all
+    decisions taken alone, and the colour was one the contrast reading later
+    found short. A refusal a person reads is a refusal the platform said.
+
+    ⚠️ AND THEY ARE THREE RATHER THAN ONE WITH THE REASON INTERPOLATED. A single
+    `platform.wrong_file` taking a `{why}` is the hand-written sentence smuggled
+    through a token: the catalogue would hold a shape and the screen would still
+    hold the words.
+  */
+  "platform.wrong_kind": {
+    status: 400, retryable: false, tone: "warning",
+    title: "That kind of file will not work",
+    detail: "It has to be {wants}.",
+  },
+  "platform.too_large": {
+    status: 400, retryable: false, tone: "warning",
+    title: "That file is too big",
+    detail: "It is {size} kB and the most is {most} kB.",
+  },
+  "platform.empty_file": {
+    status: 400, retryable: false, tone: "warning",
+    title: "That file is empty",
+    detail: "There is nothing in it to send.",
+  },
   "platform.unavailable": {
     status: 503, retryable: true, tone: "danger",
     title: "Something went wrong on our side",

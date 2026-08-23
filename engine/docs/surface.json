@@ -148,6 +148,27 @@
       "retryable": false
     },
     {
+      "code": "platform.wrong_kind",
+      "status": 400,
+      "title": "That kind of file will not work",
+      "tone": "warning",
+      "retryable": false
+    },
+    {
+      "code": "platform.too_large",
+      "status": 400,
+      "title": "That file is too big",
+      "tone": "warning",
+      "retryable": false
+    },
+    {
+      "code": "platform.empty_file",
+      "status": 400,
+      "title": "That file is empty",
+      "tone": "warning",
+      "retryable": false
+    },
+    {
       "code": "platform.unavailable",
       "status": 503,
       "title": "Something went wrong on our side",

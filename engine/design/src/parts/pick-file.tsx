@@ -24,9 +24,11 @@
 
 import * as React from "react";
 import { Button } from "@heroui/react";
+import { PLATFORM_PROBLEMS, type Problem, problem } from "@engine/kernel";
 import { DROP_PAD, SPACE } from "../tokens/metrics.js";
 import { TYPE } from "../tokens/type.js";
 import { MOTION } from "../tokens/motion.js";
+import { Trouble } from "./state.js";
 
 export interface PickFileProps {
   /**
@@ -50,15 +52,26 @@ export interface PickFileProps {
   readonly onClear?: () => void;
 }
 
-/** ⚠️ The refusals this control can answer without asking the server. */
-const refuse = (file: File, accept: readonly string[], most: number): string | null => {
+/**
+ * ⚠️ THE REFUSALS THIS CONTROL CAN ANSWER WITHOUT ASKING THE SERVER, AND THEY
+ * COME FROM THE CATALOGUE. This wrote its own three sentences for a year — in
+ * this file, in a raw `text-danger` — so a file rejected here read in different
+ * words, in a different tone and in a colour the contrast reading later found
+ * short, from the same file rejected one layer up by the server. Two answers to
+ * one question, and the one somebody actually hit was the local one.
+ */
+const refuse = (file: File, accept: readonly string[], most: number): Problem | null => {
+  const raise = (code: string, values: Readonly<Record<string, string | number>> = {}) =>
+    problem(PLATFORM_PROBLEMS, code, values);
   if (accept.length && !accept.includes(file.type)) {
-    return `that is ${file.type || "an unknown kind of file"} — it has to be ${saying(accept)}`;
+    return raise("platform.wrong_kind", { wants: saying(accept) });
   }
   if (file.size > most) {
-    return `that is ${Math.round(file.size / 1024)} kB — the most is ${Math.round(most / 1024)} kB`;
+    return raise("platform.too_large", {
+      size: Math.round(file.size / 1024), most: Math.round(most / 1024),
+    });
   }
-  if (!file.size) return "that file is empty";
+  if (!file.size) return raise("platform.empty_file");
   return null;
 };
 
@@ -74,7 +87,7 @@ export function PickFile({
 }: PickFileProps) {
   const input = React.useRef<HTMLInputElement>(null);
   const [over, setOver] = React.useState(false);
-  const [why, setWhy] = React.useState<string | null>(null);
+  const [why, setWhy] = React.useState<Problem | null>(null);
 
   const take = async (file: File | undefined): Promise<void> => {
     if (!file) return;
@@ -148,8 +161,14 @@ export function PickFile({
 
       {/* ⚠️ THE REFUSAL SITS UNDER THE CONTROL THAT CAUSED IT, never in a toast.
           A file was rejected because of something about THAT file, and the
-          sentence has to be beside the place they will try again. */}
-      {why ? <span className={`${TYPE.note} text-danger`}>{why}</span> : null}
+          sentence has to be beside the place they will try again.
+
+          ⚠️ AND IT IS `Trouble`, WHICH IS THE ONE THING THAT DRAWS A REFUSAL.
+          Inline is about WHERE it goes; what it looks like, what tone it takes
+          and whether it offers a retry are the platform's, and a control that
+          drew its own was a control where the same failure read differently
+          depending on which screen you were on. */}
+      {why ? <Trouble problem={why} /> : null}
     </div>
   );
 }

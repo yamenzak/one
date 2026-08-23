@@ -309,6 +309,9 @@ it. A caller's job is to show it, never to invent one from a status code.
 | `platform.must_accept` | 451 | There is something to agree to first | — |
 | `platform.read_only` | 402 | This workspace is read-only | — |
 | `platform.no_credits` | 402 | Not enough credits | — |
+| `platform.wrong_kind` | 400 | That kind of file will not work | — |
+| `platform.too_large` | 400 | That file is too big | — |
+| `platform.empty_file` | 400 | That file is empty | — |
 | `platform.unavailable` | 503 | Something went wrong on our side | yes |
 | `platform.undrawable` | 500 | This did not draw | yes |
 <!-- /generated -->
@@ -954,6 +957,8 @@ its own header, cited by other files, and doing nothing.
 | `every-screens-type-is-a-scale-with-a-top` | D70 | a screen assembled out of locally defensible type choices — nine sizes, none of them wrong, and no scale; or a page whose largest type is the size of everything else, where the reader's eye has nowhere to land |
 | `everything-on-a-screen-can-be-read` | D70 | ink under the contrast floor — a status colour tuned as a fill used as text, at 1.94:1 on the sentence naming a chemical hazard; a de-emphasis grey on a number; a quiet line on the one surface it does not clear. None of it visible from the palette, and none of it visible to anybody working in dark |
 | `everything-in-the-frame-can-be-read` | D70 | a shortfall in the crown, the hem or the bar — the half of every screen a product cannot opt out of, so one fault there is a fault on every screen in every product at once |
+| `no-screen-paints-a-tone-with-a-utility` | D5 | `text-danger` on a screen — the library's FILL colour used as ink, measured at 3.39:1 in light and 3.65 in dark, and a second way of saying danger that is a different red from the one the tone channel carries |
+| `one-renderer-draws-every-refusal` | D5 | a control drawing its own refusal — re-deciding the tone, whether a retry is offered and whether the reference is shown, so the same failure reads differently depending on which screen you hit it from |
 <!-- /generated -->
 
 ### And how well each decision is defended
@@ -965,7 +970,7 @@ its own header, cited by other files, and doing nothing.
 | D2 | The framework is OneEngine; the deployment is One; packages are `@engine/*` | 3 |
 | D3 | One worker on the request path; heavy work splits over RPC service bindings | 7 |
 | D4 | Composition is lazy: a request composes the app it is for, and no other | 3 |
-| D5 | Storage is placed, not owned. The directory carries every cross-tenant fact | 13 |
+| D5 | Storage is placed, not owned. The directory carries every cross-tenant fact | 15 |
 | D6 | Jurisdiction is a workspace fact, derived from the business's country | 5 |
 | D7 | HeroUI v3 is the component layer, and its components are not restyled | 64 |
 | D8 | Declarations are typed object literals; not decorators, not a custom format | 3 |

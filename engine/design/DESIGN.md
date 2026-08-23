@@ -1082,6 +1082,7 @@ guard does.
 | **The Sticky Hover** | A hover state a touch screen enters on tap and never leaves. | `hand` |
 | **The Vague Transition** | `transition: all` — animating whatever happens to change, and outliving the feature it was written for. | `hand` |
 | **The Confident Empty** | A failed load rendered as "nothing here yet"; `[]` shown as fact before the answer arrives. | `states`, `asking` |
+| **The Improvised Refusal** | A control writing its own three sentences for a failure the catalogue already has words for, in its own colour. | `problem` |
 | **The Silent Save** | A write that fails into nothing, or a control left showing a value the server refused. | `problem` |
 | **The Bare Key** | `eu`, `no_tenant`, `owner` printed where a place, a reason or a role was meant. | `present`, `tone` |
 | **The Wall** | A paragraph under a control, explaining what the control should have said. | `tone` |
