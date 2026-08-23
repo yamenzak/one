@@ -35,44 +35,42 @@ const directory = () => env.DIRECTORY as unknown as Db;
 let cookie = "";
 
 /**
- * ⚠️ ONE CLOCK ACROSS EVERY DATABASE. A request touches the directory and a
- * shard, so counting each separately would report two queries running side by
- * side as two waits — exactly the parallelism this exists to reward.
+ * HOW DEEP THE CHAIN IS, MEASURED BY MAKING EVERY QUERY COST THE SAME.
+ *
+ * ⚠️ COUNTING WHAT IS IN FLIGHT DOES NOT ANSWER THIS, AND THE FIRST VERSION OF
+ * THIS FILE TRIED. "A new wave begins when nothing is open" reports two chains
+ * running beside each other as ONE wave however long each of them is — so a
+ * three-deep chain overlapping a one-deep one reads as depth two, and the number
+ * flatters exactly the code it is meant to catch. It said `me.who` was two waves
+ * when the live deployment was spending four round trips on it.
+ *
+ * ⚠️ SO EVERY QUERY IS HELD FOR THE SAME `LAG` AND THE WALL CLOCK IS READ.
+ * Queries that ran side by side add nothing to it; queries that waited add one
+ * lag each. Total ÷ lag IS the number of round trips on the critical path, which
+ * is the only thing a person waiting is paying for. Against the live numbers it
+ * agrees: `me.who` measures four here and takes 1,038 ms there, on a database
+ * roughly 260 ms away.
  */
-const clock = () => {
-  let open = 0, depth = 0;
-  return {
-    depth: () => depth,
-    began: () => { if (open === 0) depth++; open++; },
-    ended: () => { open--; },
-    beside: () => open > 1,
-  };
-};
+const LAG = 25;
 
-const counting = (db: Db, said: string[], label: string, at: ReturnType<typeof clock>): Db => {
-  const note = (sql: string) => {
-    at.began();
-    said.push(`${String(at.depth()).padStart(2)}${at.beside() ? "|" : " "} ${label} `
-      + sql.replace(/\s+/g, " ").trim().slice(0, 88));
+const slow = (db: Db): Db => {
+  const hold = async <T>(work: Promise<T>): Promise<T> => {
+    const [got] = await Promise.all([work, new Promise((go) => { setTimeout(go, LAG); })]);
+    return got as T;
   };
-  const done = async <T>(work: Promise<T>): Promise<T> => {
-    try { return await work; } finally { at.ended(); }
-  };
-  const wrap = (o: Record<string, () => Promise<never>>, q: string) => ({
-    all: () => { note(q); return done(o.all!()); },
-    first: () => { note(q); return done(o.first!()); },
-    run: () => { note(q); return done(o.run!()); },
-    raw: () => { note(q); return done(o.raw!()); },
+  const wrap = (o: Record<string, () => Promise<never>>) => ({
+    all: () => hold(o.all!()), first: () => hold(o.first!()),
+    run: () => hold(o.run!()), raw: () => hold(o.raw!()),
   });
   return {
     prepare: (q: string) => {
       const made = db.prepare(q);
       return {
-        ...wrap(made as never, q),
-        bind: (...v: unknown[]) => wrap(made.bind(...v) as never, q),
+        ...wrap(made as never),
+        bind: (...v: unknown[]) => wrap(made.bind(...v) as never),
       } as never;
     },
-    exec: (q: string) => { note(q); return done(db.exec(q) as never) as never; },
+    exec: (q: string) => hold(db.exec(q) as never) as never,
   } as Db;
 };
 
@@ -100,17 +98,26 @@ beforeAll(async () => {
   }
 }, 120_000);
 
+const held = () => ({
+  ...asDev, DIRECTORY: slow(directory()), SHARD_EU_1: slow(env.SHARD_EU_1 as never),
+}) as never;
+
+const ask = (op: string, env_: never) =>
+  worker.fetch(new Request(`http://${SLUG}.localhost:8080/api/${op}`,
+    { headers: { cookie } }), env_, ctx);
+
+/**
+ * ⚠️ WARMED FIRST, THEN TIMED. The first call through a fresh module registry
+ * pays for the schema check and whatever the settings hold has let go of, and
+ * measuring that reports the cold path under the warm one's name.
+ */
 const spent = async (op: string) => {
-  const said: string[] = [];
-  const at = clock();
-  const res = await worker.fetch(
-    new Request(`http://${SLUG}.localhost:8080/api/${op}`, { headers: { cookie } }),
-    {
-      ...asDev,
-      DIRECTORY: counting(directory(), said, "dir  ", at),
-      SHARD_EU_1: counting(env.SHARD_EU_1 as never, said, "shard", at),
-    } as never, ctx);
-  return { status: res.status, depth: at.depth(), trips: said.length, said };
+  const at = held();
+  await ask(op, at);
+  const began = Date.now();
+  const res = await ask(op, at);
+  const ms = Date.now() - began;
+  return { status: res.status, deep: ms / LAG, ms };
 };
 
 describe("what a warm request costs", () => {
@@ -122,11 +129,11 @@ describe("what a warm request costs", () => {
     three of which the reads above had already made. It needs an account and a
     hostname, and neither is a fact in any of them.
   */
-  it("answers me.who in two waves", async () => {
+  it("answers me.who four round trips deep", async () => {
     const at = await spent("me.who");
     expect(at.status).toBe(200);
-    expect(at.depth, `${at.depth} waves, ${at.trips} trips\n${at.said.join("\n")}`)
-      .toBeLessThanOrEqual(2);
+    expect(at.deep, `${at.deep.toFixed(1)} round trips (${at.ms} ms at ${LAG} ms each)`)
+      .toBeLessThanOrEqual(4.5);
   }, 60_000);
 
   /*
@@ -137,12 +144,12 @@ describe("what a warm request costs", () => {
     was already carrying, and two more were the notification channels, which
     cost a round trip each and which one operation in the product reads.
   */
-  for (const [op, waves] of [["totals.read", 3], ["guide.view", 3]] as const) {
-    it(`answers ${op} in ${waves} waves`, async () => {
+  for (const [op, deep] of [["totals.read", 5.5], ["guide.view", 5.5]] as const) {
+    it(`answers ${op} ${deep} round trips deep`, async () => {
       const at = await spent(op);
       expect(at.status).toBe(200);
-      expect(at.depth, `${at.depth} waves, ${at.trips} trips\n${at.said.join("\n")}`)
-        .toBeLessThanOrEqual(waves);
+      expect(at.deep, `${at.deep.toFixed(1)} round trips (${at.ms} ms at ${LAG} ms each)`)
+        .toBeLessThanOrEqual(deep);
     }, 60_000);
   }
 
@@ -153,6 +160,6 @@ describe("what a warm request costs", () => {
   */
   it("still reads what it answers with", async () => {
     const at = await spent("totals.read");
-    expect(at.trips, "a read that touched nothing").toBeGreaterThan(10);
+    expect(at.deep, "a read that touched no database at all").toBeGreaterThan(1);
   }, 60_000);
 });

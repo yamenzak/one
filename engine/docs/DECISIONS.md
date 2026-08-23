@@ -2057,10 +2057,11 @@ be chosen until it answers. Four things made it ten:
   other; `canBind` — the only reason to ask the second — is the caller's, known
   before either.
 
-**Two waves now.** Everything but the session lookup goes out at once.
+**Four round trips now, from ten.** Confirmed against the live deployment: it
+was 4,123 ms and is 1,038 ms.
 
-**And an ordinary read went from six waves to three**, on two findings that are
-about the platform rather than any product:
+**And an ordinary read went from eleven round trips to five**, on two findings
+that are about the platform rather than any product:
 
 - **The notification channels cost two sequential round trips on every request,
   and one operation in the deployment reads them.** Answering "what can this
@@ -2074,10 +2075,18 @@ about the platform rather than any product:
 
 **The shape a request should have, and the reason the budget is per operation:**
 everything the door needs at once, then the wall, then the operation's own work.
-Three waves for a read, two for the identity. `engine/one/test/request-cost.test.ts`
-holds those ceilings against the real worker with a real workspace behind the
-real legal wall, and asserts a floor beside them — a budget is met perfectly by a
-request that reads nothing.
+`engine/one/test/request-cost.test.ts` holds the ceilings against the real worker
+with a real workspace behind the real legal wall, and asserts a floor beside them
+— a budget is met perfectly by a request that reads nothing.
+
+**⚠️ AND THE FIRST VERSION OF THAT HARNESS MEASURED THE WRONG THING.** It counted
+"a new wave begins when nothing else is in flight", which reports two chains
+running beside each other as one wave however long each is — so it flattered
+exactly the code it exists to catch, and reported `me.who` at two waves while the
+live deployment spent four round trips on it. It holds every query for the same
+lag and reads the wall clock now: total ÷ lag is the critical path, and it agrees
+with production to within a few per cent. A latency metric that cannot be checked
+against the thing it claims to measure is a number, not a measurement.
 
 **Therefore never:** a value resolved while building a context that most callers
 never read; a fact re-queried because it was passed as an id instead of as the
