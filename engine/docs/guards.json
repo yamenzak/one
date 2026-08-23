@@ -3251,6 +3251,15 @@
       "impl": "scripts/problem.test.mjs",
       "proves": "draw an Alert of their own",
       "fails": "a control drawing its own refusal \u2014 re-deciding the tone, whether a retry is offered and whether the reference is shown, so the same failure reads differently depending on which screen you hit it from"
+    },
+    {
+      "id": "every-write-reports-or-says-why-not",
+      "protects": "D71",
+      "stage": "19",
+      "status": "live",
+      "impl": "kernel/test/manifest.test.ts",
+      "proves": "refuses a write that neither reports nor says why not",
+      "fails": "a button pressed, a round trip waited for, and a screen that looks exactly the same \u2014 fifteen of fifty writes, none of them silent on purpose, because a field nobody has to fill is a field that stays empty"
     }
   ]
 }

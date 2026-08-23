@@ -99,6 +99,26 @@ export interface Outcome {
 }
 
 /**
+ * ⚠️ SAYING NOTHING IS A DECISION, AND IT IS WRITTEN DOWN — the same shape
+ * `audit` uses one field up, for the same reason. `outcome` was optional, and
+ * optional meant fifteen of fifty writes said nothing at all: not because
+ * anybody chose silence for them, but because a field nobody has to fill is a
+ * field that stays empty. Measured before this changed, and every one of the
+ * fifteen was a different case — some genuinely right, none of them stated.
+ *
+ * ⚠️ AND SILENCE IS OFTEN CORRECT, WHICH IS WHY THE ESCAPE EXISTS RATHER THAN A
+ * DEFAULT SENTENCE. An operation whose whole answer is the thing it returns has
+ * already reported itself; a tally pressed forty times a minute would be forty
+ * toasts. What is not correct is the third state — an operation nobody decided
+ * about — and a required field is what removes it.
+ */
+export type Silent = { readonly why: string };
+
+export type Reported = Outcome | Silent;
+
+export const isSilent = (said: Reported): said is Silent => "why" in said;
+
+/**
  * ⚠️ A REPLAY IS ANSWERED BEFORE ANYTHING ELSE HAPPENS. A phone that queued a
  * write in a basement cannot know whether the first attempt landed — the ANSWER
  * went missing, not the request — so it asks again, and without this it gets a
@@ -166,8 +186,15 @@ export interface OperationSpec<I = unknown, O = unknown> {
   readonly tool?: ToolPolicy;
   /** The events it raises. The inbox, webhooks and recognition all read this. */
   readonly emits?: readonly string[];
-  /** What it says when it worked, and what it makes stale — see `outcomeBook`. */
-  readonly outcome?: Outcome;
+  /**
+   * What it says when it worked, and what it makes stale — see `outcomeBook`.
+   *
+   * ⚠️ REQUIRED ON A WRITE, AND `{ why }` IS HOW AN OPERATION SAYS NOTHING. See
+   * `Silent`. A read never reports — the answer is the report — so this is
+   * optional on the type and asked for by the guard only where `kind` is
+   * `"write"`, which is the one place a person presses something and waits.
+   */
+  readonly outcome?: Reported;
   readonly fails?: readonly string[];
   /**
    * Calls per minute, per caller. Absent is the platform's own default.
@@ -233,7 +260,12 @@ export const isTool = (op: AnyOperation): boolean => op.tool === undefined || op
 export const outcomeBook = (
   ops: readonly AnyOperation[],
 ): Readonly<Record<string, Outcome>> =>
-  Object.fromEntries(ops.filter((o) => o.outcome).map((o) => [o.id, o.outcome!]));
+  Object.fromEntries(
+    ops
+      .filter((o): o is AnyOperation & { outcome: Outcome } =>
+        o.outcome !== undefined && !isSilent(o.outcome))
+      .map((o) => [o.id, o.outcome]),
+  );
 
 /**
  * The route an operation answers on.
@@ -252,7 +284,8 @@ export const routeFor = (op: AnyOperation): { readonly method: string; readonly 
 
 export type OperationRefusal =
   | "id_not_dotted" | "write_that_reads" | "read_that_spends" | "read_that_emits"
-  | "credits_without_a_cost" | "proof_on_a_read" | "unrecorded_write";
+  | "credits_without_a_cost" | "proof_on_a_read" | "unrecorded_write"
+  | "unreported_write";
 
 export interface OperationProblem {
   readonly operation: string;
@@ -290,6 +323,21 @@ export function refuseOperation(op: AnyOperation): readonly OperationProblem[] {
   }
   if (op.kind === "write" && op.audit === undefined && !derivable(op)) {
     at("unrecorded_write", "nothing to record and no reason given — see `audit`");
+  }
+  /*
+    ⚠️ AND NOTHING TO SAY IS A DECISION SOMEBODY MAKES, NOT A FIELD LEFT BLANK.
+    A person pressed something and waited; what they get back is either a
+    sentence or a screen that visibly changed, and which one it is belongs in
+    the declaration rather than in whichever screen happened to call it. Left
+    optional, fifteen of fifty writes said nothing — none of them deliberately.
+  */
+  if (op.kind === "write" && op.outcome === undefined) {
+    at("unreported_write", "nothing said when it worked and no reason given — see `outcome`");
+  }
+  /* ⚠️ A REASON THAT IS A LABEL IS NOT A REASON. Same floor as a guard's
+     `fails`: "n/a" and "none" are how a required field becomes optional again. */
+  if (op.outcome && isSilent(op.outcome) && op.outcome.why.trim().length < 20) {
+    at("unreported_write", `"${op.outcome.why}" is a label, not a reason to say nothing`);
   }
   return out;
 }

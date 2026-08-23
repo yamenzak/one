@@ -171,6 +171,11 @@ export function moneyOps(app: AppSpec): Readonly<Record<string, Resolved>> {
       input: {}, output: {},
       permission: "billing:manage",
       idempotency: { mode: "none" },
+      /* ⚠️ THE ANSWER IS A URL THE BROWSER IMMEDIATELY LEAVES FOR, so a
+         confirmation would be a sentence shown over a page that is already
+         navigating to somebody else's checkout — read by nobody, and the last
+         thing seen before a payment form if it is read at all. */
+      outcome: { why: "the answer is a checkout URL the page leaves for at once" },
       async handler() { return {} as never; },
     } as Resolved["spec"],
     run: async (bare, input) => {
@@ -241,6 +246,8 @@ export function moneyOps(app: AppSpec): Readonly<Record<string, Resolved>> {
       input: {}, output: {},
       permission: "billing:manage",
       idempotency: { mode: "none" },
+      /* ⚠️ Same as `money.checkout` — the page is leaving. */
+      outcome: { why: "the answer is a checkout URL the page leaves for at once" },
       async handler() { return {} as never; },
     } as Resolved["spec"],
     run: async (bare, input) => {
@@ -289,6 +296,11 @@ export function moneyOps(app: AppSpec): Readonly<Record<string, Resolved>> {
       input: {}, output: {},
       permission: "billing:manage",
       idempotency: { mode: "none" },
+      /* ⚠️ A STANDING ARRANGEMENT IS A SETTING, AND A SETTING CONFIRMS. Nothing
+         visible happens when auto-top-up is armed — the whole point is that it
+         acts later, without anybody there — so silence here is a person pressing
+         a button and having no idea whether the money will be taken. */
+      outcome: { message: "Set.", tone: "success", invalidates: ["money.wallet"] },
       async handler() { return {} as never; },
     } as Resolved["spec"],
     run: async (bare, input) => {

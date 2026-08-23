@@ -233,6 +233,11 @@ export function progressOps(app: AppSpec): Readonly<Record<string, Resolved>> {
       input: {}, output: {},
       permission: PUBLIC,
       idempotency: { mode: "none" },
+      /* ⚠️ NOBODY PRESSED ANYTHING. This is the guide writing down that it drew
+         itself, so a confirmation would be the product telling somebody about
+         its own bookkeeping — and it fires on a screen somebody is reading
+         rather than acting on. */
+      outcome: { why: "nothing was pressed — the guide is recording that it drew itself" },
       async handler() { return {} as never; },
     } as Resolved["spec"],
     run: async (bare, input) => {

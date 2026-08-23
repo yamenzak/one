@@ -414,7 +414,7 @@ and a manifest that does not compose refuses to boot.
 | `infra` | what a product needs underneath it, and what each kind can promise | 11 | — |
 | `field` | what a value is: its kind, its bounds, what it holds, whether it is the app's to keep | 8 | — |
 | `collection` | what a thing an app keeps is — and the six operations it gets for free | 18 | — |
-| `operation` | one declaration carrying every cross-cutting concern (D12) | 10 | — |
+| `operation` | one declaration carrying every cross-cutting concern (D12) | 11 | — |
 | `access` | permissions, roles, and what an app may never claim | 15 | — |
 | `reach` | how far one person works inside a workspace — where, as against what (D45) | 4 | — |
 | `gate` | the eight gates, in the order that decides which sentence somebody reads first | 3 | — |
@@ -440,7 +440,7 @@ and a manifest that does not compose refuses to boot.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**285 of them**, 284 reached by something today.
+**286 of them**, 285 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -959,6 +959,7 @@ its own header, cited by other files, and doing nothing.
 | `everything-in-the-frame-can-be-read` | D70 | a shortfall in the crown, the hem or the bar — the half of every screen a product cannot opt out of, so one fault there is a fault on every screen in every product at once |
 | `no-screen-paints-a-tone-with-a-utility` | D5 | `text-danger` on a screen — the library's FILL colour used as ink, measured at 3.39:1 in light and 3.65 in dark, and a second way of saying danger that is a different red from the one the tone channel carries |
 | `one-renderer-draws-every-refusal` | D5 | a control drawing its own refusal — re-deciding the tone, whether a retry is offered and whether the reference is shown, so the same failure reads differently depending on which screen you hit it from |
+| `every-write-reports-or-says-why-not` | D71 | a button pressed, a round trip waited for, and a screen that looks exactly the same — fifteen of fifty writes, none of them silent on purpose, because a field nobody has to fill is a field that stays empty |
 <!-- /generated -->
 
 ### And how well each decision is defended
@@ -1036,6 +1037,7 @@ its own header, cited by other files, and doing nothing.
 | D68 | A tab switch is not a journey, and only the journey still running may land | 0 |
 | D69 | Nothing reads the camera with the thread a person is waiting on | 0 |
 | D70 | A design rule is a guard or it is not a rule | 3 |
+| D71 | Every write says what happened, or says why it does not | 1 |
 <!-- /generated -->
 
 ---

@@ -2488,3 +2488,42 @@ a quality gate whose verdict is self-reported; a palette or a typeface prescribe
 as a rule rather than chosen as a decision; a coverage mandate that spends motion
 on a screen somebody uses all day; or a guard scoped to the file the fault was
 found in.
+
+---
+
+## D71 — Every write says what happened, or says why it does not
+
+**`outcome` was optional, and optional meant fifteen of fifty writes said
+nothing at all.** Not because anybody chose silence for them — because a field
+nobody has to fill is a field that stays empty. Somebody pressed a button, waited
+for a round trip, and the product's answer was that the screen looked the same.
+
+**The confirmation belongs to the DECLARATION, not to the screen that pressed
+it.** The page holds no manifest (D17), so a sentence written where the button
+lives is a sentence the declaration cannot see — and two screens calling one
+operation are then two answers to what just happened. `outcomeBook` hands the
+whole map to the browser at boot; `whenWritten` routes it to the notice channel
+by tone and forgets whatever the operation said it made stale. That half was
+already built. What was missing was that anybody had to use it.
+
+**And silence is often right, which is why the escape is a sentence rather than a
+flag.** An operation whose whole answer is the thing it returns has already
+reported itself — an AI lane, an import preview, a draft that lands in the
+editor. A tally pressed once per item on a shelf is forty toasts a minute. Each
+of those is a decision somebody should make on purpose and write down; what is
+never right is the third state, an operation nobody decided about.
+
+**It is the same shape `audit` and `tool` already use**, for the same reason, and
+that is most of the argument for it: `A | { why }` was chosen years earlier
+because a previous platform made audit opt-in and twenty of its own writes were
+recorded nowhere with every suite green. This is that lesson applied to the half
+a person can actually see.
+
+**`refuseOperation` is where it bites**, beside `unrecorded_write`, so a manifest
+that composes is a manifest where every write reports — and a `why` shorter than
+twenty characters is refused too, because "n/a" is how a required field becomes
+optional again.
+
+**Therefore never:** a write with no `outcome`; a confirmation written in the
+screen that pressed the button; a silence that is a blank field rather than a
+stated reason; or a reason that is a label.

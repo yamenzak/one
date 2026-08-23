@@ -35,6 +35,7 @@ const stub = operation({
   output: { id: field.text({ label: "Id", holds: "none" }) },
   permission: "note:write",
   idempotency: { mode: "none" },
+  outcome: { message: "Published.", tone: "success" },
   async handler() { return { id: "n1" }; },
 }) as unknown as AnyOperation;
 
@@ -83,6 +84,39 @@ describe("an app that composes", () => {
     const why = refuseApp(broken).map((r) => r.why);
     expect(why.some((w) => w.includes("ghost:read"))).toBe(true);
     expect(why.some((w) => w.includes("phantom:read"))).toBe(true);
+  });
+
+  /*
+    ⚠️ A WRITE SAYS SOMETHING WHEN IT WORKED, OR SAYS WHY NOT. `outcome` was
+    optional and fifteen of fifty writes said nothing at all — not because
+    anybody chose silence for them, but because a field nobody has to fill is a
+    field that stays empty. Somebody pressed a button and waited, and the
+    product's answer was that the screen looked the same.
+
+    ⚠️ AND SILENCE IS OFTEN CORRECT, WHICH IS WHY THE ESCAPE IS A SENTENCE
+    RATHER THAN A FLAG. "n/a" is how a required field becomes optional again, so
+    a reason too short to be one is refused as well.
+  */
+  const quiet = (over: Record<string, unknown>) =>
+    ({ ...stub, ...over } as unknown as AnyOperation);
+
+  it("refuses a write that neither reports nor says why not", () => {
+    const { outcome: _gone, ...mute } = stub as unknown as Record<string, unknown>;
+    const why = refuseApp(app({ operations: [mute as unknown as AnyOperation] })).map((r) => r.why);
+    expect(why.some((w) => w.includes("unreported_write"))).toBe(true);
+  });
+
+  it("refuses a reason that is a label rather than a reason", () => {
+    const why = refuseApp(app({ operations: [quiet({ outcome: { why: "n/a" } })] }))
+      .map((r) => r.why);
+    expect(why.some((w) => w.includes("unreported_write"))).toBe(true);
+  });
+
+  it("accepts a stated silence", () => {
+    const said = quiet({
+      outcome: { why: "the answer IS the report — it returns what it worked out" },
+    });
+    expect(refuseApp(app({ operations: [said] }))).toEqual([]);
   });
 });
 

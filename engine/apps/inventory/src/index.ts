@@ -1832,6 +1832,10 @@ const tallyUp = operation<
   },
   permission: "stock:move",
   idempotency: { mode: "key" },
+  /* ⚠️ PRESSED ONCE PER ITEM ON A SHELF, WHICH IS FORTY TIMES A MINUTE. The
+     number on the screen going up is the confirmation; a toast per scan
+     would be the whole session behind a stack of them. */
+  outcome: { why: "the tally on the screen is the confirmation, and this is pressed per item" },
   emits: ["count.tallied"],
   fails: [
     "platform.not_found", "inventory.unreadable", "inventory.closed",
@@ -2840,6 +2844,7 @@ const identify = operation<{ code: string }, Guessing>({
      two questions, and the second may get a better answer from a better model.
      What must not repeat is the WRITE, and this writes nothing. */
   idempotency: { mode: "none" },
+  outcome: { why: "the answer IS the report — this returns what it worked out, on the screen that asked" },
   fails: ["platform.unavailable"],
   audit: (input) => ({ subject: input.code, verb: "asked about" }),
   ai: {
@@ -2892,6 +2897,7 @@ const readLabel = operation<{ image: string; hint?: string }, Guessing>({
   output: guessedOut,
   permission: "product:write",
   idempotency: { mode: "none" },
+  outcome: { why: "the answer IS the report — this returns what it worked out, on the screen that asked" },
   fails: ["platform.unavailable", "platform.invalid"],
   audit: () => ({ subject: "a label", verb: "read" }),
   ai: {
@@ -2938,6 +2944,7 @@ const readNote = operation<{ image: string }, { lines: readonly Noted[] }>({
   output: { lines: field.json({ label: "Lines", holds: "none" }) },
   permission: "stock:move",
   idempotency: { mode: "none" },
+  outcome: { why: "the answer IS the report — this returns what it worked out, on the screen that asked" },
   fails: ["platform.unavailable", "platform.invalid"],
   audit: () => ({ subject: "a delivery note", verb: "read" }),
   ai: {
@@ -2999,6 +3006,7 @@ const askInWords = operation<
   },
   permission: "stock:read",
   idempotency: { mode: "none" },
+  outcome: { why: "the answer IS the report — this returns what it worked out, on the screen that asked" },
   fails: ["platform.unavailable"],
   audit: (input) => ({ subject: input.question, verb: "asked" }),
   ai: {
@@ -3803,6 +3811,7 @@ const seeImport = operation<
      look at the same sheet answer with the first one's cached verdict, which is
      wrong the moment somebody adds a product between the two. */
   idempotency: { mode: "none" },
+  outcome: { why: "the answer IS the report — this returns what it worked out, on the screen that asked" },
   audit: () => ({ subject: "a spreadsheet", verb: "looked at" }),
   async handler(ctx, input) {
     const c = ctx as Ctx;

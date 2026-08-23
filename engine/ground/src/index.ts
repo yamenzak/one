@@ -239,6 +239,7 @@ const draft = operation<{ about: string; stream?: boolean }, { text: string }>({
   output: { text: field.text({ label: "Draft", holds: "none" }) },
   permission: "note:write",
   idempotency: { mode: "none" },
+  outcome: { why: "the answer IS the report — the draft arrives in the editor that asked for it" },
   emits: ["note.drafted"],
   /* ⚠️ What the record says. A generation is a spend, and "who asked for
      what" is exactly the entry somebody reads when a bill looks wrong. */
