@@ -112,6 +112,28 @@ describe("what a browser asks for before it has read anything", () => {
     });
   }
 
+  /*
+    ⚠️ THE ICON IS KEPT FRESH FOR MINUTES ON PURPOSE — somebody uploads one and
+    immediately looks — so it is revalidated constantly, and without a tag every
+    one of those revalidations is the whole picture sent again. Three of these
+    paths are asked for by the platform itself on a cold start, before any markup
+    of ours has a say, so this is the most-requested route in the deployment.
+  */
+  for (const path of ["/icon.png", "/apple-touch-icon.png", "/favicon.ico"]) {
+    it(`answers ${path} with a tag, and a matching one with no body`, async () => {
+      const got = await call("id.localhost", path);
+      const tag = got.headers.get("etag");
+      expect(tag, `${path}: no etag, so every revalidation resends the picture`)
+        .toBeTruthy();
+
+      const again = await worker.fetch(
+        new Request(`http://id.localhost:8080${path}`, { headers: { "if-none-match": tag! } }),
+        asDev as never);
+      expect(again.status, `${path}: a matching tag`).toBe(304);
+      expect((await again.arrayBuffer()).byteLength, `${path}: a 304 carries no body`).toBe(0);
+    });
+  }
+
   it("draws a real PNG, not an empty one", async () => {
     const got = await call("id.localhost", "/icon.png");
     const bytes = new Uint8Array(await got.arrayBuffer());

@@ -432,12 +432,12 @@ and a manifest that does not compose refuses to boot.
 | `guide` | help, onboarding, the milestones a workspace passes | 5 | — |
 | `job` | scheduled work, and the record that it ran | 7 | — |
 | `brand` | which surfaces a workspace may put its own mark on | 9 | — |
-| `mark` | the logo as geometry, so the browser and the Worker draw one shape | 7 | — |
+| `mark` | the logo as geometry, so the browser and the Worker draw one shape | 8 | — |
 | `ai` | a generating action: its lane, its prompt, its ceiling | 17 | — |
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**284 of them**, 283 reached by something today.
+**285 of them**, 284 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -482,7 +482,7 @@ env or a binding.
 | `jobs` | the scheduler and the record that it ran | 10 | 1 |
 | `branding` | a workspace's own theme and marks | 4 | — |
 | `icon` | the picture a business uploads, and where a public route can read it | 8 | — |
-| `raster` | a PNG drawn in a Worker, for the tabs and home screens an SVG cannot reach | 3 | — |
+| `raster` | a PNG drawn in a Worker, for the tabs and home screens an SVG cannot reach | 5 | — |
 | `ai-actions` | which model an action runs on, and in whose words | 7 | — |
 | `models` | the model catalogue — what exists, what it costs us, what a workspace pays | 15 | — |
 | `gateway` | the one door out to a model, and where a run's real cost is read | 8 | — |
@@ -516,7 +516,7 @@ env or a binding.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 9 | — |
 
-**458 of them**, 457 reached by something today.
+**460 of them**, 459 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 
@@ -1017,6 +1017,7 @@ its own header, cited by other files, and doing nothing.
 | D57 | A total is one ask, and a collection nobody may read is absent from it | 0 |
 | D58 | An expensive component has one home, and it is reached lazily | 0 |
 | D59 | A content-hashed asset is kept; the document that names it is not | 0 |
+| D60 | A worker's one thread is a shared resource, and drawing is what spends it | 0 |
 <!-- /generated -->
 
 ---

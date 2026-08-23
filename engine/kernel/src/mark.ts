@@ -229,6 +229,28 @@ export const beakOpacity = (of: MarkOf): number => (of === "space" ? 0.55 : 1);
 /* ----------------------------------------------------------------- inside --- */
 
 /**
+ * A MARK'S SHAPE, RESOLVED ONCE — everything `inkAt` needs and nothing else.
+ *
+ * ⚠️ IT EXISTS SO THE RESOLUTION CANNOT HAPPEN INSIDE A LOOP. `inkAt` used to
+ * take a `MarkOf` and call `partsOf` itself, which reads correctly and is right
+ * for the SVG, where it happens once. The rasteriser asks the same question
+ * millions of times for one picture — a 512px tile at the rate it shipped with
+ * was 4,194,304 of them — so that convenience was several million array-and-
+ * object allocations for a shape that did not change between any two calls.
+ * Making the caller hold the shape is what makes the hoist unavoidable rather
+ * than remembered.
+ */
+export interface MarkShape {
+  readonly parts: MarkParts;
+  readonly beak: number;
+}
+
+/** ⚠️ ONE CALL FOR BOTH HALVES, so no caller can sample one mark's parts with
+    another's beak — see `MarkShape` for why the pair travels together. */
+export const shapeOf = (of: MarkOf): MarkShape =>
+  ({ parts: partsOf(of), beak: beakOpacity(of) });
+
+/**
  * IS THIS POINT IN THE INK — the whole mark, in the drawing's coordinates.
  *
  * ⚠️ ONE ANSWER FOR BOTH RENDERERS TO AGREE WITH. The SVG builds the same shape
@@ -243,8 +265,8 @@ export const beakOpacity = (of: MarkOf): number => (of === "space" ? 0.55 : 1);
  * Returns the ink's OPACITY at that point — 0 outside, 1 in the stem, and the
  * beak's own value in the beak.
  */
-export function inkAt(of: MarkOf, x: number, y: number): number {
-  const { slots, rings, bars } = partsOf(of);
+export function inkAt(shape: MarkShape, x: number, y: number): number {
+  const { slots, rings, bars } = shape.parts;
 
   /* ⚠️ THE BARS ARE TESTED FIRST BECAUSE THEY ARE ADDED RATHER THAN CUT. Asked
      after the stem, the half of each bar that overhangs would be ink and the half
@@ -268,7 +290,7 @@ export function inkAt(of: MarkOf, x: number, y: number): number {
     return 1;
   }
 
-  return inBeak(x, y) ? beakOpacity(of) : 0;
+  return inBeak(x, y) ? shape.beak : 0;
 }
 
 /**

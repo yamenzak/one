@@ -15,8 +15,9 @@
 
 import { inflateSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
-import { inkAt, inkOf } from "@engine/kernel";
-import { drawTile, encodePng, tilePng } from "../src/raster.js";
+import { inkAt, inkOf, shapeOf } from "@engine/kernel";
+import { drawTile, encodePng, etagOf, fitting, tilePng } from "../src/raster.js";
+import { TILE } from "../src/installable.js";
 
 /* --------------------------------------------------------------- decoding --- */
 
@@ -170,15 +171,15 @@ describe("the tile", () => {
   */
   it("crosses the wallet's numeral with bars that overhang it", () => {
     /* Past the stem's right edge, on the upper bar. */
-    expect(inkAt("wallet", 70, 40)).toBe(1);
+    expect(inkAt(shapeOf("wallet"), 70, 40)).toBe(1);
     /* Left of the stem, on the same bar, below the beak. */
-    expect(inkAt("wallet", 40, 46)).toBe(1);
+    expect(inkAt(shapeOf("wallet"), 40, 46)).toBe(1);
     /* Between the two bars, outside the stem: nothing. */
-    expect(inkAt("wallet", 70, 47)).toBe(0);
+    expect(inkAt(shapeOf("wallet"), 70, 47)).toBe(0);
     /* ⚠️ And the numeral is still under them — a wallet is the mark with
        something added, never a different shape. */
-    expect(inkAt("wallet", 56, 70)).toBe(1);
-    expect(inkAt("wallet", 34, 30)).toBeGreaterThan(0);
+    expect(inkAt(shapeOf("wallet"), 56, 70)).toBe(1);
+    expect(inkAt(shapeOf("wallet"), 34, 30)).toBeGreaterThan(0);
   });
 
   /* ⚠️ A MALFORMED COLOUR COSTS A TILE, NEVER THE ROUTE. This is read on the
@@ -186,6 +187,84 @@ describe("the tile", () => {
   it("survives a colour somebody typed wrong", async () => {
     await expect(tilePng({ of: "one", ground: "not a colour", ink: "#fff", size: 16 }))
       .resolves.toBeInstanceOf(Uint8Array);
+  });
+});
+
+/**
+ * ⚠️ THE THREAD THIS RUNS ON IS SHARED WITH EVERY OTHER REQUEST IN THE ISOLATE,
+ * which is why the icon's cost is asserted rather than assumed. It shipped at
+ * 4,194,304 evaluations of the shape per picture — a rate chosen for a 32px tile
+ * multiplied by a size raised to 512 somewhere else, with no place where the
+ * product of the two was a number anybody looked at. On a live Worker that was
+ * over three seconds of CPU, and a trace caught an unrelated operation running
+ * out its ten-second limit beside two of them.
+ */
+describe("what the icon costs", () => {
+  /* ⚠️ THE SIZE THE DEPLOYMENT ACTUALLY SERVES, imported rather than repeated —
+     raising `TILE` has to fail here, and it cannot if this holds its own copy. */
+  const BUDGET = 400_000;
+
+  it("draws the served tile inside its budget", () => {
+    const { cost } = fitting({ of: "one", ground: BLACK, ink: WHITE, size: TILE });
+    expect(cost, `drawing the ${TILE}px tile asks the shape ${cost} times`)
+      .toBeLessThanOrEqual(BUDGET);
+  });
+
+  /* ⚠️ AND THE BUDGET IS NOT MET BY DRAWING NOTHING. A fitting that collapsed to
+     an empty range would cost zero and pass, having produced a flat rectangle. */
+  it("still covers the whole drawing", () => {
+    const of = { of: "one" as const, ground: BLACK, ink: WHITE, size: TILE };
+    const fit = fitting(of);
+    expect(fit.x2 - fit.x1).toBeGreaterThan(TILE / 4);
+    expect(fit.y2 - fit.y1).toBeGreaterThan(TILE / 4);
+    /* The range must reach every pixel the ink can land on, or the tile is
+       silently cropped — which looks like a design decision, not a bug. */
+    expect(fit.x1).toBeLessThanOrEqual(Math.floor(fit.left));
+    expect(fit.y1).toBeLessThanOrEqual(Math.floor(fit.top));
+    expect(fit.x2).toBeGreaterThanOrEqual(Math.ceil(fit.left + fit.box.w * fit.scale));
+    expect(fit.y2).toBeGreaterThanOrEqual(Math.ceil(fit.top + fit.box.h * fit.scale));
+  });
+
+  /*
+    ⚠️ THE FINEST FEATURE IS ONE DRAWING UNIT — a counter, on a 32px tile a third
+    of a pixel wide. The budget above is affordable only because the sample rate
+    falls as the tile grows, so this is the other half of that trade and has to
+    be asserted beside it: no size may end up sampled more thinly than the
+    smallest tile has always lived with, which is 1.2 samples per drawing unit.
+    Below that the counters close up and the mark ships as a plain bar.
+  */
+  const FLOOR = 1.2;
+
+  it("keeps the counters sampled at every size", () => {
+    for (const size of [32, 64, 128, 256, 512]) {
+      const fit = fitting({ of: "one", ground: BLACK, ink: WHITE, size });
+      /* Pixels across one drawing unit, times samples per pixel. */
+      const perUnit = fit.scale * fit.samples;
+      expect(perUnit, `${size}px: ${perUnit.toFixed(1)} samples per drawing unit`)
+        .toBeGreaterThanOrEqual(FLOOR);
+    }
+  });
+
+  /* ⚠️ AND THE SAME TILE IS NEVER DRAWN TWICE. Three paths ask for this picture
+     on every cold start and none of them changes it; without the memo each one
+     pays the whole cost again, on the thread the rest of the isolate is queued
+     behind. */
+  it("draws a tile once and answers with the same bytes after", async () => {
+    const of = { of: "one" as const, ground: "#010203", ink: "#f0e1d2", size: 64 };
+    const first = await tilePng(of);
+    const again = await tilePng({ ...of });
+    expect(again).toBe(first);
+    /* A different workspace's colours are a different picture, not a cache hit. */
+    expect(await tilePng({ ...of, ink: "#ffffff" })).not.toBe(first);
+  });
+
+  /* ⚠️ AND A REVALIDATION COSTS NO BODY. The icon is kept fresh for minutes on
+     purpose, so it is revalidated often — a tag is what makes that a 304. */
+  it("tags the bytes, and a changed picture gets a changed tag", async () => {
+    const of = { of: "one" as const, ground: BLACK, ink: WHITE, size: 32 };
+    expect(etagOf(await tilePng(of))).toBe(etagOf(await tilePng({ ...of })));
+    expect(etagOf(await tilePng(of)))
+      .not.toBe(etagOf(await tilePng({ ...of, ground: "#111111" })));
   });
 });
 
@@ -202,7 +281,7 @@ describe("the geometry the two renderers share", () => {
       let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
       for (let y = 0; y <= 100; y += 0.25) {
         for (let x = 0; x <= 100; x += 0.25) {
-          if (inkAt(of, x, y) <= 0) continue;
+          if (inkAt(shapeOf(of), x, y) <= 0) continue;
           minX = Math.min(minX, x); maxX = Math.max(maxX, x);
           minY = Math.min(minY, y); maxY = Math.max(maxY, y);
         }
@@ -224,9 +303,9 @@ describe("the geometry the two renderers share", () => {
      same shape a different way. */
   it("cuts a ring out of the stem and keeps its centre", () => {
     /* The centre of the first ring is ink; the annulus around it is not. */
-    expect(inkAt("space", 52, 36)).toBe(1);
-    expect(inkAt("space", 52 + 3.5, 36)).toBe(0);
+    expect(inkAt(shapeOf("space"), 52, 36)).toBe(1);
+    expect(inkAt(shapeOf("space"), 52 + 3.5, 36)).toBe(0);
     /* And the platform's mark has no ring there at all — solid stem. */
-    expect(inkAt("one", 56, 36)).toBe(1);
+    expect(inkAt(shapeOf("one"), 56, 36)).toBe(1);
   });
 });

@@ -65,6 +65,7 @@ import { brandingOf } from "./branding.js";
 import { keep } from "./vault.js";
 import { iconPng, iconSvg, webManifest, type Installable, type Installer } from "./installable.js";
 import { iconOf } from "./icon.js";
+import { etagOf } from "./raster.js";
 import { mailedAs } from "./inbox.js";
 import { reachIn } from "./reach.js";
 import { availableChannels, type Mailer, type Pusher } from "./services.js";
@@ -691,7 +692,18 @@ export function serve(wiring: Wiring): (request: Request) => Promise<Response> {
       */
       const png = await iconPng(of);
       if (!png) return asProblem(problem(PLATFORM_PROBLEMS, "platform.not_found"));
-      return new Response(png, { headers: picture("image/png") });
+      /*
+        ⚠️ FIVE MINUTES MEANS A REVALIDATION, AND A REVALIDATION WITH NO TAG IS
+        THE WHOLE PICTURE AGAIN. Three paths here are asked for on every cold
+        start by something that never read our markup, so the tag is what turns
+        "still the same" into an empty answer instead of a fresh download.
+      */
+      const tag = etagOf(png);
+      const headers = { ...picture("image/png"), etag: tag };
+      if (request.headers.get("if-none-match") === tag) {
+        return new Response(null, { status: 304, headers });
+      }
+      return new Response(png, { headers });
     }
 
     /*

@@ -1883,3 +1883,48 @@ whole mechanism by which anybody ever gets a new build.
 cache headers; a long `max-age` without `immutable` beside it; a rule that keeps
 `index.html`, `/` or `/*`; or a performance conclusion drawn from bundle size
 without checking what a browser is asked to fetch before it can start.
+
+---
+
+## D60 — A worker's one thread is a shared resource, and drawing is what spends it
+
+**Three seconds of CPU, on a public path, on the thread every other request in
+the isolate is queued behind.** `/icon.png` and `/apple-touch-icon.png` measured
+at `cpuTimeMs` 3,137 and 3,278 on the live deployment, and the same trace caught
+an unrelated `/api/me.who` running out its ten-second wall limit beside them. A
+Worker isolate has one thread: a request that computes for seconds does not
+merely answer slowly, it stops everything sharing that isolate from answering at
+all. The symptom is on somebody's phone and the cause is on a route nobody
+suspects, because an icon is not a thing anyone profiles.
+
+**The cost was nowhere anybody could see it.** The rasteriser supersamples 4×4,
+chosen against a 32px tile and documented as costing "nothing anybody will
+measure on an icon". The tile size is 512, set in a different file for a
+different reason. Neither number is wrong; their product is 4,194,304
+evaluations of the mark's geometry per picture, and there was no place in the
+code where that product was a number. So `fitting()` now returns the plan and the
+`cost` of it from one call, and a test holds that cost to a budget against the
+size the deployment actually serves — the `planRun` shape, applied to pixels.
+
+**Three independent halves, and each is a different kind of waste.** The rate is
+now derived from the size, because antialiasing is about the finest feature and
+at 512px the pixel grid is already finer than anything being drawn (tiles up to
+180px come out byte-identical). Pixels outside the fitted ink box are ground by
+construction and are no longer asked about — four in five of them. And the shape
+is resolved once per picture instead of once per sample: `inkAt` took a `MarkOf`
+and called `partsOf` itself, which is right for the SVG where it happens once and
+was several million array allocations here. Measured together in the Workers
+runtime: 362 ms → 21 ms for the served tile.
+
+**Then it is not drawn twice.** The bytes are a pure function of mark, ground,
+ink and size, so an isolate that has drawn a tile answers with the same bytes
+after, and the response carries an `ETag` so the deliberate five-minute freshness
+costs a 304 rather than the whole picture. Neither replaces making the drawing
+cheap: a cold isolate still pays the first one, and that is the request that was
+timing out.
+
+**Therefore never:** a per-request computation on a public path whose cost is not
+a number somewhere a test can read; a sampling rate held constant while the thing
+being sampled changes size; a deterministic picture recomputed per request; or a
+resolution step inside a loop that is invariant across it. And when a page is
+slow, look at what the server spends before looking again at what it sends.
