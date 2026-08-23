@@ -128,7 +128,20 @@ const timed = async (op: string, lag: number) => {
   return { ms: Date.now() - began, status: res.status };
 };
 
+/**
+ * ⚠️ WARMED FIRST, BECAUSE THE PAIR MUST DO THE SAME WORK. The slope only means
+ * anything if both readings ran the same queries — and the FIRST call of an
+ * operation does not: a lazily-built cache, a schema check, a memo that is empty
+ * once. It failed in CI exactly that way, reporting `inbox.list` at 9.5 with a
+ * fast reading of 39 ms, which is less time than eight sequential twenty
+ * millisecond holds can take. That is not a deep request; it is two readings of
+ * different requests, subtracted.
+ *
+ * ⚠️ AND THE WARM-UP IS UNTIMED AND DISCARDED. Timing it would put the one-off
+ * cost back into the number this is trying to isolate.
+ */
 const spent = async (op: string) => {
+  await timed(op, FAST);
   const fast = await timed(op, FAST);
   const slower = await timed(op, SLOW);
   return {

@@ -73,14 +73,39 @@ let onRenewed: (() => void) | null = null;
 let told = false;
 export const whenRenewed = (run: () => void): void => { onRenewed = run; };
 
+let latest: string | null = null;
+
 const noticed = (res: Response): void => {
   const said = res.headers.get("x-one-version");
   if (!said) return;
   running ??= said;
+  latest = said;
   if (said === running || told) return;
   told = true;
   onRenewed?.();
 };
+
+/**
+ * WHICH BUILD THIS TAB IS RUNNING, AND WHICH ONE THE DEPLOYMENT IS SERVING.
+ *
+ * ⚠️ BOTH FACTS EXIST HERE ALREADY AND NEITHER WAS READABLE. Every answer is
+ * stamped with the entry bundle the worker would serve now; this module latches
+ * the first one it sees as what the tab is running, and compares. So "am I on
+ * the new build?" was answerable only from DevTools or a `curl` — which is a
+ * poor place to be when the person asking is holding a phone, testing a fix
+ * somebody just shipped them.
+ *
+ * ⚠️ AND THEY ARE SEPARATE ANSWERS ON PURPOSE. Equal means current. Different
+ * means a deploy landed under this tab, which is the state the reload notice
+ * exists for — and showing one number could never say that.
+ *
+ * ⚠️ `null` UNTIL SOMETHING HAS BEEN ASKED, which is honest rather than tidy: a
+ * screen that has made no request knows nothing about the build, and printing a
+ * dash is the difference between "not yet" and "no version", which the person
+ * reading this is specifically trying to tell apart.
+ */
+export const buildHere = (): string | null => running;
+export const buildServed = (): string | null => latest;
 
 /**
  * ⚠️ THE SIGN-IN LANE IS EXEMPT, and it has to be: a wrong code answers 401, and

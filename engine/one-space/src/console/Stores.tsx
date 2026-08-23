@@ -32,6 +32,7 @@ import {
 } from "@engine/kernel";
 import { Chip } from "@heroui/react";
 import { useLoad } from "../centre/data.js";
+import { buildHere, buildServed } from "../api.js";
 
 interface Item {
   readonly name: string;
@@ -128,8 +129,45 @@ export function Stores() {
       then={(data) => {
         const draining = data.items.filter((i) => i.state === "draining");
         const standing = data.items.filter((i) => i.state !== "draining");
+        /* ⚠️ READ AT RENDER RATHER THAN HELD IN STATE. Both are stamped on every
+           answer, so by the time this screen has its own data they are current
+           — and a `useState` here would be a third copy of a fact the door
+           already keeps, updated by whoever remembered to. */
+        const here = buildHere();
+        const served = buildServed();
+
         return (
           <Stack space="roomy">
+            {/*
+              ⚠️ WHICH BUILD IS RUNNING, BECAUSE IT WAS ANSWERABLE ONLY FROM
+              DEVTOOLS. Every answer carries the entry bundle the worker would
+              serve now, and nothing showed it — so "am I on the fix you just
+              shipped?" meant opening a console or a `curl`, which is a poor
+              place to be when the person asking is holding a phone.
+
+              ⚠️ AND IT IS TWO FACTS, NOT ONE. Equal means this tab is current.
+              Different means a deploy landed underneath it and a reload is
+              waiting — which is the state the renewal notice exists for, and
+              which one number could never say.
+            */}
+            <Group
+              label="Build"
+              under={here && served && here !== served
+                ? "A newer build is being served — reload to take it"
+                : "What this tab is running, and what the deployment serves"}
+            >
+              <FieldRow label="This tab" value={here ?? "not asked yet"} />
+              {/* ⚠️ THE DIFFERENCE IS SAID UNDER THE ROW, not coloured into it —
+                  the same rule the draining store follows two cards down. A
+                  state is one word; what to do about it is a sentence. */}
+              <FieldRow
+                label="Being served"
+                value={served ?? "not asked yet"}
+                under={here && served && here !== served
+                  ? <span data-ink="warning">This tab is a build behind</span>
+                  : undefined}
+              />
+            </Group>
             {/*
               ⚠️ NO TOKEN IS AN ANSWER, NOT AN ERROR. A deployment that cannot
               provision is a self-host, a test run, and this one before the secret
