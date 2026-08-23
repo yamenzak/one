@@ -290,7 +290,9 @@ describe("a disclosure inside a card", () => {
  * markup, the token and every source guard all looked right.
  */
 describe("the one number a screen is about", () => {
-  /** ⚠️ `SPACE.airy` — the widest rung. Above the block, and inside it. */
+  /** ⚠️ `SPACE.vast` — the rung that exists for a neighbour made of chrome. */
+  const VAST = 64;
+  /** ⚠️ `SPACE.airy` — the widest gap between two things the page itself drew. */
   const AIRY = 40;
 
   const hero = async () => {
@@ -323,10 +325,10 @@ describe("the one number a screen is about", () => {
     } finally { await page.close(); }
   };
 
-  it("stands off the chrome above it by the widest rung", async () => {
+  it("stands off the chrome above it by the rung chrome earns", async () => {
     const seen = await hero();
     expect(seen.padTop, "the figure block's top inset — zero means the rung reached the "
-      + "markup and not the stylesheet, so rebuild the SPA before believing it").toBe(AIRY);
+      + "markup and not the stylesheet, so rebuild the SPA before believing it").toBe(VAST);
   });
 
   it("separates what to do about the number from the number itself", async () => {

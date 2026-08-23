@@ -338,6 +338,20 @@ export const SPACE = {
   snug: "gap-3",
   roomy: "gap-6",
   airy: "gap-10",
+  /**
+   * ⚠️ 64px, AND IT EXISTS FOR ONE SITUATION: A BLOCK WHOSE NEIGHBOUR IS CHROME
+   * RATHER THAN TYPE. Every other gap on the ladder separates two things a page
+   * drew, and 40 is as much as any of those ever needs. A hero arrives under the
+   * crown — a control standing on a veil, the full width of the screen — and
+   * against that the widest ordinary rung still reads as a figure pushed up
+   * against the bar. Photographed on a phone, twice.
+   *
+   * ⚠️ AND A FIFTH RUNG IS A COST, WHICH IS WHY IT NAMES ITS CASE. A ladder is
+   * useful because it is short; one more step is one more defensible answer to
+   * every spacing question in the product. Reach for this only where the thing
+   * above or below is not part of the page.
+   */
+  vast: "gap-16",
 } as const;
 
 export type Space = keyof typeof SPACE;
@@ -481,22 +495,20 @@ export const BAND_PAD = "py-6" as const;
  * never air above.
  *
  * ⚠️ BOTH NUMBERS ARE RUNGS OF `SPACE`, WHICH IS WHAT MAKES IT THE SAME SYSTEM.
- * `airy` at both ends — the same step a page's own stack uses, so a hero is
- * separated from the first section by the widest gap the product has plus that
- * stack's own, and the answer to "why this much" is a rung rather than a number
- * somebody liked. The BOTTOM matches `TITLE_PAD` exactly, because a title card
- * and a hero are the same block on two kinds of screen.
+ * The answer to "why this much" is a step of the ladder rather than a number
+ * somebody liked. The BOTTOM is `airy` and matches `TITLE_PAD` exactly, because
+ * a title card and a hero are the same block on two kinds of screen.
  *
- * ⚠️ AND THE TOP IS THE SAME RUNG RATHER THAN THE ONE BELOW IT, BECAUSE OF WHAT
- * IS ABOVE IT. A title card arrives under its own name; a hero arrives under the
- * crown, and the crown is a control on a veil rather than a line of type — so
- * the number lands against 64px of chrome and a hem, and a rung that reads as
- * air under a heading reads as a figure pushed up against the bar. Only the top
- * is free here: the ladder guard asks the two blocks agree BELOW, which is where
- * a difference would give the product a roomier home page than its own detail
- * pages.
+ * ⚠️ AND THE TOP IS A RUNG WIDER, BECAUSE OF WHAT IS ABOVE IT. A title card
+ * arrives under its own name; a hero arrives under the CROWN — 64px of control
+ * standing on a veil, the full width of the screen — so what it has to clear is
+ * not a line of type, and every rung the rest of the page uses reads against it
+ * as a figure pushed up against the bar. `vast` names exactly that case. Only
+ * the top is free: the ladder guard asks the two blocks agree BELOW, which is
+ * where a difference would give the product a roomier home page than its own
+ * detail pages.
  */
-export const HERO_PAD = "pt-10 pb-10" as const;
+export const HERO_PAD = "pt-16 pb-10" as const;
 
 /**
  * ⚠️ ONE THIRD DOWN, NOT HALF — the optical centre of a door screen. A sign-in

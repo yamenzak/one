@@ -306,9 +306,15 @@ if (!rows.length) {
  */
 {
   const METRICS = readFileSync(join(ENGINE, "design/src/tokens/metrics.ts"), "utf8");
-  /* ⚠️ Read OFF `SPACE`, so a rung added or retuned carries these with it. */
-  const rungs = [...METRICS.matchAll(/^\s*(?:hair|tight|snug|roomy|airy): "gap-([\d.]+)"/gm)]
-    .map((m) => m[1]);
+  /* ⚠️ READ OFF THE `SPACE` BLOCK ITSELF, NOT OFF A LIST OF ITS KEYS. The keys
+     were named here — `hair|tight|snug|roomy|airy` — which is the second copy of
+     the thing being checked that this file elsewhere refuses to keep: a rung
+     added to the scale was invisible here, so a padding that had just become a
+     step of the ladder would report as a number somebody liked. Bounding the
+     search to the declaration is what makes it read the real thing; a bare
+     `gap-` sweep would take `ROW.gap` too, and 12 is not a rung of this scale. */
+  const block = /export const SPACE = \{([\s\S]*?)\n\} as const;/.exec(METRICS)?.[1] ?? "";
+  const rungs = [...block.matchAll(/^\s*\w+: "gap-([\d.]+)"/gm)].map((m) => m[1]);
   const below = (name) => /pb-([\d.]+)/.exec(new RegExp(`${name} = "([^"]+)"`).exec(METRICS)?.[1] ?? "")?.[1];
   const hero = below("HERO_PAD");
   const title = below("TITLE_PAD");

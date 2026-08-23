@@ -951,8 +951,8 @@ same and ask whether they are really the same kind of thing.
 Air is structural. `roomy` between kinds of thing, `snug` within one. A heading
 belongs to what is under it, never floating equidistant between two blocks.
 
-⚠️ **One ladder — 4 / 8 / 12 / 24 / 40 — and a heading's own air is a rung of it,
-not a number near one.** A hero and a title card both take `airy` below;
+⚠️ **One ladder — 4 / 8 / 12 / 24 / 40 / 64 — and a heading's own air is a rung of
+it, not a number near one.** A hero and a title card both take `airy` below;
 sections take `roomy` between them. They were 32 against a section's 24 for a
 while, which is close enough that nothing looked wrong and far enough that
 nothing looked decided — and the answer to "why this much" was nobody. Whether a
@@ -963,11 +963,19 @@ same ladder is structure, and `metrics.test.mjs` asks only the second question.
 block on two kinds of screen. Two numbers for one idea is how a product ends up
 with a roomier home page than its own detail pages for no reason anybody chose.
 
-⚠️ **ABOVE, only a hero has a question to answer, and the answer is `airy` too.**
-A title card arrives under its own name; a hero arrives under the crown — 64px of
-control standing on a veil rather than a line of type — so the rung that reads as
-air beneath a heading reads as a figure pushed up against the bar. It is the one
-place the two blocks differ, and it is the top alone.
+⚠️ **ABOVE, only a hero has a question to answer, and the answer is a rung
+wider.** A title card arrives under its own name; a hero arrives under the crown
+— 64px of control standing on a veil, the full width of the screen — so what it
+has to clear is not a line of type, and every rung the rest of the page uses
+reads against it as a figure pushed up against the bar. It is the one place the
+two blocks differ, and it is the top alone.
+
+⚠️ **`vast` is the fifth rung and it exists for that one situation: a neighbour
+made of CHROME rather than of type.** Every other gap on the ladder separates two
+things the page itself drew, and 40 is as much as any of those ever needs. A
+fifth step is a real cost — one more defensible answer to every spacing question
+in the product — so it names its case, and the case is the only reason to reach
+for it.
 
 ⚠️ **And what is UNDER a hero takes the widest rung as well** — a row of quick
 actions is what to *do* about the number, not a fourth line of its caption. At
