@@ -79,6 +79,23 @@ export interface Guessed {
   readonly storage: string;
   readonly handling: string;
   /**
+   * ⚠️ WHAT IT IS, IN A SENTENCE, AND ONLY A PHOTOGRAPH OF THE THING CAN GIVE
+   * IT. A barcode lookup answers with a name and a label answers with what is
+   * printed; neither says "a 5 litre jerrican of blue screenwash with a
+   * pull-out spout", which is what somebody scrolling a catalogue of four
+   * hundred rows is actually reading.
+   */
+  readonly description: string;
+  /**
+   * ⚠️ THE WORDS THIS THING IS FILED UNDER, AND THEY ARE MATCHED BEFORE THEY ARE
+   * MINTED. The caller hands the model the tags this workspace already uses, so
+   * the answer is mostly a choice from a list — see `product.see`. Without that
+   * the same model produces "Cleaning", "Cleaning products" and "Janitorial" on
+   * three consecutive mornings and the catalogue cannot be filtered by the thing
+   * it was filed under.
+   */
+  readonly tags: readonly string[];
+  /**
    * ⚠️ HAZARDS ARE SUGGESTED WITH A SOURCE, NEVER FILLED. A wrong GHS class on a
    * label is a legal document that is wrong, and the person printing it is the
    * one who has to answer for it.
@@ -88,7 +105,7 @@ export interface Guessed {
 
 const EMPTY: Guessed = {
   name: "", brand: "", category: "", unit: "", pack: 0, tracking: "", why: "",
-  storage: "", handling: "", hazards: [],
+  storage: "", handling: "", description: "", tags: [], hazards: [],
 };
 
 export function guessedIn(of: unknown): Guessed {
@@ -107,6 +124,13 @@ export function guessedIn(of: unknown): Guessed {
     why: words(at(of, "why"), 200),
     storage: words(at(of, "storage"), 2_000),
     handling: words(at(of, "handling"), 2_000),
+    description: words(at(of, "description"), 400),
+    /* ⚠️ SIX, AND TRIMMED. A model handed a picture and asked for categories
+       will produce fifteen, every one arguably true, and a product filed under
+       fifteen things is filed under none of them. */
+    tags: Array.isArray(at(of, "tags"))
+      ? (at(of, "tags") as readonly unknown[]).map((t) => words(t, 60)).filter(Boolean).slice(0, 6)
+      : [],
     hazards: Array.isArray(at(of, "hazards"))
       ? (at(of, "hazards") as readonly unknown[]).map((h) => words(h, 80)).filter(Boolean).slice(0, 12)
       : [],

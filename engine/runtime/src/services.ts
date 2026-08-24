@@ -68,12 +68,12 @@ export interface Ask {
    */
   readonly units?: Usage;
   /**
-   * ⚠️ A PICTURE TO LOOK AT, AS A `data:` URL. It is what the vision lane is
-   * FOR, and it is also the largest single input a request can carry — so the
-   * reserve counts it (`TOKENS_PER_IMAGE`) rather than budgeting for the
-   * sentence wrapped around it.
+   * ⚠️ PICTURES TO LOOK AT, AS `data:` URLs. They are what the vision lane is
+   * FOR, and each is larger than every other input a request carries — so the
+   * reserve counts ALL of them (`TOKENS_PER_IMAGE` × the length) rather than
+   * budgeting for the sentence wrapped around them.
    */
-  readonly image?: string;
+  readonly images?: readonly string[];
   /**
    * ⚠️ THE MODEL FOR THIS RUN, IF ONE WAS CHOSEN (D19). Resolved by the caller
    * through `running`, because the same resolution decides the PROMPT — and a
@@ -128,13 +128,13 @@ export type AiRefusal =
  */
 export interface Provider {
   /**
-   * ⚠️ THE PICTURE IS A PARAMETER RATHER THAN PART OF `Planned`, because
+   * ⚠️ THE PICTURES ARE A PARAMETER RATHER THAN PART OF `Planned`, because
    * `Planned` is the words and what they were budgeted at. An image folded in
    * there would travel through the reserve arithmetic as text, which is exactly
    * the count it is not.
    */
   run(
-    model: ModelRow, planned: Planned, maxOutput: number, image?: string,
+    model: ModelRow, planned: Planned, maxOutput: number, images?: readonly string[],
   ): Promise<Answered | GatewayRefusal>;
 }
 
@@ -150,10 +150,10 @@ export const gatewayProvider = (
   at: GatewayAt | null, tag: { readonly t: string; readonly a: string; readonly o: string },
   fetcher?: Fetcher,
 ): Provider => ({
-  run: (model, planned, maxOutput, image) =>
+  run: (model, planned, maxOutput, images) =>
     askModel(at, {
       model, system: planned.system, prompt: planned.prompt, maxOutput, tag,
-      ...(image ? { image } : {}),
+      ...(images?.length ? { images } : {}),
     }, fetcher ?? fetch),
 });
 
@@ -199,11 +199,15 @@ export async function generate(deps: AiDeps, ask: Ask): Promise<Generated | AiRe
     {
       ...(ask.units ? { units: ask.units } : {}),
       ...(model.thinks ? { thinks: true } : {}),
-      /* ⚠️ THE PICTURE IS IN THE RESERVE, and it is the largest single input in
-         the request. Budgeting for the sentence around it and not for it is a
+      /* ⚠️ EVERY PICTURE IS IN THE RESERVE, and each is larger than the whole
+         sentence around them. Budgeting for the words and not for them is a
          hold that covers a fraction of the call — which `settle`'s cap then
-         turns into tokens the platform pays for and the workspace does not. */
-      ...(ask.image ? { images: 1 } : {}),
+         turns into tokens the platform pays for and the workspace does not.
+         ⚠️ AND IT IS THE COUNT, NOT WHETHER THERE ARE ANY. `images: 1` for six
+         photographs is the same under-count wearing a plural seam's clothes:
+         five sixths of the largest input in the request, unbudgeted, on a call
+         that cannot report it. */
+      ...(ask.images?.length ? { images: ask.images.length } : {}),
     });
 
   const held = await reserve(deps.directory, ask.tenantId, planned.reserve.credits, planned.reserve.of);
@@ -220,7 +224,7 @@ export async function generate(deps: AiDeps, ask: Ask): Promise<Generated | AiRe
      outside development throws on purpose, and an unforeseen fault throws by
      accident. Handling only the first leaves the credits held on the second —
      a customer whose balance shrank and who got nothing. */
-  const out = await deps.provider.run(model, planned, ceiling, ask.image)
+  const out = await deps.provider.run(model, planned, ceiling, ask.images)
     .catch((why: unknown) => String(why instanceof Error ? why.message : why));
 
   /* ⚠️ AND A FAILURE STILL WRITES A ROW. A failure with no row is a button that
@@ -276,9 +280,9 @@ export async function generate(deps: AiDeps, ask: Ask): Promise<Generated | AiRe
  * function.
  */
 export interface Streamer {
-  /** ⚠️ A picture, like `Provider.run` — the same reason, the same shape. */
+  /** ⚠️ Pictures, like `Provider.run` — the same reason, the same shape. */
   runStream(
-    model: ModelRow, planned: Planned, maxOutput: number, image?: string,
+    model: ModelRow, planned: Planned, maxOutput: number, images?: readonly string[],
   ): Promise<Streamed | GatewayRefusal>;
 }
 
@@ -287,10 +291,10 @@ export const gatewayStreamer = (
   at: GatewayAt | null, tag: { readonly t: string; readonly a: string; readonly o: string },
   fetcher?: Fetcher,
 ): Streamer => ({
-  runStream: (model, planned, maxOutput, image) =>
+  runStream: (model, planned, maxOutput, images) =>
     askModelStream(at, {
       model, system: planned.system, prompt: planned.prompt, maxOutput, tag,
-      ...(image ? { image } : {}),
+      ...(images?.length ? { images } : {}),
     },
       fetcher ?? fetch),
 });
@@ -326,11 +330,15 @@ export async function generateStream(
     {
       ...(ask.units ? { units: ask.units } : {}),
       ...(model.thinks ? { thinks: true } : {}),
-      /* ⚠️ THE PICTURE IS IN THE RESERVE, and it is the largest single input in
-         the request. Budgeting for the sentence around it and not for it is a
+      /* ⚠️ EVERY PICTURE IS IN THE RESERVE, and each is larger than the whole
+         sentence around them. Budgeting for the words and not for them is a
          hold that covers a fraction of the call — which `settle`'s cap then
-         turns into tokens the platform pays for and the workspace does not. */
-      ...(ask.image ? { images: 1 } : {}),
+         turns into tokens the platform pays for and the workspace does not.
+         ⚠️ AND IT IS THE COUNT, NOT WHETHER THERE ARE ANY. `images: 1` for six
+         photographs is the same under-count wearing a plural seam's clothes:
+         five sixths of the largest input in the request, unbudgeted, on a call
+         that cannot report it. */
+      ...(ask.images?.length ? { images: ask.images.length } : {}),
     });
 
   const held = await reserve(deps.directory, ask.tenantId, planned.reserve.credits, planned.reserve.of);
@@ -342,7 +350,7 @@ export async function generateStream(
       model: model.id, lane: ask.lane, held: held.credits, ...it,
     });
 
-  const out = await deps.streamer.runStream(model, planned, ceiling, ask.image)
+  const out = await deps.streamer.runStream(model, planned, ceiling, ask.images)
     .catch((why: unknown) => String(why instanceof Error ? why.message : why));
 
   /* ⚠️ A REFUSAL BEFORE THE FIRST TOKEN RELEASES AND STILL RECORDS — the same

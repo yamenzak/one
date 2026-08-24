@@ -2947,7 +2947,7 @@ const breakUp = operation<{ kit: string }, { released: number }>({
 /** ⚠️ The seam the platform supplies for an operation that declared an action. */
 interface Generating {
   generate?: (
-    values: Readonly<Record<string, string>>, look?: { image?: string },
+    values: Readonly<Record<string, string>>, look?: { images?: readonly string[] },
   ) => Promise<{ readonly text: string; readonly credits: number } | string>;
 }
 
@@ -2959,10 +2959,14 @@ interface Generating {
  * working.
  */
 async function asked(
-  c: Ctx & Generating, values: Readonly<Record<string, string>>, image?: string,
+  c: Ctx & Generating, values: Readonly<Record<string, string>>,
+  /* ⚠️ A LIST EVEN WHERE THERE IS ONE, so this app has ONE shape for "here are
+     the pictures". A singular parameter beside a plural one is two ways to ask
+     the same question, and the next reader picks whichever they saw first. */
+  pictures?: readonly string[],
 ): Promise<string> {
   if (!c.generate) return c.fail("platform.unavailable");
-  const out = await c.generate(values, image ? { image } : undefined);
+  const out = await c.generate(values, pictures?.length ? { images: pictures } : undefined);
   if (typeof out === "string") return c.fail("platform.unavailable", {}, { ref: out });
   return out.text;
 }
@@ -2971,6 +2975,13 @@ const guessedOut = {
   name: field.text({ label: "Name", holds: "none" }),
   brand: field.text({ label: "Brand", holds: "none" }),
   category: field.text({ label: "Category", holds: "none" }),
+  /* ⚠️ ONE SENTENCE, AND ONLY THE READER FROM PHOTOGRAPHS FILLS IT. A barcode
+     lookup knows a name and knows nothing about what the thing looks like, so
+     it answers "" here rather than padding the name out into prose. */
+  description: field.text({ label: "Description", holds: "none" }),
+  /* ⚠️ THE KINDS IT BELONGS TO, WHICH IS A LIST, so `json` — a field is
+     single-valued here and `tagging` is where they land as rows. */
+  tags: field.json({ label: "Tags", holds: "none" }),
   unit: field.text({ label: "Counted in", holds: "none" }),
   pack: field.number({ label: "How many it holds", holds: "none" }),
   tracking: field.text({ label: "Tracked as", holds: "none" }),
@@ -3082,7 +3093,133 @@ const readLabel = operation<{ image: string; hint?: string }, Guessing>({
     if (!input.image.startsWith("data:image/")) {
       return c.fail("platform.invalid", {}, { fields: { image: "That is not a photo" } });
     }
-    return guessedIn(readJson(await asked(c, { hint: input.hint ?? "" }, input.image)));
+    return guessedIn(readJson(await asked(c, { hint: input.hint ?? "" }, [input.image])));
+  },
+});
+
+/**
+ * SEVERAL PHOTOGRAPHS OF A THING, AND WHAT IT IS.
+ *
+ * ⚠️ THIS IS NOT `product.read` WITH MORE PICTURES, AND THE SPLIT IS THE POINT.
+ * That one reads a LABEL: what is printed, in the words it is printed in,
+ * including the pictograms — the legal half, where a guess is worse than a
+ * blank. This asks the other question, the one somebody standing in a stockroom
+ * holding a thing actually has: what IS this. A brand, a kind, a sentence
+ * describing it, how it wants to be kept. One is transcription and the other is
+ * recognition, and a prompt trying to do both does neither well.
+ *
+ * ⚠️ SIX AT MOST, AND MORE THAN ONE IS THE WHOLE VALUE. A single photograph of a
+ * bottle is a bottle; the front, the back and the cap together are a product —
+ * the back is where the volume and the storage line are, and the cap is how you
+ * tell a trigger spray from a screw top. Past about six the answer stops
+ * improving and every extra picture is a reserve spent.
+ *
+ * ⚠️ AND THE TAGS THIS WORKSPACE ALREADY USES ARE SENT WITH THEM, which is the
+ * difference between a vocabulary and a pile of synonyms. The model is asked to
+ * CHOOSE from what exists and to propose a new word only where nothing fits, so
+ * a catalogue built over six months is still filterable.
+ *
+ * ⚠️ IT SUGGESTS AND COMMITS NOTHING, like every other model in this product. A
+ * name it invented is a rename; a hazard it invented is a legal document that is
+ * wrong — so hazards are not asked for here at all. That question has an
+ * operation of its own, against the label, where the answer is readable.
+ */
+/**
+ * ⚠️ SIX, AND IT IS A JUDGEMENT RATHER THAN A LIMIT SOMETHING IMPOSES. Front,
+ * back, cap, base, a size reference and one more is every angle that tells you
+ * something new about a box on a shelf; the seventh is another photograph of
+ * the front. Each one is `TOKENS_PER_IMAGE` off a balance whether or not it
+ * added anything, so the cap is where the answer stops improving.
+ */
+const SEEN_MOST = 6;
+
+/**
+ * ⚠️ THE TOTAL, IN `data:` URL CHARACTERS, AND IT IS NOT THE SAME AS SIX TIMES
+ * ONE. Six photographs straight off a phone are tens of megabytes and no
+ * provider accepts the request — which arrives as a timeout or a wall of
+ * gateway text, minutes after somebody pressed a button, having explained
+ * nothing. The sheet downscales before it asks; this is the refusal for
+ * everything that does not, and it is worth roughly a megabyte of JPEG each.
+ */
+const SEEN_BYTES = 8_000_000;
+
+const seeProduct = operation<{ images: unknown; hint?: string; known?: string }, Guessing>({
+  id: "product.see",
+  kind: "write",
+  summary: "Say what a thing is from photographs of it",
+  input: {
+    /**
+     * ⚠️ A LIST, SO IT IS `json` — a field is single-valued here, and six
+     * numbered text fields would be a shape the next caller copies.
+     *
+     * ⚠️ AND THE CAP IS ENFORCED IN THE HANDLER RATHER THAN BY THE TYPE. `json`
+     * cannot say "six data URLs under four megabytes between them", and the
+     * three things that go wrong — too many, not pictures, too big to send —
+     * each want their own sentence rather than one refusal about a shape.
+     */
+    images: field.json({ label: "Photos", required: true, holds: "none" }),
+    hint: field.text({ label: "What it is", holds: "none", max: 200 }),
+    /* ⚠️ THE WORDS THIS WORKSPACE ALREADY FILES THINGS UNDER. Sent rather than
+       looked up here so the caller decides how many are worth the tokens. */
+    known: field.text({ label: "Tags we have", holds: "none", max: 2_000 }),
+  },
+  output: guessedOut,
+  permission: "product:write",
+  idempotency: { mode: "none" },
+  outcome: { why: "the answer IS the report — this returns what it worked out, on the sheet that asked" },
+  fails: ["platform.unavailable", "platform.invalid", "platform.too_large"],
+  audit: () => ({ subject: "a product", verb: "identified" }),
+  ai: {
+    lane: "vision",
+    prompt: "You identify products from photographs for a stock system."
+      + " Answer with JSON only: name, brand, description, unit, pack, tracking,"
+      + " why, storage, handling, tags."
+      + " `name` is what somebody would call it on a shelf, not marketing copy."
+      + " `description` is one sentence: what it is, what size, what form."
+      + " `unit` is what a quantity of it would be counted in — bottle, box, kg."
+      + " `pack` is how many base units the thing pictured holds; 0 if unclear."
+      + " `tracking` is one of: listed, counted, batched, itemised. Use batched"
+      + " if it carries an expiry or a hazard pictogram; itemised if it is one"
+      + " serial-numbered object. `why` is the short reason for that rung."
+      + " `storage` and `handling` are how it wants to be kept, briefly."
+      + " `tags` are the kinds it belongs to. PREFER these words, which this"
+      + " workspace already uses: {known}. Propose a new one only where none of"
+      + " them fits. At most four."
+      + " Say nothing about hazard classes — a different reader does that from"
+      + " the printed label. Where the pictures do not show something, answer"
+      + " with an empty string rather than a guess."
+      + " The person adding it said: {hint}",
+    variables: ["known", "hint"],
+    maxOutput: 800,
+  },
+  async handler(ctx, input) {
+    const c = ctx as Ctx & Generating;
+    const shots = Array.isArray(input.images) ? input.images : [];
+    if (!shots.length) {
+      return c.fail("platform.invalid", {}, { fields: { images: "Take a photo first" } });
+    }
+    if (shots.length > SEEN_MOST) {
+      return c.fail("platform.invalid", {},
+        { fields: { images: `${SEEN_MOST} photos at most` } });
+    }
+    /* ⚠️ REFUSED HERE RATHER THAN SENT, the same way `product.read` refuses a
+       string that is not a picture: a reserve, a round trip and a confidently
+       wrong answer about nothing. */
+    const pictures = shots.filter((one): one is string =>
+      typeof one === "string" && one.startsWith("data:image/"));
+    if (pictures.length !== shots.length) {
+      return c.fail("platform.invalid", {}, { fields: { images: "One of those is not a photo" } });
+    }
+    /* ⚠️ AND THE TOTAL, BECAUSE SIX PHONE PHOTOGRAPHS ARE FORTY MEGABYTES. The
+       sheet downscales before it asks; this is what happens when something else
+       calls the operation and does not. */
+    const bytes = pictures.reduce((all, one) => all + one.length, 0);
+    if (bytes > SEEN_BYTES) {
+      return c.fail("platform.too_large",
+        { size: `${Math.round(bytes / 1_000_000)} MB`, most: `${SEEN_BYTES / 1_000_000} MB` });
+    }
+    return guessedIn(readJson(await asked(c,
+      { known: input.known ?? "", hint: input.hint ?? "" }, pictures)));
   },
 });
 
@@ -3127,7 +3264,7 @@ const readNote = operation<{ image: string }, { lines: readonly Noted[] }>({
     if (!input.image.startsWith("data:image/")) {
       return c.fail("platform.invalid", {}, { fields: { image: "That is not a photo" } });
     }
-    return { lines: notedIn(readJson(await asked(c, {}, input.image))) };
+    return { lines: notedIn(readJson(await asked(c, {}, [input.image]))) };
   },
 });
 
@@ -4819,7 +4956,7 @@ export const INVENTORY: AppSpec = defineApp({
     openCount, tallyUp, differs, closeCount,
     issue, giveBack, serve, retire, dueService,
     assemble, putIn, takeOut, checking, build, breakUp,
-    identify, readLabel, readNote, askInWords,
+    identify, readLabel, seeProduct, readNote, askInWords,
     openRun, loadRun, endRun, releaseRun, failRun, recallRun, liftHold, lateResult,
     openJob, closeJob, traceJob,
     labelPlaces, labelThings, report, seeImport, doImport,
@@ -5476,6 +5613,14 @@ export const INVENTORY: AppSpec = defineApp({
     },
     "product.read": {
       id: "product.read", label: "Read a label", lane: "vision", maxOutput: 700,
+    },
+    /* ⚠️ THE DEAREST ACTION IN THE PRODUCT, AND IT IS THE PICTURES RATHER THAN
+       the words: six of them is six times `TOKENS_PER_IMAGE` before a single
+       character of the prompt is counted. The output ceiling is modest because
+       the answer is a dozen short fields — a bigger one would reserve for prose
+       the schema throws away. */
+    "product.see": {
+      id: "product.see", label: "Identify a product from photos", lane: "vision", maxOutput: 800,
     },
     "stock.note": {
       id: "stock.note", label: "Read a delivery note", lane: "vision", maxOutput: 2_000,

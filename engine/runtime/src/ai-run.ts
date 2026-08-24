@@ -45,12 +45,17 @@ export interface RunAt {
 export function generatorFor(at: RunAt): ((
   values: Readonly<Record<string, string>>,
   /**
-   * ⚠️ A PICTURE, SEPARATE FROM THE VALUES, AND THE SPLIT IS THE POINT. Values
+   * ⚠️ PICTURES, SEPARATE FROM THE VALUES, AND THE SPLIT IS THE POINT. Values
    * fill declared `{placeholders}`; an image is not a placeholder and folding it
    * in would put a megabyte of base64 into the prompt text — where the reserve
    * would count it as characters, at the wrong rate, in the wrong direction.
+   *
+   * ⚠️ AND A LIST, BECAUSE SEVERAL PHOTOGRAPHS OF ONE THING ARE ONE QUESTION.
+   * The front, the back and the cap identify a product that no one of them
+   * does; a seam carrying one would make an app ask three times and pay three
+   * reserves for an answer it has to reconcile itself.
    */
-  look?: { readonly image?: string },
+  look?: { readonly images?: readonly string[] },
 ) => Promise<{ readonly text: string; readonly credits: number } | AiRefusal>) | undefined {
   const action = actionsOf(at.app).find((a) => a.id === at.operation);
   if (!action) return undefined;
@@ -80,7 +85,7 @@ export function generatorFor(at: RunAt): ((
          reaching a model is an instruction nobody wrote. */
       prompt: sayPrompt(placeholders(action.ai.variables), values),
       maxOutput: action.ai.maxOutput,
-      ...(look?.image ? { image: look.image } : {}),
+      ...(look?.images?.length ? { images: look.images } : {}),
     });
 
     if (typeof out === "string") return out;
@@ -104,7 +109,7 @@ export function generatorFor(at: RunAt): ((
  */
 export function streamerFor(at: StreamAt): ((
   values: Readonly<Record<string, string>>,
-  look?: { readonly image?: string },
+  look?: { readonly images?: readonly string[] },
 ) => Promise<Response | AiRefusal>) | undefined {
   const action = actionsOf(at.app).find((a) => a.id === at.operation);
   if (!action) return undefined;
@@ -129,7 +134,7 @@ export function streamerFor(at: StreamAt): ((
       system: now.prompt,
       prompt: sayPrompt(placeholders(action.ai.variables), values),
       maxOutput: action.ai.maxOutput,
-      ...(look?.image ? { image: look.image } : {}),
+      ...(look?.images?.length ? { images: look.images } : {}),
     });
 
     if (typeof out === "string") return out;

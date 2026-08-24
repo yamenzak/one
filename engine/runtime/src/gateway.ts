@@ -46,12 +46,18 @@ export interface RunAsk {
   /** ⚠️ Three, and the gateway allows five. See the header. */
   readonly tag: { readonly t: string; readonly a: string; readonly o: string };
   /**
-   * ⚠️ A PICTURE TO LOOK AT, AS A `data:` URL, and it is what makes the vision
-   * lane more than a name. Without it an app could declare `lane: "vision"`,
+   * ⚠️ PICTURES TO LOOK AT, AS `data:` URLs, and they are what make the vision
+   * lane more than a name. Without them an app could declare `lane: "vision"`,
    * compose, price a meter and pass every guard — and the model would receive
    * the words alone and answer confidently about an image nobody sent it.
+   *
+   * ⚠️ A LIST RATHER THAN ONE, BECAUSE ONE IS A SHAPE AN APP CANNOT ESCAPE. A
+   * single photograph of a bottle is a bottle; the front, the back and the cap
+   * together are a product. An app holding six and a seam holding one has two
+   * ways out and both are wrong: six calls, which is six reserves for one
+   * question, or five pictures dropped in silence.
    */
-  readonly image?: string;
+  readonly images?: readonly string[];
 }
 
 /**
@@ -60,10 +66,16 @@ export interface RunAsk {
  * anything else; sending the list shape for every call would put an app's
  * ordinary text through the path that exists for pictures, on every provider,
  * including the ones that read it less well.
+ *
+ * ⚠️ THE WORDS COME FIRST AND THE PICTURES FOLLOW IN THE ORDER THEY WERE GIVEN.
+ * The order is the app's to mean something by — "front, back, cap" is a
+ * sentence — and a seam that sorted or deduplicated them would silently
+ * rewrite it.
  */
-const said = (prompt: string, image?: string): unknown =>
-  (image
-    ? [{ type: "text", text: prompt }, { type: "image_url", image_url: { url: image } }]
+const said = (prompt: string, images?: readonly string[]): unknown =>
+  (images?.length
+    ? [{ type: "text", text: prompt },
+      ...images.map((url) => ({ type: "image_url", image_url: { url } }))]
     : prompt);
 
 export interface Answered {
@@ -176,7 +188,7 @@ export async function askModel(
         max_tokens: ask.maxOutput,
         messages: [
           { role: "system", content: ask.system },
-          { role: "user", content: said(ask.prompt, ask.image) },
+          { role: "user", content: said(ask.prompt, ask.images) },
         ],
       }),
     });
@@ -263,7 +275,7 @@ export async function askModelStream(
         stream_options: { include_usage: true },
         messages: [
           { role: "system", content: ask.system },
-          { role: "user", content: said(ask.prompt, ask.image) },
+          { role: "user", content: said(ask.prompt, ask.images) },
         ],
       }),
     });
