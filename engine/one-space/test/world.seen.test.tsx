@@ -180,8 +180,13 @@ describe("the world a person actually opens", () => {
       + `<script>window.__GROW = true</script>`
       + `<script type="module">${code}</script></body></html>`);
     await page.waitForSelector('[data-hem="bottom"]');
+    /* ⚠️ READ FIRST, THEN GROW — see `product.mount.tsx`. The fixture used to
+       grow on a timer, so this reading raced it and the test failed on its own
+       precondition whenever the machine was busy. */
+    await page.waitForFunction(() => typeof window.__grow === "function");
     const short = await page.evaluate(() => Number(
       getComputedStyle(document.querySelector('[data-hem="bottom"]')!, "::before").opacity));
+    await page.evaluate(() => { window.__grow?.(); });
     await page.waitForTimeout(600);
     const grown = await page.evaluate(() => ({
       foot: Number(getComputedStyle(

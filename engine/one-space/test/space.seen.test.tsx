@@ -112,6 +112,25 @@ describe("the type the space sets", () => {
   }
 });
 
+/*
+  ⚠️ AND NOTHING IN THE CROWN IS CUT OFF. Truncating a row is often right — a
+  workspace name has to end somewhere — and never right in the crown, where the
+  words are the only thing saying which of thirty-nine screens this is. An
+  operator arriving at "Payment and cred…" has to open it to find out what it
+  was. Body text is deliberately not asked about here for the same reason the
+  frame sweep gives: a list truncating a value is the layout doing its job.
+*/
+describe("what the space's crown says", () => {
+  for (const route of ROUTES) {
+    it(`says all of it: ${route}`, async () => {
+      const seen = await at(route, PHONE);
+      const chrome = seen.cut.filter((one) => one.where !== "");
+      expect(chrome, chrome.map((c) => `${route} — ${c.where}: "${c.text}" cut by ${c.by}px`)
+        .join(", ")).toEqual([]);
+    }, 30_000);
+  }
+});
+
 describe("everything the space says can be read", () => {
   for (const route of ROUTES) {
     for (const theme of ["dark", "light"] as const) {

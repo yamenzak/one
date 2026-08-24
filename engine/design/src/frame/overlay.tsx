@@ -311,8 +311,23 @@ export function Peek({ trigger, title, children }: {
   readonly children: React.ReactNode;
 }) {
   return (
+    /*
+      ⚠️ A DIRECT CHILD, NOT WRAPPED IN `Popover.Trigger` — the same rule `Menu`
+      records one component up, and for a fault one degree worse than the nested
+      `<button>` it avoids. `Popover.Trigger` renders a pressable of its own, so
+      a `Button` inside it came out as a `div role="button" tabindex="0"` around
+      a `button` — and react-aria gives BOTH the same `id`. Measured:
+      two tab stops for one control, "button, button" to a screen reader, and a
+      duplicate id under the popover's own `aria-*` wiring, which resolves by
+      `getElementById` and therefore silently takes whichever came first.
+      Nothing about any of it is visible in a screenshot.
+
+      ⚠️ `Popover.Trigger` IS RIGHT FOR WHAT IT IS FOR, which is content that is
+      not a control — the library's own example wraps an avatar and a name. A
+      `Peek` hangs off something somebody presses, so it is never that case.
+    */
     <Popover>
-      <Popover.Trigger>{trigger}</Popover.Trigger>
+      {trigger}
       <Popover.Content>
         <Popover.Arrow />
         <Popover.Dialog>

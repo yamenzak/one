@@ -25,7 +25,7 @@ import { INVENTORY } from "@engine/inventory";
 import { shellAt } from "../src/centre/route.js";
 
 declare global {
-  interface Window { __ROUTE?: string; __GROW?: boolean }
+  interface Window { __ROUTE?: string; __GROW?: boolean; __grow?: () => void }
 }
 
 /**
@@ -33,14 +33,21 @@ declare global {
  * lands after the frame does — a list resolves, an image decides its height —
  * and the chrome's own question ("is anything still below the fold") has a
  * different answer before and after. Under `__GROW` the child starts inside one
- * viewport and grows past it a moment later, so a hem that is only ever
+ * viewport and grows past it when the test says so, so a hem that is only ever
  * answered at mount is a hem that is wrong for the rest of the visit.
+ *
+ * ⚠️ THE TEST PULLS THE TRIGGER, IT DOES NOT WAIT FOR ONE. This was a 120ms
+ * timer, and the reading that proves the page STARTED short is taken as soon as
+ * the hem appears — so on a loaded machine the growth had already happened and
+ * the assertion failed on its own precondition ("the page did not start short,
+ * so this proves nothing"). A fixture racing the question it exists to answer is
+ * green when it is fast and red when it is not, which teaches a reader to re-run
+ * rather than to look.
  */
 function Filler() {
   const [tall, setTall] = React.useState(!window.__GROW);
   React.useEffect(() => {
-    if (window.__GROW) { const t = setTimeout(() => setTall(true), 120); return () => clearTimeout(t); }
-    return undefined;
+    if (window.__GROW) window.__grow = () => setTall(true);
   }, []);
   return <div style={{ minHeight: tall ? "150vh" : "10vh" }} />;
 }
