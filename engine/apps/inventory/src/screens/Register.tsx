@@ -193,7 +193,7 @@ const numberOr = (of: number | null): number => (of === null ? 0 : of);
 const STEPS = [
   { id: "photos", label: "Photos" },
   { id: "what", label: "What it is" },
-  { id: "counting", label: "Counting" },
+  { id: "counting", label: "Barcodes" },
   { id: "keeping", label: "Keeping" },
 ] as const;
 
@@ -392,9 +392,16 @@ export function Register({
         <Steps at={where} steps={STEPS as unknown as readonly { id: string; label: string }[]} />
 
         {/*
-          ⚠️ THE CAMERA IS FIRST BECAUSE IT IS THE FAST LANE, and it is a section
-          rather than a step: nothing below it waits for it. Somebody who knows
-          what they are adding scrolls past.
+          ⚠️ THE CAMERA IS FIRST BECAUSE IT IS THE FAST LANE. Somebody who knows
+          what they are adding presses Next past it.
+
+          ⚠️ EVERY SECTION KEEPS ITS HEADING, AND THE DUPLICATION WAS FIXED AT THE
+          OTHER END. The step's name appeared three times over the first field —
+          in the progress chip, in the screen's subtitle and in this `h2` — and
+          the first draft of the fix deleted the `h2`. That is the wrong one of
+          the three: the browser reading then found a step with nothing on it
+          outranking body text, because on a form the section heading IS the
+          hierarchy. `Steps` carries numbers now (see there); the words stayed.
         */}
         {where === "photos" ? (
         <Section label="Photos">
@@ -664,13 +671,13 @@ export function Register({
                   name={`code-${at}`}
                 />
                 <Segmented
-                  label="What kind"
+                  label="Kind of code"
                   value={row.kind}
                   onChange={(next) => { setCode(at, { kind: next }); }}
                   options={KINDS}
                 />
                 <NumberInput
-                  label="This one holds"
+                  label="How many it holds"
                   value={row.pack}
                   onChange={(next) => { setCode(at, { pack: Math.max(1, next) }); }}
                   min={1}
@@ -720,7 +727,7 @@ export function Register({
               under a line is an app people work around.
             */}
             <NumberInput
-              label="Tell me below"
+              label="Running low at"
               value={numberOr(par)}
               onChange={(next) => { setPar(next > 0 ? next : null); }}
               min={0}
@@ -754,15 +761,16 @@ export function Register({
               one delivery's date on every future one.
             */}
             <NumberInput
-              label="Keeps for, from making"
+              label="Shelf life"
               value={numberOr(shelfDays)}
               onChange={(next) => { setShelfDays(next > 0 ? next : null); }}
               min={0}
-              help={shelfDays ? `About ${Math.round(shelfDays / 30)} months. Zero means it does not expire`
-                : "In days. 730 is two years. Zero means it does not expire"}
+              help={shelfDays
+                ? `About ${Math.round(shelfDays / 30)} months from the day it was made`
+                : "Days from the day it was made. 730 is two years. Zero never expires"}
             />
             <NumberInput
-              label="Keeps for, once opened"
+              label="Once opened"
               value={numberOr(openDays)}
               onChange={(next) => { setOpenDays(next > 0 ? next : null); }}
               min={0}

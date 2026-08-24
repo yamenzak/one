@@ -63,12 +63,28 @@ export const GROUND = {
      * RELATIONSHIPS, and this tier has three of them.
      */
     control: 0.9575,
+    /**
+     * ⚠️ THE ONE A PERSON HAS CHOSEN, AND IT HAS TO GO THE OTHER WAY IN EACH
+     * THEME. A segmented control is a track with one segment lifted out of it —
+     * so in dark the chosen one is LIGHTER than the track and in light it is the
+     * only thing that can still go lighter, which is white. Both readings are
+     * the same reading: the chosen segment is nearer the viewer.
+     *
+     * ⚠️ AND IT IS NOT `--accent`. That is the primary button's near-white, and
+     * a segmented control painted with it is four primary buttons with three of
+     * them switched off. This is a MATERIAL step, not a call to action.
+     */
+    chosen: 1.0,
   },
   dark: {
     background: 0.12,
     surface: 0.21,
     raised: 0.28,
     control: 0.36,
+    /* ⚠️ Well clear of `control`'s 0.36 — see the light entry. A step of 0.04
+       would meet the floor and still read as the same material in a moving
+       light, which is where this was reported from. */
+    chosen: 0.52,
   },
 } as const;
 
@@ -188,6 +204,9 @@ function tier(mode: "light" | "dark"): string {
     `--tier-raised: ${tinted(g.raised, t)};`,
     `--tier-field: ${tinted(g.control, t)};`,
     `--tier-control: ${tinted(g.control, CONTROL_TINT[mode])};`,
+    /* ⚠️ The chosen one carries the same share of the brand as the control it is
+       lifted out of, so the pair reads as one material at two depths. */
+    `--tier-chosen: ${tinted(g.chosen, CONTROL_TINT[mode])};`,
 
     `--background: var(--tier-page);`,
     `--surface: var(--tier-base);`,
@@ -225,6 +244,29 @@ function tier(mode: "light" | "dark"): string {
       is a change to every control at once — and so is a wash over it.
     */
     `--default: var(--tier-control);`,
+    /*
+      ⚠️ THE SELECTED HALF OF EVERY CONTROL, AND NOTHING HERE BOUND IT UNTIL NOW.
+      `--default` above is what the library paints an UNSELECTED control with —
+      and a SELECTED toggle, a chosen segment and a soft chip are painted with
+      `--accent-soft`, which is a different token that was never ours. So the
+      track was our tier and the chosen segment was HeroUI's own palette: in
+      dark that is a dark tint, which put the segment somebody had chosen BELOW
+      the three they had not. Reported as the selected option looking disabled,
+      and it was — the interface was drawing "recessed" for "chosen".
+
+      ⚠️ IT IS A TIER RATHER THAN A TINT OF THE ACCENT, because the accent is
+      mono here (see below) and a mix of it with the track is a value with no
+      relationship to either. `chosen` sits in the same ladder as every other
+      surface and clears `control` by a real step in both themes.
+
+      ⚠️ AND THE FOREGROUND IS BOUND WITH IT. A fill changed without its ink is
+      how a control comes to be the right colour and unreadable — the light
+      theme's chosen tier is white, where the library's own soft foreground is
+      a pale tint of its accent.
+    */
+    `--accent-soft: var(--tier-chosen);`,
+    `--accent-soft-hover: var(--tier-chosen);`,
+    `--accent-soft-foreground: ${grey(mode === "light" ? 0.22 : 0.97)};`,
     /* ⚠️ NO EDGES. Both are ways of saying "separate", and a design needs one. */
     `--surface-shadow: none;`,
     `--overlay-shadow: none;`,

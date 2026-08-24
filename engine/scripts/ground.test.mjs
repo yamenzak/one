@@ -253,6 +253,39 @@ if (!groundShare || !controlShare) {
 }
 
 /**
+ * EVERY TOKEN THE LIBRARY PAINTS A *STATE* WITH IS ONE OF OURS.
+ *
+ * ⚠️ THIS EXISTS BECAUSE THE CHOSEN SEGMENT WAS HEROUI'S COLOUR AND THE TRACK
+ * WAS OURS. `--default` is what the library fills an UNSELECTED control with and
+ * it has been bound here for as long as the palette has existed — but a SELECTED
+ * toggle, a chosen segment and a soft chip are `--accent-soft`, a different token
+ * nobody had claimed. So the unselected segments were our control tier and the
+ * one somebody had chosen fell through to the library's own dark tint: on a dark
+ * theme the chosen option was BELOW the ones beside it, which reads as disabled.
+ * Reported from a phone, on a segmented control, as the selected option looking
+ * switched off.
+ *
+ * ⚠️ AND NOTHING COULD HAVE CAUGHT IT BY LOOKING AT OUR FILES. Every token we
+ * write resolved correctly; the fault was a token we never wrote. So the check is
+ * the other way round — it reads the LIBRARY's stylesheet for what it paints
+ * with, and asks whether each of those is claimed here.
+ *
+ * ⚠️ A LIST OF NAMES RATHER THAN A SWEEP OF EVERY VARIABLE, because most of what
+ * HeroUI defines is geometry and timing and is correctly theirs. These are the
+ * ones that carry a VALUE a person reads as a state.
+ */
+const STATEFUL = ["--accent", "--accent-foreground", "--accent-soft", "--accent-soft-foreground", "--default"];
+const adrift = STATEFUL.filter((k) => !new RegExp(`\`${k}: `).test(GROUND_SRC));
+if (adrift.length) {
+  fail(`ground.ts: ${adrift.join(", ")} is painted by the library and set by nobody here.\n` +
+       `       A state token left to HeroUI is a control whose CHOSEN half comes from\n` +
+       `       another palette — which is how a selected segment came to read as the\n` +
+       `       recessed one on a dark theme.`);
+} else {
+  ok(`stateful: every token the library paints a state with is ours (${STATEFUL.length})`);
+}
+
+/**
  * ⚠️ AND THE TOKENS ARE ACTUALLY SET TO NONE. The ban above covers what WE
  * write; the library ships its own `--surface-shadow`, and a palette that
  * forbids shadows in our files while the components draw their own is a rule

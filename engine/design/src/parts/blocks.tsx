@@ -35,16 +35,22 @@ export interface Step {
  * is the only bold thing, the rest wait in muted — a person mid-wizard reads
  * this in half a second, which is all the attention a progress row gets.
  *
- * ⚠️ ONLY THE CURRENT STEP IS NAMED ON A PHONE, and that is the difference
- * between this fitting and this wrapping. Four steps with four labels is four
- * circles, three rules and four words on one line: past about 320px of content
- * it overflows the gutter, and the row that exists to be read at a glance is the
- * one thing on the screen that does not fit. The numbers still say where somebody
- * is and how far is left — which is what the row is FOR — and the word for where
- * they are now is the only one that changes anything.
+ * ⚠️ THE NUMBERS ARE THE ROW AND THE WORDS ARE NOT, which is a narrower job than
+ * it first looks. What a progress row answers is "where am I, and how much is
+ * left" — and two numerals answer that completely. The NAME of the step is
+ * already the screen's own subtitle and the heading over the first field, so a
+ * third copy in the chip put "What it is" three times above the first thing
+ * somebody could type into.
  *
- * ⚠️ AND IT IS THE PAST STEPS THAT KEEP THEIR CHECK rather than their word. A
- * check is one glyph and reads at any width; a name is the part that costs room.
+ * ⚠️ AND FOUR NAMES DO NOT FIT A PHONE ANYWAY. Four circles, three rules and four
+ * words is past 320px of content: the row that exists to be read at a glance
+ * became the one thing on the screen that did not fit. Removing them is not a
+ * concession to the width — it is what the row was for, and the width is how it
+ * was noticed.
+ *
+ * ⚠️ THE WORDS STAY IN THE DOCUMENT, `sr-only`. A reader hears every step in
+ * order, which is the whole content of a progress row, so this costs a sighted
+ * person a repeat and costs somebody on a screen reader nothing.
  */
 export function Steps({ at, steps }: {
   readonly at: string;
@@ -76,15 +82,7 @@ export function Steps({ at, steps }: {
               >
                 {done ? <Check className="size-3.5" /> : i + 1}
               </span>
-              {/* ⚠️ HIDDEN BY WIDTH, NOT REMOVED. A reader still hears every step
-                  in order, which is the whole content of a progress row — so the
-                  narrow layout costs a sighted person a word and costs somebody
-                  on a screen reader nothing. */}
-              <span
-                className={`truncate ${now ? TYPE.label : `${TYPE.note} sr-only sm:not-sr-only`}`}
-              >
-                {s.label}
-              </span>
+                <span className="sr-only">{s.label}</span>
             </li>
           </React.Fragment>
         );
