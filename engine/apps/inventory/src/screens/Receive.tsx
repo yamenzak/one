@@ -19,7 +19,8 @@
 
 import * as React from "react";
 import {
-  AmountRow, Await, Group, FieldRow, NoteRow, Num, NumberInput, PickFile, RowsWaiting,
+  AmountRow, Await, Choice, Group, FieldRow, NoteRow, Num, NumberInput, PickFile,
+  RowsWaiting,
   Screen, Section, Steps, TextInput, Viewfinder, glyphOf, useShown, notice,
   type Loaded, type Step,
   shrunk,
@@ -74,7 +75,9 @@ export interface ReceiveProps {
   readonly onRead: (code: string) => void;
   /** Scanned something that is not a product and not a shelf. */
   readonly onForget: () => void;
-  readonly onReceive: (of: { quantity: number; lot: string; expiry: string }) => void;
+  readonly onReceive: (
+    of: { quantity: number; rung: string; lot: string; expiry: string },
+  ) => void;
   /** ⚠️ Absent once there is nothing left to take back — see `stock.undo`. */
   readonly onUndo?: () => void;
   readonly busy?: boolean;
@@ -119,6 +122,25 @@ export const startingQuantity = (): number => 1;
 export const onShelf = (many: number, pack: number | undefined): number =>
   many * Math.max(1, pack ?? 1);
 
+/**
+ * WHAT THE PICKER OFFERS — the base unit, then every rung of the ladder.
+ *
+ * ⚠️ THE BASE UNIT IS AN ENTRY, NOT AN ABSENCE. A ladder with only "sheet" and
+ * "box" on it cannot express a delivery of loose tablets, which is the state a
+ * shelf is in for most of the month; leaving it out makes the ONE thing the
+ * product is always counted in the one thing nobody can choose.
+ *
+ * ⚠️ AND ITS ID IS THE EMPTY STRING, which is what the operations already read as
+ * "in whatever the code holds". A screen inventing a sentinel like `"base"` would
+ * be a rung name the server would then have to refuse.
+ */
+export const rungsOf = (
+  unit: string, levels: readonly { readonly name: string; readonly per: number }[],
+): readonly { readonly id: string; readonly label: string }[] => [
+  { id: "", label: unit || "How many" },
+  ...levels.map((one) => ({ id: one.name, label: one.name })),
+];
+
 export function Receive({
   title, place, seen, onRead, onForget, onReceive, onUndo, busy,
   note, onNote, onLine, done, again,
@@ -137,15 +159,34 @@ export function Receive({
     code, not the screen.
   */
   const [many, setMany] = React.useState(0);
+  /*
+    ⚠️ WHICH RUNG THE NUMBER IS IN, AND IT OPENS ON THE ONE THE CODE IS PRINTED
+    ON. Somebody scanning a case is holding a case; making them say so again is
+    the control knowing less than the barcode did.
+  */
+  const [rung, setRung] = React.useState("");
   const [lot, setLot] = React.useState("");
   const [expiry, setExpiry] = React.useState("");
   const code = seen?.value ?? "";
 
   React.useEffect(() => {
     setMany(seen ? startingQuantity() : 0);
+    setRung(seen?.rung ?? "");
     setLot(seen?.lot ?? "");
     setExpiry(seen?.expiry ?? "");
   }, [code, seen]);
+
+  /* ⚠️ THE MULTIPLIER THIS SCREEN IS SHOWING, which is the rung's where one is
+     picked and the code's otherwise — the same rule the server applies in
+     `perFor`, so the sentence under the field and the number written cannot
+     disagree. The server is still the one that decides. */
+  const ladder = seen?.levels ?? [];
+  const per = rung
+    ? ladder.reduce<{ so: number; found: number | null }>((at, one) => {
+      const so = at.so * one.per;
+      return { so, found: one.name === rung ? so : at.found };
+    }, { so: 1, found: null }).found ?? 1
+    : Math.max(1, seen?.pack ?? 1);
 
   const at = !place ? "where" : !seen ? "what" : "many";
   const needs = seen?.needs ? seen.needs.split(",").filter(Boolean) : [];
@@ -168,7 +209,7 @@ export function Receive({
         ? {
           op: "stock.receive",
           label: "Add it",
-          onDo: () => { onReceive({ quantity: many, lot, expiry }); },
+          onDo: () => { onReceive({ quantity: many, rung, lot, expiry }); },
           disabled: busy === true || many <= 0 || Boolean(short),
         }
         : undefined}
@@ -226,12 +267,33 @@ export function Receive({
                   </NoteRow>
                 </>
               )}
-              {seen.pack > 1
+              {/* ⚠️ WHAT THE BARCODE ALREADY KNEW, said once and not asked
+                  again. A carton's code says it holds thirty; scanning it and
+                  recording one is the commonest wrong number in inventory
+                  work. Where a ladder names the rung, the picker below says it
+                  better than a sentence can — so this row is only for a code
+                  holding a number nothing has a word for. */}
+              {per > 1 && !rung
                 ? (
                   <FieldRow
                     label="This one holds"
-                    value={`${seen.pack} ${seen.unit}`}
+                    value={`${per} ${seen.unit}`}
                     under="Count the packs — the shelf gets that many times more"
+                  />
+                )
+                : null}
+
+              {/* ⚠️ ONLY WHERE THERE IS SOMETHING TO CHOOSE. A product with no
+                  ladder has exactly one answer, and a picker with one entry is a
+                  control that asks a question it has already answered. */}
+              {ladder.length
+                ? (
+                  <Choice
+                    label="Counted in"
+                    value={rung}
+                    onChange={setRung}
+                    options={[...rungsOf(seen.unit, ladder)]}
+                    help="What you are holding, not what the shelf counts"
                   />
                 )
                 : null}
@@ -242,11 +304,13 @@ export function Receive({
                   wrong question. The line under it does the arithmetic out loud
                   so nobody has to trust the multiplier they cannot see. */}
               <NumberInput
-                label={seen.pack > 1
-                  ? "How many of these"
-                  : seen.unit ? `How many ${seen.unit}` : "How many"}
-                help={seen.pack > 1 && many > 0
-                  ? `${onShelf(many, seen.pack)} ${seen.unit} onto the shelf`
+                label={rung
+                  ? `How many ${rung}`
+                  : per > 1
+                    ? "How many of these"
+                    : seen.unit ? `How many ${seen.unit}` : "How many"}
+                help={per > 1 && many > 0
+                  ? `${onShelf(many, per)} ${seen.unit} onto the shelf`
                   : undefined}
                 value={many}
                 onChange={setMany}

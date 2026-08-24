@@ -19,6 +19,8 @@ import {
 import { Button } from "@heroui/react";
 import { sayDate, type Instant } from "@engine/kernel";
 import type { Line } from "./sample.js";
+/* ⚠️ A quantity in the words somebody thinks in — see `packing.ts`. */
+import { spell } from "../packing.js";
 
 /** One movement, as the ledger holds it. */
 export interface Movement {
@@ -67,6 +69,11 @@ export interface Piece {
 
 export interface ThingProps {
   readonly line: Line;
+  /**
+   * ⚠️ HOW THE PRODUCT IS PACKAGED, so a number reads back in the words somebody
+   * thinks in — "3 boxes, 7 tablets" beside the 97. Empty for most things.
+   */
+  readonly levels: readonly { readonly name: string; readonly per: number }[];
   readonly history: Loaded<readonly Movement[]>;
   /** ⚠️ Empty for anything that is not `batched` — most products. */
   readonly batches: readonly Batch[];
@@ -75,6 +82,13 @@ export interface ThingProps {
   readonly again: () => void;
   readonly back: () => void;
   readonly onTake: () => void;
+  /**
+   * ⚠️ CARRYING IT SOMEWHERE ELSE, WHICH IS NOT TAKING IT. Recorded as a take
+   * plus a receive the whole carton enters the usage report — so "we used 600
+   * tablets" becomes a sentence about a trolley. It has its own verb, and it is
+   * reached from here because this screen already knows what and from where.
+   */
+  readonly onMove: () => void;
   readonly onOpen: (batch: string) => void;
   readonly onPiece: (id: string) => void;
   /**
@@ -128,7 +142,8 @@ const CAPTURED: Readonly<Record<string, string>> = {
 };
 
 export function Thing({
-  line, history, batches, pieces, again, back, onTake, onOpen, onPiece, onLabel, onAssemble,
+  line, levels, history, batches, pieces, again, back, onTake, onMove, onOpen, onPiece,
+  onLabel, onAssemble,
 }: ThingProps) {
   /* ⚠️ THE READER'S OWN CONVENTIONS. A stored instant printed as it is stored is
      the database's spelling shown to somebody who told us how they write a
@@ -145,7 +160,15 @@ export function Thing({
       shape="detail"
       title={line.name}
       /* ⚠️ A FACT UNDER THE NAME, NOT A DESCRIPTION OF THE SCREEN. */
-      under={`${figures.grouped(line.quantity)} ${line.unit} · ${line.whereName}`}
+      /* ⚠️ THE BASE NUMBER FIRST AND ALWAYS. "3 boxes, 7 tablets" is charming
+         and useless to somebody asking whether there is enough for a
+         thirty-tablet course, so the breakdown goes BESIDE the figure rather
+         than instead of it — and is absent where it would only repeat it. */
+      under={[
+        `${figures.grouped(line.quantity)} ${line.unit}`,
+        spell(line.quantity, levels, line.unit),
+        line.whereName,
+      ].filter(Boolean).join(" · ")}
       back={back}
       does={{ op: "stock.take", label: "Take some", onDo: onTake }}
       of={history}
@@ -198,6 +221,20 @@ export function Thing({
               opens it rather than printing anything.
             */}
             <NavRow icon={glyphOf("tag")} label="Print a label" onOpen={onLabel} />
+            {/*
+              ⚠️ A ROW RATHER THAN A SECOND BUTTON IN THE CHROME, and the reason
+              is that the chrome holds ONE action. Taking stock is what somebody
+              came here to do; carrying it to another shelf is the other thing
+              that can happen to this line, and two primaries side by side is a
+              screen that has stopped saying which it is for.
+
+              ⚠️ AND ONLY WHERE THERE IS SOMETHING TO CARRY. Offering to move an
+              empty shelf is a control whose only possible outcome is the
+              refusal it would earn.
+            */}
+            {line.quantity > 0
+              ? <NavRow icon={glyphOf("box")} label="Move it somewhere else" onOpen={onMove} />
+              : null}
           </Group>
 
           {/* ⚠️ BEFORE THE HISTORY, BECAUSE IT IS ABOUT WHAT HAPPENS NEXT. The

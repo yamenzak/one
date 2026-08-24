@@ -84,7 +84,7 @@ const HELD = new Set([
  */
 const SCANNED: Seen = {
   found: false, kind: "gs1", value: "05000112637922", ours: "",
-  product: "", name: "", tracking: "", unit: "", pack: 1,
+  product: "", name: "", tracking: "", unit: "", pack: 1, rung: "", levels: [],
   lot: "A5B7", expiry: "2027-03-31", needs: "",
 };
 
@@ -570,6 +570,10 @@ export function InventoryScreen({ route, onGo }: {
       return (
         <Thing
           line={LINES[0] as Line}
+          /* ⚠️ A REAL LADDER, so the ground draws the breakdown rather than
+             the one case where it is absent. A screen only ever photographed
+             without its ladder is a screen nobody has looked at with one. */
+          levels={[{ name: "sheet", per: 10 }, { name: "box", per: 3 }]}
           history={ready(HISTORY)}
           batches={BATCHES}
           /* ⚠️ EMPTY, BECAUSE THIS ONE IS A BATCHED PRODUCT. A counted or
@@ -579,6 +583,7 @@ export function InventoryScreen({ route, onGo }: {
           again={nothing}
           back={() => go("/")}
           onTake={nothing}
+          onMove={nothing}
           onOpen={nothing}
           onPiece={nothing}
           onLabel={nothing}

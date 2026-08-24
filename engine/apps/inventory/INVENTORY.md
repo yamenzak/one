@@ -60,6 +60,39 @@ second chance at it.** A workspace that received forty drills as a *number* and
 wants them itemised afterwards has forty objects with no history and no way to
 tell them apart.
 
+### The ladder between a carton and a tablet
+
+A product has exactly **one** base unit and stock is only ever counted in it. A
+shelf holds 600 tablets however they arrived — as a carton, as three boxes or as
+a handful — so there is nothing to break open, no partial-carton state, and no
+second balance that can disagree with the first.
+
+`product.levels` is an ordered list of **named multipliers**: the way somebody
+says "two boxes" while holding two boxes, and the way a number reads back in the
+words they think in. `per` is per the rung BELOW — a box holds 3 sheets, not 30
+tablets — because that is what the person entering it knows; read as base units
+the second rung is silently wrong by a factor of the first and renders perfectly.
+
+⚠️ **IT IS THE ONLY PLACE A BLISTER SHEET CAN EXIST.** A sheet inside a box
+carries no barcode, so it can never be a `code` — before this there was nowhere
+to put it at all, and anybody issuing by the sheet typed 10 every time and hoped.
+A rung needs a name and a number, not a symbol somebody can scan.
+
+⚠️ **THE MULTIPLICATION HAPPENS EXACTLY ONCE, ON THE SERVER.** A client sends a
+rung NAME and never a multiplier — a stale screen holding last week's ladder
+would otherwise move a different amount than the one written on it. And a rung
+the product does not declare is **refused** rather than read as one: falling back
+to a single receives a carton as one tablet, a wrong number nothing downstream
+can detect, because one is what a real entry looks like.
+
+**Nesting each rung as its own product was considered and rejected.** It splits
+the balance across levels so every read becomes a rollup; it multiplies `batch`,
+`code`, `stock`, `ledger`, `item` and `kit` by the depth of the ladder; and it
+forces a lot number printed on a box to belong either to the box (so a tablet
+cannot be recalled) or to the tablet (so the box row bought nothing). Nesting is
+right where a level has its own IDENTITY and lifecycle — and that is `item` and
+`kit`, which already exist.
+
 ### Four clocks, and the earliest one wins
 
 A delivery expires on the date **printed** on it; on the day it was **made** plus
@@ -81,11 +114,27 @@ delivery's date on every future one.
 An itemised object has a second clock of its own: its **service**. It is a
 different working day from an expiry, which is why the two never share a list.
 
-### Four verbs, not one with a parameter
+### Five verbs, not one with a parameter
 
-`receive`, `take`, `adjust`, `undo`. Collapsed into `change(delta)` they become
-indistinguishable in the history, and a shrinkage report over that history is a
-list of numbers nobody can explain.
+`receive`, `take`, `adjust`, `undo`, `move`. Collapsed into `change(delta)` they
+become indistinguishable in the history, and a shrinkage report over that history
+is a list of numbers nobody can explain.
+
+⚠️ **`move` IS A VERB OF ITS OWN BECAUSE A TRANSFER IS NOT A CONSUMPTION.**
+Carrying a carton from the back store to a ward shelf as a take plus a receive
+puts the whole carton into the usage report — so "we used 600 tablets this month"
+is a sentence about a trolley, and the one measure that says how fast stock
+actually goes is made partly of stock that went nowhere.
+
+It is **two rows sharing one cause**, not one row naming both ends. A transfer
+genuinely changes two balances and `stockMove` is the one function allowed to
+change one; a single-row transfer would be a second implementation of the reach
+check, the quarantine check, the shortfall and the compare-and-set, and a second
+implementation is where they drift. `against` carries the transfer's id on both
+halves, which is the question that column already answers. **An undo reverses the
+whole movement** — undoing one half would put the stock back where it left AND
+leave it where it arrived, the same boxes counted twice, from a button whose
+entire promise is that nothing happened.
 
 ⚠️ **TAKING AND CORRECTING ARE DIFFERENT GRANTS, AND IT IS THE PRODUCT'S
 SHARPEST ACCESS RULE.** Somebody on the floor takes things all day and must never
@@ -250,15 +299,16 @@ product in this repository to photograph any other way: the interesting states
 are a line that ran out, one nobody has touched since spring, and a shelf
 somebody labelled and never filled.
 
-### Fifteen collections
+### Eighteen collections
 
 `product` · `supplier` · `code` · `location` · `batch` · `unit` · `kit` ·
-`process` · `process-item` · `job` · `count` · `tally` · `stock` · `ledger`
+`process` · `process-item` · `job` · `count` · `tally` · `stock` · `ledger` ·
+`shot` · `tag` · `tagging` · `sourcing`
 
 Erasure is derived from what each one declares; nothing here carries a
 hand-written cascade.
 
-### Sixty operations
+### Forty-nine operations
 
 Grouped by what they are about: the shelf (`stock.*`), the code book (`code.*`),
 deliveries (`batch.*`), objects (`unit.*`), kits (`kit.*`), counting
@@ -336,26 +386,27 @@ container in `src/screens/live.tsx`, and rendered over a sample world by
 
 | Route | Name | Nav | Needs | Component | Container |
 |---|---|---|---|---|---|
-| `/` | Home | primary | `stock:read` | `screens/Home.tsx:132` | `screens/live.tsx:1904` |
-| `/stock` | Stock | primary | `stock:read` | `screens/Stock.tsx:92` | `screens/live.tsx:435` |
-| `/scan` | Scan | primary | `product:read` | `screens/Scan.tsx:130` | `screens/live.tsx:685` |
-| `/receive` | Receive | primary | `stock:move` | `screens/Receive.tsx:122` | `screens/live.tsx:806` |
-| `/count` | Count | primary | `stock:move` | `screens/Count.tsx:83` | `screens/live.tsx:972` |
-| `/work` | Work | primary | `process:read` | `screens/Work.tsx:65` | `screens/live.tsx:1335` |
-| `/thing` | A product | none | `product:read` | `screens/Thing.tsx:130` | `screens/live.tsx:489` |
-| `/where` | A location | none | `location:read` | `screens/Where.tsx:34` | `screens/live.tsx:636` |
-| `/item` | An item | none | `stock:read` | `screens/Item.tsx:84` | `screens/live.tsx:1138` |
-| `/kit` | A kit | none | `stock:read` | `screens/Kit.tsx:65` | `screens/live.tsx:1245` |
-| `/run` | A run | none | `process:read` | `screens/Run.tsx:73` | `screens/live.tsx:1388` |
-| `/case` | A job | none | `process:read` | `screens/Case.tsx:58` | `screens/live.tsx:1528` |
-| `/due` | Running out | secondary | `stock:read` | `screens/Due.tsx:80` | `screens/live.tsx:1528` |
-| `/labels` | Labels | secondary | `location:read` | `screens/Labels.tsx:248` | `screens/live.tsx:1656` |
-| `/reports` | Reports | none | `ledger:read` | `screens/Reports.tsx:84` | `screens/live.tsx:1656` |
-| `/ask` | Ask | secondary | `stock:read` | `screens/Ask.tsx:54` | `screens/live.tsx:1335` |
-| `/import` | Import | secondary | `product:write` | `screens/Import.tsx:131` | `screens/live.tsx:1829` |
-| `/suppliers` | Suppliers | secondary | `product:write` | `screens/Suppliers.tsx:77` | `screens/live.tsx:1829` |
-| `/register` | Add a product | none | `product:write` | `screens/Register.tsx:249` | `screens/live.tsx:2098` |
-| `/start` | Getting started | secondary | `product:read` | `screens/Start.tsx:67` | `screens/live.tsx:1904` |
+| `/` | Home | primary | `stock:read` | `screens/Home.tsx:132` | `screens/live.tsx:1940` |
+| `/stock` | Stock | primary | `stock:read` | `screens/Stock.tsx:92` | `screens/live.tsx:440` |
+| `/scan` | Scan | primary | `product:read` | `screens/Scan.tsx:133` | `screens/live.tsx:698` |
+| `/receive` | Receive | primary | `stock:move` | `screens/Receive.tsx:144` | `screens/live.tsx:831` |
+| `/count` | Count | primary | `stock:move` | `screens/Count.tsx:83` | `screens/live.tsx:914` |
+| `/work` | Work | primary | `process:read` | `screens/Work.tsx:65` | `screens/live.tsx:1356` |
+| `/move` | Move it | none | `stock:move` | `screens/Move.tsx:82` | `screens/live.tsx:831` |
+| `/thing` | A product | none | `product:read` | `screens/Thing.tsx:144` | `screens/live.tsx:494` |
+| `/where` | A location | none | `location:read` | `screens/Where.tsx:34` | `screens/live.tsx:649` |
+| `/item` | An item | none | `stock:read` | `screens/Item.tsx:84` | `screens/live.tsx:1083` |
+| `/kit` | A kit | none | `stock:read` | `screens/Kit.tsx:65` | `screens/live.tsx:1249` |
+| `/run` | A run | none | `process:read` | `screens/Run.tsx:73` | `screens/live.tsx:1356` |
+| `/case` | A job | none | `process:read` | `screens/Case.tsx:58` | `screens/live.tsx:1556` |
+| `/due` | Running out | secondary | `stock:read` | `screens/Due.tsx:80` | `screens/live.tsx:1556` |
+| `/labels` | Labels | secondary | `location:read` | `screens/Labels.tsx:248` | `screens/live.tsx:1639` |
+| `/reports` | Reports | none | `ledger:read` | `screens/Reports.tsx:84` | `screens/live.tsx:1639` |
+| `/ask` | Ask | secondary | `stock:read` | `screens/Ask.tsx:54` | `screens/live.tsx:1356` |
+| `/import` | Import | secondary | `product:write` | `screens/Import.tsx:131` | `screens/live.tsx:1806` |
+| `/suppliers` | Suppliers | secondary | `product:write` | `screens/Suppliers.tsx:77` | `screens/live.tsx:1806` |
+| `/register` | Add a product | none | `product:write` | `screens/Register.tsx:252` | `screens/live.tsx:2104` |
+| `/start` | Getting started | secondary | `product:read` | `screens/Start.tsx:67` | `screens/live.tsx:1940` |
 
 ### The surfaces that are not routes
 

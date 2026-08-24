@@ -235,8 +235,12 @@ export const spell = (
  * workspace's own words — "box", "sheet", "kg", "stück" — and no plural engine
  * gets them all right. An `s` on a word ending in `s` is the one case that reads
  * as a typo rather than as a language, so it is the one case handled.
+ *
+ * ⚠️ AND IT IS EXPORTED, so the ladder EDITOR says "How many sheets in a box"
+ * with the same rule the ladder READER uses. Two plural rules in one product is
+ * two spellings of the same word on two screens.
  */
-const plural = (name: string, many: number): string => {
+export const plural = (name: string, many: number): string => {
   const word = name.trim();
   if (many === 1 || !word) return word;
   return /(s|x|z|ch|sh)$/i.test(word) ? `${word}es` : `${word}s`;

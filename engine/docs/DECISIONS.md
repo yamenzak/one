@@ -2649,3 +2649,70 @@ answers `"refused"` is reporting to the caller that has a screen to say it on.
 What is silent is a bare `return`, which ends the work and tells nobody.
 
 **What this forbids:** a bare return in a refusal branch. `spoken` fails on it.
+
+## D76 — A packaging level is a named multiplier, never a product
+
+**A box of thirty tablets is one product, not two.** Declaring each rung of a
+packaging ladder as its own record — carton parent of box parent of sheet parent
+of tablet — is the intuitive model and the wrong one. It splits the balance
+across levels, so "how many are there" stops being a sum and becomes a tree walk
+that every reader has to get right; it multiplies `batch`, `code`, `stock`,
+`ledger`, `item` and `kit` by the depth of the ladder; and it forces the lot
+number printed on a box to belong either to the box, so a tablet cannot be
+recalled, or to the tablet, so the box row bought nothing.
+
+**So stock is only ever counted in one base unit, and a level is a name with a
+multiplier.** `product.levels` is an ordered list; `per` is per the rung BELOW,
+because "a box holds 3 sheets" is what the person entering it knows and "a box
+holds 30 tablets" is a multiplication they should not be doing. A shelf holds 600
+tablets however they arrived, so there is nothing to break open, no
+partial-carton state, and no second balance to disagree with the first.
+
+**It exists because the blister sheet had nowhere to live.** A sheet inside a box
+carries no barcode, so it can never be a `code` — the only carrier the model had.
+Anybody issuing by the sheet typed 10 every time and hoped.
+
+**The multiplication happens exactly once, on the server.** A client sends a rung
+NAME and never a number: a stale screen holding last week's ladder would
+otherwise move a different amount than the one printed on it. And a rung the
+product does not declare is REFUSED rather than read as one — falling back to a
+single receives a carton as one tablet, which is a wrong number nothing
+downstream can detect, because one is what a real entry looks like.
+
+**Nesting is right where a level has its own identity and lifecycle** — a
+serialised pallet, a returnable keg, a surgery tray. That is `item` and `kit`,
+which already exist, and the line between them is clean: a pack is N of the same
+thing and is a unit of measure with no identity; a kit is a group of different
+things that has one.
+
+**What this forbids:** a `parent` column on `product`, and any second balance
+keyed on a level.
+
+## D77 — Moving stock is a verb of its own
+
+**A transfer is not a consumption.** Carrying a carton from the back store to a
+ward shelf as a take plus a receive puts the whole carton into the usage report,
+so "we used 600 tablets this month" becomes a sentence about a trolley — and the
+one measure that says how fast stock actually goes is made partly of stock that
+went nowhere.
+
+**It is two rows sharing one cause, not one row naming both ends.** A transfer
+genuinely changes two balances and `stockMove` is the one function allowed to
+change one: it checks the shelf this person may touch, the batch's quarantine,
+the shortfall and the compare-and-set. A single-row transfer would be a second
+implementation of all four, and a second implementation is where they drift. The
+pair share a transfer id in `against`, which is the question that column already
+answers — what caused this.
+
+**The source is debited first**, because "there is not that much there" is the
+ordinary way a transfer fails and failing it before anything is written means the
+common refusal touches no rows. The rare far-half failure compensates the source
+before re-throwing the original problem; there is no transaction across these
+statements, and the alternative is stock that simply stopped existing.
+
+**An undo reverses the whole movement.** Undoing one half puts the stock back
+where it left AND leaves it where it arrived — the same boxes counted twice, from
+a button whose entire promise is that nothing happened.
+
+**What this forbids:** recording a shelf-to-shelf move as `taken` plus
+`received`, and an undo that reaches one half of a pair.

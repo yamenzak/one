@@ -12,6 +12,7 @@
  * that passes while the manifest grows a screen nobody drew.
  */
 
+import * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ready } from "@engine/design";
 import { describe, expect, it } from "vitest";
@@ -20,12 +21,14 @@ import {
   Count, INVENTORY_ROUTES, InventoryScreen, Receive, Scan,
   type Seen, type Uncovered,
 } from "../src/screens/index.js";
-import { LINES, PLACES, EMPTY_PLACE } from "../src/screens/sample.js";
+import { LINES, PLACES, EMPTY_PLACE, type Line } from "../src/screens/sample.js";
 import { Stock } from "../src/screens/Stock.js";
 import { Ask, type Answer } from "../src/screens/Ask.js";
 import { Item, type Kept } from "../src/screens/Item.js";
 import type { Guess } from "../src/screens/Scan.js";
 import { keyOf, type Noted } from "../src/screens/Receive.js";
+import { Move } from "../src/screens/Move.js";
+import { Ladder } from "../src/screens/Ladder.js";
 import { Case, type Used } from "../src/screens/Case.js";
 import { Run, type Covered } from "../src/screens/Run.js";
 import { Work, type Jobs, type Runs } from "../src/screens/Work.js";
@@ -176,7 +179,7 @@ describe("the location tree", () => {
    the prop list right. */
 const seen = (of: Partial<Seen>): Seen => ({
   found: false, kind: "gtin", value: "05000112637922", ours: "",
-  product: "", name: "", tracking: "", unit: "", pack: 1,
+  product: "", name: "", tracking: "", unit: "", pack: 1, rung: "", levels: [],
   lot: "", expiry: "", needs: "", ...of,
 });
 
@@ -311,7 +314,7 @@ describe("a batched product's deliveries", () => {
 describe("receiving", () => {
   const seen = (of: Partial<Seen>): Seen => ({
     found: false, kind: "gtin", value: "05000112637922", ours: "",
-    product: "", name: "", tracking: "", unit: "", pack: 1,
+    product: "", name: "", tracking: "", unit: "", pack: 1, rung: "", levels: [],
     lot: "", expiry: "", needs: "", ...of,
   });
 
@@ -1629,5 +1632,107 @@ describe("what a date looks like", () => {
   it("still finds the one place ISO belongs", () => {
     expect(saidDates(renderToStaticMarkup(<InventoryScreen route="/labels" />)).length)
       .toBeGreaterThan(0);
+  });
+});
+
+/* --------------------------------------------------- packaging and moving --- */
+
+/**
+ * THE LADDER ON THE SCREENS THAT USE IT.
+ *
+ * ⚠️ THE ARITHMETIC IS PROVED IN `packing.test.ts` AND THIS IS NOT THAT. What is
+ * asserted here is what a person is asked and what they are told — a field
+ * labelled in the wrong unit is a right answer typed into the wrong question,
+ * and that is the shape that put nine hundred tablets on a shelf.
+ *
+ * ⚠️ AND A PICKER WITH ONE ENTRY IS A CONTROL ASKING A QUESTION IT HAS ALREADY
+ * ANSWERED. Most products have no ladder, so the common case is the one where
+ * none of this is drawn at all.
+ */
+describe("saying how many, in the words somebody is holding", () => {
+  const AMOXI = [
+    { name: "sheet", per: 10 },
+    { name: "box", per: 3 },
+  ];
+
+  const line: Line = {
+    id: "s-amx", product: "t-amx", name: "Amoxicillin 500mg", where: "p-a1",
+    whereName: "A1", quantity: 97, unit: "tablet", tracking: "counted",
+    seen: "2026-08-20T09:00:00.000Z",
+  };
+
+  const moving = (of: Partial<React.ComponentProps<typeof Move>> = {}) =>
+    renderToStaticMarkup(
+      <Move
+        line={line}
+        levels={AMOXI}
+        shelves={[{ id: "p-b1", name: "B1" }]}
+        onMove={() => undefined}
+        back={() => undefined}
+        {...of}
+      />,
+    );
+
+  /*
+    ⚠️ THE PICKER OFFERS THE BASE UNIT TOO. A ladder of "sheet" and "box" cannot
+    express a handful of loose tablets, which is the state a shelf is in for most
+    of the month — leaving it out makes the one thing the product is always
+    counted in the one thing nobody can choose.
+  */
+  it("offers every rung and the base unit", () => {
+    const out = moving();
+    for (const word of ["tablet", "sheet", "box"]) expect(out).toContain(word);
+  });
+
+  it("draws no picker at all where the product has no ladder", () => {
+    const out = moving({ levels: [] });
+    expect(out).not.toContain("Counted in");
+    expect(out).toContain("How many tablet");
+  });
+
+  /* ⚠️ THE SHELF IT IS ON IS NOT A DESTINATION. A move to where it already is
+     writes two rows that cancel — the balance would be right, which is exactly
+     why the picker must not offer it. */
+  it("says so rather than offering nowhere to put it", () => {
+    const out = moving({ shelves: [] });
+    expect(out).toContain("nowhere else to put it");
+  });
+
+  it("names what is being moved and the shelf it leaves", () => {
+    const out = moving();
+    expect(out).toContain("Amoxicillin 500mg");
+    expect(out).toContain("A1");
+  });
+
+  /*
+    ⚠️ THE LABEL NAMES THE RUNG BELOW, which is the whole ergonomics of the
+    editor. "How many sheets in a box" is a question somebody can answer; "how
+    many tablets in a box" is a multiplication they should not be doing, and
+    reading `per` as base units is silently wrong by a factor of the rung below.
+  */
+  it("asks a ladder in the rung below, never in base units", () => {
+    const out = renderToStaticMarkup(
+      <Ladder unit="tablet" levels={AMOXI} onChange={() => undefined} />,
+    );
+    expect(out).toContain("How many tablets in a sheet");
+    expect(out).toContain("How many sheets in a box");
+  });
+
+  /* ⚠️ AND THE FEAR IT ANSWERS IS REAL. Somebody adding a ladder wonders whether
+     their shelf numbers are about to change; they are not, and one sentence
+     under the control is where that belongs. */
+  it("says the shelf is still counted in the base unit", () => {
+    const out = renderToStaticMarkup(
+      <Ladder unit="tablet" levels={AMOXI} onChange={() => undefined} />,
+    );
+    expect(out).toContain("still counted in tablet");
+  });
+
+  it("invites a ladder rather than assuming one", () => {
+    const out = renderToStaticMarkup(
+      <Ladder unit="tablet" levels={[]} onChange={() => undefined} />,
+    );
+    expect(out).toContain("It comes in packs");
+    expect(out).not.toContain("How many");
   });
 });

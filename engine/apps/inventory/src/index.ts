@@ -28,7 +28,7 @@ import { SIGNALS } from "./hazard.js";
 /* ⚠️ THE LADDER BETWEEN A CARTON AND A TABLET — a named multiplier and nothing
    more. Stock is always in base units; these are the way in and the way out. */
 import {
-  factorOf, readLevels, refuseLevels, rungFor, spell, type Level,
+  factorOf, perOf, readLevels, refuseLevels, rungFor, spell, type Level,
 } from "./packing.js";
 import { PROFILES, wordsFor, type Words } from "./words.js";
 import { columnsFor, planIn, readSheet, tallyIn, type Planned } from "./sheet.js";
@@ -1274,23 +1274,31 @@ async function stockMove(
  * carton as a single tablet — a wrong number nothing downstream can detect,
  * because 1 is a number a real entry produces.
  */
+function perFor(
+  c: Ctx, levels: readonly Level[], rung: string | null | undefined,
+  pack: number | null | undefined, unit: string,
+): number {
+  const per = perOf(levels, rung, pack);
+  /* ⚠️ THE REFUSAL LIVES HERE AND NOWHERE ELSE, so every entry point answers a
+     stale picker with the same sentence. Two copies of this branch is how one of
+     them comes to fall back to a single. */
+  if (per === null) c.fail("inventory.no_rung", { rung: (rung ?? "").trim(), name: unit });
+  return per ?? 1;
+}
+
+/** The same decision where the caller has an id rather than the product's row. */
 async function inBase(
   c: Ctx, product: string, rung: string | null | undefined, quantity: number,
 ): Promise<number> {
   const many = Math.abs(Number(quantity));
-  const named = (rung ?? "").trim();
-  if (!named) return many;
+  if (!(rung ?? "").trim()) return many;
 
   const of = await (c.db as Db).prepare(
     `SELECT levels, unit FROM product WHERE id = ? AND tenant_id = ?`)
     .bind(product, c.tenantId).first<{ levels: string | null; unit: string | null }>();
   if (!of) c.fail("platform.not_found");
 
-  const per = factorOf(readLevels(of?.levels ?? null), named);
-  if (per === null) {
-    c.fail("inventory.no_rung", { rung: named, name: of?.unit ?? "unit" });
-  }
-  return many * (per ?? 1);
+  return many * perFor(c, readLevels(of?.levels ?? null), rung, null, of?.unit ?? "unit");
 }
 
 const moveOutput = {
@@ -2081,6 +2089,12 @@ const resolveOut = {
   tracking: field.text({ label: "Tracked as", holds: "none" }),
   unit: field.text({ label: "Counted in", holds: "none" }),
   pack: field.number({ label: "How many it holds", holds: "none" }),
+  /* ⚠️ WHICH RUNG THIS CODE IS PRINTED ON, and THE PRODUCT'S WHOLE LADDER beside
+     it. Both, because the screen needs to answer two different questions: what
+     is already selected, and what else can be picked. Sending only the first
+     leaves a picker with one entry; sending only the second makes it guess. */
+  rung: field.text({ label: "Counted in", holds: "none" }),
+  levels: field.json({ label: "How it is packaged", holds: "none" }),
   /* ⚠️ WHATEVER THE CARRIER ALSO CARRIED — see `readScan`. A DataMatrix arrives
      with these and an EAN-13 does not, and the screen is a function of which. */
   lot: field.text({ label: "Lot", holds: "none" }),
@@ -2094,6 +2108,7 @@ const resolveOut = {
 interface Resolved {
   found: boolean; kind: string; value: string; ours: string;
   product: string; name: string; tracking: string; unit: string; pack: number;
+  rung: string; levels: readonly Level[];
   lot: string; expiry: string; needs: string;
 }
 
@@ -2143,6 +2158,7 @@ const resolve = operation<Resolving, Resolved>({
     const none: Resolved = {
       found: false, kind: of.kind, value: of.value, ours: of.ours ?? "",
       product: "", name: "", tracking: "", unit: "", pack: 1,
+      rung: "", levels: [],
       lot: of.lot ?? "", expiry: of.expiry ?? "", needs: "",
     };
     /* ⚠️ ONE OF OUR OWN LABELS IS NOT LOOKED UP HERE. It names a shelf, a batch
@@ -2154,13 +2170,14 @@ const resolve = operation<Resolving, Resolved>({
 
     const db = c.db as Db;
     const held = await db.prepare(
-      `SELECT c.pack AS pack, c.kind AS kind, p.id AS product, p.name AS name,
-              p.tracking AS tracking, p.unit AS unit
+      `SELECT c.pack AS pack, c.rung AS rung, c.kind AS kind, p.id AS product,
+              p.name AS name, p.tracking AS tracking, p.unit AS unit,
+              p.levels AS levels
          FROM code c JOIN product p ON p.id = c.product
         WHERE c.tenant_id = ? AND c.value = ?`)
       .bind(c.tenantId, of.value)
-      .first<{ pack: number | null; kind: string; product: string; name: string;
-        tracking: string; unit: string }>();
+      .first<{ pack: number | null; rung: string | null; kind: string; product: string;
+        name: string; tracking: string; unit: string; levels: string | null }>();
 
     if (!held) return none;
 
@@ -2176,6 +2193,11 @@ const resolve = operation<Resolving, Resolved>({
       tracking: held.tracking,
       unit: held.unit,
       pack: held.pack ?? 1,
+      /* ⚠️ THE STORED NAME, OR DERIVED FROM WHAT THE CARRIER HOLDS. A code
+         learned before the ladder existed has no rung written on it and is still
+         a box if the ladder says a box holds that many. */
+      rung: held.rung ?? rungFor(readLevels(held.levels), held.pack) ?? "",
+      levels: readLevels(held.levels),
       needs: stillNeeded(held.tracking, of).join(","),
     };
   },
@@ -2282,6 +2304,8 @@ const WHY: Readonly<Record<"empty" | "check" | "gs1", string>> = {
 interface Arriving {
   raw: string; location: string; quantity: number; day: string; year: number;
   capture?: string; lot?: string; expiry?: string;
+  /** ⚠️ Which rung the quantity is in. Absent means the scanned code's own. */
+  rung?: string;
 }
 
 /** ⚠️ How many labelled objects one scan may mint — see the refusal below. */
@@ -2296,10 +2320,13 @@ const arrive = operation<
   input: {
     raw: field.text({ label: "Code", required: true, holds: "none", max: 256 }),
     location: field.text({ label: "Where", required: true, holds: "none" }),
-    /* ⚠️ IN THE UNIT THE CODE IMPLIES — one carton is one here, and the pack
-       level turns it into ten. A caller sending the multiplied number would
-       double it. */
+    /* ⚠️ IN THE RUNG NAMED BESIDE IT, or in the unit the code implies — one
+       carton is one here and the multiplier turns it into thirty. A caller
+       sending the multiplied number would double it. */
     quantity: field.number({ label: "How many", required: true, holds: "none" }),
+    /* ⚠️ A NAME, NEVER A MULTIPLIER — see `perFor`. Absent means "in whatever
+       the scanned code holds", which is every screen written before ladders. */
+    rung: field.text({ label: "Counted in", holds: "none", max: 24 }),
     day: field.day({ label: "On", required: true, holds: "none" }),
     year: field.number({ label: "This year", required: true, holds: "none" }),
     capture: field.text({ label: "Recorded by", holds: "none" }),
@@ -2336,15 +2363,21 @@ const arrive = operation<
     }
 
     const known = await db.prepare(
-      `SELECT c.product AS product, c.pack AS pack, p.tracking AS tracking
+      `SELECT c.product AS product, c.pack AS pack, p.tracking AS tracking,
+              p.levels AS levels, p.unit AS unit
          FROM code c JOIN product p ON p.id = c.product
         WHERE c.tenant_id = ? AND c.value = ?`)
       .bind(c.tenantId, of.value)
-      .first<{ product: string; pack: number | null; tracking: string }>();
+      .first<{ product: string; pack: number | null; tracking: string;
+        levels: string | null; unit: string | null }>();
 
     let product = known?.product ?? "";
     let tracking = known?.tracking ?? "";
-    const pack = Math.max(1, known?.pack ?? 1);
+    /* ⚠️ ONE MULTIPLICATION, AND A NAMED RUNG WINS THE CODE'S OWN PACK. Both are
+       the same kind of number wearing different clothes, and a path that could
+       apply both put nine hundred tablets on a shelf once already. */
+    const pack = perFor(c, readLevels(known?.levels ?? null), input.rung,
+      known?.pack, known?.unit ?? "unit");
 
     if (!product) {
       /* ⚠️ THE WORKSPACE'S OWN DEFAULTS, NOT THIS FILE'S. What a new product
@@ -5847,6 +5880,15 @@ export const INVENTORY: AppSpec = defineApp({
     { id: "register", route: "/register", label: "Add a product", nav: "none",
       icon: "add", permission: "product:write", sky: "neon" },
     { id: "receive", route: "/receive", label: "Receive", nav: "none", icon: "add",
+      permission: "stock:move" },
+    /*
+      ⚠️ REACHED FROM THE LINE, NEVER FROM THE BAR. Somebody moving stock is
+      already looking at what they are moving — the product and the shelf it is
+      on are facts the screen arrives with, so it asks two questions rather than
+      four. A nav slot is the scarcest thing this product has (five, D10) and a
+      move is an action on a shelf, not a place to be.
+    */
+    { id: "move", route: "/move", label: "Move it", nav: "none", icon: "box",
       permission: "stock:move" },
     /* ⚠️ A COUNT IS A JOB SOMEBODY SPENDS AN AFTERNOON ON, so it is a
        destination rather than a mode. `stock:move` because counting is open to

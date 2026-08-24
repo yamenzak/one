@@ -50,6 +50,9 @@ export interface Seen {
   readonly tracking: string;
   readonly unit: string;
   readonly pack: number;
+  /** ⚠️ Which rung this code is printed on, and the product's whole ladder. */
+  readonly rung: string;
+  readonly levels: readonly { readonly name: string; readonly per: number }[];
   readonly lot: string;
   readonly expiry: string;
   /** ⚠️ What the screen must still ask for, decided by the resolver. */

@@ -19,7 +19,9 @@
  */
 
 import * as React from "react";
-import { ready, trouble, useTelling, waiting, type Loaded } from "@engine/design";
+import {
+  Nothing, Screen, glyphOf, ready, trouble, useTelling, waiting, type Loaded,
+} from "@engine/design";
 import { dayPlus, type Day, type Problem } from "@engine/kernel";
 import { INVENTORY } from "../index.js";
 import { hazardsIn, signalIn } from "../hazard.js";
@@ -39,6 +41,9 @@ import { Due, type Dated } from "./Due.js";
 import { Labels, type Labelled, type Subject, type Template } from "./Labels.js";
 import { Reports, type Reported, type Span } from "./Reports.js";
 import { Thing, type Batch, type Movement, type Piece } from "./Thing.js";
+import { Move } from "./Move.js";
+/* ⚠️ A JSON COLUMN IS WHATEVER IS IN THE COLUMN — see `packing.ts`. */
+import { readLevels } from "../packing.js";
 import { Where } from "./Where.js";
 import { Start } from "./Start.js";
 /* ⚠️ `Seen` IS TAKEN BY THE SCAN SCREEN, so the import's is renamed at the door.
@@ -591,6 +596,11 @@ const THING = (api: Door) => function ThingHere({ go, at }: Mounted) {
   return (
     <Thing
       line={line.status === "ready" && line.data ? line.data : EMPTY_LINE}
+      /* ⚠️ THE LADDER IS THE PRODUCT'S, not the line's. A stock row knows how
+         many and where; how the thing is packaged is a fact about the type. */
+      levels={readLevels(world.kinds.status === "ready"
+        ? world.kinds.data.items.find((row) => text(row.id) === of)?.levels
+        : null)}
       history={moves}
       batches={batches}
       pieces={pieces}
@@ -610,6 +620,9 @@ const THING = (api: Door) => function ThingHere({ go, at }: Mounted) {
       /* ⚠️ NOT WIRED YET, AND SAYING SO IS THE HONEST STATE. Taking stock is its
          own screen with a quantity and a place in it (OI-6). */
       onTake={() => undefined}
+      /* ⚠️ THE LINE IS THE SUBJECT, so the address carries it and the move
+         screen asks two questions rather than four. */
+      onMove={() => go(`/move/${id}`)}
       onOpen={(batch) => {
         void api.post("batch.open", { batch, day: today }).then((got) => {
           /* ⚠️ RE-READ RATHER THAN PATCHED. Opening moves the clock, and the
@@ -803,6 +816,101 @@ const SCAN = (api: Door) => function ScanHere({ go }: Mounted) {
  * calls out here would leave a nameless product with no code the first time the
  * signal drops, and four queued items offline instead of one.
  */
+/**
+ * CARRYING SOME OF A SHELF TO ANOTHER SHELF.
+ *
+ * ⚠️ IT IS REACHED FROM THE LINE, so the product and the shelf it is on are
+ * facts this screen arrived with rather than questions it asks. What is left is
+ * where to and how many, which is why the surface is three fields instead of a
+ * scanning session.
+ *
+ * ⚠️ AND THE LADDER COMES FROM THE PRODUCT, NOT FROM THE LINE. A stock row knows
+ * how many and where; how the thing is PACKAGED is a fact about the product, and
+ * it is what the rung picker offers.
+ */
+const MOVE = (api: Door) => function MoveHere({ go, at }: Mounted) {
+  const id = at[0] ?? "";
+  /* ⚠️ THE ONE CHANNEL — see `telling.tsx`. Every write below could fail into
+     nothing without it, which is what "the button does not do anything" is. */
+  const tell = useTelling();
+  const today = dayHere();
+  const world = useWorld(api);
+  const [busy, setBusy] = React.useState(false);
+
+  const places = world.places.status === "ready" && world.stock.status === "ready"
+    ? placesOf(world.places.data.items, world.stock.data.items)
+    : [];
+  const line = both(world.stock, world.kinds, (stock, kinds) =>
+    pick(linesOf(stock.items, places, kinds.items), id));
+
+  const held = line.status === "ready" ? line.data : undefined;
+  /* ⚠️ THE PRODUCT'S OWN ROW, because the ladder is the product's. */
+  const kind = world.kinds.status === "ready"
+    ? world.kinds.data.items.find((row) => text(row.id) === (held?.product ?? ""))
+    : undefined;
+
+  /*
+    ⚠️ EVERY SHELF EXCEPT THE ONE IT IS ON. A move to where it already is writes
+    two rows that cancel — the balance would be right, which is exactly why the
+    picker must not offer it. The door refuses it too.
+  */
+  const shelves = places
+    .filter((one) => one.id !== (held?.where ?? ""))
+    .map((one) => ({ id: one.id, name: one.name }));
+
+  if (line.status === "ready" && !held) {
+    /*
+      ⚠️ AN ADDRESS NAMING A LINE THIS WORKSPACE DOES NOT HAVE IS A MISTAKE TO
+      REPORT, never a blank form to fill in. Drawing the move screen over an
+      empty line would offer to carry nothing from nowhere, and the person would
+      find out by pressing.
+    */
+    return (
+      <Screen shape="form" title="Move it" back={() => go("/stock")}>
+        <Nothing
+          /* ⚠️ THE SCREEN'S OWN NOUN, never a shrug — this emptiness is about a
+             thing on a shelf, and the mark is what says which. */
+          icon={glyphOf("box")}
+          says="That is not on a shelf any more"
+          under="Somebody moved or took the last of it"
+          offer={{ label: "Back to the stock", onDo: () => go("/stock") }}
+        />
+      </Screen>
+    );
+  }
+
+  return (
+    <Move
+      line={held ?? EMPTY_LINE}
+      levels={readLevels(kind?.levels)}
+      shelves={shelves}
+      busy={busy}
+      back={() => go(held ? `/thing/${id}` : "/stock")}
+      onMove={({ to, quantity, rung }) => {
+        if (!held) return;
+        setBusy(true);
+        void api.post("stock.move", {
+          product: held.product,
+          from: held.where,
+          to,
+          quantity,
+          /* ⚠️ THE NAME, NEVER THE MULTIPLIER — resolved on the server against
+             the ladder the product declares now. */
+          ...(rung ? { rung } : {}),
+          day: today,
+          capture: "typed",
+        }).then((got) => {
+          setBusy(false);
+          if (!got.ok) { tell.failed(got.problem); return; }
+          tell.did("Moved.");
+          world.again();
+          go(`/thing/${id}`);
+        });
+      }}
+    />
+  );
+};
+
 const RECEIVE = (api: Door) => function ReceiveHere() {
   /* ⚠️ THE ONE CHANNEL — see `telling.tsx`. Every write below could fail
      into nothing before this, and several of them did. */
@@ -896,7 +1004,7 @@ const RECEIVE = (api: Door) => function ReceiveHere() {
         setLast(raw);
         setSeen({
           found: false, kind: line.code ? "gtin" : "other", value: raw, ours: "",
-          product: "", name: line.name, tracking: "", unit: "", pack: 1,
+          product: "", name: line.name, tracking: "", unit: "", pack: 1, rung: "", levels: [],
           lot: line.lot, expiry: line.expiry,
           /* ⚠️ WHAT THE PAGE DID NOT SAY, ASKED FOR. A note that gave a lot and
              no date is a batch with no expiry unless the person is asked. */
@@ -919,13 +1027,16 @@ const RECEIVE = (api: Door) => function ReceiveHere() {
           });
         }
         : undefined}
-      onReceive={({ quantity, lot, expiry }) => {
+      onReceive={({ quantity, rung, lot, expiry }) => {
         if (!place || !seen) return;
         setBusy(true);
         void api.post<{ movement: string }>("stock.arrive", {
           raw: last,
           location: place.id,
           quantity,
+          /* ⚠️ THE NAME, NEVER THE MULTIPLIER — the server resolves it against
+             what the product declares now. */
+          ...(rung ? { rung } : {}),
           day: today,
           year: new Date().getFullYear(),
           capture: "scanned",
@@ -2228,6 +2339,10 @@ const REGISTER = (api: Door) => function RegisterHere({ app, go }: Mounted) {
            hand against, so it is the one they took first and deliberately. */
         ...(kept.length ? { photo: kept[0], shots: kept.slice(1) } : {}),
         codes: of.codes, tags: of.tags, sources: of.sources,
+        /* ⚠️ ONLY WHERE THERE IS ONE. An empty ladder and no ladder are the same
+           thing to every reader, and sending `[]` would store a row saying
+           somebody described the packaging as nothing. */
+        ...(of.levels.length ? { levels: of.levels } : {}),
       });
 
       setBusy(false);
@@ -2421,6 +2536,7 @@ export function mount({ register, api }: Mounting): void {
     ["/scan", SCAN(api)],
     ["/register", REGISTER(api)],
     ["/receive", RECEIVE(api)],
+    ["/move", MOVE(api)],
     ["/count", COUNT(api)],
     ["/ask", ASK(api)],
     ["/work", WORK(api)],

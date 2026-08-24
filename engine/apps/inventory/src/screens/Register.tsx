@@ -56,6 +56,7 @@ import { Button } from "@heroui/react";
 import { MOST_BYTES } from "@engine/kernel";
 /* ⚠️ ONE BOX IS ONE CODE — the fold the reader has no way to know. */
 import { foldScan } from "../code.js";
+import { Ladder, type Rung } from "./Ladder.js";
 
 /** ⚠️ Up to six — see `product.see`: past that the answer stops improving. */
 export const MOST_PHOTOS = 6;
@@ -116,6 +117,8 @@ export interface Registering {
   readonly name: string;
   readonly brand: string;
   readonly description: string;
+  /** ⚠️ How it is packaged. Empty for most things — see `Ladder`. */
+  readonly levels: readonly Rung[];
   readonly unit: string;
   readonly tracking: string;
   readonly whole: boolean;
@@ -258,6 +261,9 @@ export function Register({
   const [brand, setBrand] = React.useState("");
   const [description, setDescription] = React.useState("");
   const [unit, setUnit] = React.useState("");
+  /* ⚠️ HOW IT IS PACKAGED — see `Ladder` and `packing.ts`. Empty for most
+     things, which is why the editor draws one blank row and no more. */
+  const [levels, setLevels] = React.useState<readonly Rung[]>([]);
   const [tracking, setTracking] = React.useState("counted");
   const [whole, setWhole] = React.useState(true);
   const [par, setPar] = React.useState<number | null>(null);
@@ -383,6 +389,10 @@ export function Register({
     onRegister({
       name: name.trim(), brand: brand.trim(), description: description.trim(),
       unit: unit.trim(), tracking, whole, par,
+      /* ⚠️ ONLY THE ROWS SOMEBODY FINISHED. A half-typed rung — a name with no
+         number — is refused at the door, so sending it would turn an unfinished
+         line into a refusal about a field the person had not got to yet. */
+      levels: levels.filter((one) => one.name.trim() && one.per > 1),
       storage: storage.trim(), handling: handling.trim(),
       shelfDays, openDays,
       supplier, reorder, reorderQty,
@@ -963,6 +973,19 @@ export function Register({
               min={0}
               help="Zero means never"
             />
+
+            {/*
+              ⚠️ HOW IT IS PACKAGED, AND THE SHELF IS STILL COUNTED IN ONE UNIT.
+              A rung is a NAMED MULTIPLIER — the way somebody says "two boxes"
+              while holding two boxes, and the way a number reads back in the
+              words they think in. Nothing here changes what the balance is in.
+
+              ⚠️ AND IT IS THE ONLY PLACE A BLISTER SHEET CAN EXIST. A sheet
+              inside a box carries no barcode, so it can never be a code; before
+              this there was nowhere to put it and anybody issuing by the sheet
+              typed 10 every time and hoped.
+            */}
+            <Ladder unit={unit} levels={levels} onChange={setLevels} />
         </Section>
         </>
         ) : null}
