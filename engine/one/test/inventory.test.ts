@@ -621,3 +621,232 @@ describe("how far this workspace has got", () => {
     expect(said.status).toBe(404);
   });
 });
+
+/* ------------------------------------------------------- carrying and rungs --- */
+
+/**
+ * THE BOX, THE SHEET AND THE TABLET — and carrying some of it to another shelf.
+ *
+ * ⚠️ THIS IS THE ONE STORY THE MODEL COULD NOT TELL. A carton of amoxicillin
+ * holds twenty boxes, a box three blister sheets, a sheet ten tablets — and the
+ * SHEET carries no barcode, so it could never be a `code` and there was nowhere
+ * to put it at all. Anybody issuing by the sheet typed 10 every time and hoped.
+ *
+ * ⚠️ AND MOVING SOME OF IT WAS A TAKE PLUS A RECEIVE, which puts the whole
+ * carton into the usage report — so "we used 600 tablets" was a sentence about a
+ * trolley. `moved` is a verb of its own for that reason, and it is two rows
+ * sharing one cause rather than one row naming both ends, because `stockMove` is
+ * the only function allowed to change a balance.
+ *
+ * ⚠️ STOCK STAYS IN BASE UNITS THROUGHOUT, which is what makes the whole thing
+ * small: a shelf holds 600 tablets however they arrived, so there is nothing to
+ * break open, no partial-carton state and no second balance to disagree with the
+ * first. A rung is a named multiplier applied exactly once, at the door.
+ */
+describe("a ladder of packaging, and carrying stock between shelves", () => {
+  const LEVELS = [
+    { name: "sheet", per: 10 },
+    { name: "box", per: 3 },
+    { name: "carton", per: 20 },
+  ];
+
+  /** A workspace with the ladder on it, a back store and a ward shelf. */
+  const dispensary = async (name: string) => {
+    const back = idOf(await write("location.create", { name: `${name} store`, kind: "room" }));
+    const ward = idOf(await write("location.create", { name: `${name} ward`, kind: "shelf" }));
+    const made = await write("product.register", {
+      name, unit: "tablet", tracking: "counted", levels: LEVELS,
+    });
+    expect(made.status, JSON.stringify(made.body)).toBe(200);
+    return { back, ward, product: String(made.body.product) };
+  };
+
+  const onShelf = async (product: string, location: string): Promise<number> => {
+    const lines = await read("stock.list");
+    const rows = (lines.body.items as { product: string; location: string; quantity: number }[]);
+    return rows.filter((l) => l.product === product && l.location === location)
+      .reduce((sum, l) => sum + l.quantity, 0);
+  };
+
+  /*
+    ⚠️ ONE CARTON IS SIX HUNDRED TABLETS, AND THE MULTIPLICATION HAPPENS ONCE.
+    Sending a rung NAME rather than a multiplier is the whole safety of it: a
+    client that sent 600 would be deciding how much stock exists.
+  */
+  it("receives one carton as six hundred tablets", async () => {
+    const { back, product } = await dispensary("Amoxicillin 500mg");
+    const got = await write("stock.receive", {
+      product, location: back, quantity: 600, day: TODAY, capture: "typed" });
+    expect(got.status, JSON.stringify(got.body)).toBe(200);
+    expect(await onShelf(product, back)).toBe(600);
+  });
+
+  /*
+    ⚠️ AND THE SHEET IS THE RUNG THAT PROVES THE POINT. It has no barcode, so a
+    model built on codes alone could not express it — and issuing by the sheet is
+    exactly what a dispensary does all day.
+  */
+  it("moves two boxes to the ward, and it is sixty tablets", async () => {
+    const { back, ward, product } = await dispensary("Amoxicillin 250mg");
+    await write("stock.receive", {
+      product, location: back, quantity: 600, day: TODAY, capture: "typed" });
+
+    const moved = await write("stock.move", {
+      product, from: back, to: ward, quantity: 2, rung: "box",
+      day: TODAY, capture: "typed",
+    });
+    expect(moved.status, JSON.stringify(moved.body)).toBe(200);
+    expect(moved.body.arrived).toBe(60);
+
+    expect(await onShelf(product, back)).toBe(540);
+    expect(await onShelf(product, ward)).toBe(60);
+  });
+
+  it("moves a single sheet, which is ten", async () => {
+    const { back, ward, product } = await dispensary("Amoxicillin 125mg");
+    await write("stock.receive", {
+      product, location: back, quantity: 600, day: TODAY, capture: "typed" });
+    const moved = await write("stock.move", {
+      product, from: back, to: ward, quantity: 1, rung: "sheet",
+      day: TODAY, capture: "typed" });
+    expect(moved.status, JSON.stringify(moved.body)).toBe(200);
+    expect(await onShelf(product, ward)).toBe(10);
+  });
+
+  /*
+    ⚠️ A RUNG THE PRODUCT DOES NOT DECLARE IS REFUSED, NEVER READ AS ONE. Falling
+    back to a single would move one tablet where a pallet was meant — a wrong
+    number nothing downstream can detect, because one is what a real entry looks
+    like. The usual cause is a stale screen, so the refusal names the rung.
+  */
+  it("refuses a rung this product does not have", async () => {
+    const { back, ward, product } = await dispensary("Amoxicillin 100mg");
+    await write("stock.receive", {
+      product, location: back, quantity: 600, day: TODAY, capture: "typed" });
+
+    const said = await write("stock.move", {
+      product, from: back, to: ward, quantity: 1, rung: "pallet",
+      day: TODAY, capture: "typed" });
+    expect(said.status).toBe(422);
+    expect(JSON.stringify(said.body)).toContain("pallet");
+
+    /* ⚠️ AND THE REFUSAL MOVED NOTHING. A 422 over a write that had already
+       landed is worse than no refusal at all. */
+    expect(await onShelf(product, back)).toBe(600);
+    expect(await onShelf(product, ward)).toBe(0);
+  });
+
+  /*
+    ⚠️ A MOVE IS NOT A CONSUMPTION, AND THE HISTORY HAS TO SAY SO. Recorded as a
+    take plus a receive the whole carton enters every usage report, so the one
+    measure that says how fast stock actually goes would be made partly of stock
+    that went nowhere.
+  */
+  it("records a transfer as two halves of one movement, and neither is a take", async () => {
+    const { back, ward, product } = await dispensary("Amoxicillin 50mg");
+    await write("stock.receive", {
+      product, location: back, quantity: 600, day: TODAY, capture: "typed" });
+    await write("stock.move", {
+      product, from: back, to: ward, quantity: 1, rung: "box",
+      day: TODAY, capture: "typed" });
+
+    const history = await read("ledger.list");
+    const rows = (history.body.items as
+      { product: string; move: string; delta: number; against: string | null }[])
+      .filter((l) => l.product === product);
+
+    const carried = rows.filter((l) => l.move === "moved");
+    expect(carried).toHaveLength(2);
+    /* ⚠️ ONE CAUSE ON BOTH, which is what makes "these two rows are one
+       movement" a question with an answer. */
+    expect(new Set(carried.map((l) => l.against)).size).toBe(1);
+    /* ⚠️ AND THEY CANCEL, because nothing was consumed. */
+    expect(carried.reduce((sum, l) => sum + l.delta, 0)).toBe(0);
+    expect(rows.some((l) => l.move === "taken")).toBe(false);
+  });
+
+  /*
+    ⚠️ MORE THAN IS THERE IS REFUSED BEFORE ANYTHING IS WRITTEN. This is the
+    ordinary way a transfer fails, and the source is debited first precisely so
+    that the common refusal touches no rows at all.
+  */
+  it("refuses to carry more than the shelf holds, and moves nothing", async () => {
+    const { back, ward, product } = await dispensary("Amoxicillin 25mg");
+    await write("stock.receive", {
+      product, location: back, quantity: 30, day: TODAY, capture: "typed" });
+
+    const said = await write("stock.move", {
+      product, from: back, to: ward, quantity: 1, rung: "carton",
+      day: TODAY, capture: "typed" });
+    expect(said.status).toBe(409);
+
+    expect(await onShelf(product, back)).toBe(30);
+    expect(await onShelf(product, ward)).toBe(0);
+  });
+
+  /* ⚠️ AND A MOVE TO WHERE IT ALREADY IS WOULD WRITE TWO ROWS THAT CANCEL. The
+     balance would be right, which is exactly why it has to be refused: a history
+     with a pair of nothings in it is one somebody scrolls past. */
+  it("refuses a move to the shelf it is already on", async () => {
+    const { back, product } = await dispensary("Amoxicillin 10mg");
+    await write("stock.receive", {
+      product, location: back, quantity: 30, day: TODAY, capture: "typed" });
+    const said = await write("stock.move", {
+      product, from: back, to: back, quantity: 1, rung: "box",
+      day: TODAY, capture: "typed" });
+    expect(said.status).toBe(400);
+    expect(JSON.stringify(said.body)).toContain("shelf it is on");
+  });
+
+  /*
+    ⚠️ AN UNDO REVERSES THE WHOLE MOVEMENT, AND A TRANSFER IS TWO ROWS. Undoing
+    one half puts the stock back on the shelf it left AND leaves it on the shelf
+    it reached — the same boxes counted twice, from one press of a button whose
+    entire promise is that nothing happened.
+  */
+  it("takes back both halves of a transfer, not one", async () => {
+    const { back, ward, product } = await dispensary("Amoxicillin 5mg");
+    await write("stock.receive", {
+      product, location: back, quantity: 600, day: TODAY, capture: "typed" });
+    const moved = await write("stock.move", {
+      product, from: back, to: ward, quantity: 1, rung: "carton",
+      day: TODAY, capture: "typed" });
+    expect(moved.status, JSON.stringify(moved.body)).toBe(200);
+
+    const back_again = await write("stock.undo", {
+      movement: String(moved.body.movement), day: TODAY });
+    expect(back_again.status, JSON.stringify(back_again.body)).toBe(200);
+
+    expect(await onShelf(product, back)).toBe(600);
+    expect(await onShelf(product, ward)).toBe(0);
+  });
+
+  /* ⚠️ A PRODUCT WITH NO LADDER IS UNCHANGED — the quantity is base units, which
+     is what every screen written before this sends. */
+  it("carries a plain quantity where there is no ladder", async () => {
+    const here = idOf(await write("location.create", { name: "Rack 9", kind: "rack" }));
+    const there = idOf(await write("location.create", { name: "Rack 10", kind: "rack" }));
+    const product = idOf(await write("product.create", {
+      name: "Cable ties", unit: "item", tracking: "counted" }));
+    await write("stock.receive", {
+      product, location: here, quantity: 100, day: TODAY, capture: "typed" });
+
+    const moved = await write("stock.move", {
+      product, from: here, to: there, quantity: 40, day: TODAY, capture: "typed" });
+    expect(moved.status, JSON.stringify(moved.body)).toBe(200);
+    expect(await onShelf(product, here)).toBe(60);
+    expect(await onShelf(product, there)).toBe(40);
+  });
+
+  /* ⚠️ AND THE LADDER IS REFUSED AT THE DOOR RATHER THAN CLEANED UP ON READ. A
+     rung silently discarded on save is a picker missing an entry, found by
+     whoever receives the next delivery. */
+  it("refuses a ladder naming a rung after the base unit", async () => {
+    const said = await write("product.register", {
+      name: "Confused tablets", unit: "tablet", tracking: "counted",
+      levels: [{ name: "Tablet", per: 10 }],
+    });
+    expect(said.status).toBe(400);
+    expect(JSON.stringify(said.body)).toContain("already");
+  });
+});

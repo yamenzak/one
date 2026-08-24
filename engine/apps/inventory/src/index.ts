@@ -25,6 +25,11 @@ import {
    reading and the precedence rules are the SCREEN's — a label is printed there,
    and a contradiction reported where nothing prints is a warning nobody sees. */
 import { SIGNALS } from "./hazard.js";
+/* ⚠️ THE LADDER BETWEEN A CARTON AND A TABLET — a named multiplier and nothing
+   more. Stock is always in base units; these are the way in and the way out. */
+import {
+  factorOf, readLevels, refuseLevels, rungFor, spell, type Level,
+} from "./packing.js";
 import { PROFILES, wordsFor, type Words } from "./words.js";
 import { columnsFor, planIn, readSheet, tallyIn, type Planned } from "./sheet.js";
 import { dailyIn, lossesIn, reorder, toldIn, usageIn } from "./report.js";
@@ -119,6 +124,24 @@ const product = collection({
        Tessa called it `divisible` and it was doing real work: it is what decides
        whether a half is a legitimate quantity or a fault. */
     whole: field.bool({ label: "Whole units only", holds: "none" }),
+    /*
+      ⚠️ HOW THIS THING IS PACKAGED, AND STOCK IS STILL ONLY EVER IN `unit`. A
+      shelf holds 97 tablets whether they arrived as a carton, three boxes or a
+      handful — so there is nothing to break open, no partial-carton state, and no
+      second balance that can disagree with the first. A level is a NAMED
+      MULTIPLIER: it is how somebody says "two boxes" while holding two boxes, and
+      how a number is read back in the words they think in.
+
+      ⚠️ AND IT IS WHY A BLISTER SHEET CAN EXIST. A sheet inside a box carries no
+      barcode, so it can never be a `code` — there was nowhere to put it at all,
+      and anybody issuing by the sheet typed 10 every time and hoped. A rung needs
+      a name and a number, not a symbol somebody can scan.
+
+      ⚠️ `per` IS PER THE RUNG BELOW — see `packing.ts`. Read as base units the
+      second rung is silently wrong by a factor of the first, and it renders
+      perfectly.
+    */
+    levels: field.json({ label: "How it is packaged", holds: "none" }),
     /* ⚠️ WHEN TO SAY SOMETHING, NOT WHEN TO REFUSE. Stock is not a permission —
        running out is a fact about the world, and an app that refused a take
        because a number went under a line would be an app people work around. */
@@ -368,6 +391,19 @@ const code = collection({
        by that name, correctly, because everywhere else it would be showing
        somebody the code. */
     pack: field.number({ label: "How many it holds", holds: "none", min: 1 }),
+    /*
+      ⚠️ WHICH RUNG OF THE PRODUCT'S LADDER THIS CODE IS PRINTED ON, where it is
+      on one. It is a NAME for `pack`, not a second authority: the arithmetic
+      reads `pack`, always, because that is what the carrier was measured at when
+      the code was learned. A supplier who changes a case quantity issues a new
+      GTIN, so the two never have to be reconciled.
+
+      ⚠️ AND IT IS WHAT MAKES THE PICKER SAY THE RIGHT THING. Scanning a case and
+      being offered "How many of these" is correct and anonymous; being offered
+      "How many cases", already selected, is the same control knowing what is in
+      somebody's hands.
+    */
+    rung: field.text({ label: "Counted in", holds: "none", max: 24 }),
     /* ⚠️ WHERE IT CAME FROM, because a code somebody scanned once at speed and a
        code that arrived in a supplier's file deserve different amounts of trust
        when two of them disagree. */
@@ -1225,6 +1261,38 @@ async function stockMove(
   return { id, quantity: now, movement };
 }
 
+/**
+ * WHAT A QUANTITY MEANS IN BASE UNITS — the one multiplication, on the server.
+ *
+ * ⚠️ THE CLIENT SENDS A NAME AND NEVER A MULTIPLIER. "Two boxes" is what somebody
+ * holding two boxes can say; `× 30` is a decision about how much stock moves, and
+ * a screen holding last week's ladder would make it differently from the record.
+ * The rung is resolved here, against what the product declares now.
+ *
+ * ⚠️ AND A RUNG THE PRODUCT DOES NOT DECLARE IS REFUSED, NEVER READ AS ONE.
+ * `factorOf` answers `null` for exactly this reason: falling back to 1 receives a
+ * carton as a single tablet — a wrong number nothing downstream can detect,
+ * because 1 is a number a real entry produces.
+ */
+async function inBase(
+  c: Ctx, product: string, rung: string | null | undefined, quantity: number,
+): Promise<number> {
+  const many = Math.abs(Number(quantity));
+  const named = (rung ?? "").trim();
+  if (!named) return many;
+
+  const of = await (c.db as Db).prepare(
+    `SELECT levels, unit FROM product WHERE id = ? AND tenant_id = ?`)
+    .bind(product, c.tenantId).first<{ levels: string | null; unit: string | null }>();
+  if (!of) c.fail("platform.not_found");
+
+  const per = factorOf(readLevels(of?.levels ?? null), named);
+  if (per === null) {
+    c.fail("inventory.no_rung", { rung: named, name: of?.unit ?? "unit" });
+  }
+  return many * (per ?? 1);
+}
+
 const moveOutput = {
   id: field.text({ label: "Line", holds: "none" }),
   quantity: field.number({ label: "How many now", holds: "none" }),
@@ -1302,6 +1370,138 @@ const adjust = operation<MoveInput, Moved>({
   },
 });
 
+/**
+ * CARRYING SOMETHING FROM ONE SHELF TO ANOTHER.
+ *
+ * ⚠️ IT IS A VERB OF ITS OWN BECAUSE A TRANSFER IS NOT A CONSUMPTION. Done as a
+ * take plus a receive — which is what everybody does when there is no move — the
+ * whole carton enters the usage report, so "we used 600 tablets this month" is a
+ * sentence about a trolley. The one measure that says how fast stock actually
+ * goes would be made partly of stock that went nowhere.
+ *
+ * ⚠️ AND IT IS TWO CALLS TO THE CHOKEPOINT RATHER THAN ONE ROW NAMING BOTH ENDS.
+ * `stockMove` checks the shelf this person may touch, the batch's quarantine, the
+ * shortfall and the compare-and-set. A single-row transfer would be a second
+ * implementation of all four, and a second implementation is where they drift —
+ * so the pair share one id in `against`, which is the question that column
+ * already answers.
+ *
+ * ⚠️ THE SOURCE IS DEBITED FIRST, AND THE ORDER IS THE COMMON CASE. "There is not
+ * that much there" is what a transfer usually fails on, and failing it before
+ * anything is written means the ordinary refusal touches no rows at all. What is
+ * left is the rare one — a credit that loses a compare-and-set — and that is
+ * compensated below rather than left as stock destroyed.
+ */
+interface ShiftInput {
+  product: string; from: string; to: string; quantity: number;
+  day: string; capture: string; reason?: string; batch?: string; rung?: string;
+}
+
+const shift = operation<ShiftInput, Moved & { arrived: number }>({
+  id: "stock.move",
+  kind: "write",
+  summary: "Carry stock from one shelf to another",
+  input: {
+    product: field.text({ label: "Product", required: true, holds: "none" }),
+    from: field.text({ label: "From", required: true, holds: "none" }),
+    to: field.text({ label: "To", required: true, holds: "none" }),
+    /* ⚠️ IN THE LEVEL NAMED BESIDE IT, exactly as `stock.arrive` is in the unit
+       the code implies. The multiplication happens once, on the server, in
+       `perOf`. */
+    quantity: field.number({ label: "How many", required: true, holds: "none" }),
+    /* ⚠️ A NAME, NEVER A MULTIPLIER. A client that sent the number would be
+       deciding how much stock moves, and a stale screen holding last week's
+       ladder would move a different amount than the one on it.
+
+       ⚠️ AND `rung` RATHER THAN `level`, FOR THE REASON `pack` IS NOT `level`
+       EITHER: a setting's authority is a `level` in this platform, so
+       `scripts/keys.test.mjs` refuses a screen printing a field by that name —
+       correctly, because everywhere else it would be showing somebody a key. */
+    rung: field.text({ label: "Counted in", holds: "none", max: 24 }),
+    day: field.day({ label: "On", required: true, holds: "none" }),
+    capture: field.text({ label: "Recorded by", required: true, holds: "none" }),
+    reason: field.text({ label: "Why", holds: "none" }),
+    batch: field.text({ label: "Batch", holds: "none" }),
+  },
+  output: {
+    ...moveOutput,
+    /* ⚠️ WHAT THE DESTINATION HOLDS NOW. A transfer answers about the shelf
+       somebody is walking away from AND the one they just filled; returning only
+       the source makes the screen guess at the half it cannot see. */
+    arrived: field.number({ label: "There now", holds: "none" }),
+  },
+  permission: "stock:move",
+  idempotency: { mode: "key" },
+  emits: ["stock.moved"],
+  outcome: { message: "Moved.", tone: "success", invalidates: ["stock.list", "ledger.list"] },
+  fails: [
+    "inventory.short", "inventory.moved", "inventory.held", "inventory.no_rung",
+    "platform.not_found", "platform.invalid", "platform.out_of_reach",
+  ],
+  audit: (input) => ({ subject: input.product, verb: "moved" }),
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const db = c.db as Db;
+
+    /* ⚠️ A MOVE TO WHERE IT ALREADY IS WOULD WRITE TWO ROWS THAT CANCEL, and the
+       balance would be right — which is exactly why it has to be refused here.
+       A history with a pair of nothings in it is a history somebody scrolls
+       past looking for the movement that mattered. */
+    if (input.from === input.to) {
+      c.fail("platform.invalid", {}, { fields: { to: "That is the shelf it is on" } });
+    }
+
+    /*
+      ⚠️ BOTH SHELVES, BEFORE EITHER IS TOUCHED. `stockMove` checks its own, so
+      leaving this out would debit the source and only then discover that this
+      person cannot reach the destination — a refusal with stock already gone.
+    */
+    mine(c, input.from);
+    mine(c, input.to);
+
+    const many = await inBase(c, input.product, input.rung, input.quantity);
+    const batch = input.batch ? { batch: input.batch } : {};
+    /* ⚠️ ONE CAUSE ON BOTH HALVES, minted before either is written — it is what
+       makes "these two rows are one movement" a question with an answer. */
+    const shifted = `mov_${c.now}_${input.product}`;
+    const common = {
+      product: input.product, day: input.day, capture: input.capture,
+      against: shifted, ...(input.reason ? { reason: input.reason } : {}), ...batch,
+    };
+
+    const left = await stockMove(c, "moved", {
+      ...common, location: input.from, quantity: -many,
+    });
+
+    let arrived: Moved;
+    try {
+      arrived = await stockMove(c, "moved", {
+        ...common, location: input.to, quantity: many,
+      });
+    } catch (why) {
+      /*
+        ⚠️ THE SOURCE IS PUT BACK BEFORE THE REFUSAL IS RE-THROWN, because there
+        is no transaction across these statements and the alternative is stock
+        that simply stopped existing. It is recorded as `undone` against the
+        outbound movement rather than as a third `moved`: the history then reads
+        as one attempt that was taken back, which is what happened.
+
+        ⚠️ AND THE ORIGINAL PROBLEM IS WHAT REACHES THE PERSON. A compensation
+        that reported its own success, or its own failure, would hide the reason
+        the transfer did not happen.
+      */
+      await stockMove(c, "undone", {
+        ...common, location: input.from, quantity: many, against: left.movement,
+      }).catch(() => undefined);
+      throw why;
+    }
+
+    /* ⚠️ THE OUTBOUND MOVEMENT IS WHAT IS ANSWERED, so an undo reaches the pair
+       through the half that names the shelf somebody was standing at. */
+    return { ...left, arrived: arrived.quantity };
+  },
+});
+
 /* --------------------------------------------------------- the catalogue --- */
 
 /**
@@ -1340,6 +1540,8 @@ interface Registering {
   readonly tags?: unknown;
   readonly sources?: unknown;
   readonly shots?: unknown;
+  /** ⚠️ How it is packaged — see `packing.ts`. Stock stays in `unit`. */
+  readonly levels?: unknown;
   readonly anyway?: boolean;
 }
 
@@ -1538,6 +1740,9 @@ const register = operation<Registering, Registered>({
     tags: field.json({ label: "Tags", holds: "none" }),
     sources: field.json({ label: "Suppliers", holds: "none" }),
     shots: field.json({ label: "Pictures", holds: "none" }),
+    /* ⚠️ AND A FIFTH — the packaging ladder, which is a list for the same
+       reason. `per` is per the rung below; see `packing.ts`. */
+    levels: field.json({ label: "How it is packaged", holds: "none" }),
     /* ⚠️ "I LOOKED AT WHAT RESEMBLES IT AND THIS IS NOT ONE OF THEM." */
     anyway: field.bool({ label: "Register anyway", holds: "none" }),
   },
@@ -1572,6 +1777,17 @@ const register = operation<Registering, Registered>({
     if (!(LADDER as readonly string[]).includes(input.tracking)) {
       return c.fail("platform.invalid", {}, { fields: { tracking: "Choose how it is tracked" } });
     }
+
+    /*
+      ⚠️ THE LADDER IS REFUSED AT THE DOOR RATHER THAN CLEANED UP ON READ.
+      `readLevels` DROPS what it cannot use, which is right for a column that may
+      hold anything and wrong for somebody typing into a form: a rung silently
+      discarded on save is a picker missing an entry, found by whoever receives
+      the next delivery.
+    */
+    const levels = readLevels(input.levels);
+    const wrong = refuseLevels(levels, unit);
+    if (wrong) return c.fail("platform.invalid", {}, { fields: { levels: wrong } });
 
     const brand = (input.brand ?? "").trim();
     const codes = codesIn(input.codes);
@@ -1630,11 +1846,14 @@ const register = operation<Registering, Registered>({
     const product = newId("prd", new Date(c.now));
     await db.prepare(
       `INSERT INTO product (id, tenant_id, name, brand, description, tracking, unit, whole,
-                            par, storage, handling, shelfDays, openDays, photo, supplier,
-                            reorder, reorderQty, unnamed, at, by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`)
+                            levels, par, storage, handling, shelfDays, openDays, photo,
+                            supplier, reorder, reorderQty, unnamed, at, by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`)
       .bind(product, c.tenantId, name, brand || null, (input.description ?? "").trim() || null,
         input.tracking, unit, input.whole ? 1 : 0,
+        /* ⚠️ NULL RATHER THAN `[]`, so "nobody described the packaging" and "it
+           comes in ones" are not the same stored value. */
+        levels.length ? JSON.stringify(levels) : null,
         Number.isFinite(Number(input.par)) ? Number(input.par) : null,
         (input.storage ?? "").trim() || null, (input.handling ?? "").trim() || null,
         /* ⚠️ ABSENT IS NULL, NOT NOUGHT. "Nobody said how long it keeps" and "it
@@ -1649,10 +1868,10 @@ const register = operation<Registering, Registered>({
 
     for (const one of codes) {
       await db.prepare(
-        `INSERT INTO code (id, tenant_id, value, product, kind, pack, source, at, by)
-          VALUES (?, ?, ?, ?, ?, ?, 'typed', ?, ?)`)
+        `INSERT INTO code (id, tenant_id, value, product, kind, pack, rung, source, at, by)
+          VALUES (?, ?, ?, ?, ?, ?, ?, 'typed', ?, ?)`)
         .bind(newId("code", new Date(c.now)), c.tenantId, one.value, product, one.kind,
-          one.pack, c.now, c.accountId ?? null).run();
+          one.pack, rungFor(levels, one.pack), c.now, c.accountId ?? null).run();
     }
 
     /*
@@ -2261,11 +2480,11 @@ const undo = operation<{ movement: string; day: string }, Moved>({
        shelf they have since been taken off — is refused by `stockMove`, with
        the sentence that names the place rather than the record. */
     const of = await db.prepare(
-      `SELECT move, product, location, batch, delta, at, by FROM ledger
+      `SELECT move, product, location, batch, delta, at, by, against FROM ledger
         WHERE id = ? AND tenant_id = ?`)
       .bind(input.movement, c.tenantId)
       .first<{ move: string; product: string; location: string; batch: string | null;
-        delta: number; at: string; by: string | null }>();
+        delta: number; at: string; by: string | null; against: string | null }>();
     if (!of) return c.fail("platform.not_found");
 
     /* ⚠️ AN UNDO IS NOT ITSELF UNDOABLE. Two of them facing each other is a
@@ -2287,6 +2506,38 @@ const undo = operation<{ movement: string; day: string }, Moved>({
       .bind(c.tenantId, of.product, of.location, of.batch ?? null, of.at)
       .first<{ id: string }>();
     if (since) return c.fail("inventory.late");
+
+    /*
+      ⚠️ AN UNDO REVERSES THE WHOLE MOVEMENT, AND A TRANSFER IS TWO ROWS. Undoing
+      one half puts the stock back on the shelf it left AND leaves it on the shelf
+      it reached — the same boxes counted twice, from one press of a button whose
+      whole promise is that nothing happened.
+
+      ⚠️ THE OTHER HALF IS FOUND BY THE CAUSE THEY SHARE, which is why `stock.move`
+      mints one and writes it on both. It is reversed FIRST: the far shelf is the
+      one nobody is standing at, so if the pair cannot be completed the failure
+      lands before the near half moves and the record stays true.
+    */
+    if (of.move === "moved" && of.against) {
+      const other = await db.prepare(
+        `SELECT id, location, batch, delta FROM ledger
+          WHERE tenant_id = ? AND against = ? AND id != ? AND move = 'moved'`)
+        .bind(c.tenantId, of.against, input.movement)
+        .first<{ id: string; location: string; batch: string | null; delta: number }>();
+      /* ⚠️ A HALF WITH NO SIBLING IS A TRANSFER THAT ALREADY FAILED AND WAS
+         COMPENSATED — there is nothing left to take back on the other side. */
+      if (other) {
+        await stockMove(c, "undone", {
+          product: of.product,
+          location: other.location,
+          ...(other.batch ? { batch: other.batch } : {}),
+          quantity: -other.delta,
+          day: input.day,
+          capture: "typed",
+          against: other.id,
+        });
+      }
+    }
 
     return stockMove(c, "undone", {
       product: of.product,
@@ -5510,7 +5761,7 @@ export const INVENTORY: AppSpec = defineApp({
   ],
   operations: [
     resembling, register,
-    receive, take, adjust, arrive, undo, starts, resolve, learn, open, due,
+    receive, take, adjust, shift, arrive, undo, starts, resolve, learn, open, due,
     openCount, tallyUp, differs, closeCount,
     issue, giveBack, serve, retire, dueService,
     assemble, putIn, takeOut, checking, build, breakUp,
@@ -5772,6 +6023,23 @@ export const INVENTORY: AppSpec = defineApp({
       title: "Somebody else moved this",
       detail: "The number changed while you were working. Look again.",
       tone: "warning",
+    },
+    /*
+      ⚠️ A LEVEL THIS PRODUCT DOES NOT HAVE IS REFUSED RATHER THAN READ AS ONE,
+      and this is the sentence that says so. Falling back to a single would put a
+      carton on the shelf as one tablet — a wrong number nothing downstream can
+      detect, because one is what a real entry looks like.
+
+      ⚠️ AND IT NAMES THE RUNG, BECAUSE THE CAUSE IS ALMOST ALWAYS A STALE SCREEN.
+      Somebody removed "carton" from the ladder while a phone in the stock room
+      still had it on the picker; "there is no carton any more" is the whole
+      explanation, and `plain` carries it when the value never arrives.
+    */
+    "inventory.no_rung": {
+      status: 422, retryable: false, tone: "warning",
+      title: "There is no {rung} on this one",
+      plain: "That level is not on this product any more",
+      detail: "It is counted in {name}. Reload and pick again.",
     },
     /*
       ⚠️ A BAD READ IS RETRYABLE AND SAYS SO, because the fix is almost always to

@@ -59,15 +59,33 @@ export const promotes = (from: Tracking, to: Tracking): boolean =>
  * stock that went out, and the shrinkage number nobody can explain would be
  * partly made of people correcting themselves within a minute.
  */
-export const MOVES = ["received", "taken", "adjusted", "undone"] as const;
+/**
+ * ⚠️ AND `moved` IS A FIFTH, BECAUSE A TRANSFER IS NOT A CONSUMPTION. Carrying a
+ * carton from the back store to a ward shelf as a take plus a receive puts the
+ * whole carton into the usage report — so "we used 600 tablets" is a sentence
+ * about a trolley, and the one measure that says how fast stock actually goes is
+ * made partly of stock that went nowhere.
+ *
+ * ⚠️ IT IS TWO ROWS SHARING ONE CAUSE, NOT ONE ROW WITH TWO PLACES. A transfer
+ * genuinely changes two balances, and `stockMove` is the one function allowed to
+ * change one — it checks the shelf a person may touch, the batch's quarantine,
+ * the shortfall and the compare-and-set. A single row naming both ends would be a
+ * second implementation of all four, and the second one is where they drift.
+ * `against` carries the transfer's id on both halves, which is the question that
+ * column already answers: what caused this.
+ */
+export const MOVES = ["received", "taken", "adjusted", "undone", "moved"] as const;
 export type Move = typeof MOVES[number];
 
 /**
  * ⚠️ Signed, because a ledger of resulting balances cannot be replayed.
  *
- * ⚠️ `adjusted` AND `undone` TAKE THE SIGN THEY WERE GIVEN. A correction may go
- * either way, and an undo is by definition the exact opposite of one particular
- * movement — the caller has that number and this function does not.
+ * ⚠️ `adjusted`, `undone` AND `moved` TAKE THE SIGN THEY WERE GIVEN. A correction
+ * may go either way; an undo is by definition the exact opposite of one
+ * particular movement; and a transfer is negative at the shelf it leaves and
+ * positive at the one it reaches, which is a fact about WHICH HALF is being
+ * written and not about the verb. The caller has that sign and this function does
+ * not.
  */
 export const applyMove = (move: Move, quantity: number): number =>
   (move === "taken" ? -Math.abs(quantity) : move === "received" ? Math.abs(quantity) : quantity);
