@@ -80,7 +80,15 @@ const product = collection({
   fields: {
     name: field.text({ label: "Name", required: true, holds: "none", max: 200 }),
     brand: field.text({ label: "Brand", holds: "none", max: 120 }),
-    category: field.text({ label: "Category", holds: "none", max: 120 }),
+    /**
+     * ⚠️ SUPERSEDED BY `tag`, AND STILL DECLARED, WHICH IS DELIBERATE. Nothing
+     * writes this any more — a product belongs to as many kinds as it belongs
+     * to, and one string made somebody pick the one they would search by. The
+     * column stays because a schema module adds and never drops: removing the
+     * declaration would leave rows carrying a word no screen can reach, which is
+     * worse than a field that is honestly labelled as the old answer.
+     */
+    category: field.text({ label: "Category (was)", holds: "none", max: 120 }),
     /* ⚠️ THE LADDER, AND `listed` IS THE RUNG THAT MATTERS MOST. A thing nobody
        counts still has a place, a photograph, a manual and a service date — which
        is most of what a home or an office actually needs, and what no inventory
@@ -148,11 +156,36 @@ const product = collection({
       after itself, and this is what makes that row FINDABLE rather than a
       silent pile of numbered things nobody ever looks at.
     */
-    /* ⚠️ WHO IT USUALLY COMES FROM, which is what turns "buy 90" into an order.
-       One rather than many: a product with three suppliers has a purchasing
-       decision behind it, and a list here would be a list nothing chooses
-       from. */
-    supplier: field.ref({ label: "Usually from", holds: "none", to: "supplier" }),
+    /**
+     * ⚠️ WHICH SUPPLIER IS PREFERRED — one field, because ordering is a decision
+     * and a list is a list nothing chooses from. That sentence was the whole
+     * argument for a single supplier and it is still right; what it was wrong
+     * about is that the OTHERS then had nowhere to live at all. `sourcing` is
+     * the list; this names the one an order goes to.
+     *
+     * ⚠️ AND IT MUST BE ONE OF THEM. A preferred supplier absent from the
+     * product's own list is an order addressed to somebody the catalogue does
+     * not say sells it.
+     */
+    supplier: field.ref({ label: "Order from", holds: "none", to: "supplier" }),
+    /**
+     * ⚠️ WHETHER CROSSING `par` IS WORTH ACTING ON, WHICH IS NOT THE SAME AS
+     * WORTH KNOWING. Every product with a `par` is reported when it goes under;
+     * this is the smaller set somebody wants a purchase raised for, and it is
+     * separate because "tell me" and "do something" are different appetites and
+     * a workspace has far more of the first.
+     *
+     * DEFER(inventory-reorder): what crossing the line SENDS — an email to the
+     * preferred supplier, and the RFQ lane behind it — is not built. Until it
+     * is, this decides whether the product joins the reorder list rather than
+     * whether anything leaves the building, and the screen says exactly that. A
+     * switch whose label promises an email nobody sends is worse than no switch.
+     */
+    reorder: field.bool({ label: "Raise a reorder", holds: "none" }),
+    /* ⚠️ HOW MANY TO GET, not how many are left. A par of 20 answers "tell me at
+       20" and says nothing about whether the right order is 20 or 200 — which
+       depends on the pack, the lead time and how fast it moves. */
+    reorderQty: field.number({ label: "How many to order", holds: "none", min: 1 }),
     unnamed: field.bool({ label: "Not named yet", holds: "none" }),
     /*
       ⚠️ WHAT ONE OF THESE IS SUPPOSED TO CONTAIN — the standard tray, the
@@ -321,6 +354,133 @@ const code = collection({
          read off a box, so when two codes disagree it is the one that wins. */
       values: ["scanned", "typed", "imported", "ai-assisted", "minted"],
     }),
+  },
+});
+
+/**
+ * A PICTURE OF A PRODUCT THAT IS NOT THE PHOTOGRAPH OF RECORD.
+ *
+ * ⚠️ `product.photo` IS THE ONE SOMEBODY TOOK, AND IT STAYS THAT WAY. It is what
+ * a person looks at to decide whether the thing in their hand is this product,
+ * and that question has to be answered by a photograph of the actual thing. This
+ * collection is the GALLERY around it — the other five angles, the clean shot
+ * for a catalogue — and it is a separate table rather than a list on the product
+ * for one reason: every row has to be able to say where it came from.
+ *
+ * ⚠️ `made` IS A COLUMN BECAUSE IT IS A FACT ABOUT THE IMAGE, NOT A CONVENTION.
+ * A generated picture is a picture of what a model believes the product looks
+ * like, and in a warehouse that is a different KIND of thing from a photograph —
+ * so it is marked in the database, not in a filename or by which screen drew it.
+ * `product.photo` may never point at one, and a product carrying a hazard
+ * classification may not have one at all: a generated drum with a generated
+ * pictogram on it is a picture of a legal declaration nobody made.
+ */
+const shot = collection({
+  id: "shot",
+  label: { one: "Picture", many: "Pictures" },
+  scope: { of: "tenant" },
+  permission: "product",
+  retention: null,
+  onClose: { then: "purge" },
+  /* ⚠️ Queued, like the product itself: a picture taken in a basement is the
+     whole reason the phone was out. */
+  offline: "queue",
+  fields: {
+    product: field.ref({ label: "Product", required: true, holds: "none", to: "product" }),
+    image: field.media({ label: "Picture", required: true, holds: "none", purpose: "product-photo" }),
+    /* ⚠️ TRUE MEANS A MODEL DREW IT. See the header — this is the whole reason
+       the gallery is a table. */
+    made: field.bool({ label: "Made by a model", holds: "none" }),
+    /* ⚠️ WHICH ANGLE, so a gallery has an order somebody chose rather than the
+       order the uploads happened to finish in. */
+    ord: field.number({ label: "Order", holds: "none", min: 0, max: 99 }),
+  },
+});
+
+/**
+ * A WORD THIS WORKSPACE USES FOR A KIND OF THING.
+ *
+ * ⚠️ A VOCABULARY RATHER THAN A STRING ON EACH PRODUCT, AND THE REASON IS THE
+ * MODEL. Asking one to categorise a thing against nothing produces "Cleaning",
+ * "Cleaning products", "Cleaning supplies" and "Janitorial" across four
+ * mornings — every one defensible, and the catalogue is then unfilterable by the
+ * thing it was categorised for. A table can be READ before it is written to, so
+ * the question becomes "which of these does it belong to, and is any of them
+ * missing" rather than "what would you call this".
+ *
+ * ⚠️ AND IT REPLACES `product.category`, WHICH WAS ONE STRING. A product belongs
+ * to more than one kind — a nitrile glove is protective equipment AND a
+ * consumable AND single-use — and a single field made somebody pick the one they
+ * would search by, which is the one they remember and nobody else does.
+ */
+const tag = collection({
+  id: "tag",
+  label: { one: "Tag", many: "Tags" },
+  scope: { of: "tenant" },
+  permission: "product",
+  retention: null,
+  onClose: { then: "purge" },
+  offline: "cache",
+  /* ⚠️ The whole point of the table: a tag is looked up by its word. */
+  searchable: ["name"],
+  fields: {
+    name: field.text({ label: "Tag", required: true, holds: "none", max: 60 }),
+    /* ⚠️ WHERE IT CAME FROM, for the same reason `code.source` records it: a
+       word a model invented and a word somebody typed deserve different amounts
+       of trust the day the list needs tidying. */
+    source: field.enum({
+      label: "Added by", holds: "none",
+      values: ["typed", "imported", "ai-assisted"],
+    }),
+  },
+});
+
+/** One product, one tag. The join, so a tag can be renamed in one place. */
+const tagging = collection({
+  id: "tagging",
+  label: { one: "Tagging", many: "Taggings" },
+  scope: { of: "tenant" },
+  permission: "product",
+  retention: null,
+  onClose: { then: "purge" },
+  offline: "queue",
+  fields: {
+    product: field.ref({ label: "Product", required: true, holds: "none", to: "product" }),
+    tag: field.ref({ label: "Tag", required: true, holds: "none", to: "tag" }),
+  },
+});
+
+/**
+ * SOMEWHERE THIS PRODUCT CAN BE BOUGHT FROM.
+ *
+ * ⚠️ THE PRODUCT USED TO CARRY ONE SUPPLIER, AND THE ARGUMENT FOR ONE WAS THAT A
+ * LIST IS A LIST NOTHING CHOOSES FROM. That argument is right about the moment
+ * of ordering and wrong about the world: a workspace that dual-sources a
+ * consumable recorded the second place nowhere, so the answer to "who else sells
+ * this" lived in somebody's head.
+ *
+ * ⚠️ SO THE LIST IS HERE AND THE CHOICE STAYS ON THE PRODUCT. `product.supplier`
+ * names which of these is PREFERRED — one field, one answer, and the reorder
+ * still has nothing to ask. A second `preferred` flag on these rows would be the
+ * same fact in two places, which is how two of them come to be true.
+ */
+const sourcing = collection({
+  id: "sourcing",
+  label: { one: "Supply", many: "Supplies" },
+  scope: { of: "tenant" },
+  permission: "product",
+  retention: null,
+  onClose: { then: "purge" },
+  offline: "queue",
+  fields: {
+    product: field.ref({ label: "Product", required: true, holds: "none", to: "product" }),
+    supplier: field.ref({ label: "Supplier", required: true, holds: "none", to: "supplier" }),
+    /* ⚠️ WHAT THEY CALL IT, which is what goes on an order and is almost never
+       what this workspace calls it. */
+    ref: field.text({ label: "Their reference", holds: "none", max: 80 }),
+    /* ⚠️ HOW LONG THEY TAKE, per supplier rather than per product — which is the
+       whole reason somebody keeps a second one. */
+    leadDays: field.number({ label: "Days to arrive", holds: "none", min: 0, max: 365 }),
   },
 });
 
@@ -4652,7 +4812,7 @@ export const INVENTORY: AppSpec = defineApp({
 
   collections: [
     product, supplier, code, location, batch, unit, kit, process, processItem, job,
-    count, tally, stock, ledger,
+    count, tally, stock, ledger, shot, tag, tagging, sourcing,
   ],
   operations: [
     receive, take, adjust, arrive, undo, starts, resolve, learn, open, due,
