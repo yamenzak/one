@@ -78,18 +78,42 @@ export const GROUND = {
      * real share of the workspace's colour (`CHOSEN_TINT`), and a mix into white
      * has nowhere to go: the result is white with a suggestion in it. A step down
      * leaves the hue somewhere to be.
+     *
+     * ⚠️ AND IT IS AN ANCHOR RATHER THAN THE FILL'S VALUE now that the share is
+     * most of the mix — the lightness that survives is mostly the brand's own.
      */
-    chosen: 0.93,
+    chosen: 0.88,
   },
+  /**
+   * ⚠️ THE DARK LADDER IS PITCHED FOR AN OLED PANEL, WHICH IS A DIFFERENT GROUND
+   * FROM A DARK LCD. A backlit panel cannot reach black, so its "dark" theme is
+   * built around a lifted floor and every tier has to clear it — which is where
+   * `0.12 / 0.21 / 0.28 / 0.36` came from, and on a phone that switches pixels
+   * off it reads as four shades of grey card laid on a grey page. An emissive
+   * panel gives the floor away for free: the page can go nearly to nothing, and
+   * the whole ladder moves down with it while keeping the SAME steps.
+   *
+   * ⚠️ IT IS THE STEPS THAT ARE THE PALETTE, NOT THE VALUES. Every tier moved by
+   * about the same amount, so a card is still raised off the page by more than
+   * the floor and a control still clears all three grounds it can sit on. What
+   * changed is where the bottom is.
+   */
   dark: {
-    background: 0.12,
-    surface: 0.21,
-    raised: 0.28,
-    control: 0.36,
-    /* ⚠️ Well clear of `control`'s 0.36 — see the light entry. A step of 0.04
-       would meet the floor and still read as the same material in a moving
-       light, which is where this was reported from. */
-    chosen: 0.58,
+    /* ⚠️ NOT ZERO, AND `CURTAIN.edge` HAS THE ARGUMENT: an OLED switches a pure
+       black pixel off, and the boundary between an off pixel and a lit one reads
+       as a hole rather than as depth. This is as low as the ground goes. */
+    background: 0.055,
+    surface: 0.135,
+    raised: 0.195,
+    control: 0.255,
+    /*
+     * ⚠️ THIS IS NO LONGER A GREY THE BRAND IS TINTED INTO — see `CHOSEN_TINT`.
+     * The number is the ANCHOR the mix pulls toward, and it is high because the
+     * thing it is anchoring is nearly all brand: its job is to keep a dark
+     * workspace colour from landing under its own near-black ink, not to set the
+     * value of the fill.
+     */
+    chosen: 0.72,
   },
 } as const;
 
@@ -109,10 +133,18 @@ export const MIN_DELTA = 0.04;
  * a near-black surface is mostly swallowed. These are the numbers at which a card
  * looks made of the screen rather than tinted.
  */
-export const TINT = { light: 5, dark: 8 } as const;
+/**
+ * ⚠️ AND DARK TAKES LESS THAN IT USED TO, WHICH IS THE OTHER HALF OF THE OLED
+ * PITCH. The share was tuned against a floor of 0.12, where a tint has a lifted
+ * grey to sit in and reads as warmth. Against 0.055 the same share is the
+ * brightest thing in the surface, so every card, field and control came out
+ * visibly BROWN on an amber workspace — a page of tinted slabs rather than a
+ * dark interface with a coloured light on it. Lower ground, smaller share.
+ */
+export const TINT = { light: 5, dark: 5 } as const;
 
 /** The page's own ground carries more of it: it is the thing being belonged TO. */
-export const GROUND_TINT = { light: 9, dark: 6 } as const;
+export const GROUND_TINT = { light: 9, dark: 4 } as const;
 
 /**
  * THE CURTAIN — the ground of the opening, and the one surface in the product
@@ -159,7 +191,7 @@ export const CURTAIN = {
  * Dark stays at the surface share: tint on a near-black control is swallowed,
  * and the ground there carries less than the surfaces do, not more.
  */
-export const CONTROL_TINT = { light: 9, dark: 8 } as const;
+export const CONTROL_TINT = { light: 9, dark: 5 } as const;
 
 /**
  * ⚠️ THE ONE PLACE A CONTROL IS ALLOWED TO CARRY THE BRAND, AND THE MONO RULE IS
@@ -179,8 +211,20 @@ export const CONTROL_TINT = { light: 9, dark: 8 } as const;
  * At the control tier's 8% the chosen segment came out a warm grey somebody read
  * as brown — present enough to muddy the mono palette, not present enough to say
  * anything. Read as a colour or do not carry one.
+ *
+ * ⚠️ AND "READ AS A COLOUR" MEANS MOSTLY BRAND, WHICH 26/38 WAS NOT. A quarter
+ * of a hue mixed into a grey is a grey with a cast; beside a control tier that a
+ * lit sky was ALSO washing with the same brand, the chosen segment came out the
+ * LESS coloured of the two — a segmented control whose selected option looked
+ * like the one nobody had picked. That is the same defect as the recessed fill
+ * this token was introduced to fix, arrived at from the other direction.
+ *
+ * ⚠️ SO THE GREY IS NOW THE MINORITY, AND ITS ONLY JOB IS A FLOOR. What is left
+ * of it holds a very dark workspace colour up far enough for near-black ink
+ * (`CHOSEN_INK`) to stay readable on it. The fill's hue, chroma and most of its
+ * value are the brand's.
  */
-export const CHOSEN_TINT = { light: 26, dark: 38 } as const;
+export const CHOSEN_TINT = { light: 78, dark: 88 } as const;
 
 const grey = (l: number) => `oklch(${l} 0 0)`;
 

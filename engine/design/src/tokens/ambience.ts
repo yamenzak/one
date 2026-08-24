@@ -926,13 +926,32 @@ export function ambienceStylesheet(): string {
       ⚠️ AND THE PAGE ITSELF IS NOT WASHED. `--background` is what the scene is
       painted ON, so tinting it would be washing the light with its own colour.
     */
+    /*
+      ⚠️ AND THE SHARES CAME DOWN, BECAUSE A CONTROL AT 26% IS NOT LIT — IT IS
+      PAINTED. The ladder was tuned as light landing on a grey palette, and it is
+      mixing into tiers that ALREADY carry the brand (`TINT`, `CONTROL_TINT`) —
+      so a field on a lit page was a quarter of the workspace's hue on top of a
+      tinted grey, which on an amber deployment is a brown slab. Measured against
+      the OLED ground it is worse, not better: the darker the tier, the further
+      the same share moves it.
+
+      ⚠️ THE ORDER IS WHAT MATTERS AND IT IS UNCHANGED — a surface barely, a card
+      some, a control most. What changed is the top of the range, so a control is
+      still the most-lit surface on the page and is no longer the most COLOURED
+      thing on it.
+
+      ⚠️ AND `--accent-soft` IS DELIBERATELY NOT IN THIS BLOCK. It is the one fill
+      that is already mostly brand (`CHOSEN_TINT`), so washing it would be lighting
+      a colour with itself — and the whole reason the shares above have a ceiling
+      is to keep the unchosen controls from out-colouring the chosen one.
+    */
     `[data-wash="true"] {`,
-    `  --surface: color-mix(in oklab, var(--scene-wash) 8%, var(--tier-base));`,
-    `  --surface-secondary: color-mix(in oklab, var(--scene-wash) 15%, var(--tier-card));`,
-    `  --surface-tertiary: color-mix(in oklab, var(--scene-wash) 22%, var(--tier-raised));`,
-    `  --overlay: color-mix(in oklab, var(--scene-wash) 22%, var(--tier-raised));`,
-    `  --field-background: color-mix(in oklab, var(--scene-wash) 26%, var(--tier-field));`,
-    `  --default: color-mix(in oklab, var(--scene-wash) 26%, var(--tier-control));`,
+    `  --surface: color-mix(in oklab, var(--scene-wash) 5%, var(--tier-base));`,
+    `  --surface-secondary: color-mix(in oklab, var(--scene-wash) 8%, var(--tier-card));`,
+    `  --surface-tertiary: color-mix(in oklab, var(--scene-wash) 12%, var(--tier-raised));`,
+    `  --overlay: color-mix(in oklab, var(--scene-wash) 12%, var(--tier-raised));`,
+    `  --field-background: color-mix(in oklab, var(--scene-wash) 14%, var(--tier-field));`,
+    `  --default: color-mix(in oklab, var(--scene-wash) 14%, var(--tier-control));`,
     `}`,
     /*
       ⚠️ `data-capsule` HAD NO RULE AT ALL, WHICH IS WHY THE NAV WAS A RECTANGLE.

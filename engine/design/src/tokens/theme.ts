@@ -100,6 +100,14 @@ const TONED_CHIPS = `
  * ⚠️ AND IT IS DARK IN BOTH THEMES BECAUSE THE FILL IS LIGHT IN BOTH. `chosen`
  * means nearer the viewer, so it goes UP from the control tier in dark and stays
  * near the top in light; the ink follows the fill rather than the theme.
+ *
+ * ⚠️ THE FILL IS NOW MOSTLY THE WORKSPACE'S BRAND (`CHOSEN_TINT`), WHICH MAKES
+ * THIS INK A BET ON THE BRAND BEING A MID-TO-BRIGHT COLOUR. It is the same bet
+ * every tier in `ground.ts` already makes — the surfaces are mixes WITH `--brand`
+ * and assume it is a colour rather than a near-black — and the grey left in the
+ * mix is what holds a dark brand up. A workspace that picks something very deep
+ * would want this ink to flip, and CSS cannot decide that until `contrast-color()`
+ * ships: the honest state is that the floor is a floor, not a guarantee.
  */
 const CHOSEN_INK = `
 .toggle-button[data-selected="true"] { --toggle-button-fg-selected: oklch(0.18 0 0); }
