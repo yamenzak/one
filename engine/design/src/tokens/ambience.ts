@@ -945,13 +945,27 @@ export function ambienceStylesheet(): string {
       a colour with itself — and the whole reason the shares above have a ceiling
       is to keep the unchosen controls from out-colouring the chosen one.
     */
+    /*
+      ⚠️ AND THE SHARES HALVED AGAIN WHEN THE TIERS STARTED CARRYING THE HUE
+      THEMSELVES. For as long as a product's colour reached only the page element,
+      every `--tier-*` resolved on `:root` against the deployment's neutral and
+      this block was the ONLY place the product's colour touched a surface — so it
+      had been tuned upward until it could carry that on its own, at 26%. With the
+      hue on the document (`PageProps.hue`) the tiers are already made of it, and
+      the two stacked: the amber arrived twice and the second dose was the one
+      that read as brown.
+
+      ⚠️ WHAT IS LEFT IS THE JOB THIS BLOCK ACTUALLY HAS — a LIT page differing
+      from an unlit one. Not "the surfaces have a colour", which is the palette's,
+      but "this screen is standing in a light".
+    */
     `[data-wash="true"] {`,
-    `  --surface: color-mix(in oklab, var(--scene-wash) 5%, var(--tier-base));`,
-    `  --surface-secondary: color-mix(in oklab, var(--scene-wash) 8%, var(--tier-card));`,
-    `  --surface-tertiary: color-mix(in oklab, var(--scene-wash) 12%, var(--tier-raised));`,
-    `  --overlay: color-mix(in oklab, var(--scene-wash) 12%, var(--tier-raised));`,
-    `  --field-background: color-mix(in oklab, var(--scene-wash) 14%, var(--tier-field));`,
-    `  --default: color-mix(in oklab, var(--scene-wash) 14%, var(--tier-control));`,
+    `  --surface: color-mix(in oklab, var(--scene-wash) 4%, var(--tier-base));`,
+    `  --surface-secondary: color-mix(in oklab, var(--scene-wash) 6%, var(--tier-card));`,
+    `  --surface-tertiary: color-mix(in oklab, var(--scene-wash) 9%, var(--tier-raised));`,
+    `  --overlay: color-mix(in oklab, var(--scene-wash) 9%, var(--tier-raised));`,
+    `  --field-background: color-mix(in oklab, var(--scene-wash) 10%, var(--tier-field));`,
+    `  --default: color-mix(in oklab, var(--scene-wash) 10%, var(--tier-control));`,
     `}`,
     /*
       ⚠️ `data-capsule` HAD NO RULE AT ALL, WHICH IS WHY THE NAV WAS A RECTANGLE.

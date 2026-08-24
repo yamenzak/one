@@ -56,10 +56,21 @@ export interface PageProps {
    * seconds in. What survives of a workspace's identity is its NAME and its
    * MARK; what a screen is made of belongs to whoever built the screen.
    *
-   * ⚠️ AND IT LANDS AS `--brand`, ON THIS ELEMENT, so the scene resolves it
-   * against the page it is painting. Every family reads its `lit` slot from the
-   * same variable, so an app that sets this once wears its colour in its
-   * ground, its light and its wash with nothing else edited.
+   * ⚠️ AND IT LANDS AS `--brand`, ON THIS ELEMENT **AND ON THE DOCUMENT**, which
+   * is two places for one value and both are load-bearing. On the element,
+   * because the scene resolves its `lit` slot against the page it is painting.
+   * On the document, because every tier in the palette is a `color-mix` with
+   * `--brand` DECLARED ON `:root` — and a custom property is substituted where it
+   * is declared, so a hue set only here is invisible to all of them: what
+   * descendants inherit is a colour that was already resolved, one level too
+   * high, against the deployment's own neutral.
+   *
+   * ⚠️ AND THE DOCUMENT IS WHERE OVERLAYS LIVE. `applyAppearance` and
+   * `applyMotion` both stamp `documentElement` for exactly this reason and say so
+   * — a modal, a drawer, a popover and a tooltip are portalled to `document.body`,
+   * outside whatever the application renders into. A hue that reached only the
+   * page left every control inside a sheet on the deployment's grey while the
+   * screen behind it wore the product's colour.
    */
   readonly hue?: string;
   /**
@@ -262,9 +273,40 @@ const field = (html: string, reach?: "card") => (
  * is a page whose last control sits under the address bar until you scroll,
  * which reads as a broken layout rather than as a unit bug.
  */
+/**
+ * THE PRODUCT'S COLOUR, ON THE DOCUMENT, FOR AS LONG AS THE PRODUCT IS ON SCREEN.
+ *
+ * ⚠️ SEE `PageProps.hue` FOR WHY THIS IS NOT THE INLINE STYLE'S JOB — briefly:
+ * every tier is declared on `:root`, a custom property resolves where it is
+ * declared, and overlays are portalled outside the page.
+ *
+ * ⚠️ IT RESTORES WHAT IT FOUND RATHER THAN CLEARING. Two pages overlap for the
+ * length of a transition, so the arriving one stamps while the leaving one is
+ * still mounted; a cleanup that removed the property would take the NEW page's
+ * colour off the document a frame after it was set. Restoring the previous value
+ * makes the pair commute whichever order they run in.
+ *
+ * ⚠️ AND IT IS A LAYOUT EFFECT. A paint between mount and stamp is one frame of
+ * the deployment's grey on a coloured product, which reads as a flash on every
+ * navigation rather than as a load.
+ */
+function useHue(hue: string | undefined): void {
+  React.useLayoutEffect(() => {
+    if (!hue || typeof document === "undefined") return;
+    const root = document.documentElement;
+    const before = root.style.getPropertyValue("--brand");
+    root.style.setProperty("--brand", hue);
+    return () => {
+      if (before) root.style.setProperty("--brand", before);
+      else root.style.removeProperty("--brand");
+    };
+  }, [hue]);
+}
+
 export function Page(
   { sky = "plain", hue, seedling, world, density = "even", nav, children }: PageProps,
 ) {
+  useHue(hue);
   /*
     ⚠️ THE THEME PICKS A SKY, AND THIS REPLACES A RULE THAT SHOULD NEVER HAVE
     BEEN ONE. For one build a world was a dark room in both themes, because every

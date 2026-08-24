@@ -466,12 +466,19 @@ export const GROUND_CSS = [
     `--default` on `[data-wash]`, which is the page element, so the unselected
     track picked the product's amber up and the chosen segment did not.
 
-    ⚠️ ONLY THIS TIER IS RE-DERIVED, AND THAT IS A DECISION RATHER THAN A
-    MINIMAL FIX. The surfaces staying on the deployment's brand is what makes an
-    OLED ground read as neutral dark rather than as a tinted slab; the mono rule
-    then says the one coloured control on the screen is the one carrying
-    information, and "this is the one you chose" is that. Surfaces mono, choice
-    in the product's hue.
+    ⚠️ AND THIS IS THE SECOND OF TWO MECHANISMS, NOT THE FIX. `Page` stamps the
+    hue on `documentElement` as well (`useHue`), which is what makes every tier
+    above resolve against it — including for a modal or a drawer, which is
+    portalled to `body` and is outside this selector entirely. That stamp is the
+    general answer; this rule is what covers a page rendered without it: static
+    markup with no effects, and a NESTED page declaring a hue of its own, where
+    the document carries the outer product's colour and this one carries its own.
+
+    ⚠️ ONLY THIS TIER IS RESTATED, THOUGH, AND THAT IS THE DECISION. A nested
+    page differing from the document in its whole surface ladder would be a card
+    made of one product inside a screen made of another; what it needs to differ
+    in is the one token that says "chosen", because that is the only one carrying
+    information rather than material.
 
     ⚠️ `--accent-soft` IS RESTATED HERE TOO, NOT JUST THE TIER. It is declared on
     `:root` as `var(--tier-chosen)` and so is ALREADY RESOLVED there — moving the
