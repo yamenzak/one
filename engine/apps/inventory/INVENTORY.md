@@ -338,14 +338,14 @@ container in `src/screens/live.tsx`, and rendered over a sample world by
 |---|---|---|---|---|---|
 | `/` | Home | primary | `stock:read` | `screens/Home.tsx:132` | `screens/live.tsx:1944` |
 | `/stock` | Stock | primary | `stock:read` | `screens/Stock.tsx:92` | `screens/live.tsx:424` |
-| `/scan` | Scan | primary | `product:read` | `screens/Scan.tsx:127` | `screens/live.tsx:674` |
-| `/receive` | Receive | primary | `stock:move` | `screens/Receive.tsx:101` | `screens/live.tsx:795` |
-| `/count` | Count | primary | `stock:move` | `screens/Count.tsx:80` | `screens/live.tsx:948` |
+| `/scan` | Scan | primary | `product:read` | `screens/Scan.tsx:130` | `screens/live.tsx:674` |
+| `/receive` | Receive | primary | `stock:move` | `screens/Receive.tsx:104` | `screens/live.tsx:795` |
+| `/count` | Count | primary | `stock:move` | `screens/Count.tsx:83` | `screens/live.tsx:948` |
 | `/work` | Work | primary | `process:read` | `screens/Work.tsx:65` | `screens/live.tsx:1355` |
 | `/thing` | A product | none | `product:read` | `screens/Thing.tsx:130` | `screens/live.tsx:478` |
 | `/where` | A location | none | `location:read` | `screens/Where.tsx:34` | `screens/live.tsx:625` |
 | `/item` | An item | none | `stock:read` | `screens/Item.tsx:84` | `screens/live.tsx:1105` |
-| `/kit` | A kit | none | `stock:read` | `screens/Kit.tsx:66` | `screens/live.tsx:1212` |
+| `/kit` | A kit | none | `stock:read` | `screens/Kit.tsx:65` | `screens/live.tsx:1212` |
 | `/run` | A run | none | `process:read` | `screens/Run.tsx:73` | `screens/live.tsx:1412` |
 | `/case` | A job | none | `process:read` | `screens/Case.tsx:58` | `screens/live.tsx:1495` |
 | `/due` | Running out | secondary | `stock:read` | `screens/Due.tsx:80` | `screens/live.tsx:1555` |
@@ -354,7 +354,7 @@ container in `src/screens/live.tsx`, and rendered over a sample world by
 | `/ask` | Ask | secondary | `stock:read` | `screens/Ask.tsx:54` | `screens/live.tsx:1302` |
 | `/import` | Import | secondary | `product:write` | `screens/Import.tsx:131` | `screens/live.tsx:1789` |
 | `/suppliers` | Suppliers | secondary | `product:write` | `screens/Suppliers.tsx:77` | `screens/live.tsx:1860` |
-| `/register` | Add a product | none | `product:write` | `screens/Register.tsx:230` | `screens/live.tsx:2049` |
+| `/register` | Add a product | none | `product:write` | `screens/Register.tsx:232` | `screens/live.tsx:2049` |
 | `/start` | Getting started | secondary | `product:read` | `screens/Start.tsx:67` | `screens/live.tsx:1944` |
 
 ### The surfaces that are not routes

@@ -45,6 +45,18 @@ const walk = (dir) => {
 };
 
 const files = ["design/src", "one-space/src", "apps"].flatMap((r) => walk(join(ENGINE, r)));
+
+/*
+  ⚠️ CODE, NOT PROSE, AND THIS GUARD READ BOTH. It selected every file whose
+  TEXT contained `getUserMedia` — so the pure module that holds the reader's
+  decision, whose header explains that the bug was never in `getUserMedia`, was
+  selected as a file that opens a camera and failed for not asking one for a
+  size. A guard that fires on documentation teaches people not to write any.
+*/
+const withoutWords = (src) => src
+  .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "))
+  .replace(/^(\s*)\/\/.*$/gm, "$1");
+
 if (!files.length) {
   fail("no source files were read at all — a check over an empty corpus is green\n"
     + "       for the same reason a check over a clean one is.");
@@ -65,7 +77,7 @@ if (!decoders.length) {
 
 for (const f of decoders) {
   const at = f.slice(ENGINE.length + 1);
-  const text = readFileSync(f, "utf8");
+  const text = withoutWords(readFileSync(f, "utf8"));
   /* ⚠️ A CADENCE, DECLARED AS A NUMBER SOMEBODY CHOSE. The old loop had none —
      not a wrong one, none — which is why nobody could point at it. */
   if (!/READS_PER_SECOND/.test(text)) {
@@ -100,13 +112,13 @@ if (!bad && decoders.length) {
  * this caps how MUCH, and a decode that overruns its gap makes the cadence a
  * wish.
  */
-const cameras = files.filter((f) => /getUserMedia/.test(readFileSync(f, "utf8")));
+const cameras = files.filter((f) => /getUserMedia/.test(withoutWords(readFileSync(f, "utf8"))));
 if (!cameras.length) {
   fail("nothing opens a camera — this half of the guard passes over nothing.");
 }
 for (const f of cameras) {
   const at = f.slice(ENGINE.length + 1);
-  const text = readFileSync(f, "utf8");
+  const text = withoutWords(readFileSync(f, "utf8"));
   if (!/width:\s*\{\s*ideal:/.test(text)) {
     fail(`${at}: opens a camera without asking for a size, so the decoder is handed\n`
       + "       whatever the sensor produces — and the cost per read is set by the\n"
