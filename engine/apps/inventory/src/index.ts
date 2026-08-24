@@ -388,8 +388,22 @@ const shot = collection({
   fields: {
     product: field.ref({ label: "Product", required: true, holds: "none", to: "product" }),
     image: field.media({ label: "Picture", required: true, holds: "none", purpose: "product-photo" }),
-    /* ⚠️ TRUE MEANS A MODEL DREW IT. See the header — this is the whole reason
-       the gallery is a table. */
+    /**
+     * ⚠️ TRUE MEANS A MODEL DREW IT. See the header — this is the whole reason
+     * the gallery is a table.
+     *
+     * DEFER(inventory-gallery): nothing sets it yet, because there is no way to
+     * MAKE one. Every AI lane in this deployment answers with text: `generate`
+     * returns `{ text, credits }` and the gateway's compat endpoint reads
+     * `choices[].message.content`. A run that answers with BYTES is a different
+     * shape end to end — an `image` meter that counts pictures rather than
+     * tokens, a write through the media ledger so the object is inside the
+     * quota and inside erasure, and a settle against a per-image price. The
+     * column and the rule it carries are right and cost nothing to hold; the
+     * gallery screen offers no "recreate" control until the lane behind it
+     * exists, because a button that produces nothing is the failure this whole
+     * file is written against.
+     */
     made: field.bool({ label: "Made by a model", holds: "none" }),
     /* ⚠️ WHICH ANGLE, so a gallery has an order somebody chose rather than the
        order the uploads happened to finish in. */
