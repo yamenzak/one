@@ -1157,6 +1157,7 @@ Some of this is guarded and some is judgement:
 - `shape` — every screen declares one, the shape places the action, and no screen draws its own crown or pins its own dock.
 - `showcase` — everything this package ships is drawn somewhere, or the reason it is not is written down.
 - `space` — one API door, one door classifier, and no screen that is never drawn.
+- `spoken` — every refused mutation reaches a person; none returns into silence.
 - `states` — four outcomes, a placeholder the component draws itself, three kinds of motion, one rhythm.
 - `surface` — every declaration reaches a screen, and every field kind has a control.
 - `tone` — one voice — label length, description length, sentence case, full stops.

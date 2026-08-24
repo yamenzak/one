@@ -208,6 +208,10 @@ interface Page { readonly items: readonly Row[]; readonly total: number; readonl
 interface Totals { readonly counts: Readonly<Record<string, number | undefined>> }
 
 function usePaged(run: (after: string | null) => Promise<Got<Page>>, on: readonly unknown[] = []) {
+  /* ⚠️ THE ONE CHANNEL — see `telling.tsx`. A refused FIRST page becomes the
+     list's own `trouble`; a refused LATER one cannot, because the rows already
+     on screen are real and must not be replaced by a refusal. */
+  const tell = useTelling();
   const [of, set] = React.useState<Loaded<readonly Row[]>>(waiting());
   const [total, setTotal] = React.useState(0);
   const [next, setNext] = React.useState<string | null>(null);
@@ -235,7 +239,14 @@ function usePaged(run: (after: string | null) => Promise<Got<Page>>, on: readonl
     if (!next) return;
     const asked = next;
     void run(asked).then((got) => {
-      if (!got.ok) return;
+      /*
+        ⚠️ A PAGE THAT WOULD NOT LOAD SAYS SO RATHER THAN LEAVING THE LIST. The
+        rows already on screen are real and must not be replaced by a refusal —
+        so this cannot become a `trouble` state — but pressing "show more" and
+        getting the same list back is the same dead control as anywhere else.
+        `next` is left as it was, so the button stays and can be pressed again.
+      */
+      if (!got.ok) { tell.failed(got.problem, "Could not load any more"); return; }
       set((was) => (was.status === "ready" ? ready([...was.data, ...got.value.items]) : was));
       setTotal(got.value.total);
       setNext((now) => (now === asked ? got.value.next : now));
@@ -793,6 +804,10 @@ const SCAN = (api: Door) => function ScanHere({ go }: Mounted) {
  * signal drops, and four queued items offline instead of one.
  */
 const RECEIVE = (api: Door) => function ReceiveHere() {
+  /* ⚠️ THE ONE CHANNEL — see `telling.tsx`. Every write below could fail
+     into nothing before this, and several of them did. */
+  const tell = useTelling();
+
   const world = useWorld(api);
   const [place, setPlace] = React.useState<{ id: string; name: string } | null>(null);
   const [seen, setSeen] = React.useState<Seen | null>(null);
@@ -822,7 +837,15 @@ const RECEIVE = (api: Door) => function ReceiveHere() {
     setLast(raw);
     void api.get<Seen>("code.resolve", { raw, year: String(new Date().getFullYear()) })
       .then((got) => {
-        if (!got.ok) { setSeen(null); return; }
+        /*
+          ⚠️ A CODE THAT WOULD NOT RESOLVE IS SAID OUT LOUD. This cleared the
+          panel and returned — so somebody pointing a phone at a box got the
+          read beep from the camera and then a screen that went blank, which
+          reads as a scanner that half works. The reader has confirmed the
+          digits by now; what failed is the LOOKUP, and that is a different
+          sentence with a different fix.
+        */
+        if (!got.ok) { setSeen(null); tell.failed(got.problem); return; }
         /* ⚠️ A SHELF LABEL MOVES THE SESSION RATHER THAN BECOMING A ROW. It is
            the highest-leverage behaviour in the whole flow: point at a shelf,
            scan, scan, scan, point at the next shelf. */
@@ -886,11 +909,12 @@ const RECEIVE = (api: Door) => function ReceiveHere() {
       onUndo={undoable
         ? () => {
           void api.post("stock.undo", { movement: undoable, day: today }).then((got) => {
-            if (!got.ok) return;
+            if (!got.ok) { tell.failed(got.problem); return; }
             /* ⚠️ THE OFFER GOES THE MOMENT IT IS TAKEN. An undo is not itself
                undoable, and a button that would now be refused is worse than no
                button at all. */
             setUndoable(null);
+            tell.did("Put back");
             world.again();
           });
         }
@@ -909,7 +933,7 @@ const RECEIVE = (api: Door) => function ReceiveHere() {
           ...(expiry ? { expiry } : {}),
         }).then((got) => {
           setBusy(false);
-          if (!got.ok) return;
+          if (!got.ok) { tell.failed(got.problem); return; }
           /* ⚠️ THE LINE IS TICKED ONLY WHERE THE WRITE LANDED. A worklist that
              crossed a line off on the press rather than on the answer is a page
              somebody works through twice. */
@@ -946,6 +970,10 @@ const RECEIVE = (api: Door) => function ReceiveHere() {
  * this component would be one person's half of it.
  */
 const COUNT = (api: Door) => function CountHere() {
+  /* ⚠️ THE ONE CHANNEL — see `telling.tsx`. Every write below could fail
+     into nothing before this, and several of them did. */
+  const tell = useTelling();
+
   const world = useWorld(api);
   const [place, setPlace] = React.useState<{ id: string; name: string } | null>(null);
   const [session, setSession] = React.useState("");
@@ -1033,7 +1061,11 @@ const COUNT = (api: Door) => function CountHere() {
        than being counted onto it. */
     void api.get<Seen>("code.resolve", { raw, year: String(new Date().getFullYear()) })
       .then((got) => {
-        if (!got.ok) return;
+        /* ⚠️ SAID, FOR THE REASON ONE SCREEN OVER. A count is the flow where a
+           silent scan costs most: somebody works down a rack believing every
+           beep landed, and the shelf is short at the end with nothing to say
+           which line it was. */
+        if (!got.ok) { tell.failed(got.problem); return; }
         if (got.value.ours === "location") {
           const found = places.find((p) => p.code === got.value.value || p.id === got.value.value);
           if (found) { setPlace({ id: found.id, name: found.name }); setSession(""); }
@@ -1081,11 +1113,12 @@ const COUNT = (api: Door) => function CountHere() {
       onClose={() => {
         if (!session) return;
         void api.post("count.close", { count: session, day: today }).then((got) => {
-          if (!got.ok) return;
+          if (!got.ok) { tell.failed(got.problem); return; }
           /* ⚠️ THE SESSION ENDS HERE RATHER THAN BEING RE-READ. It is closed, and
              a screen still offering to count onto it would be offering something
              the operation now refuses. */
           setSession("");
+          tell.did("Count closed");
           world.again();
         });
       }}
@@ -1660,6 +1693,10 @@ const REPORTS = (api: Door) => function ReportsHere({ go }: Mounted) {
  * what comes out.
  */
 const LABELS = (api: Door) => function LabelsHere() {
+  /* ⚠️ THE ONE CHANNEL — see `telling.tsx`. Every write below could fail
+     into nothing before this, and several of them did. */
+  const tell = useTelling();
+
   const today = dayHere();
   const [subject, setSubject] = React.useState<Subject>("place");
   const [template, setTemplate] = React.useState<Template>("tag");
@@ -1762,7 +1799,10 @@ const LABELS = (api: Door) => function LabelsHere() {
         setBusy(true);
         void api.post(mint, { ids: picked }).then((got) => {
           setBusy(false);
-          if (!got.ok) return;
+          /* ⚠️ AND NOTHING IS PRINTED ON A FAILURE. The sheet was drawn with
+             blanks in it, so printing anyway puts a page of unreadable symbols
+             in somebody's hand and they find out at the shelf. */
+          if (!got.ok) { tell.failed(got.problem); return; }
           world.again();
           /* ⚠️ AFTER THE REPAINT, so the sheet carries the codes that were just
              minted rather than the blanks it was drawn with. */
@@ -1787,6 +1827,10 @@ const LABELS = (api: Door) => function LabelsHere() {
  * after a change does not throw the change away.
  */
 const IMPORT = (api: Door) => function ImportHere() {
+  /* ⚠️ THE ONE CHANNEL — see `telling.tsx`. Every write below could fail
+     into nothing before this, and several of them did. */
+  const tell = useTelling();
+
   const today = dayHere();
   const [text, setText] = React.useState("");
   const [seen, setSeen] = React.useState<Seeing | null>(null);
@@ -1808,7 +1852,7 @@ const IMPORT = (api: Door) => function ImportHere() {
     setBusy(true);
     void api.post<Seeing>("product.preview", { text, columns }).then((got) => {
       setBusy(false);
-      if (!got.ok) return;
+      if (!got.ok) { tell.failed(got.problem); return; }
       setSeen(got.value);
     });
   };
@@ -1840,7 +1884,7 @@ const IMPORT = (api: Door) => function ImportHere() {
           text, day: today, columns: { ...(seen?.columns ?? {}), ...said },
         }).then((got) => {
           setBusy(false);
-          if (!got.ok) return;
+          if (!got.ok) { tell.failed(got.problem); return; }
           setDone(got.value);
         });
       }}
@@ -1858,6 +1902,10 @@ const IMPORT = (api: Door) => function ImportHere() {
  * steps. It is the one fact that says whether a row is still worth keeping.
  */
 const SUPPLIERS = (api: Door) => function SuppliersHere() {
+  /* ⚠️ THE ONE CHANNEL — see `telling.tsx`. Every write below could fail
+     into nothing before this, and several of them did. */
+  const tell = useTelling();
+
   const rows = useAsked<{ items: readonly Row[] }>(api, "supplier.list");
   const kinds = useAsked<{ items: readonly Row[] }>(api, "product.list");
   const lead = useAsked<{ leadDays: number }>(api, "product.start");
@@ -1914,8 +1962,9 @@ const SUPPLIERS = (api: Door) => function SuppliersHere() {
         void api.post(of.id ? "supplier.update" : "supplier.create",
           of.id ? { id: of.id, ...body } : body).then((got) => {
           setBusy(false);
-          if (!got.ok) return;
+          if (!got.ok) { tell.failed(got.problem); return; }
           setEditing(null);
+          tell.did(of.id ? "Supplier saved" : `${body.name} added`);
           rows.again();
         });
       }}

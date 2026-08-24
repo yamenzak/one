@@ -63,7 +63,15 @@ export function NewWorkspace({ where }: { readonly where: Where }) {
   useEffect(() => {
     void (async () => {
       const out = await api.get<{ items: readonly Product[] }>("me.products");
-      if (!out.ok) return;
+      /*
+        ⚠️ A CATALOGUE THAT WOULD NOT LOAD IS NOT AN EMPTY CATALOGUE. Returning
+        here left `products` at its waiting value forever — so the card that
+        picks what the workspace starts with never appeared, and founding
+        proceeded with nothing chosen. Nothing failed visibly; the question was
+        simply never asked, which is the worse half of the same fault.
+      */
+      if (!out.ok) { setProblem(out.problem); return; }
+      setProblem(null);
       setProducts(out.value.items);
       /*
         ⚠️ THE FIRST ONE IS TICKED, AND ONLY WHERE THERE IS A CHOICE TO MAKE.
