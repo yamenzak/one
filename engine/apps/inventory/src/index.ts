@@ -28,7 +28,7 @@ import { SIGNALS } from "./hazard.js";
 import { PROFILES, wordsFor, type Words } from "./words.js";
 import { columnsFor, planIn, readSheet, tallyIn, type Planned } from "./sheet.js";
 import { dailyIn, lossesIn, reorder, toldIn, usageIn } from "./report.js";
-import { CODE_KINDS, readScan, stillNeeded, unread } from "./code.js";
+import { CODE_KINDS, asGtin, readScan, stillNeeded, unread } from "./code.js";
 import { settleCount, type Change } from "./count.js";
 import { guessedIn, notedIn, readJson, type Noted } from "./reading.js";
 import {
@@ -80,6 +80,19 @@ const product = collection({
   fields: {
     name: field.text({ label: "Name", required: true, holds: "none", max: 200 }),
     brand: field.text({ label: "Brand", holds: "none", max: 120 }),
+    /**
+     * ⚠️ ONE SENTENCE SAYING WHAT IT IS, WHICH A NAME CANNOT. "Gloves, blue" is
+     * what somebody calls it on a shelf; "a box of 100 disposable blue nitrile
+     * gloves, medium" is what settles whether the thing in their hand is this
+     * row — and the second is the question a catalogue of eight hundred rows
+     * asks all day.
+     *
+     * ⚠️ NOT SEARCHABLE, DELIBERATELY. `searchable` above is what leaves this
+     * database to be found by MEANING, and a description written by a model is
+     * the one field here nobody typed — indexing it would let a guess decide
+     * what a search for a real phrase returns.
+     */
+    description: field.long({ label: "Description", holds: "none", max: 600 }),
     /**
      * ⚠️ SUPERSEDED BY `tag`, AND STILL DECLARED, WHICH IS DELIBERATE. Nothing
      * writes this any more — a product belongs to as many kinds as it belongs
@@ -1262,6 +1275,386 @@ const adjust = operation<MoveInput, Moved>({
       c.fail("platform.invalid", {}, { fields: { reason: "Say what was wrong" } });
     }
     return stockMove(c, "adjusted", input);
+  },
+});
+
+/* --------------------------------------------------------- the catalogue --- */
+
+/**
+ * TWO SPELLINGS OF ONE NAME, MADE INTO ONE KEY.
+ *
+ * ⚠️ THIS IS THE WHOLE OF THE RESEMBLANCE CHECK AND IT IS DELIBERATELY BLUNT.
+ * "Gloves, Nitrile (Blue)" and "gloves nitrile blue" are the same product typed
+ * by two people; anything cleverer — an edit distance, a stemmer — starts
+ * calling different products the same one, and a false match here is a person
+ * being told their new product already exists when it does not.
+ */
+const oneWord = (of: string): string =>
+  of.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
+/** ⚠️ Name and brand together, because two brands of the same thing are two rows. */
+const sameThing = (name: string, brand: string): string =>
+  `${oneWord(brand)}|${oneWord(name)}`;
+
+interface Registering {
+  readonly name: string;
+  readonly brand?: string;
+  readonly description?: string;
+  readonly unit: string;
+  readonly tracking: string;
+  readonly whole?: boolean;
+  readonly par?: number;
+  readonly storage?: string;
+  readonly handling?: string;
+  readonly photo?: string;
+  readonly supplier?: string;
+  readonly reorder?: boolean;
+  readonly reorderQty?: number;
+  readonly codes?: unknown;
+  readonly tags?: unknown;
+  readonly sources?: unknown;
+  readonly shots?: unknown;
+  readonly anyway?: boolean;
+}
+
+interface Registered {
+  readonly product: string;
+  readonly codes: number;
+  readonly tags: number;
+  readonly sources: number;
+}
+
+/** ⚠️ What the sheet sends per barcode. `pack` is the carton's whole reason. */
+interface CodeIn { value: string; kind: string; pack: number }
+interface SourceIn { supplier: string; ref: string; leadDays: number | null }
+
+const codesIn = (of: unknown): readonly CodeIn[] =>
+  (Array.isArray(of) ? of : [])
+    .map((one) => {
+      const it = (one ?? {}) as Record<string, unknown>;
+      const raw = String(it.value ?? "").trim();
+      return {
+        /* ⚠️ NORMALISED BEFORE IT IS COMPARED OR STORED. An EAN-13 off a box and
+           the `(01)` of the DataMatrix on the same box differ by a leading zero;
+           stored as they were typed they are two codes for one product, and the
+           duplicate check below cannot see either from the other. */
+        value: /^\d{8,14}$/.test(raw) ? asGtin(raw) : raw,
+        kind: (CODE_KINDS as readonly string[]).includes(String(it.kind))
+          ? String(it.kind) : "other",
+        pack: Math.max(1, Math.trunc(Number(it.pack ?? 1)) || 1),
+      };
+    })
+    .filter((one) => one.value.length > 0);
+
+const sourcesIn = (of: unknown): readonly SourceIn[] =>
+  (Array.isArray(of) ? of : [])
+    .map((one) => {
+      const it = (one ?? {}) as Record<string, unknown>;
+      const days = Number(it.leadDays);
+      return {
+        supplier: String(it.supplier ?? "").trim(),
+        ref: String(it.ref ?? "").trim().slice(0, 64),
+        /* ⚠️ `null` RATHER THAN `0`, because a supplier who has not been asked
+           how long they take is not a supplier who delivers the same day. */
+        leadDays: Number.isFinite(days) && days >= 0 ? Math.trunc(days) : null,
+      };
+    })
+    .filter((one) => one.supplier.length > 0);
+
+const wordsIn = (of: unknown, most: number, long: number): readonly string[] => {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const one of Array.isArray(of) ? of : []) {
+    const said = String(one ?? "").trim().slice(0, long);
+    if (!said || seen.has(oneWord(said))) continue;
+    seen.add(oneWord(said));
+    out.push(said);
+    if (out.length >= most) break;
+  }
+  return out;
+};
+
+/**
+ * THINGS THAT LOOK LIKE THE ONE BEING TYPED, WHILE IT IS STILL BEING TYPED.
+ *
+ * ⚠️ A CATALOGUE FILLS WITH DUPLICATES ONE AT A TIME, BY PEOPLE BEING CAREFUL.
+ * Somebody adds "Blue nitrile gloves" because searching for "gloves nitrile" in
+ * a hurry found nothing, and from then on half the stock is under one row and
+ * half under the other — every report wrong, and neither row obviously the
+ * mistake. The moment to prevent that is while the name is being typed, not in
+ * a monthly tidy-up nobody schedules.
+ *
+ * ⚠️ IT IS A READ, SO IT MAY BE ASKED ON EVERY KEYSTROKE. Refusing the write
+ * instead would be a form somebody fills in completely and is then told to throw
+ * away — which is how people learn to press "register anyway" without reading.
+ */
+const resembling = operation<
+  { name?: string; brand?: string; code?: string },
+  { matches: readonly { id: string; name: string; brand: string; why: string }[] }
+>({
+  id: "product.resembling",
+  kind: "read",
+  summary: "Things already here that look like this one",
+  input: {
+    name: field.text({ label: "Name", holds: "none", max: 200 }),
+    brand: field.text({ label: "Brand", holds: "none", max: 120 }),
+    code: field.text({ label: "Code", holds: "none", max: 64 }),
+  },
+  output: { matches: field.json({ label: "Matches", holds: "none" }) },
+  permission: "product:read",
+  /* ⚠️ A READ ASKED ON EVERY KEYSTROKE REPLAYS NOTHING — there is no write to
+     repeat, and keying it would put a cache in front of a question whose whole
+     value is that the answer changes as the letters do. */
+  idempotency: { mode: "none" },
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const db = c.db as Db;
+    const out = new Map<string, { id: string; name: string; brand: string; why: string }>();
+
+    /*
+      ⚠️ THE CODE FIRST, BECAUSE IT IS THE ONLY CERTAIN ANSWER. A barcode names
+      one product; a name resembles several. Reporting them in one list with the
+      certain one buried is how somebody scrolls past the row that settles it.
+    */
+    const raw = (input.code ?? "").trim();
+    if (raw) {
+      const value = /^\d{8,14}$/.test(raw) ? asGtin(raw) : raw;
+      const owner = await db.prepare(
+        `SELECT p.id, p.name, p.brand FROM code c JOIN product p ON p.id = c.product
+          WHERE c.tenant_id = ? AND c.value = ? LIMIT 1`)
+        .bind(c.tenantId, value).first<{ id: string; name: string; brand: string | null }>();
+      if (owner) {
+        out.set(owner.id, {
+          id: owner.id, name: owner.name, brand: owner.brand ?? "", why: "same code",
+        });
+      }
+    }
+
+    const said = (input.name ?? "").trim();
+    /*
+      ⚠️ THREE CHARACTERS, BECAUSE ONE MATCHES THE CATALOGUE. A prefix search on
+      "b" answers with everything, which reads to the person typing as "you
+      already have all of this" — the opposite of the sentence this exists to
+      say.
+    */
+    if (oneWord(said).length >= 3) {
+      const key = sameThing(said, input.brand ?? "");
+      const like = await db.prepare(
+        `SELECT id, name, brand FROM product
+          WHERE tenant_id = ? AND unnamed = 0 AND lower(name) LIKE ?
+          ORDER BY name LIMIT 6`)
+        .bind(c.tenantId, `%${oneWord(said)}%`)
+        .all<{ id: string; name: string; brand: string | null }>();
+      for (const row of like.results ?? []) {
+        if (out.has(row.id)) continue;
+        out.set(row.id, {
+          id: row.id, name: row.name, brand: row.brand ?? "",
+          /* ⚠️ THE TWO ARE DIFFERENT SENTENCES ON THE SCREEN. "The same name and
+             brand" is almost certainly the same thing; "a similar name" is a
+             prompt to look, and conflating them makes the strong one weak. */
+          why: sameThing(row.name, row.brand ?? "") === key ? "same name and brand" : "similar name",
+        });
+      }
+    }
+
+    return { matches: [...out.values()] };
+  },
+});
+
+/**
+ * REGISTERING A PRODUCT — THE WHOLE RECORD, IN ONE WRITE.
+ *
+ * ⚠️ ONE OPERATION RATHER THAN FIVE, BECAUSE HALF A PRODUCT IS WORSE THAN NONE.
+ * A row, its barcodes, its tags and its suppliers arrive from one sheet as one
+ * decision; written as four calls the second can fail and leave a product
+ * nobody can scan, in a catalogue where the way you find things is scanning
+ * them. The person would then be looking at a product that exists, believing
+ * the barcode they typed is on it.
+ *
+ * ⚠️ A TAKEN BARCODE IS REFUSED AND A RESEMBLING NAME IS NOT, and the split is
+ * the whole of the duplicate rule. A code names one product — a second owner
+ * makes every future scan of that string ambiguous, and the resolver answers
+ * with whichever row it read first, wrongly, for ever. A name that looks like
+ * another name is a question, and the answer is genuinely sometimes "yes, two
+ * brands make this" — so it is reported by `product.resembling` while the sheet
+ * is open, and `anyway` is how somebody who looked says so.
+ *
+ * ⚠️ AND `anyway` DOES NOT WAIVE THE CODE. A person cannot press past a fact.
+ */
+const register = operation<Registering, Registered>({
+  id: "product.register",
+  kind: "write",
+  summary: "Add a product to the catalogue",
+  input: {
+    name: field.text({ label: "Name", required: true, holds: "none", max: 200 }),
+    brand: field.text({ label: "Brand", holds: "none", max: 120 }),
+    description: field.long({ label: "Description", holds: "none", max: 600 }),
+    unit: field.text({ label: "Counted in", required: true, holds: "none", max: 24 }),
+    tracking: field.enum({
+      label: "Tracked as", required: true, holds: "none", values: [...LADDER],
+    }),
+    whole: field.bool({ label: "Whole units only", holds: "none" }),
+    par: field.number({ label: "Tell me below", holds: "none", min: 0 }),
+    storage: field.long({ label: "How to store it", holds: "none", max: 2_000 }),
+    handling: field.long({ label: "How to handle it", holds: "none", max: 2_000 }),
+    photo: field.media({ label: "Photo", holds: "none", purpose: "product-photo" }),
+    supplier: field.ref({ label: "Order from", holds: "none", to: "supplier" }),
+    reorder: field.bool({ label: "Raise a reorder", holds: "none" }),
+    reorderQty: field.number({ label: "How many to order", holds: "none", min: 1 }),
+    /* ⚠️ FOUR LISTS, SO FOUR `json` FIELDS — a field here is single-valued, and
+       each of these is a join collection on the other side of the write. */
+    codes: field.json({ label: "Barcodes", holds: "none" }),
+    tags: field.json({ label: "Tags", holds: "none" }),
+    sources: field.json({ label: "Suppliers", holds: "none" }),
+    shots: field.json({ label: "Pictures", holds: "none" }),
+    /* ⚠️ "I LOOKED AT WHAT RESEMBLES IT AND THIS IS NOT ONE OF THEM." */
+    anyway: field.bool({ label: "Register anyway", holds: "none" }),
+  },
+  output: {
+    product: field.text({ label: "Product", holds: "none" }),
+    codes: field.number({ label: "Barcodes", holds: "none" }),
+    tags: field.number({ label: "Tags", holds: "none" }),
+    sources: field.number({ label: "Suppliers", holds: "none" }),
+  },
+  permission: "product:write",
+  /* ⚠️ KEYED, BECAUSE A DOUBLE TAP ON A PHONE WITH A SLOW CONNECTION IS THE
+     ordinary way this gets pressed twice — and the second one would land as a
+     second product with the same name and none of the barcodes. */
+  idempotency: { mode: "key" },
+  emits: ["product.created"],
+  outcome: {
+    message: "Added.", tone: "success",
+    invalidates: ["product.list", "tag.list", "code.list"],
+  },
+  fails: ["platform.invalid", "platform.not_found", "inventory.taken", "inventory.resembles"],
+  audit: (input) => ({ subject: input.name, verb: "registered" }),
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const db = c.db as Db;
+
+    const name = (input.name ?? "").trim();
+    if (!name) return c.fail("platform.invalid", {}, { fields: { name: "Give it a name" } });
+    const unit = (input.unit ?? "").trim();
+    if (!unit) {
+      return c.fail("platform.invalid", {}, { fields: { unit: "Say what it is counted in" } });
+    }
+    if (!(LADDER as readonly string[]).includes(input.tracking)) {
+      return c.fail("platform.invalid", {}, { fields: { tracking: "Choose how it is tracked" } });
+    }
+
+    const brand = (input.brand ?? "").trim();
+    const codes = codesIn(input.codes);
+    const sources = sourcesIn(input.sources);
+    const tags = wordsIn(input.tags, 12, 60);
+
+    /*
+      ⚠️ EVERY CODE IS CHECKED BEFORE ANY ROW IS WRITTEN. Checking as it inserts
+      would leave a product half-registered behind a refusal about its third
+      barcode — a row the person did not ask for, named after a thing they were
+      told was not created.
+
+      ⚠️ READ THEN WRITE, RATHER THAN `ON CONFLICT`. `code` is a declared
+      collection and the generated DDL carries no unique index on
+      `(tenant_id, value)`, so an upsert naming one is not a stricter write —
+      it is `SQLITE_ERROR` at run time and a 503 on the whole door.
+    */
+    for (const one of codes) {
+      const taken = await db.prepare(
+        `SELECT p.name FROM code c JOIN product p ON p.id = c.product
+          WHERE c.tenant_id = ? AND c.value = ? LIMIT 1`)
+        .bind(c.tenantId, one.value).first<{ name: string }>();
+      if (taken) return c.fail("inventory.taken", { code: one.value, name: taken.name });
+    }
+
+    /*
+      ⚠️ THE BACKSTOP, NOT THE MECHANISM. `product.resembling` is what the sheet
+      shows while somebody types; this catches the case where nothing was shown
+      — an offline queue replaying, an agent, a second tab — and it refuses only
+      on the certain half of that check, the same name AND the same brand.
+    */
+    if (!input.anyway) {
+      const key = sameThing(name, brand);
+      const like = await db.prepare(
+        `SELECT id, name, brand FROM product
+          WHERE tenant_id = ? AND unnamed = 0 AND lower(name) = ?`)
+        .bind(c.tenantId, name.toLowerCase())
+        .all<{ id: string; name: string; brand: string | null }>();
+      const already = (like.results ?? []).find(
+        (row) => sameThing(row.name, row.brand ?? "") === key);
+      if (already) return c.fail("inventory.resembles", { name: already.name, id: already.id });
+    }
+
+    const product = newId("prd", new Date(c.now));
+    await db.prepare(
+      `INSERT INTO product (id, tenant_id, name, brand, description, tracking, unit, whole,
+                            par, storage, handling, photo, supplier, reorder, reorderQty,
+                            unnamed, at, by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`)
+      .bind(product, c.tenantId, name, brand || null, (input.description ?? "").trim() || null,
+        input.tracking, unit, input.whole ? 1 : 0,
+        Number.isFinite(Number(input.par)) ? Number(input.par) : null,
+        (input.storage ?? "").trim() || null, (input.handling ?? "").trim() || null,
+        input.photo ?? null, input.supplier ?? null,
+        input.reorder ? 1 : 0,
+        Number.isFinite(Number(input.reorderQty)) ? Number(input.reorderQty) : null,
+        c.now, c.accountId ?? null).run();
+
+    for (const one of codes) {
+      await db.prepare(
+        `INSERT INTO code (id, tenant_id, value, product, kind, pack, source, at, by)
+          VALUES (?, ?, ?, ?, ?, ?, 'typed', ?, ?)`)
+        .bind(newId("code", new Date(c.now)), c.tenantId, one.value, product, one.kind,
+          one.pack, c.now, c.accountId ?? null).run();
+    }
+
+    /*
+      ⚠️ A TAG IS MATCHED BEFORE IT IS MINTED, WHICH IS THE WHOLE POINT OF THE
+      TABLE. "Cleaning" typed today and "cleaning" typed in March are one word;
+      minting the second makes the catalogue unfilterable by the thing it was
+      filed under, one morning at a time.
+    */
+    for (const word of tags) {
+      const held = await db.prepare(
+        `SELECT id FROM tag WHERE tenant_id = ? AND lower(name) = ? LIMIT 1`)
+        .bind(c.tenantId, word.toLowerCase()).first<{ id: string }>();
+      const tagId = held?.id ?? newId("tag", new Date(c.now));
+      if (!held) {
+        await db.prepare(
+          `INSERT INTO tag (id, tenant_id, name, source, at, by) VALUES (?, ?, ?, 'typed', ?, ?)`)
+          .bind(tagId, c.tenantId, word, c.now, c.accountId ?? null).run();
+      }
+      await db.prepare(
+        `INSERT INTO tagging (id, tenant_id, product, tag, at, by) VALUES (?, ?, ?, ?, ?, ?)`)
+        .bind(newId("tgg", new Date(c.now)), c.tenantId, product, tagId, c.now,
+          c.accountId ?? null).run();
+    }
+
+    for (const one of sources) {
+      await db.prepare(
+        `INSERT INTO sourcing (id, tenant_id, product, supplier, ref, leadDays, at, by)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+        .bind(newId("src", new Date(c.now)), c.tenantId, product, one.supplier,
+          one.ref || null, one.leadDays, c.now, c.accountId ?? null).run();
+    }
+
+    /*
+      ⚠️ THE GALLERY, AND `made` IS 0 ON EVERY ROW THIS WRITES. Everything here
+      is a photograph somebody took — see `shot`'s own header, and the deferral
+      on the column: nothing in this deployment can make one yet, and a row
+      claiming otherwise would be a lie in the one place the distinction
+      matters.
+    */
+    const shots = wordsIn(input.shots, SEEN_MOST, 64);
+    let ord = 0;
+    for (const image of shots) {
+      await db.prepare(
+        `INSERT INTO shot (id, tenant_id, product, image, made, ord, at, by)
+          VALUES (?, ?, ?, ?, 0, ?, ?, ?)`)
+        .bind(newId("sht", new Date(c.now)), c.tenantId, product, image, ord++, c.now,
+          c.accountId ?? null).run();
+    }
+
+    return { product, codes: codes.length, tags: tags.length, sources: sources.length };
   },
 });
 
@@ -4966,6 +5359,7 @@ export const INVENTORY: AppSpec = defineApp({
     count, tally, stock, ledger, shot, tag, tagging, sourcing,
   ],
   operations: [
+    resembling, register,
     receive, take, adjust, arrive, undo, starts, resolve, learn, open, due,
     openCount, tallyUp, differs, closeCount,
     issue, giveBack, serve, retire, dueService,
@@ -5278,6 +5672,18 @@ export const INVENTORY: AppSpec = defineApp({
       status: 409, retryable: false, tone: "warning",
       title: "That code belongs to something else",
       detail: "Open the product it is on and check which one is right.",
+    },
+    /*
+      ⚠️ A RESEMBLANCE IS A QUESTION, AND THIS IS THE BACKSTOP FOR WHEN NOBODY
+      WAS ASKED IT. The sheet shows what a name looks like while it is being
+      typed; a queued write replaying, an agent or a second tab never saw that
+      list, and a catalogue fills with duplicates one careful person at a time.
+      Retryable, because the retry is the same request with the answer in it.
+    */
+    "inventory.resembles": {
+      status: 409, retryable: true, tone: "warning",
+      title: "You already have one called that",
+      detail: "\"{name}\" is here under the same brand. Open it, or register this one anyway.",
     },
     /*
       ⚠️ ONE REFUSAL FOR EVERY ACT AN OBJECT'S STANDING FORBIDS, and the sentence
