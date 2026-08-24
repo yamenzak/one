@@ -42,7 +42,7 @@ const GLYPH: Readonly<Record<ConsolePartId, string>> = {
   tenants: "workspace",
   accounts: "people",
   catalogue: "bank",
-  ai: "sparkle",
+  ai: "model",
   keys: "key",
   switches: "settings",
   maintenance: "power",

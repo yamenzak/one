@@ -30,7 +30,7 @@ const dot = (r: number, a: number) => (_p: Palette) =>
  * speck, which is why it is the rarest and the fastest to twinkle. Taken from
  * the avatar style these worlds come from, which had already solved it.
  */
-const sparkle = (_p: Palette) =>
+const glint = (_p: Palette) =>
   `<path transform="translate(-2.1 -2.1) scale(.42)" fill="#fff" fill-opacity=".9"`
   + ` d="M5 1.8Q5.5 4.5 8.2 5 5.5 5.5 5 8.2 4.5 5.5 1.8 5 4.5 4.5 5 1.8"/>`;
 
@@ -41,7 +41,7 @@ const sparkle = (_p: Palette) =>
  * ⚠️ AND ONLY A SHARE OF THE BRIGHT ONES MOVE. A field where everything twinkles
  * is a field nobody can read over — the movement stops reading as life and
  * starts reading as noise. Roughly one in three of the two brightest, half the
- * sparkles, none of the faint.
+ * glints, none of the faint.
  */
 const STARS = {
   id: "star",
@@ -52,7 +52,7 @@ const STARS = {
     { weight: 3, draw: dot(0.8, 0.85) },
     { weight: 3, draw: dot(1.1, 0.85), beat: "medium" as const, moving: 0.34 },
     { weight: 1, draw: dot(1.4, 0.9), beat: "large" as const, moving: 0.34 },
-    { weight: 1, draw: sparkle, beat: "sparkle" as const, moving: 0.5 },
+    { weight: 1, draw: glint, beat: "glint" as const, moving: 0.5 },
   ],
 } as const;
 

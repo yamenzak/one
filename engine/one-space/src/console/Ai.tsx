@@ -27,7 +27,7 @@ interface AiAt {
 /** ⚠️ One glyph per row, named beside the words rather than nested in a ternary
     that has to grow a branch every time a sub-page is added. */
 const GLYPH: Readonly<Record<AiPart, Parameters<typeof glyphOf>[0]>> = {
-  models: "bank", actions: "sparkle", gateway: "database", finding: "search",
+  models: "bank", actions: "model", gateway: "database", finding: "search",
 };
 
 /** ⚠️ What each row is FOR, in the reader's words — see `Console.tsx`'s `saidOf`. */

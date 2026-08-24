@@ -232,11 +232,13 @@ if (!stolen) ok(`no screen draws a registered mark itself (${looked} files, ${KN
  * about it is generated.
  */
 {
-  const RESERVED = "sparkle";
+  const RESERVED = "model";
   const MAY = new Set([
     /* The AI area of the operator console, and the two screens inside it. */
     "one-space/src/space/Console.tsx",
     "one-space/src/console/Ai.tsx",
+    /* ⚠️ THE REGISTRY ITSELF, which names every mark including this one. */
+    "design/src/frame/shell.tsx",
     "one-space/src/console/Actions.tsx",
     /* A note about what a DRAFT cost — the credits a model spent. */
     "ground/src/screens/Note.tsx",
@@ -329,6 +331,58 @@ const apps = appManifests();
     }
   }
   if (!clashed) ok(`distinct: ${checked} nav destination(s) across ${apps.length} app(s), no mark used twice in one bar`);
+}
+
+/**
+ * BANNED MARKS, AND THE LIST CAN ONLY GROW.
+ *
+ * ⚠️ A GLYPH GETS BANNED WHEN IT STOPS SAYING ANYTHING. `sparkle` was the one
+ * mark meaning "a model made this" and it spread to four screens, two console
+ * sections and a nav destination in a fortnight — at which point it was not
+ * carrying a meaning, it was carrying enthusiasm. It is also the most worn-out
+ * mark in software: it reads as "AI" to whoever drew it and as nothing at all to
+ * somebody counting boxes in a cold room. Replaced by `model`, which is literal.
+ *
+ * ⚠️ THE BAN IS ON THE WHOLE TREE, NOT ON THE REGISTRY. Deleting the entry stops
+ * `glyphOf("sparkle")` resolving and does NOT stop anybody importing `Sparkles`
+ * from lucide and drawing it directly — which is exactly what the guard above
+ * exists to catch for a different reason, and exactly what somebody in a hurry
+ * would do. Both doors are checked here.
+ *
+ * ⚠️ AND IT IS CHECKED IN COMMENTS TOO — ONE FILE EXCEPTED. A banned name left
+ * in prose is the next person's permission slip. `shell.tsx` is where the ban is
+ * written down and has to be able to name what it banned.
+ */
+{
+  const BANNED = [
+    { name: "sparkle", icon: "Sparkles", instead: "`model`, or the noun the row is actually about" },
+  ];
+  const EXCUSED = ["design/src/frame/shell.tsx", "engine/scripts/glyphs.test.mjs"];
+  let found = 0;
+  const tree = [
+    ...filesIn("design/src"),
+    ...filesIn("one-space/src"),
+    /* ⚠️ THE PROVING GROUND TOO. It is not a product, and it is where most of
+       the design system is actually drawn — a banned mark surviving there is a
+       banned mark the next screen copies. It held one. */
+    ...filesIn("ground/src"),
+    ...appDirs().flatMap((d) => filesIn(d)),
+  ];
+  for (const file of tree) {
+    const where = rel(file);
+    if (EXCUSED.some((e) => where.endsWith(e) || where === e)) continue;
+    let src = "";
+    try { src = readFileSync(file, "utf8"); } catch { continue; }
+    for (const { name, icon, instead } of BANNED) {
+      const asName = new RegExp(`\\b${name}\\b`, "i").test(src);
+      const asIcon = new RegExp(`\\b${icon}\\b`).test(src);
+      if (!asName && !asIcon) continue;
+      found++;
+      fail(`${where}: draws or names the banned mark \`${name}\`.\n`
+        + `       It stopped meaning anything — use ${instead}.`);
+    }
+  }
+  if (!found) ok(`banned: ${BANNED.length} retired mark(s), none drawn or named across ${tree.length} file(s)`);
 }
 
 process.exit(bad ? 1 : 0);

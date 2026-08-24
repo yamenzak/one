@@ -195,7 +195,7 @@ export const BEAT = {
   /* A sky's three: small, sharp marks, so they may go most of the way out. */
   medium: { period: "5.2s", delay: "2s", dip: 0.3 },
   large: { period: "3.7s", delay: "2.7s", dip: 0.3 },
-  sparkle: { period: "2.8s", delay: "1.4s", dip: 0.3 },
+  glint: { period: "2.8s", delay: "1.4s", dip: 0.3 },
   /* An aura's two: enormous and soft, so they barely move and take an age. */
   swell: { period: "13s", delay: "0s", dip: 0.62 },
   breathe: { period: "19s", delay: "6.5s", dip: 0.78 },

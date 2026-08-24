@@ -99,7 +99,7 @@ export function Actions({ app, onGo }: {
       face={(a) => appFace(a.id, a.mark)}
       chosen={app}
       onChoose={onGo}
-      nothing={{ icon: glyphOf("sparkle"), says: "No product here declares a generating action" }}
+      nothing={{ icon: glyphOf("model"), says: "No product here declares a generating action" }}
       then={(chosen) => (
         <Screen shape="list" under="What answers each one, and whose words it uses">
           {/*

@@ -27,7 +27,7 @@ import { Button } from "@heroui/react";
 import {
   Banknote, Bell, Building2, Calendar, CheckCheck, Circle, ClipboardList, Clock, Cog, Coins, Database,
   Boxes, ChartColumn, FileText, House, Inbox as InboxGlyph, Mail, MapPin, NotebookPen, Package, Plus, Search,
-  Power, Shield, Sparkles, Star, Sun, Tag, TriangleAlert, UserRound, Users,
+  Power, Cpu, Shield, Star, Sun, Tag, TriangleAlert, UserRound, Users,
 } from "lucide-react";
 /* ⚠️ OURS, BECAUSE THEIR MOTION IS INSIDE THEM — see `marks.tsx`. A bell rings
    by its clapper and a calendar turns its days over; neither is a transform on
@@ -94,7 +94,25 @@ const GLYPHS: Readonly<Record<string, React.ReactNode>> = {
      extending rather than a reason to reach for `Circle`. A name nobody mapped
      draws the neutral mark, which in a five-row menu is five identical circles
      — the one outcome worse than no glyph at all. */
-  sparkle: <Sparkles />, clock: <Clock />, database: <Database />,
+  /*
+    ⚠️ `model`, AND THE MARK IT REPLACED IS BANNED. This was `sparkle`, drawn
+    with lucide's `Sparkles`, and it had become the mark for anything a model
+    touched anywhere in the product — four screens, two console sections and a
+    nav destination. A glyph that appears wherever a feature is new is not
+    carrying a meaning, it is carrying enthusiasm, and the sparkle is the single
+    most worn-out mark in software right now: it says "AI" to a designer and
+    nothing at all to somebody counting boxes in a cold room.
+
+    ⚠️ WHAT IT SAYS NOW IS WHAT IT IS. A processor is literal, unglamorous and
+    unambiguous — this line came out of a machine rather than off the label — and
+    it does not promise magic, which is the promise the sparkle was making on
+    behalf of a model that sometimes reads a barcode wrong.
+
+    ⚠️ AND IT IS STILL (`STILL`). A mark that means "a machine produced this"
+    appears beside RESULTS, often several in a column; a character on it would be
+    a list that shimmers wherever the model has been.
+  */
+  model: <Cpu />, clock: <Clock />, database: <Database />,
   /* ⚠️ AND THE THREE A MANIFEST ALREADY NAMED. `chart`, `search` and `star` are
      in a reference app's own screen declarations, so the nav drew a neutral
      circle for three of its destinations — the failure this map's own header
@@ -164,10 +182,6 @@ export const LIVELY: Readonly<Record<string, string>> = {
   settings: "turn", cog: "turn", clock: "turn",
   money: "flip", coins: "flip", bank: "flip", card: "flip",
   star: "twinkle", sun: "twinkle",
-  /* ⚠️ `spark`, NOT `twinkle`, AND THE SPLIT IS THE POINT. A star catches the
-     light; a sparkle is the one mark in this product that means "a model made
-     this", and a character of its own is what stops the two drifting into one. */
-  sparkle: "spark",
   people: "nod", users: "nod", person: "nod", home: "nod", house: "nod",
   /* A key turns in a lock, and a stack of plates settles when one lands. */
   key: "unlock", layers: "stack",
@@ -196,6 +210,8 @@ export const STILL: readonly string[] = [
     screen: a character there is a list that twitches wherever a thumb lands.
   */
   "box", "pin", "tag",
+  /* ⚠️ `model` IS STILL — see the glyph. It sits beside results, in columns. */
+  "model",
   /*
     ⚠️ `power` IS STILL FOR `alert`'S REASON, AND IT IS THE SAME DECISION. This
     is the mark on the row that shuts every door — it is already the only item on

@@ -320,7 +320,7 @@ export function Scan({
           ? (
             <Section label="What it looks like">
               <Group>
-                <NoteRow icon={glyphOf("sparkle")}>
+                <NoteRow icon={glyphOf("model")}>
                   Filled in by a model. Check it before you add it
                 </NoteRow>
                 <FieldRow label="Name" value={got.name} />

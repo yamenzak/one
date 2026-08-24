@@ -87,7 +87,7 @@ export function Ask({ title, of, lines, onAsk, again }: AskProps) {
         then={(answer) => (answer
           ? (
             <Group label="The answer">
-              <NoteRow icon={glyphOf("sparkle")}>{answer.answer}</NoteRow>
+              <NoteRow icon={glyphOf("model")}>{answer.answer}</NoteRow>
               {/*
                 ⚠️ SAID ONLY WHERE IT IS NOT THE WHOLE PICTURE. On a workspace of
                 forty lines the bound is invisible and mentioning it is noise; on

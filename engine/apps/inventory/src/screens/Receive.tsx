@@ -295,7 +295,7 @@ export function Receive({
                   if (!lines.length) return <NoteRow>Nothing could be read off that</NoteRow>;
                   return (
                     <>
-                      <NoteRow icon={glyphOf("sparkle")}>
+                      <NoteRow icon={glyphOf("model")}>
                         Read by a model. Check each line before you add it
                       </NoteRow>
                       {lines.map((line) => {

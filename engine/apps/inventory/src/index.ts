@@ -5595,9 +5595,9 @@ export const INVENTORY: AppSpec = defineApp({
        a camera and one is a sentence, and a screen with a code box beside a
        question box is a screen where half the questions are scanned.
 
-       ⚠️ AND `sparkle`, WHICH IS RESERVED FOR EXACTLY THIS. It is the one mark
-       in the product that means a model made something, and this is the one
-       surface whose whole content a model made. */
+       ⚠️ AND `model`, WHICH IS RESERVED FOR EXACTLY THIS. It is the one mark
+       in the product that means a machine produced something, and this is the
+       one surface whose whole content a machine produced. */
     /*
       ⚠️ WHERE EVERY NOTE THE NIGHT SENDS LANDS, AND IT HAD TO EXIST BEFORE THEY
       COULD. `batch.due` and `unit.due` answered per product and per item, so
@@ -5653,7 +5653,7 @@ export const INVENTORY: AppSpec = defineApp({
        they are looking at; a slot in the bar would make it a place to go first
        and then say what you wanted, which is one step longer from every screen
        in the product. */
-    { id: "ask", route: "/ask", label: "Ask", nav: "none", chrome: "assistant", icon: "sparkle",
+    { id: "ask", route: "/ask", label: "Ask", nav: "none", chrome: "assistant", icon: "model",
       permission: "stock:read", sky: "glow" },
     /*
       ⚠️ A DESTINATION RATHER THAN A STEP IN A WIZARD, and it is the screen that

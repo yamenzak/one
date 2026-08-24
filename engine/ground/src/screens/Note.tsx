@@ -158,7 +158,7 @@ export function Note({ title, note, onBack, onPublish, onOpen }: {
                         stops somebody misreading the rows above it. It is not a
                         `Hint`: nothing here is a control, so there is nothing to
                         hover. */}
-                    <NoteRow icon={glyphOf("sparkle")}>
+                    <NoteRow icon={glyphOf("model")}>
                       What it cost is the credits a draft spent, not what anybody
                       was paid.
                     </NoteRow>

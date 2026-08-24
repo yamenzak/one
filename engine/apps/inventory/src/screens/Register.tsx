@@ -539,7 +539,7 @@ export function Register({
                 /* ⚠️ SAID ONCE, NOT PER FIELD. A badge on every row a model
                    touched is texture; one line above the form is the sentence. */
                 return (
-                  <NoteRow icon={glyphOf("sparkle")}>
+                  <NoteRow icon={glyphOf("model")}>
                     {of.why
                       ? `Filled in by a model — ${of.why.toLowerCase()}. Check it before you add it`
                       : "Filled in by a model. Check it before you add it"}
