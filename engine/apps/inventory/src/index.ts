@@ -3643,13 +3643,41 @@ const seeProduct = operation<{ images: unknown; hint?: string; known?: string },
       + " Answer with JSON only: name, brand, description, unit, pack, tracking,"
       + " why, storage, handling, tags, shelfDays, openDays, hazardous."
       + " `name` is what somebody would call it on a shelf, not marketing copy."
-      + " `description` is one sentence: what it is, what size, what form."
+      /*
+        ⚠️ MARKDOWN, AND THE FIELD IS THE REASON. `description`, `storage` and
+        `handling` are `Written` fields — they render what a model wrote through
+        `Markdown`, with headings, lists and emphasis, and they open six rows
+        tall. Asked for "one sentence" and "briefly" the model answered in one
+        line, which is a field for three paragraphs with one line in it: the
+        control was the brief and the prompt was arguing with it.
+
+        ⚠️ AND WHAT IS BEING ASKED FOR IS THE PART SOMEBODY READS AT A SHELF.
+        "Keep cool" is not handling; what it must not sit beside, what to do if
+        it spills, and what the label says about the temperature are — and they
+        are a LIST, which is why the field renders one.
+      */
+      + " `description`, `storage` and `handling` are MARKDOWN. Use `-` bullets"
+      + " and `**bold**` where they help; no headings above `###`, no tables."
+      + " `description` says what it is, what size and what form — two or three"
+      + " sentences, ending with anything printed on the label that a person"
+      + " picking it off a shelf would want."
       + " `unit` is what a quantity of it would be counted in — bottle, box, kg."
       + " `pack` is how many base units the thing pictured holds; 0 if unclear."
       + " `tracking` is one of: listed, counted, batched, itemised. Use batched"
       + " if it carries an expiry or a hazard pictogram; itemised if it is one"
       + " serial-numbered object. `why` is the short reason for that rung."
-      + " `storage` and `handling` are how it wants to be kept, briefly."
+      /*
+        ⚠️ SEPARATED, BECAUSE THEY ARE DIFFERENT QUESTIONS AND WERE ONE CLAUSE.
+        Where it lives is a property of the shelf; what to do with it is a
+        property of the person holding it, and a model asked for both "briefly"
+        answered the first and dropped the second.
+      */
+      + " `storage` is where it must be kept: temperature, light, damp, and"
+      + " anything it must not be stored beside. `handling` is what somebody"
+      + " moving, opening or spilling it has to do — protective equipment, what"
+      + " to do on contact, how to dispose of it. Where the label states"
+      + " neither, say what the kind of product ordinarily needs and say that"
+      + " is what you are doing. Bullets, not a paragraph."
       + " `tags` are the kinds it belongs to. PREFER these words, which this"
       + " workspace already uses: {known}. Propose a new one only where none of"
       + " them fits. At most four."
@@ -3688,7 +3716,20 @@ const seeProduct = operation<{ images: unknown; hint?: string; known?: string },
       + " rather than a guess."
       + " The person adding it said: {hint}",
     variables: ["known", "hint"],
-    maxOutput: 800,
+    /*
+      ⚠️ RAISED WITH THE PROMPT THAT ASKS FOR MORE, AND THAT ORDER IS THE POINT.
+      Three of these fields are markdown now — a description, where it must be
+      kept, and what somebody handling it has to do, each of them a short list.
+      At 800 the answer is truncated mid-JSON and the whole extraction is
+      discarded, which reads as a model that could not see the label.
+
+      ⚠️ AND THE CEILING IS THE RESERVE. `settle` charges `min(held, actual)`, so
+      every token an estimate fails to count is one the platform pays for and the
+      workspace does not — silently, on every call. Asking for more output
+      without raising this is the under-count with a prompt change in front of
+      it.
+    */
+    maxOutput: 1_400,
   },
   async handler(ctx, input) {
     const c = ctx as Ctx & Generating;

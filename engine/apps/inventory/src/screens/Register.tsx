@@ -50,7 +50,7 @@ import {
   ActionRow, Await, Bars, Group, NoteRow, NumberInput, PickFile, Row,
   RowsWaiting, SAYS_KIND, Screen, Section, Segmented, Spacer, Stack, Steps, Tags,
   Lookup, TextInput, ToggleRow, Viewfinder, Written, kindOf,
-  glyphOf, shrunk, type Loaded, type Option,
+  glyphOf, shrunk, useTelling, type Loaded, type Option,
 } from "@engine/design";
 import { Button } from "@heroui/react";
 import { MOST_BYTES } from "@engine/kernel";
@@ -240,6 +240,9 @@ export function Register({
   title, back, knownTags, knownUnits, suppliers, resembles, onLook, onIdentify,
   guessed, onRegister, busy, again,
 }: RegisterProps) {
+  /* ⚠️ THE ONE CHANNEL — see `telling.tsx`. Promoting a photograph reorders a
+     list somebody is looking at, which is a change they made and should hear. */
+  const tell = useTelling();
   const [photos, setPhotos] = React.useState<readonly string[]>([]);
   const [name, setName] = React.useState("");
   const [brand, setBrand] = React.useState("");
@@ -547,37 +550,84 @@ export function Register({
               word, and it is also the one they will want to look at.
             */}
             {photos.length ? (
-              /* ⚠️ FOUR ACROSS, NOT THREE. At three columns with the first
-                 spanning two, the picture of record was two-thirds of a phone's
-                 width — a thumbnail the size of a hero, pushing the button that
-                 uses them below the fold. Four keeps the first one clearly the
-                 first and gives the rest back the screen. */
-              <div className="grid grid-cols-4 gap-2">
-                {photos.map((one, at) => (
-                  <div
-                    key={one.slice(-24)}
-                    className={`relative overflow-hidden rounded-xl ${at === 0 ? "col-span-2 row-span-2" : ""}`}
-                  >
-                    <img
-                      src={one}
-                      alt={at === 0 ? "The picture of record" : `Angle ${at + 1}`}
-                      className="aspect-square h-full w-full object-cover"
-                    />
-                    {/* ⚠️ ON THE TILE, NOT IN A ROW UNDER IT. A remove that is not
-                        on the thing it removes is a remove somebody has to count
-                        rows to trust. */}
-                    <div className="absolute right-1 top-1">
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        aria-label={at === 0 ? "Remove the picture of record" : `Remove angle ${at + 1}`}
-                        onPress={() => { setPhotos((held) => held.filter((_, i) => i !== at)); }}
-                      >
-                        ✕
-                      </Button>
+              /*
+                ⚠️ A STRIP THAT SCROLLS, NOT A GRID THAT REFLOWS. A grid on a
+                phone spends the width it has on however many tiles happen to
+                exist, so six photographs are six thumbnails too small to check
+                and the button that uses them is below the fold. A strip gives
+                each one a size that does not change with the count, and the
+                gesture for "what else did I take" is the one a phone already
+                teaches.
+
+                ⚠️ THE FIRST TILE IS WIDER, because it is a different thing. It
+                becomes `product.photo` — what somebody checks the thing in their
+                hand against — and the rest are the gallery. It is also first in
+                the strip, so "which one is it" needs no caption.
+
+                ⚠️ AND IT BLEEDS PAST THE GUTTER. A strip that stops at the
+                column's edge looks like a row that happens to be too long; one
+                that runs off the screen says there is more, which is the whole
+                affordance.
+              */
+              <div className="-mx-4 overflow-x-auto px-4">
+                <div className="flex w-max gap-2">
+                  {photos.map((one, at) => (
+                    <div
+                      key={one.slice(-24)}
+                      className={`relative shrink-0 overflow-hidden rounded-xl ${at === 0 ? "w-40" : "w-28"}`}
+                    >
+                      <img
+                        src={one}
+                        alt={at === 0 ? "The picture of record" : `Angle ${at + 1}`}
+                        className="aspect-square h-full w-full object-cover"
+                      />
+                      {/* ⚠️ ON THE TILE, NOT IN A ROW UNDER IT. A remove that is
+                          not on the thing it removes is a remove somebody has to
+                          count tiles to trust. */}
+                      <div className="absolute right-1 top-1">
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          aria-label={at === 0 ? "Remove the picture of record" : `Remove angle ${at + 1}`}
+                          onPress={() => { setPhotos((held) => held.filter((_, i) => i !== at)); }}
+                        >
+                          ✕
+                        </Button>
+                      </div>
+                      {/*
+                        ⚠️ AND PROMOTING ONE IS A MOVE, NOT A FLAG. Which
+                        photograph is the picture of record is decided by ORDER —
+                        the first is the one — so "use this one" puts it first
+                        rather than setting a field beside it. One fact, one
+                        place: a `primary` flag alongside an ordered list is two
+                        answers to the same question, and they disagree the first
+                        time somebody deletes the flagged one.
+
+                        ⚠️ OFFERED ONLY WHERE IT WOULD DO SOMETHING. On the tile
+                        that is already first it is a control that changes
+                        nothing, which is read as broken.
+                      */}
+                      {at === 0 ? null : (
+                        <div className="absolute inset-x-1 bottom-1">
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            aria-label={`Make angle ${at + 1} the picture of record`}
+                            onPress={() => {
+                              setPhotos((held) => [
+                                held[at] as string,
+                                ...held.filter((_, i) => i !== at),
+                              ]);
+                              tell.did("Now the picture of record");
+                            }}
+                          >
+                            Use this
+                          </Button>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             ) : null}
 

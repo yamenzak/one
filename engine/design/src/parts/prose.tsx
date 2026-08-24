@@ -41,7 +41,8 @@
 import * as React from "react";
 import { TYPE } from "../tokens/type.js";
 import { CARD_ROWS, PROSE, SPACE } from "../tokens/metrics.js";
-import { LongText, NamedAlready, Segmented } from "./forms.js";
+import { Switch } from "@heroui/react";
+import { LongText, NamedAlready } from "./forms.js";
 
 /* ------------------------------------------------------------------ parse --- */
 
@@ -345,20 +346,26 @@ export function Written({
   return (
     <div className={`flex flex-col ${SPACE.tight}`}>
       {has ? (
+        /*
+          ⚠️ A SWITCH, NOT A SEGMENTED CONTROL, AND THE SIZE IS THE ARGUMENT. A
+          two-option group is a slab the width of the card carrying one bit —
+          the loudest thing in a section whose subject is the paragraph under
+          it, repeated on every long field. A segmented control earns its width
+          when the options are PEERS somebody chooses between; "show me what I
+          wrote" is not a peer of writing, it is a mode on top of it.
+
+          ⚠️ AND IT IS LABELLED "Preview" RATHER THAN "Write / Preview", because
+          a switch says what turning it ON does. The pair of words was the group
+          having to name the state it was leaving.
+        */
         <div className={`flex items-center justify-between ${SPACE.snug}`}>
           <span className={TYPE.label}>{label}</span>
-          {/* ⚠️ `NamedAlready` RATHER THAN A `hideLabel` PROP — the row above has
-              already printed the name, and this is the seam that exists for it.
-              It hides the label, never drops it, so the control is still
-              announced to anybody navigating by keyboard. */}
-          <NamedAlready>
-          <Segmented
-            label={`How to show ${label.toLowerCase()}`}
-            value={reading ? "read" : "write"}
-            onChange={(id) => { setReading(id === "read"); }}
-            options={[{ id: "write", label: "Write" }, { id: "read", label: "Preview" }]}
-          />
-          </NamedAlready>
+          <Switch isSelected={reading} onChange={setReading}>
+            <Switch.Content>
+              <span className={TYPE.note}>Preview</span>
+              <Switch.Control><Switch.Thumb /></Switch.Control>
+            </Switch.Content>
+          </Switch>
         </div>
       ) : null}
 
