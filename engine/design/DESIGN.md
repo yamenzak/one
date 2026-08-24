@@ -1083,10 +1083,11 @@ guard does.
 | **The Vague Transition** | `transition: all` — animating whatever happens to change, and outliving the feature it was written for. | `hand` |
 | **The Confident Empty** | A failed load rendered as "nothing here yet"; `[]` shown as fact before the answer arrives. | `states`, `asking` |
 | **The Improvised Refusal** | A control writing its own three sentences for a failure the catalogue already has words for, in its own colour. | `problem` |
-| **The Silent Action** | A button pressed, a round trip waited for, and the screen looks exactly the same — because nothing declared what it says when it works. | `problem` |
+| **The Silent Action** | A button pressed, a round trip waited for, and the screen looks exactly the same — because nothing declared what it says when it works. | `manifest` |
 | **The Silent Save** | A write that fails into nothing, or a control left showing a value the server refused. | `problem` |
 | **The Bare Key** | `eu`, `no_tenant`, `owner` printed where a place, a reason or a role was meant. | `present`, `tone` |
 | **The Wall** | A paragraph under a control, explaining what the control should have said. | `tone` |
+| **The Unmeasured** | A surface that renders, ships, and is in no sweep — so every rule about pixels is true of it only by luck. | `geometry.seen` |
 | **The Unreachable** | A capability built, wired, and mounted by nothing — tables applied, no route, every suite green. | `reached`, `showcase`, `surface` |
 | **The Unmarked Mark** | A registered glyph drawn by a screen itself, or one animated because it could be. | `glyphs` |
 | **The Dead Attribute** | A `data-` attribute stamped on markup that no selector, variant or query reads. | `attrs` |

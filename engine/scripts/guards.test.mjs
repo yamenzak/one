@@ -273,21 +273,29 @@ if (!table) {
       .matchAll(/"([a-z-]+)"/g)].map((m) => m[1]),
   );
   /**
-   * ⚠️ AND A ROW MAY CITE THE BROWSER LANE, WHICH THE GATE DELIBERATELY DOES NOT
-   * RUN (D49). Contrast is a rendered fact — a token pair after a `color-mix`, a
-   * theme and a workspace's brand — so the only thing that can check it is a
-   * page in a real browser, and refusing that citation would push a whole class
-   * of fault back into prose.
+   * ⚠️ A ROW MAY CITE A GATE GUARD, A VITEST SUITE, OR THE BROWSER LANE — the
+   * three places a check actually runs in this repository, and no fourth. The
+   * browser lane is the one the gate deliberately does NOT run (D49): contrast
+   * is a rendered fact — a token pair after a `color-mix`, a theme and a
+   * workspace's brand — so the only thing that can check it is a page in a real
+   * browser, and refusing that citation would push a whole class of fault back
+   * into prose. A `.seen` suffix is what says which lane a row means.
    */
-  const browserChecks = new Set(
-    [...walk("design/test"), ...walk("one-space/test"), ...walk("apps")]
-      .filter((p) => /\.seen\.test\.[jt]sx?$/.test(p))
-      .map((p) => p.split("/").pop().replace(/\.seen\.test\..*$/, "")),
-  );
+  const everyTest = [...walk("design/test"), ...walk("one-space/test"), ...walk("kernel/test"),
+    ...walk("ground/test"), ...walk("runtime/test"), ...walk("apps")]
+    .filter((p) => /\.test\.[jt]sx?$/.test(p))
+    .map((p) => p.split("/").pop());
+  const browserChecks = new Set(everyTest
+    .filter((f) => f.includes(".seen."))
+    .map((f) => f.replace(/\.seen\.test\..*$/, "")));
+  const fastChecks = new Set(everyTest
+    .filter((f) => !f.includes(".seen."))
+    .map((f) => f.replace(/\.test\..*$/, "")));
   let unbacked = 0;
   for (const [, name, cited] of rows) {
     for (const [, guard] of cited.matchAll(/`([a-z-]+)(?:\.seen)?`/g)) {
-      if (runs.has(guard) || (/\.seen`/.test(cited) && browserChecks.has(guard))) continue;
+      const wants = /\.seen`/.test(cited) ? browserChecks : fastChecks;
+      if (runs.has(guard) || wants.has(guard)) continue;
       unbacked++;
       fail(`design/DESIGN.md: "${name}" cites \`${guard}\`, which nothing runs.\n` +
         `       A named failure with no check behind it reads as covered and is not.`);
