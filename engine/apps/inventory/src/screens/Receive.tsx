@@ -3,8 +3,8 @@
  *
  * ⚠️ THE WORST OUTCOME IN THIS PRODUCT IS SOMEBODY NOT RECORDING SOMETHING
  * because a form demanded a field they did not have. Every decision below falls
- * out of that: the place is remembered between scans, the quantity starts at the
- * number the code implies, the questions a good label already answered are not
+ * out of that: the place is remembered between scans, the quantity opens at one
+ * of whatever was scanned, the questions a good label already answered are not
  * asked, and the whole thing is one press away from being taken back.
  *
  * ⚠️ THE PLACE IS SET ONCE AND KEPT, WHICH IS THE WHOLE SPEED OF IT. Point at a
@@ -101,6 +101,24 @@ export interface ReceiveProps {
 export const keyOf = (line: Noted): string =>
   `${line.code}\u0000${line.name}\u0000${line.quantity}\u0000${line.lot}`;
 
+/**
+ * ⚠️ THE TWO HALVES OF THE PACK MULTIPLIER, WRITTEN ONCE, BECAUSE THEY WERE BOTH
+ * WRONG AT THE SAME TIME. `stock.arrive` multiplies the quantity it is sent by
+ * the scanned code's `pack`, so this screen counts THE THING SCANNED and the
+ * operation turns it into base units. Seeding the field with the pack applied
+ * the multiplier twice — a carton of thirty went onto the shelf as nine hundred,
+ * with the number the person expected showing on screen the whole time.
+ *
+ * ⚠️ AND THE INVARIANT IS THE COMPOSITION, WHICH IS WHY THESE ARE ONE PAIR:
+ * scanning a carton once and pressing the only button puts exactly one carton
+ * away. Either half on its own reads as reasonable.
+ */
+export const startingQuantity = (): number => 1;
+
+/** How many base units a quantity of the scanned thing lands as. */
+export const onShelf = (many: number, pack: number | undefined): number =>
+  many * Math.max(1, pack ?? 1);
+
 export function Receive({
   title, place, seen, onRead, onForget, onReceive, onUndo, busy,
   note, onNote, onLine, done, again,
@@ -108,9 +126,15 @@ export function Receive({
   /* ⚠️ The reader's own calendar — see the expiry in the list below. */
   const shown = useShown();
   /*
-    ⚠️ THE QUANTITY STARTS AT WHAT THE CODE IMPLIES AND IS RE-SEEDED PER SCAN. A
-    field holding the last item's number is how somebody receives eleven of the
-    next thing — so the key of this state is the code, not the screen.
+    ⚠️ THE QUANTITY IS HOW MANY OF THE SCANNED THING, WHICH IS ONE. `stock.arrive`
+    multiplies by the code's pack — one carton is `1` here and thirty on the
+    shelf — so seeding this with the pack multiplies it twice: scanning a carton
+    of thirty and pressing the only button put NINE HUNDRED tablets away, and the
+    number on screen was the one the person expected.
+
+    ⚠️ AND IT IS RE-SEEDED PER SCAN. A field holding the last item's number is how
+    somebody receives eleven of the next thing — so the key of this state is the
+    code, not the screen.
   */
   const [many, setMany] = React.useState(0);
   const [lot, setLot] = React.useState("");
@@ -118,7 +142,7 @@ export function Receive({
   const code = seen?.value ?? "";
 
   React.useEffect(() => {
-    setMany(seen ? Math.max(1, seen.pack) : 0);
+    setMany(seen ? startingQuantity() : 0);
     setLot(seen?.lot ?? "");
     setExpiry(seen?.expiry ?? "");
   }, [code, seen]);
@@ -207,13 +231,23 @@ export function Receive({
                   <FieldRow
                     label="This one holds"
                     value={`${seen.pack} ${seen.unit}`}
-                    under="Scanning it adds that many"
+                    under="Count the packs — the shelf gets that many times more"
                   />
                 )
                 : null}
 
+              {/* ⚠️ THE NUMBER IS IN WHAT WAS SCANNED, NOT IN THE BASE UNIT, and
+                  the label has to say which — "How many tablets" over a field
+                  that counts cartons is how a right number is typed into the
+                  wrong question. The line under it does the arithmetic out loud
+                  so nobody has to trust the multiplier they cannot see. */}
               <NumberInput
-                label={seen.unit ? `How many ${seen.unit}` : "How many"}
+                label={seen.pack > 1
+                  ? "How many of these"
+                  : seen.unit ? `How many ${seen.unit}` : "How many"}
+                help={seen.pack > 1 && many > 0
+                  ? `${onShelf(many, seen.pack)} ${seen.unit} onto the shelf`
+                  : undefined}
                 value={many}
                 onChange={setMany}
                 min={0}

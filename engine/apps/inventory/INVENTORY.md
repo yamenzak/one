@@ -339,7 +339,7 @@ container in `src/screens/live.tsx`, and rendered over a sample world by
 | `/` | Home | primary | `stock:read` | `screens/Home.tsx:132` | `screens/live.tsx:1904` |
 | `/stock` | Stock | primary | `stock:read` | `screens/Stock.tsx:92` | `screens/live.tsx:435` |
 | `/scan` | Scan | primary | `product:read` | `screens/Scan.tsx:130` | `screens/live.tsx:685` |
-| `/receive` | Receive | primary | `stock:move` | `screens/Receive.tsx:104` | `screens/live.tsx:806` |
+| `/receive` | Receive | primary | `stock:move` | `screens/Receive.tsx:122` | `screens/live.tsx:806` |
 | `/count` | Count | primary | `stock:move` | `screens/Count.tsx:83` | `screens/live.tsx:972` |
 | `/work` | Work | primary | `process:read` | `screens/Work.tsx:65` | `screens/live.tsx:1335` |
 | `/thing` | A product | none | `product:read` | `screens/Thing.tsx:130` | `screens/live.tsx:489` |

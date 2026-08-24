@@ -361,11 +361,19 @@ describe("receiving", () => {
   });
 
   /* ⚠️ THE PACK LEVEL IS SAID, because "scan a carton, record one" is the
-     commonest wrong number in inventory work. */
-  it("says what a carton holds", () => {
+     commonest wrong number in inventory work.
+
+     ⚠️ AND THE FIELD SAYS WHICH THING IT COUNTS. `stock.arrive` multiplies by
+     the pack, so this number is cartons and not gloves — a field labelled "How
+     many gloves" over one is a right answer typed into the wrong question, and
+     it is the shape that put nine hundred tablets on a shelf. See
+     `packing.screens.test.tsx` for the arithmetic. */
+  it("says what a carton holds, and counts cartons", () => {
     const out = drawn({ id: "p-a1", name: "A1" }, seen({ found: true, pack: 10, unit: "glove" }));
     expect(out).toContain("10 glove");
-    expect(out).toContain("Scanning it adds that many");
+    expect(out).toContain("Count the packs");
+    expect(out).toContain("How many of these");
+    expect(out).not.toContain("How many glove");
   });
 
   /* ⚠️ ONLY WHAT THE LABEL DID NOT CARRY. A DataMatrix arrives with both, and
