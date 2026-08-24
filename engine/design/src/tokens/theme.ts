@@ -88,6 +88,24 @@ const TONED_CHIPS = `
   --danger-soft-foreground: var(--danger-soft-ink);
 }`;
 
+/**
+ * THE INK ON THE THREE THINGS FILLED WITH `--accent-soft`.
+ *
+ * ⚠️ IT IS BY SELECTOR RATHER THAN BY VARIABLE, AND THAT IS THE LIBRARY'S DOING.
+ * `--chip-fg` and `--badge-fg` are set INSIDE `.chip--accent.chip--soft` and
+ * `.badge--soft.badge--accent`; a `:root` declaration of the same name loses to
+ * every one of them. Written as a token it would resolve, compute, and change
+ * nothing — the shape of bug this package keeps finding.
+ *
+ * ⚠️ AND IT IS DARK IN BOTH THEMES BECAUSE THE FILL IS LIGHT IN BOTH. `chosen`
+ * means nearer the viewer, so it goes UP from the control tier in dark and stays
+ * near the top in light; the ink follows the fill rather than the theme.
+ */
+const CHOSEN_INK = `
+.toggle-button[data-selected="true"] { --toggle-button-fg-selected: oklch(0.18 0 0); }
+.chip--accent.chip--soft { --chip-fg: oklch(0.18 0 0); }
+.badge--soft.badge--accent { --badge-fg: oklch(0.18 0 0); }`;
+
 const NEUTRAL_CHIP = `
 .chip--default.chip--soft { color: var(--muted); }`;
 
@@ -179,7 +197,8 @@ export const TONE_CSS = `${QUIET_INK}
 [data-ink="warning"] { color: color-mix(in oklab, var(--warning) ${INK_PULL.warning}%, var(--foreground)); }
 [data-ink="danger"] { color: color-mix(in oklab, var(--danger) ${INK_PULL.danger}%, var(--foreground)); }
 ${TONED_CHIPS}
-${NEUTRAL_CHIP}`;
+${NEUTRAL_CHIP}
+${CHOSEN_INK}`;
 
 /* -------------------------------------------------------------------- sky --- */
 

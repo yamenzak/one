@@ -274,7 +274,21 @@ if (!groundShare || !controlShare) {
  * HeroUI defines is geometry and timing and is correctly theirs. These are the
  * ones that carry a VALUE a person reads as a state.
  */
-const STATEFUL = ["--accent", "--accent-foreground", "--accent-soft", "--accent-soft-foreground", "--default"];
+/*
+  ⚠️ `--accent-soft-foreground` IS DELIBERATELY NOT ON THIS LIST, AND THE REASON
+  IS THE ONE THING THIS FILE CANNOT SEE. It is overloaded in the library: the ink
+  on an `--accent-soft` fill AND the ink on a `.button--secondary`, which is
+  filled with `--default`. Those are two different grounds, so ONE value cannot be
+  right for both — bound here for the soft fill it measured every secondary button
+  in dark at 1.86:1, which is unreadable.
+
+  ⚠️ SO IT IS LEFT TO THE LIBRARY AND CHECKED WHERE IT CAN BE. A pair of colours
+  is a CONTRAST, and contrast is a measurement — `geometry.seen`'s reading walks
+  every screen in both themes and would fail on this token the moment it stopped
+  working over our `--default`. A source check asserting it is "set" would pass on
+  a value nobody could read, which is the failure this whole file exists to avoid.
+*/
+const STATEFUL = ["--accent", "--accent-foreground", "--accent-soft", "--default"];
 const adrift = STATEFUL.filter((k) => !new RegExp(`\`${k}: `).test(GROUND_SRC));
 if (adrift.length) {
   fail(`ground.ts: ${adrift.join(", ")} is painted by the library and set by nobody here.\n` +

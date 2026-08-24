@@ -47,8 +47,9 @@
 
 import * as React from "react";
 import {
-  ActionRow, Await, LongText, NoteRow, NumberInput, PickFile, RowsWaiting, Screen,
-  Section, Segmented, Stack, Steps, Tags, TextInput, ToggleRow, Viewfinder,
+  ActionRow, Await, Bars, Group, LongText, NoteRow, NumberInput, PickFile, Row,
+  RowsWaiting, SAYS_KIND, Screen, Section, Segmented, Spacer, Stack, Steps, Tags,
+  TextInput, ToggleRow, Viewfinder, kindOf,
   glyphOf, shrunk, type Loaded, type Option,
 } from "@engine/design";
 import { Button } from "@heroui/react";
@@ -166,14 +167,25 @@ const RUNGS: readonly Option[] = [
   { id: "itemised", label: "Itemised", help: "Each one is its own" },
 ];
 
-const KINDS: readonly Option[] = [
-  { id: "gtin", label: "Barcode" },
-  { id: "qr", label: "QR" },
-  { id: "datamatrix", label: "Square code" },
-  { id: "other", label: "Other" },
-];
+/**
+ * ⚠️ WHAT A CODE IS, WORKED OUT RATHER THAN ASKED. The step used to offer four
+ * options — Barcode, QR, Square code, Other — and every one of them was a
+ * SYMBOLOGY, which is not what the field holds. `CODE_KINDS` is what a code
+ * NAMES: a retail GTIN, a supplier's part number, one of our own labels. The
+ * control was asking a question about the picture and storing the answer in a
+ * column about the namespace.
+ *
+ * ⚠️ AND BOTH ARE KNOWABLE WITHOUT ASKING. Eight, twelve or thirteen digits
+ * whose last one is the weighted sum of the rest is a GTIN and nothing else is;
+ * the camera hands back the symbology it decoded. A form asking a person to
+ * re-state what the machine read is a form nobody can get right more often than
+ * the machine.
+ */
+const namespaceOf = (value: string): string =>
+  (kindOf(value) === "other" ? "other" : "gtin");
 
-const EMPTY_CODE: CodeRow = { value: "", kind: "gtin", pack: 1 };
+/** ⚠️ The symbology, which is what a person recognises the picture by. */
+const sayKind = (value: string): string => SAYS_KIND[kindOf(value)];
 
 /* ⚠️ A NUMBER FIELD THAT IS ALLOWED TO BE UNANSWERED. `0` and "nobody said" are
    different facts about a threshold: the first tells you at nothing left, the
@@ -233,7 +245,9 @@ export function Register({
   const [openDays, setOpenDays] = React.useState<number | null>(null);
   const [tags, setTags] = React.useState<readonly string[]>([]);
   const [word, setWord] = React.useState("");
-  const [codes, setCodes] = React.useState<readonly CodeRow[]>([EMPTY_CODE]);
+  /* ⚠️ EMPTY, NOT ONE BLANK ROW. A row with no code in it was a card with no
+     barcode on it and a pack size for a thing nobody had named. */
+  const [codes, setCodes] = React.useState<readonly CodeRow[]>([]);
   const [sources, setSources] = React.useState<readonly SourceRow[]>([]);
   const [supplier, setSupplier] = React.useState("");
   const [reorder, setReorder] = React.useState(false);
@@ -454,14 +468,49 @@ export function Register({
               }}
             />
 
-            {photos.map((one, at) => (
-              <ActionRow
-                key={one.slice(-24)}
-                label={at === 0 ? "The picture of record" : `Angle ${at + 1}`}
-                under={at === 0 ? "What somebody checks the thing in their hand against" : undefined}
-                onDo={() => { setPhotos((held) => held.filter((_, i) => i !== at)); }}
-              />
-            ))}
+            {/*
+              ⚠️ THE PHOTOGRAPHS, AS PHOTOGRAPHS. This was a list of rows saying
+              "The picture of record" and "Angle 2" — words about pictures, on the
+              one screen where the pictures are already in hand. Somebody who has
+              just taken six shots of a box wants to see which six; a row of names
+              makes them remember, and the whole point of taking them was not to
+              have to.
+
+              ⚠️ THE FIRST ONE IS BIGGER, because it is a different thing. It
+              becomes `product.photo` — what somebody checks the thing in their
+              hand against — and the rest are the gallery. A caption saying so on
+              every tile is texture; one tile at twice the size says it without a
+              word, and it is also the one they will want to look at.
+            */}
+            {photos.length ? (
+              <div className="grid grid-cols-3 gap-2">
+                {photos.map((one, at) => (
+                  <div
+                    key={one.slice(-24)}
+                    className={`relative overflow-hidden rounded-xl ${at === 0 ? "col-span-2 row-span-2" : ""}`}
+                  >
+                    <img
+                      src={one}
+                      alt={at === 0 ? "The picture of record" : `Angle ${at + 1}`}
+                      className="aspect-square h-full w-full object-cover"
+                    />
+                    {/* ⚠️ ON THE TILE, NOT IN A ROW UNDER IT. A remove that is not
+                        on the thing it removes is a remove somebody has to count
+                        rows to trust. */}
+                    <div className="absolute right-1 top-1">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        aria-label={at === 0 ? "Remove the picture of record" : `Remove angle ${at + 1}`}
+                        onPress={() => { setPhotos((held) => held.filter((_, i) => i !== at)); }}
+                      >
+                        ✕
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
 
             {/*
               ⚠️ ONE PRESS, AND IT SAYS WHAT IT COSTS BY SAYING WHAT IT DOES.
@@ -623,12 +672,12 @@ export function Register({
         */}
         <Section label="Barcodes">
             {/*
-              ⚠️ SCANNED, NOT TYPED, BECAUSE A BARCODE IS FOURTEEN DIGITS AND
-              NOBODY TYPES FOURTEEN DIGITS TWICE. A product often has two or
-              three — the item, the inner, the carton — and the way to record
-              them is to hold each one up in turn, which is the same gesture
-              Receive and Count already use. Every scan appends a row; the
-              typed field under the frame is the way that always works.
+              ⚠️ ONE WAY IN, AND IT WAS TWO. `Viewfinder` carries its own typed
+              field — that is the shape of the control, so every scanning surface
+              has a keyboard route whether or not whoever wrote it thought about
+              the camera failing. This screen then drew a SECOND text field per
+              code row, so the step had two boxes asking for the same digits one
+              above the other, and neither said which one the scan would fill.
 
               ⚠️ AND A CODE ALREADY ON THE LIST IS IGNORED RATHER THAN ADDED
               TWICE. A label sits in front of a lens for a second and decodes
@@ -638,10 +687,6 @@ export function Register({
             */}
             <Viewfinder
               says="Hold each barcode up in turn"
-              /* ⚠️ THE READ IS HEARD, WHICH IS WHY THIS SURFACE NEEDS NO CHANGE
-                 FOR IT — `Viewfinder` beeps for a read, a repeat and a refusal.
-                 A caller that turned it off here would be the one place in the
-                 product where scanning is silent. */
               typed={{
                 label: "Or type a code",
                 placeholder: "What is printed under the bars",
@@ -651,58 +696,66 @@ export function Register({
                 const said = code.trim();
                 if (!said) return;
                 setCodes((held) => (held.some((one) => one.value === said)
-                  ? held
-                  /* ⚠️ INTO THE FIRST EMPTY ROW BEFORE APPENDING, so the row the
-                     sheet opens with is the one that fills rather than being
-                     left blank above the scan. */
-                  : held.some((one) => !one.value.trim())
-                    ? held.map((one) => (one.value.trim() ? one : { ...one, value: said }))
-                    : [...held, { ...EMPTY_CODE, value: said }]));
+                  ? held : [...held, { value: said, kind: namespaceOf(said), pack: 1 }]));
               }}
             />
 
-            {codes.map((row, at) => (
-              <React.Fragment key={at}>
-                <TextInput
-                  label={at === 0 ? "Code" : `Code ${at + 1}`}
-                  value={row.value}
-                  onChange={(next) => { setCode(at, { value: next }); }}
-                  placeholder="Scan it above, or type what is printed"
-                  name={`code-${at}`}
-                />
-                <Segmented
-                  label="Kind of code"
-                  value={row.kind}
-                  onChange={(next) => { setCode(at, { kind: next }); }}
-                  options={KINDS}
-                />
-                <NumberInput
-                  label="How many it holds"
-                  value={row.pack}
-                  onChange={(next) => { setCode(at, { pack: Math.max(1, next) }); }}
-                  min={1}
-                  help={unit ? `In ${unit}. One for a single item, more for a carton` : undefined}
-                />
-                {codes.length > 1
-                  ? (
-                    <Button
-                      variant="secondary"
-                      onPress={() => {
-                        setCodes((held) => held.filter((_, i) => i !== at));
-                      }}
-                    >
-                      Remove this code
-                    </Button>
-                  )
-                  : null}
-              </React.Fragment>
-            ))}
-            <Button
-              variant="secondary"
-              onPress={() => { setCodes((held) => [...held, EMPTY_CODE]); }}
-            >
-              Another barcode
-            </Button>
+            {/*
+              ⚠️ WHAT WAS SCANNED, SHOWN AS WHAT IT IS. Every code used to be a
+              text field, a four-way "what kind" and a number — twelve controls
+              for three barcodes, on a phone, to record something the camera had
+              already read. A code that has been read is a FACT: it is drawn, it
+              is named, and the one thing nobody can know from looking at it is
+              how many the pack holds.
+
+              ⚠️ AND THEY SCROLL SIDEWAYS RATHER THAN STACKING. Three of these
+              down the page is the step's whole height for its least important
+              part; in a row they are one glance, and the barcode itself is what
+              somebody checks against the box.
+            */}
+            {codes.length ? (
+              <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1">
+                {/* ⚠️ THE SIZING IS OUTSIDE THE CARD AND THE COLUMN IS THE CARD'S.
+                    A `Stack` inside a `Group` is a second column in something that
+                    is already one — a second inset and a second gap, which is what
+                    "double padding" means (`rhythm`). The div carries a width and
+                    nothing else. */}
+                {codes.map((row, at) => (
+                  <div key={row.value || at} className="w-60 shrink-0 snap-start">
+                    <Group label={sayKind(row.value)}>
+                        {/*
+                          ⚠️ DRAWN WHERE IT CAN BE, AND ONLY THERE. `Bars` answers
+                          nothing for a Code-128 or a number somebody typed — a
+                          convincing picture of the wrong symbology scans as the
+                          wrong product, which is worse than no picture at all.
+                        */}
+                        <Bars of={row.value} onScreen />
+                        <Row space="tight">
+                          <span className="tabular-nums truncate">{row.value}</span>
+                          <Spacer />
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            aria-label={`Remove ${row.value}`}
+                            onPress={() => {
+                              setCodes((held) => held.filter((_, i) => i !== at));
+                            }}
+                          >
+                            Remove
+                          </Button>
+                        </Row>
+                        <NumberInput
+                          label="How many it holds"
+                          value={row.pack}
+                          onChange={(next) => { setCode(at, { pack: Math.max(1, next) }); }}
+                          min={1}
+                          help={unit ? `In ${unit}. One for a single item` : "One for a single item"}
+                        />
+                    </Group>
+                  </div>
+                ))}
+              </div>
+            ) : null}
         </Section>
 
         <Section label="Counting">

@@ -73,8 +73,13 @@ export const GROUND = {
      * ⚠️ AND IT IS NOT `--accent`. That is the primary button's near-white, and
      * a segmented control painted with it is four primary buttons with three of
      * them switched off. This is a MATERIAL step, not a call to action.
+     *
+     * ⚠️ IT IS NOT PURE WHITE EITHER, AND THE BRAND IS THE REASON. This carries a
+     * real share of the workspace's colour (`CHOSEN_TINT`), and a mix into white
+     * has nowhere to go: the result is white with a suggestion in it. A step down
+     * leaves the hue somewhere to be.
      */
-    chosen: 1.0,
+    chosen: 0.93,
   },
   dark: {
     background: 0.12,
@@ -84,7 +89,7 @@ export const GROUND = {
     /* ⚠️ Well clear of `control`'s 0.36 — see the light entry. A step of 0.04
        would meet the floor and still read as the same material in a moving
        light, which is where this was reported from. */
-    chosen: 0.52,
+    chosen: 0.58,
   },
 } as const;
 
@@ -156,6 +161,27 @@ export const CURTAIN = {
  */
 export const CONTROL_TINT = { light: 9, dark: 8 } as const;
 
+/**
+ * ⚠️ THE ONE PLACE A CONTROL IS ALLOWED TO CARRY THE BRAND, AND THE MONO RULE IS
+ * WHY RATHER THAN WHY NOT. That rule says the interface is values so that COLOUR
+ * BECOMES INFORMATION — the one coloured thing on a screen is, by construction,
+ * the thing that matters. "This is the one you chose" is exactly that: it is the
+ * only fact a segmented control carries, and drawing it as a slightly different
+ * grey spends the interface's whole colour budget on nothing and then reports the
+ * choice in the channel with the least signal left.
+ *
+ * ⚠️ AND IT IS A SHARE OF THE WORKSPACE'S OWN BRAND, not a colour chosen here. On
+ * an amber deployment the chosen segment is amber; on a green one it is green.
+ * The alternative — a fixed hue for "selected" — is a second brand every
+ * workspace has to live beside, which is the thing `--brand` exists to prevent.
+ *
+ * ⚠️ THE SHARE IS LARGER IN DARK BECAUSE A TINT ON A LIFTED GREY IS SWALLOWED.
+ * At the control tier's 8% the chosen segment came out a warm grey somebody read
+ * as brown — present enough to muddy the mono palette, not present enough to say
+ * anything. Read as a colour or do not carry one.
+ */
+export const CHOSEN_TINT = { light: 26, dark: 38 } as const;
+
 const grey = (l: number) => `oklch(${l} 0 0)`;
 
 /**
@@ -204,9 +230,10 @@ function tier(mode: "light" | "dark"): string {
     `--tier-raised: ${tinted(g.raised, t)};`,
     `--tier-field: ${tinted(g.control, t)};`,
     `--tier-control: ${tinted(g.control, CONTROL_TINT[mode])};`,
-    /* ⚠️ The chosen one carries the same share of the brand as the control it is
-       lifted out of, so the pair reads as one material at two depths. */
-    `--tier-chosen: ${tinted(g.chosen, CONTROL_TINT[mode])};`,
+    /* ⚠️ A REAL SHARE OF THE BRAND — see `CHOSEN_TINT`. This is the one control
+       fill in the product that is a colour rather than a value, and the mono rule
+       is the argument for it rather than against it. */
+    `--tier-chosen: ${tinted(g.chosen, CHOSEN_TINT[mode])};`,
 
     `--background: var(--tier-page);`,
     `--surface: var(--tier-base);`,
@@ -266,7 +293,18 @@ function tier(mode: "light" | "dark"): string {
     */
     `--accent-soft: var(--tier-chosen);`,
     `--accent-soft-hover: var(--tier-chosen);`,
-    `--accent-soft-foreground: ${grey(mode === "light" ? 0.22 : 0.97)};`,
+    /*
+      ⚠️ AND THE INK FOR IT IS NOT SET HERE, WHICH IS THE PART THAT BIT. The
+      obvious move is `--accent-soft-foreground`, and that token is OVERLOADED in
+      the library: it is the ink on an `--accent-soft` fill AND the ink on a
+      `.button--secondary`, which is filled with `--default`. Bound once for the
+      new light fill it turned every secondary button in dark into near-black on
+      the control tier — measured at 1.86:1 by the browser reading, which is the
+      one channel that could have caught it. The three fills that actually use
+      `--accent-soft` take their ink in `CHOSEN_INK`, by selector, because the
+      library sets these inside its own component rules and a `:root` variable
+      loses to that.
+    */
     /* ⚠️ NO EDGES. Both are ways of saying "separate", and a design needs one. */
     `--surface-shadow: none;`,
     `--overlay-shadow: none;`,

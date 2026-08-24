@@ -354,7 +354,7 @@ container in `src/screens/live.tsx`, and rendered over a sample world by
 | `/ask` | Ask | secondary | `stock:read` | `screens/Ask.tsx:54` | `screens/live.tsx:1302` |
 | `/import` | Import | secondary | `product:write` | `screens/Import.tsx:131` | `screens/live.tsx:1789` |
 | `/suppliers` | Suppliers | secondary | `product:write` | `screens/Suppliers.tsx:77` | `screens/live.tsx:1860` |
-| `/register` | Add a product | none | `product:write` | `screens/Register.tsx:218` | `screens/live.tsx:2049` |
+| `/register` | Add a product | none | `product:write` | `screens/Register.tsx:230` | `screens/live.tsx:2049` |
 | `/start` | Getting started | secondary | `product:read` | `screens/Start.tsx:67` | `screens/live.tsx:1944` |
 
 ### The surfaces that are not routes

@@ -165,22 +165,22 @@ part that is not. Refresh with `node engine/scripts/docs.test.mjs --write`.
 <!-- generated: node scripts/inventory.mjs vocabulary -->
 | Home | What it is for | Ships |
 |---|---|---|
-| `tokens/` | colour, type, spacing, motion, the chrome and hem rules | 82 |
+| `tokens/` | colour, type, spacing, motion, the chrome and hem rules | 83 |
 | `scene/` | the ambience engine — families, marks, the world behind a screen | 1 |
 | `frame/` | page, shape, crown, nav, dock, overlays — what wraps a screen | 61 |
-| `parts/` | rows, cards, lists, controls, the four outcomes | 170 |
+| `parts/` | rows, cards, lists, controls, the four outcomes | 178 |
 | `rendered/` | whole surfaces drawn from a kernel declaration | 53 |
 | `chart/` | the data vocabulary — a number as a shape | 39 |
 | `measure/` | what a screen actually lays out, in a real browser — the harness every app sweeps its own screens with | 1 |
 
-**407 exports.** Every one is reachable as `import { … } from "@engine/design"`;
+**416 exports.** Every one is reachable as `import { … } from "@engine/design"`;
 there is no deep import, and a guard says so.
 
 ### `tokens/`
 
 - `tokens/ambience.ts` — `ambienceStylesheet`, `FADE`, `GRAIN`, `GRAIN_OPACITY`, `HEM_HOLD`, `LIGHT`, `MATTE`, `ON_SCENE`, `REACH`, `skyWorld`, `World`, `worldCss`
 - `tokens/appearance.ts` — `Appearance`, `APPEARANCE_KEY`, `APPEARANCE_SCRIPT`, `APPEARANCES`, `applyAppearance`, `preferred`, `remember`, `resolve`, `stored`
-- `tokens/ground.ts` — `CONTROL_TINT`, `CURTAIN`, `FOCUS`, `GROUND`, `GROUND_CSS`, `GROUND_TINT`, `MIN_DELTA`, `TINT`
+- `tokens/ground.ts` — `CHOSEN_TINT`, `CONTROL_TINT`, `CURTAIN`, `FOCUS`, `GROUND`, `GROUND_CSS`, `GROUND_TINT`, `MIN_DELTA`, `TINT`
 - `tokens/motion.ts` — `applyLiveliness`, `ARRIVE`, `ARRIVE_MARK`, `ARRIVE_MOTION`, `ARRIVE_RISE`, `arriveAt`, `BEAT`, `BLOCK_MOTION`, `DELAY`, `Device`, `DOOR_MOTION`, `doorAt`, `Duration`, `DURATION`, `earned`, `Ease`, `EASE`, `EASE_SPLINE`, `GLYPH_MOTION`, `Intent`, `Liveliness`, `LIVELINESS`, `LIVELINESS_KEY`, `livelinessStored`, `Motion`, `MOTION`, `motionFor`, `OPENING_MOTION`, `READER_MOTION`, `reading`, `REDUCED`, `rememberLiveliness`, `SAID`, `transition`, `TURN`, `TURN_AT`, `turns`, `useMotion`, `useStill`, `useStillness`
 - `tokens/theme.ts` — `colorFor`, `productCss`, `TONE_CSS`
 - `tokens/type.ts` — `CHART_TYPE`, `FACE_CSS`, `FACE_STACK`, `MARK_STACK`, `MONO_STACK`, `Role`, `ROLES`, `sentence`, `text`, `TYPE`
@@ -206,6 +206,7 @@ there is no deep import, and a guard says so.
 ### `parts/`
 
 - `parts/arrange.tsx` — `Center`, `Cluster`, `Columns`, `Grid`, `Rail`, `Row`, `Spacer`, `Stack`
+- `parts/bars.tsx` — `Bars`, `Bars`, `barsFor`, `BarsProps`, `checksIn`, `CodeKind`, `kindOf`, `SAYS_KIND`
 - `parts/beside.tsx` — `Hint`, `Pip`
 - `parts/blocks.tsx` — `Branch`, `Crumbs`, `Document`, `Faq`, `Gauge`, `Hotkey`, `Moment`, `PageTabs`, `Reveal`, `Step`, `Steps`, `TabSpec`, `Timeline`, `Tree`, `TreeProps`
 - `parts/bones.tsx` — `blanks`, `useBones`, `Waiting`
