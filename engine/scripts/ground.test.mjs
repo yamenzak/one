@@ -490,6 +490,77 @@ for (const file of FILES.filter((f) => rel(f).startsWith("design/src/chart/"))) 
 
 if (!mono) ok(`mono: the interface is values, the data is hues, and focus is neither`);
 
+/* ------------------------------------------------------------- unlocked --- */
+
+/**
+ * A SURFACE THAT PAINTS ITSELF INSTEAD OF READING A TIER.
+ *
+ * ⚠️ THE PALETTE WAS UNIFIED AND NOT LOCKED, AND THOSE ARE DIFFERENT THINGS. Every
+ * tier, every state and every ambience is derived in `ground.ts` and `theme.ts` —
+ * and nothing stopped the next screen writing `bg-[#1a1a1a]` because it looked
+ * right on the phone in front of somebody. One of those is invisible; four are a
+ * second palette; and the day the tiers move they are the screens that do not.
+ *
+ * ⚠️ IT IS THE STYLE POSITION THAT IS CHECKED, NOT THE LITERAL. A first draft
+ * banned any colour-shaped string and reported ten files, every one of them
+ * right: a BARCODE is pure black on pure white because a scanner needs it to be,
+ * a GHS hazard diamond is that red by law, a logo is fixed artwork, a canvas
+ * fills white under a JPEG because JPEG has no alpha, and sample data is a colour
+ * somebody picked stored as a value. None of those is a surface, and a guard that
+ * cannot tell artwork from chrome is one somebody waives.
+ *
+ * ⚠️ SO WHAT IS REFUSED IS A COLOUR IN A `style` OBJECT OR AN ARBITRARY TAILWIND
+ * VALUE — `background`, `color`, `borderColor`, `bg-[…]`, `text-[…]`. That is
+ * exactly "this screen decided what it is made of", and it is the whole class.
+ */
+{
+  /* ⚠️ A colour landing where the INTERFACE is painted, rather than in a drawing. */
+  const STYLED = [
+    /\b(?:background|backgroundColor|color|borderColor|outlineColor|fill|stroke)\s*:\s*["'`]?(?:#[0-9a-fA-F]{3,8}|oklch\(|rgba?\(|hsla?\()/,
+    /\b(?:bg|text|border|outline|ring|from|via|to|shadow)-\[(?:#|rgb|hsl|oklch)/,
+  ];
+  /* ⚠️ A product's `hue:` is sanctioned wherever it appears — it is the input. */
+  const HUE = /\bhue:\s*"/;
+  const MAY = new Map([
+    ["one-space/src/brand.ts", "the deployment's own colour, and the only one it has"],
+    /* ⚠️ PAPER IS NOT A SURFACE. A printed label is black ink on white stock and
+       must not follow a theme — a dark-mode label is a sheet of toner nobody can
+       read, on the one output this product makes that cannot be re-rendered. */
+    ["design/src/parts/labels.tsx", "print: paper is white and ink is black, whatever the screen is"],
+  ]);
+  let painted = 0;
+  let looked = 0;
+  const TREE = [...FILES, ...filesIn("ground/src")];
+  for (const file of TREE) {
+    const where = rel(file);
+    /* ⚠️ The token layer is where colour is DEFINED. Everything else consumes it. */
+    if (where.startsWith("design/src/tokens/")) continue;
+    if (where.startsWith("design/src/scene/")) continue;
+    if (where.startsWith("design/src/chart/")) continue;
+    if (where.startsWith("design/src/measure/")) continue;
+    if (MAY.has(where)) continue;
+    looked++;
+    const src = readFileSync(file, "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "))
+      .replace(/^(\s*)\/\/.*$/gm, "$1");
+    for (const line of src.split("\n")) {
+      if (HUE.test(line)) continue;
+      if (!STYLED.some((re) => re.test(line))) continue;
+      /* ⚠️ An SVG's own `fill`/`stroke` attribute is artwork, not a surface. */
+      if (/<(?:path|rect|circle|ellipse|polygon|polyline|line|g|svg|text)\b/.test(line)) continue;
+      painted++;
+      fail(`${where}: a surface paints itself instead of reading a tier.\n`
+        + `       Every value on a surface comes from the palette — \`--surface\`, \`--default\`,\n`
+        + `       \`--on\`, \`--foreground\` — so moving the tiers reaches it. A literal here is\n`
+        + `       a screen the next palette change will not reach.`);
+      break;
+    }
+  }
+  if (!painted) {
+    ok(`locked: ${looked} file(s) draw, none paints a surface itself`);
+  }
+}
+
 console.log(bad
   ? `\nground: ${bad} finding(s) — an edge, or a boundary that needs one.`
   : `\nground: no borders, no shadows, one monochrome interface, one coloured data.`);

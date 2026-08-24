@@ -109,9 +109,20 @@ const HEARD = /\btell\.failed\b|\btrouble\s*\(|\bproblem\b|\bfailed\s*\(|\bthrow
  */
 const HANDED = /\breturn\s+[^;\s}][^;]*;/;
 
+/*
+  ⚠️ THE WHOLE TREE THAT DRAWS, NOT ONLY THE APPS. The first draft swept the app
+  registry and the deployment's own screens — which is where the reported fault
+  was, and is not where the rule lives. `design/src` holds the rendered surfaces
+  every app mounts (settings, money, the vault, the inbox), so a swallowed
+  refusal there is one every product inherits at once; `ground` is the proving
+  ground, is not a product, and is where most of these surfaces are actually
+  exercised. Leaving either out makes this a guard about OneInventory.
+*/
 const FILES = [
   ...appDirs().flatMap((d) => filesIn(d)),
   ...filesIn("one-space/src"),
+  ...filesIn("design/src"),
+  ...filesIn("ground/src"),
 ];
 
 let swallowed = 0;
