@@ -121,6 +121,13 @@ export const TYPE = {
   body: "text-base leading-relaxed text-pretty",
   /** Names a control or a value. Not a heading — it labels something beside it. */
   label: "text-base font-medium",
+  /**
+   * ⚠️ A WORD INSIDE A SENTENCE THAT IS LOUDER THAN THE REST, and it needs a
+   * token because Tailwind's preflight resets `<strong>` to inherit. Written as
+   * a bare `font-semibold` in the one component that renders somebody else's
+   * writing, it is a weight nothing else in the system can see or agree with.
+   */
+  strong: "font-semibold",
   /** Secondary: a caption, a hint, a timestamp. Quieter, never smaller than 14px. */
   note: "text-sm text-muted",
   /**

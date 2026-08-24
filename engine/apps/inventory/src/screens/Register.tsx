@@ -47,9 +47,9 @@
 
 import * as React from "react";
 import {
-  ActionRow, Await, Bars, Group, LongText, NoteRow, NumberInput, PickFile, Row,
+  ActionRow, Await, Bars, Group, NoteRow, NumberInput, PickFile, Row,
   RowsWaiting, SAYS_KIND, Screen, Section, Segmented, Spacer, Stack, Steps, Tags,
-  TextInput, ToggleRow, Viewfinder, kindOf,
+  TextInput, ToggleRow, Viewfinder, Written, kindOf,
   glyphOf, shrunk, type Loaded, type Option,
 } from "@engine/design";
 import { Button } from "@heroui/react";
@@ -564,11 +564,19 @@ export function Register({
               autoFocus
             />
             <TextInput label="Brand" value={brand} onChange={setBrand} name="brand" />
-            <LongText
+            {/*
+              ⚠️ `Written` RATHER THAN A ONE-LINE FIELD, AND THE CONTROL IS THE
+              BRIEF. A model reading six photographs writes real prose here —
+              what it is, what size, what form, what it is not — and drawn at the
+              default height it arrived in a box one line tall, so what came back
+              looked like a fragment and what people typed was a fragment.
+            */}
+            <Written
               label="Description"
               value={description}
               onChange={setDescription}
               placeholder="What it is, what size, what form"
+              rows={5}
             />
 
             {/*
@@ -806,17 +814,26 @@ export function Register({
         {where === "keeping" ? (
         <>
         <Section label="Keeping it">
-            <LongText
+            {/*
+              ⚠️ THE TWO FIELDS `Written` WAS BUILT FOR. Storage and handling are
+              where a model writes headed paragraphs and a list of what a thing
+              must not sit beside — and this is read at a shelf by somebody
+              holding a box, which is the one place a wall of grey is useless.
+              Markdown in, structure out.
+            */}
+            <Written
               label="How to store it"
               value={storage}
               onChange={setStorage}
-              placeholder="Cool, dry, upright"
+              placeholder="Cool, dry, upright — and what it must not sit beside"
+              rows={6}
             />
-            <LongText
+            <Written
               label="How to handle it"
               value={handling}
               onChange={setHandling}
               placeholder="Gloves, two people, keep flat"
+              rows={6}
             />
             {/*
               ⚠️ HOW LONG IT KEEPS IS THE PRODUCT'S; WHEN THIS ONE EXPIRES IS THE

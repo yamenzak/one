@@ -428,6 +428,29 @@ export const GLYPH_GAP = "gap-[0.3em]" as const;
 export const PAD = "p-4" as const;
 
 /**
+ * WRITING SOMEBODY ELSE WROTE — the four insets `Markdown` needs and nothing else.
+ *
+ * ⚠️ THEY ARE HERE RATHER THAN IN THE COMPONENT FOR THE REASON EVERY OTHER
+ * SPACING TOKEN IS. A renderer that picked its own would be a second rhythm
+ * inside a card that already has one, visible only where a model happened to
+ * write a list — which is the least-reviewed surface in the product.
+ *
+ * ⚠️ AND A LIST HANGS ITS MARKER OUTSIDE THE TEXT COLUMN, which is what `pl-5`
+ * buys and why it is not the same number as a quote's. A bullet indented WITH
+ * its text reads as a second paragraph that starts oddly.
+ */
+export const PROSE = {
+  /** A list, with room for the marker outside the column. */
+  list: "pl-5",
+  /** A quote, in from the column it interrupts. */
+  quote: "pl-3",
+  /** A word of code inside a sentence. */
+  tick: "px-1 py-0.5",
+  /** A block of it. */
+  fence: "p-3",
+} as const;
+
+/**
  * ⚠️ AN EMPTY STATE IS GIVEN ROOM, BECAUSE ROOM IS WHAT IT IS MADE OF. At `PAD`
  * it is a short stack of centred text pinned to the top of whatever space it was
  * dropped into, which reads as content that failed to arrive. The height is what

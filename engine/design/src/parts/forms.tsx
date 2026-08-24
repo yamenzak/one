@@ -228,16 +228,24 @@ export function SecretInput({ set, onChange, ...p }: Said & {
   );
 }
 
-export function LongText({ value, onChange, placeholder, ...p }: Said & {
+export function LongText({ value, onChange, placeholder, rows, ...p }: Said & {
   readonly value: string | undefined;
   readonly onChange: (value: string) => void;
   readonly placeholder?: string;
+  /**
+   * ⚠️ HOW TALL IT OPENS, AND IT IS NOT COSMETIC. A field for three paragraphs
+   * that opens at one line is a field somebody writes one line in — the control
+   * is the brief. The two long-form fields in the catalogue (a description, the
+   * storage and handling notes) were both drawn at the default and both were
+   * filled in as a sentence.
+   */
+  readonly rows?: number;
 }) {
   const pending = value === undefined;
   return (
     <TextField value={value ?? ""} onChange={onChange} {...said(p)} isDisabled={p.disabled === true || pending}>
       <Naming>{p.label}</Naming>
-      <TextArea placeholder={placeholder} />
+      <TextArea placeholder={placeholder} {...(rows === undefined ? {} : { rows })} />
       <Tail help={p.help} error={p.error} />
     </TextField>
   );

@@ -168,12 +168,12 @@ part that is not. Refresh with `node engine/scripts/docs.test.mjs --write`.
 | `tokens/` | colour, type, spacing, motion, the chrome and hem rules | 83 |
 | `scene/` | the ambience engine — families, marks, the world behind a screen | 1 |
 | `frame/` | page, shape, crown, nav, dock, overlays — what wraps a screen | 61 |
-| `parts/` | rows, cards, lists, controls, the four outcomes | 184 |
+| `parts/` | rows, cards, lists, controls, the four outcomes | 191 |
 | `rendered/` | whole surfaces drawn from a kernel declaration | 53 |
 | `chart/` | the data vocabulary — a number as a shape | 39 |
 | `measure/` | what a screen actually lays out, in a real browser — the harness every app sweeps its own screens with | 1 |
 
-**422 exports.** Every one is reachable as `import { … } from "@engine/design"`;
+**429 exports.** Every one is reachable as `import { … } from "@engine/design"`;
 there is no deep import, and a guard says so.
 
 ### `tokens/`
@@ -221,6 +221,7 @@ there is no deep import, and a guard says so.
 - `parts/opening.tsx` — `Opening`, `OpeningProps`
 - `parts/permission.tsx` — `Permission`, `PermissionRow`, `PermissionRowProps`
 - `parts/pick-file.tsx` — `asDataUrl`, `PickFile`, `PickFileProps`, `saysKind`, `shrunk`, `sift`, `takes`
+- `parts/prose.tsx` — `Chunk`, `ChunkKind`, `Markdown`, `MarkdownProps`, `readInline`, `readProse`, `Written`
 - `parts/reading.ts` — `FORGET`, `FrameAt`, `Sifted`, `siftFrame`, `SURE`, `Votes`
 - `parts/recall.tsx` — `Block`, `seedShapes`, `shapeFor`, `ShapeWaiting`, `useRecalledShape`
 - `parts/said.tsx` — `Amount`, `Clock`, `Dated`, `machineHere`, `Num`, `Presenting`, `Size`, `Unit`, `useAmount`, `useDay`, `useDays`, `useFigures`, `useShown`, `When`
