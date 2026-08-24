@@ -1092,6 +1092,7 @@ guard does.
 | **The Unmarked Mark** | A registered glyph drawn by a screen itself, or one animated because it could be. | `glyphs` |
 | **The Dead Attribute** | A `data-` attribute stamped on markup that no selector, variant or query reads. | `attrs` |
 | **The Borrowed Slot** | A control handed across a prop naming a `slot` — resolved against whatever encloses the *screen*, not the component it was written for. Harmless in a fixture, a blank page inside a presented surface. | `heroui` |
+| **The Doubled Control** | One control rendered as two: a wrapper pressable around a real one. Two tab stops, "button, button" to a screen reader, and one `id` on both — which every `aria-labelledby` and `<label for>` then resolves to whichever came first. Invisible in a screenshot. | `geometry.seen`, `space.seen` |
 
 ### What is checked today
 

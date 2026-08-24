@@ -968,6 +968,7 @@ its own header, cited by other files, and doing nothing.
 | `every-control-the-space-asks-for-is-reachable` | D7 | a control an operator cannot hit on the phone they are holding, on the screens where a workspace is suspended, a plan is edited and an account is closed |
 | `the-spaces-type-is-a-scale-with-a-top` | D7 | a console page where nothing outranks the body, so an operator scanning for the one figure that matters reads every line to find it |
 | `everything-the-space-says-can-be-read` | D7 | ink under the contrast floor on the screens that carry a refusal, an arrears and a deletion — measured in both themes, because a palette that clears in one can fail in the other |
+| `no-name-is-used-twice` | D7 | a control rendered as two — a wrapper pressable around the real one, sharing its `id`, so the screen reader is handed the wrong element and the keyboard stops on a div that looks like nothing. Every other reading here passes over it: the box is the right size, the ink clears the floor, the page does not spill |
 <!-- /generated -->
 
 ### And how well each decision is defended
@@ -981,7 +982,7 @@ its own header, cited by other files, and doing nothing.
 | D4 | Composition is lazy: a request composes the app it is for, and no other | 3 |
 | D5 | Storage is placed, not owned. The directory carries every cross-tenant fact | 15 |
 | D6 | Jurisdiction is a workspace fact, derived from the business's country | 5 |
-| D7 | HeroUI v3 is the component layer, and its components are not restyled | 69 |
+| D7 | HeroUI v3 is the component layer, and its components are not restyled | 70 |
 | D8 | Declarations are typed object literals; not decorators, not a custom format | 3 |
 | D9 | Libraries encode decisions; we write invariants | 3 |
 | D10 | Five primary destinations, maximum | 5 |

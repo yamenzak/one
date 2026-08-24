@@ -25,7 +25,7 @@ import { chromium, type Browser } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   DESK, ENOUGH_TO_RANK, PHONE, SCALE_CEILING,
-  contrastOf, geometryOf, isLarge, mounted, sayTwins, scaleOf,
+  contrastOf, geometryOf, isLarge, mounted, sayTwins, strayTwins, scaleOf,
   stylesheet, tooSmall, unreadable,
 } from "@engine/design/measuring";
 import {
@@ -159,7 +159,8 @@ describe("every name the space puts in the document", () => {
   for (const route of ROUTES) {
     it(`calls each of them one thing: ${route}`, async () => {
       const seen = await at(route, PHONE);
-      expect(seen.twins, `${route}: ${sayTwins(seen.twins)}`).toEqual([]);
+      const stray = strayTwins(seen.twins);
+      expect(stray, `${route}: ${sayTwins(stray)}`).toEqual([]);
     }, 30_000);
   }
 });

@@ -15,7 +15,7 @@
 import { chromium, type Browser } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
-  DESK, PHONE, geometryOf, sayTwins, stylesheet, tooSmall,
+  DESK, PHONE, geometryOf, sayTwins, strayTwins, stylesheet, tooSmall,
 } from "@engine/design/measuring";
 import { GROUND_ROUTES, GroundScreen } from "../src/screens/index.js";
 
@@ -82,7 +82,8 @@ describe("every name the ground puts in the document", () => {
   for (const route of GROUND_ROUTES) {
     it(`calls each of them one thing: ${route}`, async () => {
       const seen = await at(route, PHONE);
-      expect(seen.twins, `${route}: ${sayTwins(seen.twins)}`).toEqual([]);
+      const stray = strayTwins(seen.twins);
+      expect(stray, `${route}: ${sayTwins(stray)}`).toEqual([]);
     }, 30_000);
   }
 });

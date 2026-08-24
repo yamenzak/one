@@ -353,8 +353,11 @@ export interface Geometry {
    * ⚠️ ONE ENTRY PER REPEATED `id`, NOT PER ELEMENT — the same rule `type`
    * follows. What is under test is the SET of names used twice; listing both
    * halves of each would report the fault as though it were two.
+   *
+   * `each` is `tag.class` per element wearing the name, which is what makes the
+   * one exemption below expressible as a shape rather than as a count.
    */
-  readonly twins: readonly { readonly id: string; readonly tags: string }[];
+  readonly twins: readonly { readonly id: string; readonly each: readonly string[] }[];
 }
 
 /**
@@ -382,11 +385,43 @@ export const tooSmall = (targets: Geometry["targets"]): Geometry["targets"] =>
     && !INSIDE_A_CONTROL.some((one) => t.kind.includes(one)));
 
 /**
- * ⚠️ HOW A DOUBLED CONTROL READS, PUT INTO WORDS A FAILURE CAN PRINT. One answer
- * for every product, for the reason `tooSmall` gives one paragraph up.
+ * ⚠️ THE ONE DUPLICATE THAT IS NOT OURS, AND IT IS WRITTEN DOWN RATHER THAN
+ * QUIET — the same treatment `INSIDE_A_CONTROL` gets, for the same reason.
+ * HeroUI's `DateField.Group` and `DateField.Input` BOTH render
+ * `role="group"`, and react-aria hands both the field's id and the same
+ * `aria-labelledby`. Reproduced from the library's own documented anatomy, with
+ * nothing of ours in the tree: `<DateField><Label/><DateField.Group>
+ * <DateField.Input/></DateField.Group></DateField>` — which is verbatim its
+ * "Basic" example and every other example on the page.
+ *
+ * ⚠️ SO IT IS NOT FIXABLE HERE WITHOUT DROPPING ONE OF THE TWO, and a component
+ * composed against its own documentation is the thing D7 exists to protect.
+ * Patching around it would put a bespoke date field in the tree to work around a
+ * beta defect that will be fixed upstream.
+ *
+ * ⚠️ AND IT IS A SHAPE, NOT A COUNT. Exactly the library's own two classes, in
+ * that order, nowhere else — so a screen that stacks a third element on the same
+ * name, or repeats an id anywhere our code reaches, still fails. Like the
+ * exemption above, it can only SHRINK: when the library stops doing it, this
+ * entry stops matching and is deleted.
  */
+const THE_LIBRARYS = ["div.date-input-group", "div.date-input-group__input"];
+
+const isTheLibrarys = (one: Geometry["twins"][number]): boolean =>
+  one.each.length === THE_LIBRARYS.length
+  && one.each.every((what, at) => what === THE_LIBRARYS[at]);
+
+/**
+ * ⚠️ ONE ANSWER FOR EVERY PRODUCT, FOR THE REASON `tooSmall` GIVES: an app
+ * carrying the exemption itself is an app that forgets it, and then reports a
+ * fault nobody can act on.
+ */
+export const strayTwins = (twins: Geometry["twins"]): Geometry["twins"] =>
+  twins.filter((one) => !isTheLibrarys(one));
+
+/** ⚠️ How a doubled control reads, in words a failure can print. */
 export const sayTwins = (twins: Geometry["twins"]): string =>
-  twins.map((t) => `"${t.id}" is on ${t.tags}`).join("; ");
+  twins.map((t) => `"${t.id}" is on ${t.each.join(" in ")}`).join("; ");
 
 /**
  * ⚠️ HOW MANY SIZES A SCREEN MAY SET, AND IT IS A CEILING RATHER THAN A TARGET.
@@ -618,11 +653,14 @@ export async function geometryOf(
       for (const el of Array.prototype.slice.call(
         document.querySelectorAll("[id]")) as Element[]) {
         if (!el.id) continue;
-        (byId.get(el.id) ?? byId.set(el.id, []).get(el.id)!).push(el.tagName.toLowerCase());
+        const named = typeof el.className === "string" && el.className
+          ? `${el.tagName.toLowerCase()}.${el.className.split(" ")[0]}`
+          : el.tagName.toLowerCase();
+        (byId.get(el.id) ?? byId.set(el.id, []).get(el.id)!).push(named);
       }
       const twins = Array.from(byId.entries())
-        .filter(([, tags]) => tags.length > 1)
-        .map(([id, tags]) => ({ id, tags: tags.join(" in ") }));
+        .filter(([, each]) => each.length > 1)
+        .map(([id, each]) => ({ id, each }));
       /* ⚠️ ELLIPSIS ONLY, NOT EVERY OVERFLOW. A scroller's content is wider than
          its box on purpose, and a clipped decoration is not text somebody was
          meant to read; what this is looking for is the layout deciding, on its
