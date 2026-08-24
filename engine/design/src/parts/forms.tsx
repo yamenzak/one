@@ -425,9 +425,42 @@ export function Choice({ value, onChange, options, placeholder, ...p }: Said & {
 }
 
 /**
+ * ⚠️ THE CURRENT VALUE, IN THE LIST, WHETHER OR NOT THE CALLER PUT IT THERE.
+ * Shared by every control that resolves a KEY against a collection — see
+ * `Lookup`. Exported so a test can ask the question without mounting anything.
+ */
+export const withValue = (
+  options: readonly Option[], value: string | undefined | null,
+): readonly Option[] => {
+  const held = (value ?? "").trim();
+  if (!held || options.some((o) => o.id === held)) return options;
+  /* ⚠️ FIRST, because it is the current answer and the rest are alternatives. */
+  return [{ id: held, label: held }, ...options];
+};
+
+/**
  * ⚠️ A LOOKUP IS A CHOICE WITH TOO MANY OPTIONS TO SCROLL. Same options shape,
  * same grammar; the difference is that typing narrows. Past a dozen options,
  * `Choice` is the wrong control and this is the right one.
+ *
+ * ⚠️ AND IT HOLDS A VALUE ITS OPTIONS DO NOT, WHICH IT DID NOT AND WHICH IS
+ * INVISIBLE. `selectedKey` is resolved against the COLLECTION: a key React Aria
+ * cannot find in the list renders as an EMPTY input, silently. So a caller that
+ * set a value outside the list — a model's answer, a value restored from a
+ * record, a unit some other workspace uses — had a control showing a placeholder
+ * over state that was correctly full.
+ *
+ * ⚠️ IT WAS PHOTOGRAPHED ON THE UNIT FIELD. A model read "30 Filmtabletten" off
+ * a box and answered `unit`; the field offers what the WORKSPACE already uses,
+ * which on a new workspace is nothing; `setUnit` ran, the form was complete, and
+ * the person saw an empty box and a placeholder. Then it saved a value they had
+ * never seen — which is worse than losing it.
+ *
+ * ⚠️ SO THE VALUE IS ALWAYS IN THE LIST. Folding it in is the whole fix: the key
+ * resolves, the input shows it, and the dropdown shows it as the current choice
+ * with everything else under it. The comment at the unit call site already
+ * promised this ("anything typed, so a new unit costs nothing"); the control had
+ * never been able to do it.
  */
 export function Lookup({ value, onChange, options, placeholder, name, autoFocus, ...p }: Said & {
   readonly value: string | undefined | null;
@@ -438,6 +471,7 @@ export function Lookup({ value, onChange, options, placeholder, name, autoFocus,
   readonly autoFocus?: boolean;
 }) {
   const pending = value === undefined;
+  const shown = withValue(options, value);
   return (
     <ComboBox
       name={name}
@@ -453,7 +487,7 @@ export function Lookup({ value, onChange, options, placeholder, name, autoFocus,
       </ComboBox.InputGroup>
       <ComboBox.Popover>
         <ListBox>
-          {options.map((o) => (
+          {shown.map((o) => (
             <ListBox.Item key={o.id} id={o.id} textValue={o.label}>
               {o.label}
               {o.help ? <Description>{o.help}</Description> : null}

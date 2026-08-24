@@ -168,12 +168,12 @@ part that is not. Refresh with `node engine/scripts/docs.test.mjs --write`.
 | `tokens/` | colour, type, spacing, motion, the chrome and hem rules | 83 |
 | `scene/` | the ambience engine — families, marks, the world behind a screen | 1 |
 | `frame/` | page, shape, crown, nav, dock, overlays — what wraps a screen | 66 |
-| `parts/` | rows, cards, lists, controls, the four outcomes | 191 |
+| `parts/` | rows, cards, lists, controls, the four outcomes | 192 |
 | `rendered/` | whole surfaces drawn from a kernel declaration | 53 |
 | `chart/` | the data vocabulary — a number as a shape | 39 |
 | `measure/` | what a screen actually lays out, in a real browser — the harness every app sweeps its own screens with | 1 |
 
-**434 exports.** Every one is reachable as `import { … } from "@engine/design"`;
+**435 exports.** Every one is reachable as `import { … } from "@engine/design"`;
 there is no deep import, and a guard says so.
 
 ### `tokens/`
@@ -214,7 +214,7 @@ there is no deep import, and a guard says so.
 - `parts/credits.tsx` — `Credits`, `CreditsProps`
 - `parts/face.tsx` — `appFace`, `Face`, `FaceKind`, `FaceOf`, `FaceProps`, `FaceSize`, `faceUri`, `ONE_FACE`, `Orb`, `placeFace`, `whoFace`, `worldFor`
 - `parts/feedback.tsx` — `Beep`, `say`, `wakeSound`
-- `parts/forms.tsx` — `Agree`, `Choice`, `CodeEntry`, `DateInput`, `Dates`, `Dial`, `LongText`, `Lookup`, `MoneyInput`, `NamedAlready`, `Naming`, `NumberInput`, `NumberInputProps`, `OneOf`, `Option`, `PeriodId`, `PeriodInput`, `PERIODS`, `Picks`, `Said`, `SearchInput`, `SecretInput`, `Segmented`, `spanOf`, `Tags`, `Tail`, `TextInput`, `TextInputProps`, `TimeInput`
+- `parts/forms.tsx` — `Agree`, `Choice`, `CodeEntry`, `DateInput`, `Dates`, `Dial`, `LongText`, `Lookup`, `MoneyInput`, `NamedAlready`, `Naming`, `NumberInput`, `NumberInputProps`, `OneOf`, `Option`, `PeriodId`, `PeriodInput`, `PERIODS`, `Picks`, `Said`, `SearchInput`, `SecretInput`, `Segmented`, `spanOf`, `Tags`, `Tail`, `TextInput`, `TextInputProps`, `TimeInput`, `withValue`
 - `parts/gated.tsx` — `Allowed`, `sayGate`, `Stopped`, `STOPPED`, `useGate`
 - `parts/heads.tsx` — `Balance`, `distinguishing`, `Figure`, `Prose`, `Section`, `SectionTitle`, `Title`
 - `parts/listing.tsx` — `Col`, `Listing`, `ListingProps`, `Paged`

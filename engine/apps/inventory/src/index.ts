@@ -3641,7 +3641,8 @@ const seeProduct = operation<{ images: unknown; hint?: string; known?: string },
     lane: "vision",
     prompt: "You identify products from photographs for a stock system."
       + " Answer with JSON only: name, brand, description, unit, pack, tracking,"
-      + " why, storage, handling, tags, shelfDays, openDays, hazardous."
+      + " why, storage, handling, tags, shelfDays, openDays, hazardous,"
+      + " labelExpiry."
       + " `name` is what somebody would call it on a shelf, not marketing copy."
       /*
         ⚠️ MARKDOWN, AND THE FIELD IS THE REASON. `description`, `storage` and
@@ -3702,6 +3703,19 @@ const seeProduct = operation<{ images: unknown; hint?: string; known?: string },
       + " after opening, in days — the open-jar symbol reading 12M is 365. Use 0"
       + " for either where nothing says. NEVER answer with a date: a printed"
       + " expiry belongs to one delivery, not to the product."
+      /*
+        ⚠️ AND THE DATE IS REPORTED SEPARATELY RATHER THAN SWALLOWED. Told only
+        "never answer with a date", a model that has read a legible expiry off
+        the carton throws it away — so `shelfDays` comes back 0, correctly, and
+        the person looking at the photograph they just took of "verwendbar bis
+        08 2029" beside an empty field reads that as the reading having failed.
+        Reported here, the screen says why the duration is blank and where the
+        date actually goes.
+      */
+      + " `labelExpiry` is the use-by date PRINTED on this box, as you read it"
+      + " (\"08/2029\"), or an empty string where none is legible. It is never a"
+      + " shelf life and never fills one in: it is reported so the person can be"
+      + " told that this date belongs to the delivery."
       /*
         ⚠️ SEEING A PICTOGRAM AND CLASSIFYING ONE ARE DIFFERENT ACTS, and only
         the first is observation. Which hazard class an orange diamond declares

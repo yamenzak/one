@@ -75,6 +75,16 @@ export interface Guessed {
   /** ⚠️ Durations, never dates — a printed expiry belongs to one delivery. */
   readonly shelfDays: number;
   readonly openDays: number;
+  /**
+   * ⚠️ THE DATE ON THIS BOX, WHICH IS NOT A SHELF LIFE AND IS REPORTED SO THE
+   * SCREEN CAN SAY WHY IT LEFT ONE BLANK. A pharmaceutical carton prints "use
+   * by 08/2029" and no manufacturing date, so no duration can be worked out —
+   * the model is right to answer zero, and a person who has just photographed a
+   * date sitting beside an empty "Shelf life" reasonably reads that as a
+   * failure. It is also the wrong FIELD: this date belongs to one delivery, and
+   * is captured from the batch when the box is received.
+   */
+  readonly labelExpiry: string;
   /** ⚠️ A pictogram was SEEN. Which class it declares is the label reader's. */
   readonly hazardous: boolean;
 }
@@ -260,6 +270,9 @@ export function Register({
   /* ⚠️ EMPTY, NOT ONE BLANK ROW. A row with no code in it was a card with no
      barcode on it and a pack size for a thing nobody had named. */
   const [codes, setCodes] = React.useState<readonly CodeRow[]>([]);
+  /* ⚠️ WHAT THE MODEL READ OFF THE BOX, WAITING FOR A BARCODE TO BELONG TO —
+     see the extraction below. */
+  const [readPack, setReadPack] = React.useState<number | null>(null);
   const [sources, setSources] = React.useState<readonly SourceRow[]>([]);
   const [supplier, setSupplier] = React.useState("");
   const [reorder, setReorder] = React.useState(false);
@@ -299,13 +312,19 @@ export function Register({
       const seen = new Set(held.map((t) => t.toLowerCase()));
       return [...held, ...answer.tags.filter((t: string) => !seen.has(t.toLowerCase()))];
     });
-    /* ⚠️ THE PACK GOES ON THE FIRST BARCODE, NOT ON THE PRODUCT. "It holds 100"
-       is a fact about the box the code is printed on — a product counted in
-       gloves has no pack of its own, and a carton and an inner both do. */
-    if (answer.pack > 1) {
-      setCodes((held) => held.map((row, i) => (i === 0 && row.pack === 1
-        ? { ...row, pack: answer.pack } : row)));
-    }
+    /*
+      ⚠️ THE PACK GOES ON THE FIRST BARCODE, NOT ON THE PRODUCT. "It holds 30" is
+      a fact about the box the code is printed on — a product counted in gloves
+      has no pack of its own, and a carton and an inner both do.
+
+      ⚠️ AND IT IS REMEMBERED RATHER THAN WRITTEN, WHICH IS THE WHOLE FIX. This
+      mapped over `codes` — which is EMPTY when the answer arrives, because the
+      photographs are step one and the barcodes are step three. `[].map()` is
+      `[]`, so a model that had correctly read "30 Filmtabletten" off the box had
+      its answer dropped without a word, every time. Held here, it becomes the
+      first scanned code's pack when there is finally a code to put it on.
+    */
+    if (answer.pack > 1) setReadPack(answer.pack);
   }, [answer]);
 
   /*
@@ -833,8 +852,19 @@ export function Register({
               onRead={(code) => {
                 const said = code.trim();
                 if (!said) return;
-                setCodes((held) => (held.some((one) => one.value === said)
-                  ? held : [...held, { value: said, kind: namespaceOf(said), pack: 1 }]));
+                setCodes((held) => {
+                  if (held.some((one) => one.value === said)) return held;
+                  /*
+                    ⚠️ THE MODEL'S COUNT LANDS ON THE FIRST CODE AND NOWHERE
+                    ELSE. "30 per box" was read off the box the first barcode is
+                    printed on; the second code is the carton or the inner, and
+                    giving it the same number would say the carton holds thirty
+                    too. It is a starting value on one row, editable like any
+                    other.
+                  */
+                  const pack = held.length === 0 && readPack ? readPack : 1;
+                  return [...held, { value: said, kind: namespaceOf(said), pack }];
+                });
               }}
             />
 
@@ -978,6 +1008,28 @@ export function Register({
                 ? `About ${Math.round(shelfDays / 30)} months from the day it was made`
                 : "Days from the day it was made. 730 is two years. Zero never expires"}
             />
+            {/*
+              ⚠️ WHY IT IS EMPTY, WHERE IT IS EMPTY, AND ONLY WHEN A DATE WAS
+              ACTUALLY SEEN. A shelf life is a DURATION and a carton prints a
+              DATE — with no manufacturing date beside it nothing can work one
+              out, so leaving this blank is the model being right. Somebody who
+              has just photographed "verwendbar bis 08 2029" and finds the field
+              empty reads that as the reading having failed, and either types a
+              number they guessed or stops trusting the extraction.
+
+              ⚠️ AND IT NAMES WHERE THE DATE DOES GO. It is a fact about one
+              delivery, not about the product, and it is already carried in the
+              box's own DataMatrix — so it is captured when the box is received
+              rather than typed here.
+            */}
+            {!shelfDays && answer?.labelExpiry
+              ? (
+                <NoteRow icon={glyphOf("model")}>
+                  {`The label says ${answer.labelExpiry}. That is this box's date, `
+                    + "not how long the product keeps — it is recorded when you receive it."}
+                </NoteRow>
+              )
+              : null}
             <NumberInput
               label="Once opened"
               value={numberOr(openDays)}
