@@ -239,8 +239,25 @@ async function show(
     return;
   }
   await page.setContent(pageMounting(what, css, theme));
+  /*
+    ⚠️ DRAWN, NOT NECESSARILY DRAWN INTO `#root`. A surface that opens OVER
+    something — the space is one, and so is every sheet — renders through a
+    PORTAL appended to `<body>`, so the mount point it was given stays empty for
+    ever while the screen is perfectly present. Waiting on `#root` alone, that is
+    indistinguishable from a page that threw: the wait times out, the suite
+    reports nothing for twenty seconds per measurement, and the first thing
+    anybody sees is a file that gave up.
+
+    ⚠️ SO THE QUESTION IS WHETHER THERE ARE WORDS ON THE PAGE, which is the same
+    question one level less specific and is what every assertion downstream
+    actually reads. `#root` is still checked first and still satisfies it
+    immediately for an ordinary mount, so nothing that passed before waits a
+    frame longer.
+  */
   await page.waitForFunction(
-    () => (document.getElementById("root")?.children.length ?? 0) > 0, undefined, { timeout: 20_000 });
+    () => (document.getElementById("root")?.children.length ?? 0) > 0
+      || (document.body.innerText ?? "").trim().length > 0,
+    undefined, { timeout: 20_000 });
 }
 
 /* ------------------------------------------------------------- what it is --- */

@@ -25,16 +25,28 @@
  */
 
 import { createRoot } from "react-dom/client";
+import { SessionProvider } from "../src/session.js";
 import { OneSpace } from "../src/space/OneSpace.js";
 
 declare global {
   interface Window { __ROUTE?: string }
 }
 
+/*
+  ⚠️ THE SESSION PROVIDER IS NOT OPTIONAL, AND FINDING THAT OUT COST FORTY
+  MINUTES. `useSession` THROWS outside it rather than returning nothing — which
+  is the right design and is invisible to a harness, because a throw during
+  mount leaves `#root` empty and the wait for it to fill just times out. Two
+  hundred and thirty-four measurements, each waiting twenty seconds for a page
+  that was never going to draw, and not one line of output until the file gave
+  up. The error was one `pageerror` listener away the whole time.
+*/
 createRoot(document.getElementById("root") as HTMLElement).render(
-  <OneSpace
-    path={window.__ROUTE ?? "/"}
-    onGo={() => undefined}
-    onClose={() => undefined}
-  />,
+  <SessionProvider>
+    <OneSpace
+      path={window.__ROUTE ?? "/"}
+      onGo={() => undefined}
+      onClose={() => undefined}
+    />
+  </SessionProvider>,
 );
