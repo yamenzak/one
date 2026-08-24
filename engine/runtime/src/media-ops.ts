@@ -62,9 +62,15 @@ export function mediaOps(app: AppSpec): Readonly<Record<string, Resolved>> {
 
   const bucket = (ctx: PlatformCtx): Bucket => {
     const held = (ctx as unknown as { bucket?: Bucket | null }).bucket;
-    /* ⚠️ REFUSED RATHER THAN THROWN. A deployment whose bucket is not live yet
-       is a deployment that stores no files — a state it has to survive. */
-    if (!held) ctx.fail("platform.unavailable");
+    /*
+      ⚠️ REFUSED RATHER THAN THROWN, AND BY ITS OWN NAME. A deployment whose
+      bucket is not live yet is a deployment that stores no files — a state it
+      has to survive, and one somebody can finish. It answered
+      `platform.unavailable` for a while, which is the sentence for an
+      unexpected throw: "Something went wrong on our side. It is not you." over
+      a knowable state, with nothing a person could do about it.
+    */
+    if (!held) ctx.fail("platform.no_store");
     return held;
   };
 

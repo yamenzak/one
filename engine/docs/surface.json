@@ -169,6 +169,13 @@
       "retryable": false
     },
     {
+      "code": "platform.no_store",
+      "status": 503,
+      "title": "Files cannot be stored yet",
+      "tone": "warning",
+      "retryable": false
+    },
+    {
       "code": "platform.unavailable",
       "status": 503,
       "title": "Something went wrong on our side",

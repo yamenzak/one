@@ -142,4 +142,48 @@ if (!swallowed) {
   ok(`spoken: ${checked} refusal branch(es) across ${FILES.length} file(s), every one reaches somebody`);
 }
 
+/**
+ * AND A REFUSAL NEVER SHOWS A PERSON A PLACEHOLDER.
+ *
+ * ⚠️ A REFUSED UPLOAD SAID "Quote {ref} if you tell us about it" WITH THE BRACES
+ * INTACT, and it was photographed. `problem()` drops a SENTENCE whose value never
+ * arrived, which makes that unreachable at runtime — but a TITLE cannot be
+ * dropped, because a refusal with no words in it is a card nobody can read. A
+ * templated title therefore needs a `plain` beside it: the same fact without the
+ * numbers.
+ *
+ * ⚠️ THIS IS THE STATIC HALF, AND IT IS THE ONE THAT SCALES. The runtime test
+ * covers the platform's own catalogue; every app writes its own, and the next one
+ * will be written by somebody who has never read this file.
+ */
+{
+  const CATALOGUES = [
+    ...filesIn("kernel/src"),
+    ...appDirs().flatMap((d) => filesIn(d)),
+    ...filesIn("one-space/src"),
+    ...filesIn("runtime/src"),
+  ];
+  /* ⚠️ A `title:` and whatever follows it up to the next key or the block's end. */
+  const TITLES = /title:\s*"([^"]*)"([\s\S]{0,160})/g;
+  let bare = 0;
+  let seen = 0;
+  for (const file of CATALOGUES) {
+    const src = strip(readFileSync(file, "utf8"));
+    for (const hit of src.matchAll(TITLES)) {
+      const title = hit[1] ?? "";
+      if (!/\{\w+\}/.test(title)) continue;
+      seen++;
+      /* ⚠️ Only within the same object literal — `}` ends it. */
+      const rest = (hit[2] ?? "").split(/\n\s*\}/)[0] ?? "";
+      if (/\bplain:\s*"/.test(rest)) continue;
+      bare++;
+      const at = src.slice(0, hit.index ?? 0).split("\n").length;
+      fail(`${rel(file)}:${at}: a refusal titled "${title}" interpolates a value and has no \`plain\`.\n`
+        + `       A detail can be dropped when its value never arrives; a title cannot —\n`
+        + `       so give it the same sentence without the numbers.`);
+    }
+  }
+  if (!bare) ok(`worded: ${seen} templated refusal title(s), each with a fallback`);
+}
+
 process.exit(bad ? 1 : 0);

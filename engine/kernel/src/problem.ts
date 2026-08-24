@@ -22,6 +22,19 @@ export interface ProblemDef {
   readonly status: number;
   /** One line, ours, in the reader's terms. Interpolates `{token}`. */
   readonly title: string;
+  /**
+   * ⚠️ THE TITLE WHEN THE VALUES DID NOT ARRIVE, AND ONLY A TEMPLATED TITLE
+   * NEEDS ONE. A detail can be dropped — it is optional by construction, and a
+   * refusal that says less says nothing untrue. A TITLE cannot: a refusal with
+   * no words in it is a card a person cannot read at all, so a templated title
+   * with no values has to have somewhere to fall back to.
+   *
+   * ⚠️ AND IT IS DECLARED RATHER THAN DERIVED. Stripping the tokens out of the
+   * sentence leaves "Your plan includes , and  are in use", which is worse than
+   * either honest version. What the shorter wording says is the same fact
+   * without the numbers.
+   */
+  readonly plain?: string;
   /** What to do about it, where there is something. */
   readonly detail?: string;
   /**
@@ -103,6 +116,7 @@ export const PLATFORM_PROBLEMS: ProblemCatalog = {
   "platform.quota_reached": {
     status: 402, retryable: false, tone: "warning",
     title: "Your plan includes {limit}, and {used} are in use",
+    plain: "Your plan has no room left for this",
     detail: "Change your plan, or free one up.",
   },
   "platform.payment_required": {
@@ -131,6 +145,7 @@ export const PLATFORM_PROBLEMS: ProblemCatalog = {
   "platform.out_of_reach": {
     status: 403, retryable: false, tone: "warning",
     title: "That is not one of your {places}",
+    plain: "That is not one of yours",
     detail: "Ask somebody who runs this workspace to add it.",
   },
   "platform.proof_required": {
@@ -188,6 +203,23 @@ export const PLATFORM_PROBLEMS: ProblemCatalog = {
     title: "That file is empty",
     detail: "There is nothing in it to send.",
   },
+  /*
+    ⚠️ A DEPLOYMENT THAT STORES NO FILES YET IS NOT A DEPLOYMENT THAT BROKE, and
+    it was reported as one. Uploading a photograph before the bucket is live
+    answered "Something went wrong on our side" — the sentence for an unexpected
+    throw — over a state somebody can actually finish. What a person then does is
+    nothing, because they have been told it is not their problem and given no
+    handle on it.
+
+    ⚠️ AND `retryable` IS FALSE, WHICH IS THE PART A CLIENT READS. `unavailable`
+    is retryable, so an upload against a deployment with no bucket was a client
+    politely hammering a door that will never open until an operator opens it.
+  */
+  "platform.no_store": {
+    status: 503, retryable: false, tone: "warning",
+    title: "Files cannot be stored yet",
+    detail: "This deployment's file storage is not finished. An operator can complete it.",
+  },
   "platform.unavailable": {
     status: 503, retryable: true, tone: "danger",
     title: "Something went wrong on our side",
@@ -214,6 +246,34 @@ export const PLATFORM_PROBLEMS: ProblemCatalog = {
 export const say = (template: string, values: Readonly<Record<string, string | number>> = {}): string =>
   template.replace(/\{(\w+)\}/g, (whole, key: string) => (key in values ? String(values[key]) : whole));
 
+/**
+ * A SENTENCE WHOSE VALUE NEVER ARRIVED IS DROPPED, NOT SHOWN WITH ITS BRACES.
+ *
+ * ⚠️ THIS SHIPPED AND WAS PHOTOGRAPHED. A refused upload told somebody
+ * "It is not you. Quote {ref} if you tell us about it." — the one refusal a
+ * person is most likely to see, asking them to quote a literal brace. The value
+ * was missing because `ctx.fail("platform.unavailable")` supplies no reference;
+ * only the unexpected-throw path does.
+ *
+ * ⚠️ AND `say` LEAVING THE TOKEN VISIBLE IS CORRECT — IT IS THE REASON THIS
+ * SURVIVED. The rule is "visibly wrong beats plausibly wrong", written so a
+ * missing value could not print `undefined`, and it works: it is loud, and it
+ * is loud AT THE PERSON rather than at whoever wrote the call. Being visible in
+ * development requires somebody to look; being visible in production requires
+ * nothing.
+ *
+ * ⚠️ SO THE TOKEN STAYS VISIBLE IN `say` — where tests and guards read it — and
+ * a `Problem` on its way to a screen loses the sentence instead. A refusal that
+ * says less is a refusal that says nothing untrue, and "It is not you." on its
+ * own is still the whole point of that message.
+ */
+const whole = (text: string): string => text
+  /* ⚠️ Split AFTER a full stop, so the stop stays with the sentence it ends. */
+  .split(/(?<=[.!?])\s+/)
+  .filter((sentence) => !/\{\w+\}/.test(sentence))
+  .join(" ")
+  .trim();
+
 export function problem(
   catalog: ProblemCatalog,
   code: string,
@@ -237,11 +297,26 @@ export function problem(
     exactly what made this survive.
   */
   const said = extra.ref ? { ...values, ref: extra.ref } : values;
+  /*
+    ⚠️ A TITLE IS MANDATORY, SO IT FALLS BACK TO THE INTERPOLATED TEXT rather
+    than to nothing — a refusal with no title is a card with no words in it,
+    which is worse than one brace. A DETAIL is optional by construction, so an
+    emptied one is simply absent and the screen draws the title alone.
+  */
+  const titled = whole(say(def.title, said));
+  const detailed = def.detail ? whole(say(def.detail, said)) : "";
   return {
     code: known ? code : "platform.unavailable",
     status: def.status,
-    title: say(def.title, said),
-    ...(def.detail ? { detail: say(def.detail, said) } : {}),
+    /*
+      ⚠️ THE DECLARED FALLBACK, THEN THE RAW. `plain` is what a templated title
+      says without its numbers; the raw interpolation is the last resort and
+      keeps its braces, which is a bug somebody has to have introduced by
+      writing a token into a title and no `plain` beside it — `problem-words`
+      fails on exactly that.
+    */
+    title: titled || (def.plain ? say(def.plain, said) : say(def.title, said)),
+    ...(detailed ? { detail: detailed } : {}),
     retryable: def.retryable,
     tone: def.tone,
     ...(extra.fields ? { fields: extra.fields } : {}),

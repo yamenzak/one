@@ -1185,7 +1185,9 @@ export async function performOperation(
             spec, scope, query, limit),
       }
       : {}),
-    fail: (code, values, extra) => { throw new Refused(problem(catalog, code, values, extra)); },
+    fail: (code, values, extra) => {
+      throw new Refused(withRef(catalog, code, values, extra, now, op.id));
+    },
   };
 
   /*
@@ -1270,6 +1272,41 @@ export async function performOperation(
   }
 }
 
+/**
+ * ⚠️ A REFUSAL THAT ASKS FOR A REFERENCE IS GIVEN ONE, AND IT WAS NOT. Only the
+ * unexpected-throw path minted a ref, so every deliberate
+ * `ctx.fail("platform.unavailable")` produced a sentence reading "Quote {ref} if
+ * you tell us about it" with the braces intact. That was photographed on a
+ * refused upload — the one refusal a person is most likely to meet.
+ *
+ * ⚠️ THE KERNEL NOW DROPS A SENTENCE IT CANNOT COMPLETE, so the braces cannot
+ * reach a screen either way. This is the other half: the sentence is worth
+ * KEEPING, because a person who cannot quote anything has a report nobody can
+ * trace. Minted and logged here, so the reference on their screen is in the log
+ * beside the cause.
+ *
+ * ⚠️ ONLY WHERE THE WORDS ASK FOR IT. Minting one for every refusal would log a
+ * line for each wrong password and each field somebody left blank — expected
+ * outcomes, and the noise that makes a log unreadable when it matters.
+ */
+const withRef = (
+  catalog: Parameters<typeof problem>[0], code: string,
+  values: Readonly<Record<string, string | number>> | undefined,
+  extra: { readonly fields?: Readonly<Record<string, string>>; readonly ref?: string } | undefined,
+  now: Date, where: string,
+) => {
+  const def = catalog[code];
+  const asks = !!def && /\{ref\}/.test(`${def.title} ${def.detail ?? ""}`);
+  if (!asks || extra?.ref) return problem(catalog, code, values, extra);
+  const ref = newId("err", now);
+  /* ⚠️ THE CODE IS AN ARGUMENT, NOT INTERPOLATED. `logs` refuses a value inside
+     a template because a log line leaves the jurisdiction and outlives every
+     erasure — a rule about data, applied here to a constant, and the guard is
+     right not to try to tell the difference. */
+  console.error(`${ref} ${where}`, code);
+  return problem(catalog, code, { ...(values ?? {}), ref }, { ...(extra ?? {}), ref });
+};
+
 type _Op = Composed["byId"] extends ReadonlyMap<string, infer V> ? V : never;
 
 /* ---------------------------------------------------------------- personal --- */
@@ -1323,7 +1360,9 @@ async function answerPersonal(
     issue: (next: Session | null) => {
       cookie = next ? setCookie(next.id, wiring.roots.root) : clearCookie(wiring.roots.root);
     },
-    fail: (code, values, extra) => { throw new Refused(problem(catalog, code, values, extra)); },
+    fail: (code, values, extra) => {
+      throw new Refused(withRef(catalog, code, values, extra, now, id));
+    },
   };
 
 

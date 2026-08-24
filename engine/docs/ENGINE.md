@@ -312,6 +312,7 @@ it. A caller's job is to show it, never to invent one from a status code.
 | `platform.wrong_kind` | 400 | That kind of file will not work | — |
 | `platform.too_large` | 400 | That file is too big | — |
 | `platform.empty_file` | 400 | That file is empty | — |
+| `platform.no_store` | 503 | Files cannot be stored yet | — |
 | `platform.unavailable` | 503 | Something went wrong on our side | yes |
 | `platform.undrawable` | 500 | This did not draw | yes |
 <!-- /generated -->
