@@ -34,7 +34,7 @@ import {
    the outside, and lucide's path order is not something to build on. */
 import {
   BellMark, CalendarMark, CheckMark, FlagMark, InboxMark, KeyMark, LayersMark, LeaveMark,
-  RefreshMark, SearchMark, ShareMark, ShieldMark,
+  RefreshMark, ScanMark, SearchMark, ShareMark, ShieldMark, TallyMark,
 } from "../parts/marks.js";
 import { Page } from "./page.js";
 import { Island } from "./chrome.js";
@@ -55,6 +55,12 @@ import { Face, appFace, worldFor, type FaceOf } from "../parts/face.js";
  */
 const GLYPHS: Readonly<Record<string, React.ReactNode>> = {
   home: <House />, house: <House />, sun: <Sun />,
+  /* ⚠️ SCANNING IS NOT SEARCHING AND COUNTING IS NOT FINISHING, which is what
+     the two nearest glyphs said for as long as these did not exist. A magnifier
+     means somebody looking for a thing they cannot see; a double-check is the
+     mark on a delivered message. Both were on a bottom bar, one apart, against
+     destinations that mean the opposite. See `marks.tsx`. */
+  scan: <ScanMark />, tally: <TallyMark />,
   people: <Users />, users: <Users />,
   /* ⚠️ A WORKSPACE IS A BUSINESS AND A PERSON IS ONE PERSON, and both were
      landing on the neutral mark — an anonymous circle in a menu, which is the
@@ -153,6 +159,7 @@ export const LIVELY: Readonly<Record<string, string>> = {
   trust: "guard", shield: "guard",
   check: "draw",
   search: "seek",
+  scan: "read", tally: "count",
   /* The whole mark moving IS the purpose. */
   settings: "turn", cog: "turn", clock: "turn",
   money: "flip", coins: "flip", bank: "flip", card: "flip",

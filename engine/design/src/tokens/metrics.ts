@@ -168,6 +168,20 @@ export const TILE = {
 export const ICON = { row: 20, crown: 20, quick: 22, nav: 24, face: 28, tile: 26 } as const;
 
 /**
+ * THE RADIUS OF THE LIGHT UNDER THE NAV'S ACTIVE MARK.
+ *
+ * ⚠️ A HALO, NOT A DISC, WHICH IS THE WHOLE DIFFERENCE BETWEEN A LIGHT AND THE
+ * PILL THIS DESIGN REMOVED. At the glyph’s own 24 the gradient stops where the
+ * mark stops and reads as a filled lozenge behind it; wider than about 30 it
+ * spreads under the neighbouring item and the bar has two things lit.
+ *
+ * ⚠️ IT IS HERE RATHER THAN IN THE STYLESHEET THAT USES IT because it is
+ * measured against `ICON.nav` — the two move together, and a number chosen
+ * beside a gradient is a number nobody can find from the glyph it is sized to.
+ */
+export const GLOW = 22 as const;
+
+/**
  * ⚠️ A FACE IS 40px, AND THE CROWN LOOKED EMPTY UNTIL IT WAS. A 24px avatar in a
  * 64px bar leaves the whole thing top-light and unbalanced — which is most of
  * why a crown reads as unfinished even when everything in it is correct.
@@ -301,6 +315,28 @@ export const ISLAND_PAD = "p-1.5" as const;
  * wrong, because the eye reads the mismatch as a rendering fault.
  */
 export const ISLAND_ITEM = "px-2 py-2.5" as const;
+
+/**
+ * HOW WIDE A CLOSED NAV ITEM MAY GROW.
+ *
+ * ⚠️ THE BAR WAS ARITHMETIC FOR FIVE AND LOOKED LIKE FIVE-MINUS-ONE AT FOUR.
+ * The closed items are `grow basis-0`, so they divide whatever the open one
+ * leaves: measured at 390px that is 59px each with five destinations and 88px
+ * with four. Nothing is misaligned at 88 — every item is still equal and still
+ * centred — but the marks sit that much further apart than the design was drawn
+ * for, and a bar with holes in it reads as a bar missing an item.
+ *
+ * ⚠️ AND A PRODUCT LEGITIMATELY HAS FOUR. A destination whose feature the plan
+ * does not include is withheld by the server, so the same product is a five-item
+ * bar on one plan and a four-item bar on another — which is correct, and means
+ * the number is not something the design may assume.
+ *
+ * ⚠️ SO THE ITEMS TAKE WHAT THEY NEED AND THE ROW KEEPS THE REST. With a
+ * ceiling the leftover stops going into the gaps and goes to the ends, where
+ * `justify-center` on the bar splits it evenly — the same marks at the same
+ * pitch whether there are three of them or five.
+ */
+export const ISLAND_ITEM_MAX = "max-w-[4.5rem]" as const;
 export const ISLAND_HERE = "px-4 py-2.5" as const;
 
 /**

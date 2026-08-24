@@ -41,7 +41,8 @@
  */
 
 /* ⚠️ The pace and the curve are the vocabulary's, not this file's — see `DRIFT`. */
-import { DURATION, EASE, transition } from "./motion.js";
+import { DURATION, EASE, MOTION, transition } from "./motion.js";
+import { GLOW, ICON } from "./metrics.js";
 import {
   DENSITY, FAMILIES, render, type Density, type SceneFamily, type Sky,
 } from "../scene/index.js";
@@ -1043,6 +1044,60 @@ export function ambienceStylesheet(): string {
       more edge, in a system that spent a whole pass removing them.
     */
     `[data-here="true"] { color: var(--foreground); }`,
+    /*
+      ⚠️ THE ONE PLACE A PRODUCT'S OWN COLOUR TOUCHES THE CHROME, AND IT IS A
+      LIGHT RATHER THAN A SURFACE. The bar carries no fill by design — every
+      plate and pill it used to have was removed, and each was removed for a
+      measured reason. What it had left was no material at all: four grey glyphs
+      and one white one on the page's own ground, which is honest and reads as
+      unfinished.
+
+      ⚠️ SO THE ACTIVE ITEM IS LIT, NOT FILLED. `--brand` is the product's
+      declared hue (`AppSpec.hue`), already on the element the ground is painted
+      on, so this needs nothing passed down and nothing hardcoded: OneInventory's
+      amber, and a true neutral where the deployment's own mono brand applies —
+      which is correct, not a fallback. A deployment with no colour of its own
+      gets a lift rather than a tint.
+
+      ⚠️ IT SITS UNDER THE GLYPH AND NOWHERE NEAR THE WORD. Two reasons and both
+      are measured: the contrast reading composites every translucent layer above
+      the text, so a wash under the label changes the ground the one word on the
+      bar is read against; and a glow spanning the whole open item is a pill with
+      soft edges, which is the shape this design removed.
+
+      ⚠️ `closest-side` AND NO BLUR. A `filter: blur()` promotes a layer and
+      repaints it on every frame of the travel, on the one control that is on
+      screen for the whole session — the gradient IS the blur, for nothing.
+    */
+    /* ⚠️ THE LIGHT IS WEAKER ON A BRIGHT GROUND, AND THAT IS PHYSICS RATHER THAN
+       TASTE. On black a warm halo adds luminance and reads as something lit; on
+       cream the same mix subtracts it and reads as a stain under the mark —
+       rendered at one strength in both, the light theme came out looking like
+       highlighter. Two numbers, one for each ground it has to work on. */
+    `[data-island="true"] { --nav-lit: 30% }`,
+    `[data-theme="light"] [data-island="true"] { --nav-lit: 16% }`,
+    `[data-island="true"] button[data-here="true"] { position: relative }`,
+    `[data-island="true"] button[data-here="true"]::before {`,
+    `  content: ""; position: absolute; z-index: 0;`,
+    /* ⚠️ ANCHORED TO THE GLYPH, WHICH IS THE LEFT OF AN OPEN ITEM RATHER THAN
+       its middle — a light centred on a pill that has a word in it sits under
+       the word. `ISLAND_HERE` is `px-4`, so 1rem in plus half a nav glyph. */
+    `  inset-block: 50%; inset-inline-start: calc(1rem + ${ICON.nav / 2}px);`,
+    `  width: 0; height: 0; overflow: visible; pointer-events: none;`,
+    `  box-shadow: 0 0 0 0 transparent;`,
+    `  background: radial-gradient(closest-side,`,
+    `    color-mix(in oklab, var(--brand) var(--nav-lit), transparent), transparent);`,
+    `  padding: ${GLOW}px; margin: -${GLOW}px;`,
+    `}`,
+    /* ⚠️ IT ARRIVES WITH THE WORD AND LEAVES WITH IT — the same asymmetry
+       `MOTION.unfold` and `MOTION.fold` describe. A light that faded on its own
+       clock is a second thing happening during one movement. */
+    `[data-island="true"] button::before { opacity: 0; transition: ${MOTION.unlit} }`,
+    `[data-island="true"] button[data-here="true"]::before {`,
+    `  opacity: 1; transition: ${MOTION.lit} }`,
+    /* ⚠️ AND THE GLYPH STAYS ABOVE ITS OWN LIGHT. Without a stacking context on
+       the content the gradient paints over the mark it is meant to be behind. */
+    `[data-island="true"] button > * { position: relative; z-index: 1 }`,
     /*
       ⚠️ AND THE LABEL INSIDE IT HAS TO BE TOLD, WHICH IS A SPECIFICITY FACT
       RATHER THAN A DESIGN ONE. The open word is `TYPE.note`, and `note` is

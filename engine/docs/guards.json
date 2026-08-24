@@ -3350,6 +3350,36 @@
       "lane": "seen",
       "proves": "calls each of them one thing",
       "fails": "a control rendered as two — a wrapper pressable around the real one, sharing its `id`, so a screen reader is handed the wrong element and the keyboard stops on a div that looks like nothing. Every other reading passes over it: the box is the right size, the ink clears the floor, the page does not spill"
+    },
+    {
+      "id": "the-bar-keeps-its-pitch",
+      "protects": "D10",
+      "stage": "85",
+      "status": "live",
+      "impl": "design/test/bar.seen.test.tsx",
+      "lane": "seen",
+      "proves": "never lets a closed item sprawl",
+      "fails": "a nav drawn for five destinations that reads as five-minus-one whenever a product has four — the closed items are `grow basis-0`, so without a ceiling they divide whatever is left and the marks sit half again as far apart on one plan as on another"
+    },
+    {
+      "id": "the-bar-centres-what-it-has",
+      "protects": "D10",
+      "stage": "85",
+      "status": "live",
+      "impl": "design/test/bar.seen.test.tsx",
+      "lane": "seen",
+      "proves": "centres what it has",
+      "fails": "every item capped and the whole leftover collecting at one end, which is a bar with a hole in it rather than a bar with fewer things in it"
+    },
+    {
+      "id": "the-destination-somebody-is-on-is-lit",
+      "protects": "D7",
+      "stage": "85",
+      "status": "live",
+      "impl": "design/test/bar.seen.test.tsx",
+      "lane": "seen",
+      "proves": "lights the destination somebody is on",
+      "fails": "the one place a product's colour touches the chrome, silently not painted — the light is a `color-mix` on the declared hue, so a manifest carrying an OKLCH triple instead of a colour makes the whole declaration invalid and nothing else about the bar changes"
     }
   ]
 }

@@ -4690,7 +4690,7 @@ export const INVENTORY: AppSpec = defineApp({
       for every screen they then work on. Ambience everywhere is ambience
       nowhere; a home that is lit is only lit because a shelf list is not.
     */
-    { id: "home", route: "/", label: "Home", nav: "primary", icon: "star",
+    { id: "home", route: "/", label: "Home", nav: "primary", icon: "home",
       permission: "stock:read", sky: "neon" },
     { id: "stock", route: "/stock", label: "Stock", nav: "primary", icon: "box",
       permission: "stock:read" },
@@ -4701,7 +4701,7 @@ export const INVENTORY: AppSpec = defineApp({
        ⚠️ AND `plain`, DELIBERATELY. The camera fills the screen, and an ambience
        behind a live video is a pattern nobody sees competing with the one thing
        somebody is looking at. */
-    { id: "scan", route: "/scan", label: "Scan", nav: "primary", icon: "search",
+    { id: "scan", route: "/scan", label: "Scan", nav: "primary", icon: "scan",
       permission: "product:read" },
     /*
       ⚠️ STOCK'S OWN ACTION, NOT A DESTINATION — and the two are not the same
@@ -4722,7 +4722,7 @@ export const INVENTORY: AppSpec = defineApp({
        destination rather than a mode. `stock:move` because counting is open to
        everybody — it is SETTLING one that needs `stock:adjust`, which the
        operation asks for rather than the nav. */
-    { id: "count", route: "/count", label: "Count", nav: "primary", icon: "check",
+    { id: "count", route: "/count", label: "Count", nav: "primary", icon: "tally",
       permission: "stock:move" },
     /*
       ⚠️ THE ONE DESTINATION A BASEMENT NEVER OPENS.

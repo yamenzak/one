@@ -16,7 +16,7 @@ import * as React from "react";
 import { PRIMARY_MAX, screenFor } from "@engine/kernel";
 import { Button } from "@heroui/react";
 import {
-  GUTTER, ICON, ISLAND_HERE, ISLAND_ITEM, ISLAND_PAD, PAD, ROW, SAFE_BOTTOM, SPACE, WIDTH,
+  GUTTER, ICON, ISLAND_HERE, ISLAND_ITEM, ISLAND_ITEM_MAX, ISLAND_PAD, PAD, ROW, SAFE_BOTTOM, SPACE, WIDTH,
 } from "../tokens/metrics.js";
 import type { Width } from "../tokens/metrics.js";
 import { MOTION, transition, useStill } from "../tokens/motion.js";
@@ -258,7 +258,15 @@ export function Island({ items, here, onGo, act, only }: {
           the state it was in before anybody noticed the nav was a rectangle. */}
       <div
         data-island="true"
-        className={`flex w-full ${WIDTH.read} flex-row items-center ${SPACE.hair} ${ISLAND_PAD}`}
+        /* ⚠️ `justify-center`, AND IT ONLY DOES ANYTHING BELOW FIVE. With five
+           destinations the row fills the bar exactly and this is inert; with
+           four or three the closed items hit `ISLAND_ITEM_MAX` and stop
+           growing, so there is leftover — and left-packed it all collects at
+           the right end, which is a bar with a hole in it rather than a bar
+           with fewer items. Centred, the marks keep their pitch and the slack
+           splits between the ends. */
+        className={`flex w-full ${WIDTH.read} flex-row items-center justify-center`
+          + ` ${SPACE.hair} ${ISLAND_PAD}`}
       >
         {shown.map((item) => {
           /* ⚠️ OPEN ONLY WHEN THERE IS NO ACT — see `act`. The bar carries one
@@ -293,7 +301,7 @@ export function Island({ items, here, onGo, act, only }: {
                  drop whatever fell off the right edge. */
               className={`flex-row items-center justify-center ${SPACE.tight} ${ROW.free} `
                 + (open ? `shrink-0 ${ISLAND_HERE}` : `shrink-0 ${ISLAND_ITEM}`)
-                + (act ? "" : open ? "" : " grow basis-0 min-w-0")}
+                + (act ? "" : open ? "" : ` grow basis-0 min-w-0 ${ISLAND_ITEM_MAX}`)}
               onPress={() => onGo(item.route)}
             >
               {/* ⚠️ NO HINT HERE, AND THAT IS THE ONE DELIBERATE OMISSION. The
@@ -342,10 +350,17 @@ export function Island({ items, here, onGo, act, only }: {
               <span
                 className={`${TYPE.note} ${isHere ? "text-foreground" : ""}`
                   + ` overflow-hidden whitespace-nowrap leading-none${open ? " text-ellipsis" : ""}`}
+                /* ⚠️ TWO INTENTS, NOT ONE — see `MOTION.unfold` / `MOTION.fold`.
+                   The word that is leaving is quicker than the word arriving, so
+                   the room is free before anything moves into it; at one
+                   duration the four closed glyphs visibly shuffle for the whole
+                   transition. And `reveal`, which this used, names `max-height`
+                   while the bar animates `max-width` — so the width had never
+                   been transitioned at all and only the fade was moving. */
                 style={{
                   maxWidth: open ? "10rem" : 0,
                   opacity: open ? 1 : 0,
-                  transition: MOTION.reveal,
+                  transition: open ? MOTION.unfold : MOTION.fold,
                 }}
               >
                 {item.label}

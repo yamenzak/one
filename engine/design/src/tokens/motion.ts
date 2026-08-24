@@ -105,6 +105,27 @@ export const DURATION = {
 
 export type Duration = keyof typeof DURATION;
 
+/**
+ * WHEN A SECOND THING IN ONE MOVEMENT STARTS.
+ *
+ * ⚠️ TWO NUMBERS, AND THEY ARE NOT DURATIONS. A delay is how far behind the
+ * leading edge something follows, and the vocabulary above has nothing that
+ * means that — so the first version of the nav's travel wrote `60ms` and `90ms`
+ * at the call sites, which is exactly the private number `metrics` and `motion`
+ * exist to refuse. It was refused.
+ *
+ * ⚠️ AND THEY ARE SHORT BY DESIGN. Past about a tenth of a second a follower
+ * stops reading as part of the same movement and becomes a second event — which
+ * is the difference between a word emerging from a mark and a word appearing
+ * after one.
+ */
+export const DELAY = {
+  /** Just behind the leading edge — a follower, still one movement. */
+  behind: "60ms",
+  /** After the room is made: a word waiting for the space to open. */
+  after: "90ms",
+} as const;
+
 /** One transition, as a CSS value. */
 export const transition = (
   properties: string, duration: Duration = "quick", ease: Ease = "settle",
@@ -462,6 +483,54 @@ export const MOTION = {
    * things around it have to move with it rather than jump when it lands.
    */
   reveal: transition("max-height, opacity, transform", "moderate", "travel"),
+  /**
+   * THE NAV'S WORD ARRIVING, AND LEAVING — two intents, because they are not the
+   * same length and that asymmetry is the whole effect.
+   *
+   * ⚠️ `reveal` NAMES `max-height` AND THE BAR ANIMATES `max-width`, so for as
+   * long as this bar has existed the label's WIDTH has snapped. Only its opacity
+   * moved. The header on `Island` describes a word that "grows out of one item
+   * while the one before it closes" and a motion that "is continuous"; what
+   * shipped was two boxes changing size in one frame with a fade over the top,
+   * which is why it read as two things resizing rather than one thing moving.
+   *
+   * ⚠️ AND NEITHER OF THEM TRANSLATES. A few pixels of lead-in would make the
+   * word read as sliding out of its mark, and it is not worth what it costs: a
+   * `transform` anywhere in the bar's file is refused by `heroui`, whose reason
+   * is that a transformed STICKY box counts toward the document's scrollable
+   * overflow. Narrowing a sound guard to admit a garnish is the wrong trade, and
+   * `max-width` from zero already opens the word from the edge the glyph is on.
+   *
+   * ⚠️ THE OUTGOING WORD IS FASTER THAN THE INCOMING ONE, and that is what makes
+   * it read as ONE movement between two items rather than a swap. Room has to be
+   * free before the arriving word can take it — at equal durations the two
+   * compete for the same pixels for the whole transition, and the four closed
+   * glyphs visibly shuffle in the middle of it.
+   *
+   * ⚠️ AND THE ARRIVING WORD IS DELAYED BEHIND ITS OWN WIDTH. Opacity opening
+   * with the box puts letters on the screen while the space is a third open, so
+   * they appear clipped and then un-clip. The width goes first and the word
+   * follows into the room it made.
+   */
+  unfold: [
+    transition("max-width", "moderate", "travel"),
+    `opacity ${DURATION.quick} ${EASE.plain} ${DELAY.after}`,
+  ].join(", "),
+  fold: [
+    transition("max-width", "quick", "travel"),
+    transition("opacity", "instant", "plain"),
+  ].join(", "),
+  /**
+   * THE LIGHT UNDER THE NAV'S ACTIVE MARK, COMING AND GOING.
+   *
+   * ⚠️ IT IS AN INTENT RATHER THAN A PAIR OF NUMBERS IN THE STYLESHEET THAT
+   * PAINTS IT, and the reason is the claim it makes: the light arrives WITH the
+   * word. Written where the gradient is, that is two timings a person has to
+   * compare across two files to check — and the motion guard refused the second
+   * copy, correctly, the first time it was written that way.
+   */
+  lit: `opacity ${DURATION.moderate} ${EASE.plain} ${DELAY.behind}`,
+  unlit: transition("opacity", "quick", "plain"),
 } as const;
 
 export type Intent = keyof typeof MOTION;
@@ -693,6 +762,27 @@ export const GLYPH_MOTION = [
   `  55% { transform: translateX(-7px); opacity: 0 }`,
   `  100% { transform: translateX(0); opacity: 1 }`,
   `}`,
+  /*
+    ⚠️ THE BEAM CROSSES AND COMES BACK, because a viewfinder that swept once and
+    stopped at the bottom is a scanner that has finished — and this mark is
+    pressed to START one. Out of the window at both ends so the line is never
+    seen resting anywhere but the middle.
+  */
+  `@keyframes glyph-sweep-beam {`,
+  `  0% { transform: translateY(0); opacity: 1 }`,
+  `  45% { transform: translateY(-6px); opacity: 0 }`,
+  `  55% { transform: translateY(6px); opacity: 0 }`,
+  `  100% { transform: translateY(0); opacity: 1 }`,
+  `}`,
+  /*
+    ⚠️ THE FIFTH STROKE IS DRAWN, NOT MOVED. A tally is finished by putting the
+    diagonal ACROSS the four, so what the eye wants is the line arriving along
+    its own length — the same draw the tick uses, which is the one motion in this
+    vocabulary that means "somebody just made this mark".
+  */
+  `@keyframes glyph-fifth {`,
+  `  0% { stroke-dashoffset: 20 } 100% { stroke-dashoffset: 0 }`,
+  `}`,
   /* The line reaches the other two; what is shared does not move. */
   `@keyframes glyph-reach {`,
   `  0% { transform: scaleX(0.2); opacity: 0.3 }`,
@@ -810,6 +900,15 @@ export const GLYPH_MOTION = [
   `  animation: glyph-draw ${DURATION.moderate} ${EASE.enter} backwards }`,
   `[data-glyph="draw"][data-lively="true"] [data-part="tick-two"] {`,
   `  animation: glyph-draw ${DURATION.moderate} ${EASE.enter} 140ms backwards }`,
+  `[data-glyph="read"][data-lively="true"] [data-part="beam"] {`,
+  `  animation: glyph-sweep-beam ${DURATION.stately} ${EASE.travel} backwards }`,
+  /* ⚠️ `pathLength` IS NOT SET HERE, so the dash numbers are the path's own
+     length in user units — the diagonal is 18.6 long and 20 clears it. The tick
+     sets `pathLength`; this one does not, and mixing the two conventions in one
+     rule is how a draw comes out half-finished. */
+  `[data-glyph="count"] [data-part="fifth"] { stroke-dasharray: 20 }`,
+  `[data-glyph="count"][data-lively="true"] [data-part="fifth"] {`,
+  `  animation: glyph-fifth ${DURATION.moderate} ${EASE.enter} backwards }`,
   `[data-glyph="seek"][data-lively="true"] [data-part="lens"],`,
   `[data-glyph="seek"][data-lively="true"] [data-part="handle"] {`,
   `  animation: glyph-sweep ${DURATION.stately} ${EASE.settle} backwards }`,

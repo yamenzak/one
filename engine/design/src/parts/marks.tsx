@@ -337,3 +337,75 @@ export const FlagMark = () => (
     </g>
   </Mark>
 );
+
+/**
+ * A VIEWFINDER, AND THE BEAM IS WHAT TRAVELS.
+ *
+ * ⚠️ SCANNING WAS A MAGNIFIER, WHICH IS THE WRONG VERB. A magnifier means
+ * search — a person looking for something they cannot see — and scanning is the
+ * opposite act: the thing is in your hand and the machine reads it. Two
+ * destinations one apart in the same bar, Scan and a search field in the crown,
+ * cannot both be a magnifier.
+ *
+ * ⚠️ FOUR CORNERS AND NO FRAME, because a closed rectangle is a photograph and
+ * an open one is a target. It is also what every scanner overlay in the world
+ * draws, which is the point: this is the one mark in the product a warehouse
+ * already knows.
+ *
+ * ⚠️ THE BEAM IS A SEPARATE PART SO IT CAN SWEEP. A viewfinder that moved as one
+ * object would be a rectangle sliding, which says nothing; what reads as reading
+ * is the line crossing the window while the corners hold still.
+ */
+export const ScanMark = () => (
+  <Mark>
+    <g data-part="corners">
+      <path d="M3 8V5.5A2.5 2.5 0 0 1 5.5 3H8" />
+      <path d="M16 3h2.5A2.5 2.5 0 0 1 21 5.5V8" />
+      <path d="M21 16v2.5a2.5 2.5 0 0 1-2.5 2.5H16" />
+      <path d="M8 21H5.5A2.5 2.5 0 0 1 3 18.5V16" />
+    </g>
+    <g data-part="beam">
+      <path d="M6 12h12" />
+    </g>
+  </Mark>
+);
+
+/**
+ * A TALLY, AND THE FIFTH STROKE IS THE ONE THAT MOVES.
+ *
+ * ⚠️ COUNTING WAS A DOUBLE-CHECK, WHICH MEANS DONE — the mark a messenger puts
+ * on a delivered message. A count is not a completion: it is the act of going
+ * along a shelf and marking what is there, and the double-check said the
+ * opposite of that on the one screen somebody opens to START one.
+ *
+ * ⚠️ UPRIGHTS AND A DIAGONAL, which is how a human being has counted on a wall
+ * for six thousand years and is legible to somebody who has never opened this
+ * product. A number would not be: a glyph carrying a digit means that digit.
+ *
+ * ⚠️ THREE UPRIGHTS, NOT FOUR, AND THAT IS A SIZE DECISION RATHER THAN AN
+ * ARITHMETIC ONE. A real group is four and a crossing stroke — drawn at 24px
+ * with a 2px pen that is five strokes across sixteen pixels, so the gaps come
+ * out narrower than the ink and the mark reads as HATCHING. Rendered and looked
+ * at, it was a striped block. Three uprights and the diagonal is the same idea
+ * with gaps wider than the strokes, and nobody counts the strokes on an icon.
+ *
+ * ⚠️ AND THE DIAGONAL STAYS INSIDE THE GROUP. Running it corner to corner made
+ * an X over the uprights rather than a stroke through them: a tally is crossed
+ * out by something that begins and ends at the group it closes.
+ *
+ * ⚠️ THE DIAGONAL IS THE PART, because a tally is finished by the stroke that
+ * crosses the others. The uprights are what has been counted and do not move;
+ * the crossing one is the counting.
+ */
+export const TallyMark = () => (
+  <Mark>
+    <g data-part="strokes">
+      <path d="M6 6v12" />
+      <path d="M11.5 6v12" />
+      <path d="M17 6v12" />
+    </g>
+    <g data-part="fifth">
+      <path d="M4 17.5 19 6.5" />
+    </g>
+  </Mark>
+);

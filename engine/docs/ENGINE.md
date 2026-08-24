@@ -968,7 +968,10 @@ its own header, cited by other files, and doing nothing.
 | `every-control-the-space-asks-for-is-reachable` | D7 | a control an operator cannot hit on the phone they are holding, on the screens where a workspace is suspended, a plan is edited and an account is closed |
 | `the-spaces-type-is-a-scale-with-a-top` | D7 | a console page where nothing outranks the body, so an operator scanning for the one figure that matters reads every line to find it |
 | `everything-the-space-says-can-be-read` | D7 | ink under the contrast floor on the screens that carry a refusal, an arrears and a deletion — measured in both themes, because a palette that clears in one can fail in the other |
-| `no-name-is-used-twice` | D7 | a control rendered as two — a wrapper pressable around the real one, sharing its `id`, so the screen reader is handed the wrong element and the keyboard stops on a div that looks like nothing. Every other reading here passes over it: the box is the right size, the ink clears the floor, the page does not spill |
+| `no-name-is-used-twice` | D7 | a control rendered as two — a wrapper pressable around the real one, sharing its `id`, so a screen reader is handed the wrong element and the keyboard stops on a div that looks like nothing. Every other reading passes over it: the box is the right size, the ink clears the floor, the page does not spill |
+| `the-bar-keeps-its-pitch` | D10 | a nav drawn for five destinations that reads as five-minus-one whenever a product has four — the closed items are `grow basis-0`, so without a ceiling they divide whatever is left and the marks sit half again as far apart on one plan as on another |
+| `the-bar-centres-what-it-has` | D10 | every item capped and the whole leftover collecting at one end, which is a bar with a hole in it rather than a bar with fewer things in it |
+| `the-destination-somebody-is-on-is-lit` | D7 | the one place a product's colour touches the chrome, silently not painted — the light is a `color-mix` on the declared hue, so a manifest carrying an OKLCH triple instead of a colour makes the whole declaration invalid and nothing else about the bar changes |
 <!-- /generated -->
 
 ### And how well each decision is defended
@@ -982,10 +985,10 @@ its own header, cited by other files, and doing nothing.
 | D4 | Composition is lazy: a request composes the app it is for, and no other | 3 |
 | D5 | Storage is placed, not owned. The directory carries every cross-tenant fact | 15 |
 | D6 | Jurisdiction is a workspace fact, derived from the business's country | 5 |
-| D7 | HeroUI v3 is the component layer, and its components are not restyled | 70 |
+| D7 | HeroUI v3 is the component layer, and its components are not restyled | 71 |
 | D8 | Declarations are typed object literals; not decorators, not a custom format | 3 |
 | D9 | Libraries encode decisions; we write invariants | 3 |
-| D10 | Five primary destinations, maximum | 5 |
+| D10 | Five primary destinations, maximum | 7 |
 | D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 19 |
 | D12 | Every cross-cutting concern is a field on a declaration, never a call site | 137 |
 | D13 | The agent surface is derived: every operation is an MCP tool unless it says why not | 4 |
@@ -1159,8 +1162,9 @@ that names no stage, so this list cannot grow by forgetting.
 | 82 | A home screen, and a checklist that knows whose step it is | shipped |
 | 83 | A product's colour is the product's, and one family commits | shipped |
 | 84 | A design rule is a guard, and the measuring is done in a browser | shipped |
+| 85 | The bar earns its material: bespoke marks, one lit destination, one movement | shipped |
 
-**74 shipped, 10 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**75 shipped, 10 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---
