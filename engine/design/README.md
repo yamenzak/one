@@ -165,15 +165,15 @@ part that is not. Refresh with `node engine/scripts/docs.test.mjs --write`.
 <!-- generated: node scripts/inventory.mjs vocabulary -->
 | Home | What it is for | Ships |
 |---|---|---|
-| `tokens/` | colour, type, spacing, motion, the chrome and hem rules | 81 |
+| `tokens/` | colour, type, spacing, motion, the chrome and hem rules | 82 |
 | `scene/` | the ambience engine — families, marks, the world behind a screen | 1 |
 | `frame/` | page, shape, crown, nav, dock, overlays — what wraps a screen | 61 |
-| `parts/` | rows, cards, lists, controls, the four outcomes | 163 |
+| `parts/` | rows, cards, lists, controls, the four outcomes | 169 |
 | `rendered/` | whole surfaces drawn from a kernel declaration | 53 |
 | `chart/` | the data vocabulary — a number as a shape | 39 |
 | `measure/` | what a screen actually lays out, in a real browser — the harness every app sweeps its own screens with | 1 |
 
-**399 exports.** Every one is reachable as `import { … } from "@engine/design"`;
+**406 exports.** Every one is reachable as `import { … } from "@engine/design"`;
 there is no deep import, and a guard says so.
 
 ### `tokens/`
@@ -181,7 +181,7 @@ there is no deep import, and a guard says so.
 - `tokens/ambience.ts` — `ambienceStylesheet`, `FADE`, `GRAIN`, `GRAIN_OPACITY`, `HEM_HOLD`, `LIGHT`, `MATTE`, `ON_SCENE`, `REACH`, `skyWorld`, `World`, `worldCss`
 - `tokens/appearance.ts` — `Appearance`, `APPEARANCE_KEY`, `APPEARANCE_SCRIPT`, `APPEARANCES`, `applyAppearance`, `preferred`, `remember`, `resolve`, `stored`
 - `tokens/ground.ts` — `CONTROL_TINT`, `CURTAIN`, `FOCUS`, `GROUND`, `GROUND_CSS`, `GROUND_TINT`, `MIN_DELTA`, `TINT`
-- `tokens/motion.ts` — `applyLiveliness`, `ARRIVE`, `ARRIVE_MARK`, `ARRIVE_MOTION`, `ARRIVE_RISE`, `arriveAt`, `BEAT`, `BLOCK_MOTION`, `DELAY`, `Device`, `DOOR_MOTION`, `doorAt`, `Duration`, `DURATION`, `earned`, `Ease`, `EASE`, `EASE_SPLINE`, `GLYPH_MOTION`, `Intent`, `Liveliness`, `LIVELINESS`, `LIVELINESS_KEY`, `livelinessStored`, `Motion`, `MOTION`, `motionFor`, `OPENING_MOTION`, `reading`, `REDUCED`, `rememberLiveliness`, `SAID`, `transition`, `TURN`, `TURN_AT`, `turns`, `useMotion`, `useStill`, `useStillness`
+- `tokens/motion.ts` — `applyLiveliness`, `ARRIVE`, `ARRIVE_MARK`, `ARRIVE_MOTION`, `ARRIVE_RISE`, `arriveAt`, `BEAT`, `BLOCK_MOTION`, `DELAY`, `Device`, `DOOR_MOTION`, `doorAt`, `Duration`, `DURATION`, `earned`, `Ease`, `EASE`, `EASE_SPLINE`, `GLYPH_MOTION`, `Intent`, `Liveliness`, `LIVELINESS`, `LIVELINESS_KEY`, `livelinessStored`, `Motion`, `MOTION`, `motionFor`, `OPENING_MOTION`, `READER_MOTION`, `reading`, `REDUCED`, `rememberLiveliness`, `SAID`, `transition`, `TURN`, `TURN_AT`, `turns`, `useMotion`, `useStill`, `useStillness`
 - `tokens/theme.ts` — `colorFor`, `productCss`, `TONE_CSS`
 - `tokens/type.ts` — `CHART_TYPE`, `FACE_CSS`, `FACE_STACK`, `MARK_STACK`, `MONO_STACK`, `Role`, `ROLES`, `sentence`, `text`, `TYPE`
 
@@ -211,6 +211,7 @@ there is no deep import, and a guard says so.
 - `parts/bones.tsx` — `blanks`, `useBones`, `Waiting`
 - `parts/credits.tsx` — `Credits`, `CreditsProps`
 - `parts/face.tsx` — `appFace`, `Face`, `FaceKind`, `FaceOf`, `FaceProps`, `FaceSize`, `faceUri`, `ONE_FACE`, `Orb`, `placeFace`, `whoFace`, `worldFor`
+- `parts/feedback.tsx` — `Beep`, `say`, `wakeSound`
 - `parts/forms.tsx` — `Agree`, `Choice`, `CodeEntry`, `DateInput`, `Dates`, `Dial`, `LongText`, `Lookup`, `MoneyInput`, `NamedAlready`, `Naming`, `NumberInput`, `NumberInputProps`, `OneOf`, `Option`, `PeriodId`, `PeriodInput`, `PERIODS`, `Picks`, `Said`, `SearchInput`, `SecretInput`, `Segmented`, `spanOf`, `Tags`, `Tail`, `TextInput`, `TextInputProps`, `TimeInput`
 - `parts/gated.tsx` — `Allowed`, `sayGate`, `Stopped`, `STOPPED`, `useGate`
 - `parts/heads.tsx` — `Balance`, `distinguishing`, `Figure`, `Prose`, `Section`, `SectionTitle`, `Title`
@@ -218,7 +219,7 @@ there is no deep import, and a guard says so.
 - `parts/logo.tsx` — `Lockup`, `LockupProps`
 - `parts/opening.tsx` — `Opening`, `OpeningProps`
 - `parts/permission.tsx` — `Permission`, `PermissionRow`, `PermissionRowProps`
-- `parts/pick-file.tsx` — `asDataUrl`, `PickFile`, `PickFileProps`
+- `parts/pick-file.tsx` — `asDataUrl`, `PickFile`, `PickFileProps`, `saysKind`, `sift`, `takes`
 - `parts/recall.tsx` — `Block`, `seedShapes`, `shapeFor`, `ShapeWaiting`, `useRecalledShape`
 - `parts/said.tsx` — `Amount`, `Clock`, `Dated`, `machineHere`, `Num`, `Presenting`, `Size`, `Unit`, `useAmount`, `useDay`, `useDays`, `useFigures`, `useShown`, `When`
 - `parts/settle.tsx` — `SettledProps`, `SettledSwitch`

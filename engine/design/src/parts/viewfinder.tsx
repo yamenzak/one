@@ -33,12 +33,29 @@
  * ⚠️ THE TORCH IS PART OF THE CONTROL, NOT A FEATURE. Stock lives in basements,
  * cold rooms and the backs of racks. A torch button on the surface that needs it
  * is one press; the same person's alternative is leaving the app.
+ *
+ * ⚠️ THE CAMERA IS NOT OPENED UNTIL SOMEBODY ASKS FOR IT, and that is not a
+ * performance tweak. Mounted, this used to raise the permission prompt the
+ * instant the screen drew — so a person who opened a long form to TYPE a product
+ * in was asked for camera access before reading the first field, and the phone
+ * lit its camera indicator for a lens nobody was pointing anywhere. It also held
+ * the device for as long as the screen was open, which on a phone means the
+ * scanning surface somebody actually wanted next reports "the camera is busy".
+ * The frame is a still panel with a button on it until it is pressed.
+ *
+ * ⚠️ AND EVERY READ IS HEARD, BECAUSE THE EYES ARE ON THE SHELF. Somebody
+ * scanning holds the phone at arm's length pointed at a label; whatever the
+ * screen says arrives in peripheral vision at best. Read, read-AGAIN and refused
+ * are three things to do next, so they are three different sounds — see
+ * `feedback.tsx`. A repeat used to be swallowed in silence, which is
+ * indistinguishable from a camera that has stopped working.
  */
 
 import * as React from "react";
 import { CameraOff } from "lucide-react";
 import { Button } from "@heroui/react";
 import { Stack } from "./arrange.js";
+import { say, wakeSound } from "./feedback.js";
 import { TextInput } from "./forms.js";
 import { Nothing } from "./state.js";
 import { SPACE } from "../tokens/metrics.js";
@@ -136,6 +153,14 @@ export interface ViewfinderProps {
   readonly again?: number;
   /** Stops the camera without unmounting: a sheet open behind another sheet. */
   readonly paused?: boolean;
+  /**
+   * ⚠️ SILENCES THE BEEP AND NOT THE BUZZ — see `say`. A surface where sound
+   * would be wrong (a demo, a shared screen) still owes somebody holding the
+   * phone the confirmation that the read landed, and the two channels are not
+   * interchangeable: a phone on silent has only the buzz, a desktop only the
+   * beep.
+   */
+  readonly quiet?: boolean;
   /** ⚠️ The app's words for what to point at. This package has no nouns. */
   readonly says?: string;
   /**
@@ -163,13 +188,17 @@ export interface ViewfinderProps {
  * wrong: a stream that is not stopped keeps the camera light on after the sheet
  * closes, which reads as an app that is watching you.
  */
-function useCamera(paused: boolean, video: React.RefObject<HTMLVideoElement | null>) {
+function useCamera(on: boolean, video: React.RefObject<HTMLVideoElement | null>) {
   const [trouble, setTrouble] = React.useState<Trouble | null>(null);
   const [live, setLive] = React.useState(false);
   const track = React.useRef<MediaStreamTrack | null>(null);
 
   React.useEffect(() => {
-    if (paused) return;
+    /* ⚠️ NOTHING IS ASKED FOR UNTIL SOMEBODY ASKS — see the header. This is also
+       what clears a previous trouble: turning the camera off and on again is a
+       real retry, and a stale "the camera is busy" over a working lens is worse
+       than no message. */
+    if (!on) { setTrouble(null); return; }
 
     /* ⚠️ CHECKED BEFORE ASKING. On an insecure origin `mediaDevices` is simply
        undefined, and reading `.getUserMedia` off it throws — so the honest state
@@ -230,7 +259,7 @@ function useCamera(paused: boolean, video: React.RefObject<HTMLVideoElement | nu
       stream?.getTracks().forEach((t) => { t.stop(); });
       if (video.current) video.current.srcObject = null;
     };
-  }, [paused, video]);
+  }, [on, video]);
 
   return { trouble, live, track };
 }
@@ -272,6 +301,15 @@ function useReading(
   live: boolean,
   video: React.RefObject<HTMLVideoElement | null>,
   onRead: (code: string) => void,
+  /**
+   * ⚠️ THE REPEAT IS REPORTED, NOT SWALLOWED. The de-duplication window exists so
+   * a label held in front of a lens is ONE read rather than thirty — but from the
+   * person's side, pointing at a code and getting nothing at all is what a broken
+   * scanner looks like, so they move the phone, try again, and lose the count.
+   * Saying "that one again" is a different sound and a different sentence, and it
+   * is the difference between a window and a fault.
+   */
+  onAgain: (code: string) => void,
   again: number,
 ) {
   /* ⚠️ IN A REF, NOT IN STATE. Re-arming the loop on every read would restart
@@ -279,6 +317,12 @@ function useReading(
   const last = React.useRef<{ code: string; at: number }>({ code: "", at: 0 });
   const said = React.useRef(onRead);
   said.current = onRead;
+  const twice = React.useRef(onAgain);
+  twice.current = onAgain;
+  /* ⚠️ A SEPARATE, LONGER WINDOW FOR SAYING "AGAIN", because the read window is
+     short enough that a label held steady would otherwise announce a repeat eight
+     times a second. This is about the PERSON's rhythm rather than the decoder's. */
+  const told = React.useRef(0);
 
   React.useEffect(() => {
     if (!live) return;
@@ -306,7 +350,11 @@ function useReading(
           const now = Date.now();
           if (code && (code !== last.current.code || now - last.current.at > again)) {
             last.current = { code, at: now };
+            told.current = now;
             said.current(code);
+          } else if (code && now - told.current > again) {
+            told.current = now;
+            twice.current(code);
           }
         } catch {
           /* ⚠️ A FRAME THAT WILL NOT DECODE IS THE ORDINARY CASE — a hand across
@@ -325,11 +373,37 @@ function useReading(
 /* ------------------------------------------------------------------ surface --- */
 
 export function Viewfinder({
-  onRead, again = 1_500, paused = false, says, typed,
+  onRead, again = 1_500, paused = false, quiet = false, says, typed,
 }: ViewfinderProps) {
   const video = React.useRef<HTMLVideoElement>(null);
-  const { trouble, live, track } = useCamera(paused, video);
-  useReading(live && !paused, video, onRead, again);
+
+  /*
+    ⚠️ OFF UNTIL SOMEBODY PRESSES IT — see the header. `paused` is the caller's
+    switch and `wanted` is the person's, and they are different questions: a
+    sheet opening behind another one should not lose a camera somebody
+    deliberately started, and a screen drawing should never open one nobody
+    asked for.
+  */
+  const [wanted, setWanted] = React.useState(false);
+  const { trouble, live, track } = useCamera(wanted && !paused, video);
+
+  /* ⚠️ THE READ AND THE REPEAT BOTH SPEAK — see `feedback.tsx`. The caller hears
+     only the read, because "that one again" is the SAME code and handing it over
+     would be every caller writing the de-duplication this control exists to do. */
+  const heard = React.useCallback((code: string) => {
+    say("yes", quiet);
+    onRead(code);
+  }, [onRead, quiet]);
+  const twice = React.useCallback(() => { say("again", quiet); }, [quiet]);
+
+  useReading(live && !paused, video, heard, twice, again);
+
+  /* ⚠️ A FAULT IS HEARD TOO, ONCE. Somebody who pressed the button and put the
+     phone to a shelf is not reading the screen, so a refused camera that only
+     draws a sentence is a person waiting for a beep that is never coming.
+     `trouble` is a settled state rather than a stream, so this fires on the
+     transition and not per frame. */
+  React.useEffect(() => { if (trouble) say("no", quiet); }, [trouble, quiet]);
 
   /*
     ⚠️ THE FIELD CLEARS ITSELF ON SUBMIT, and that is what makes it a scanner
@@ -359,6 +433,12 @@ export function Viewfinder({
       {...(typed.help === undefined ? {} : { help: typed.help })}
     />
   );
+
+  /* ⚠️ THE AUDIO IS WOKEN INSIDE THE PRESS, which is the only place a browser
+     will allow it — see `wakeSound`. Started from the decode loop instead, the first
+     beep of a session is silently swallowed, and that is the read somebody is
+     listening hardest for. */
+  const start = React.useCallback(() => { wakeSound(); setWanted(true); }, []);
 
   const [lit, setLit] = React.useState(false);
   /* ⚠️ OFFERED ONLY WHERE IT EXISTS. A torch button on a laptop is a control
@@ -393,6 +473,15 @@ export function Viewfinder({
             and the registry lives in the shell, so routing it through `glyphOf`
             would make a leaf control import the frame above it. */}
         <Nothing icon={<CameraOff />} says={said.says} under={said.under} />
+        {/* ⚠️ A RETRY, BECAUSE THREE OF THE FIVE ARE TEMPORARY. `taken` ends when
+            the other app closes and `refused` ends when somebody allows it in the
+            address bar — and with no way to ask again, both leave a permanent
+            sentence over a camera that started working a minute ago. Turning it
+            off and on is a real retry: the effect tears the stream down and
+            clears the trouble. */}
+        <Button variant="secondary" onPress={() => { setWanted(false); }}>
+          Try again
+        </Button>
         {port}
       </Stack>
     );
@@ -402,25 +491,83 @@ export function Viewfinder({
     <Stack space="snug">
       <div
         /* ⚠️ A FIXED ASPECT RATHER THAN A HEIGHT. The frame is the same shape on
-           every device, so the guide inside it means the same thing — and the
+           every device, so what is drawn on it means the same thing — and the
            video fills it by cropping rather than by letterboxing, which is what
-           `object-cover` is for. */
+           `object-cover` is for.
+
+           ⚠️ AND THE PANEL IS THE SAME SIZE BEFORE THE CAMERA OPENS. A frame that
+           appeared on the press would push everything under it down the page at
+           the moment somebody is lining up a shot. */
         className="relative w-full aspect-[4/3] overflow-hidden rounded-2xl bg-black"
       >
-        <video
-          ref={video}
-          className="absolute inset-0 h-full w-full object-cover"
-          style={{ opacity: live ? 1 : 0, transition: MOTION.enter }}
-          muted
-          playsInline
-          /* ⚠️ The camera is a picture of what somebody is pointing at, and it
-             carries nothing a reader needs described. */
-          aria-hidden="true"
-        />
-        {/* ⚠️ NO GUIDE BOX, AND THE FIRST DRAFT DREW ONE. The decoder reads the
-            WHOLE frame, so a rectangle in the middle is the interface lying
-            about how it works — somebody lines a barcode up inside it and the
-            one who ignored it scans faster. The frame is the guide. */}
+        {wanted ? (
+          <video
+            ref={video}
+            className="absolute inset-0 h-full w-full object-cover"
+            style={{ opacity: live ? 1 : 0, transition: MOTION.enter }}
+            muted
+            playsInline
+            /* ⚠️ The camera is a picture of what somebody is pointing at, and it
+               carries nothing a reader needs described. */
+            aria-hidden="true"
+          />
+        ) : null}
+
+        {/*
+          ⚠️ THE OFF STATE IS THE DEFAULT AND IT SAYS WHAT PRESSING WILL DO. An
+          empty black rectangle reads as a camera that failed; this reads as a
+          camera that has not been asked yet, which is what it is.
+        */}
+        {wanted ? null : (
+          <div className={`absolute inset-0 flex flex-col items-center justify-center ${SPACE.tight}`}>
+            <span className={`${TYPE.note} text-white/70`}>{says ?? "Point it at a code"}</span>
+            <Button size="sm" variant="secondary" onPress={start}>Open the camera</Button>
+          </div>
+        )}
+
+        {/*
+          ⚠️ THE OVERLAY SAYS "THIS READS CODES", AND IT IS NOT A GUIDE BOX. The
+          first draft drew a rectangle in the middle and it was removed for a good
+          reason that is still good: the decoder reads the WHOLE frame, so a box
+          somebody lines a barcode up inside is the interface lying about how it
+          works — and the person who ignores it scans faster. The reason it came
+          back is a different one: with nothing drawn at all, a live picture of a
+          shelf is indistinguishable from a camera that is simply ON, and somebody
+          holding a code in front of it has no way to tell whether anything is
+          reading.
+
+          ⚠️ SO THE BRACKETS SIT AT THE CORNERS OF THE WHOLE FRAME rather than
+          around a smaller one, which is the honest statement of the read area,
+          and the line SWEEPS, which is the honest statement that it is looking.
+          Both are marks about the machine's state, not instructions to the person.
+        */}
+        {wanted && live ? (
+          <div aria-hidden className="pointer-events-none absolute inset-0">
+            {[
+              "left-2 top-2 border-l-2 border-t-2 rounded-tl-lg",
+              "right-2 top-2 border-r-2 border-t-2 rounded-tr-lg",
+              "left-2 bottom-2 border-l-2 border-b-2 rounded-bl-lg",
+              "right-2 bottom-2 border-r-2 border-b-2 rounded-br-lg",
+            ].map((at) => (
+              <span key={at} className={`absolute size-8 border-white/70 ${at}`} />
+            ))}
+            {/* ⚠️ ONE MOVING THING, AND IT IS THE ONE THAT MEANS SOMETHING —
+                the motion budget (DESIGN.md §11). `data-reading` rather than an
+                `animate-[…]` utility, because that string is only emitted if
+                Tailwind has SEEN it and it would carry none of the reduced-motion
+                machinery — see `READER_MOTION`, which is where the keyframe and
+                both opt-outs live. */}
+            {/* ⚠️ A SOLID HAIRLINE, WITH NO GLOW AND NO ALPHA. Both were on it
+                and both were decoration the guards were right to refuse: a
+                `boxShadow` is an edge in a style object (D7), and a translucent
+                white fill is the shape of a scrim over somebody's world. One
+                pixel of white over a dark picture is already the mark this is
+                borrowing — a laser scanner's line — and softening it only made
+                it harder to see against a pale label. */}
+            <span data-reading="beam" className="absolute inset-x-6 h-px bg-white" />
+          </div>
+        ) : null}
+
         {hasTorch ? (
           <div className="absolute bottom-3 right-3">
             <Button size="sm" variant={lit ? "primary" : "secondary"} onPress={() => { light(!lit); }}>
@@ -430,7 +577,10 @@ export function Viewfinder({
         ) : null}
       </div>
 
-      <p className={TYPE.note}>{says ?? "Point it at a code"}</p>
+      {/* ⚠️ THE LINE UNDER THE FRAME IS THE STATE, not a repeat of the label. Off,
+          the words are already inside the panel beside the button that opens it;
+          on, this is what tells somebody the reader is running. */}
+      {wanted ? <p className={TYPE.note}>{says ?? "Point it at a code"}</p> : null}
       {port}
     </Stack>
   );

@@ -34,6 +34,17 @@ export interface Step {
  * WHERE A FLOW IS, IN ITS OWN WORDS. Done steps wear a check, the current one
  * is the only bold thing, the rest wait in muted — a person mid-wizard reads
  * this in half a second, which is all the attention a progress row gets.
+ *
+ * ⚠️ ONLY THE CURRENT STEP IS NAMED ON A PHONE, and that is the difference
+ * between this fitting and this wrapping. Four steps with four labels is four
+ * circles, three rules and four words on one line: past about 320px of content
+ * it overflows the gutter, and the row that exists to be read at a glance is the
+ * one thing on the screen that does not fit. The numbers still say where somebody
+ * is and how far is left — which is what the row is FOR — and the word for where
+ * they are now is the only one that changes anything.
+ *
+ * ⚠️ AND IT IS THE PAST STEPS THAT KEEP THEIR CHECK rather than their word. A
+ * check is one glyph and reads at any width; a name is the part that costs room.
  */
 export function Steps({ at, steps }: {
   readonly at: string;
@@ -47,9 +58,14 @@ export function Steps({ at, steps }: {
         const now = i === here;
         return (
           <React.Fragment key={s.id}>
-            {i > 0 ? <span aria-hidden className="h-px w-6 bg-current opacity-30" /> : null}
+            {/* ⚠️ THE RULE SHRINKS RATHER THAN DISAPPEARING. It is what makes the
+                circles read as a sequence instead of as a row of chips, and at
+                `min-w` it still does that in a third of the room. */}
+            {i > 0 ? (
+              <span aria-hidden className="h-px min-w-2 flex-1 bg-current opacity-30 sm:max-w-6" />
+            ) : null}
             <li
-              className={`flex items-center ${SPACE.tight} ${now ? "" : "text-muted"}`}
+              className={`flex min-w-0 items-center ${SPACE.tight} ${now ? "" : "text-muted"}`}
               aria-current={now ? "step" : undefined}
             >
               {/* ⚠️ No type size of its own — the number inherits the step's,
@@ -60,7 +76,15 @@ export function Steps({ at, steps }: {
               >
                 {done ? <Check className="size-3.5" /> : i + 1}
               </span>
-              <span className={now ? TYPE.label : TYPE.note}>{s.label}</span>
+              {/* ⚠️ HIDDEN BY WIDTH, NOT REMOVED. A reader still hears every step
+                  in order, which is the whole content of a progress row — so the
+                  narrow layout costs a sighted person a word and costs somebody
+                  on a screen reader nothing. */}
+              <span
+                className={`truncate ${now ? TYPE.label : `${TYPE.note} sr-only sm:not-sr-only`}`}
+              >
+                {s.label}
+              </span>
             </li>
           </React.Fragment>
         );

@@ -44,6 +44,18 @@ export interface PickFileProps {
   readonly under?: string;
   readonly label?: string;
   readonly busy?: boolean;
+  /**
+   * ⚠️ HOW MANY AT ONCE, AND ONE IS NOT THE ONLY ANSWER. A person adding six
+   * photographs of a box took them in the camera roll a minute ago and they are
+   * adjacent in it — six trips through the picker to fetch six adjacent files is
+   * the control making somebody pay for a limit that was never a decision. Above
+   * one, the input is `multiple` and the picker offers a selection.
+   *
+   * ⚠️ AND IT IS A CEILING RATHER THAN A COUNT. The caller usually holds some
+   * already, so what it may take now is `most − held` — computed by the caller,
+   * because only the caller knows what it is holding.
+   */
+  readonly atOnce?: number;
   /** ⚠️ Bytes, already read. A caller should never be handed a `File`: two
       screens would then each write their own reader, and one would forget the
       error event. */
@@ -63,8 +75,8 @@ export interface PickFileProps {
 const refuse = (file: File, accept: readonly string[], most: number): Problem | null => {
   const raise = (code: string, values: Readonly<Record<string, string | number>> = {}) =>
     problem(PLATFORM_PROBLEMS, code, values);
-  if (accept.length && !accept.includes(file.type)) {
-    return raise("platform.wrong_kind", { wants: saying(accept) });
+  if (accept.length && !takes(accept, file.type)) {
+    return raise("platform.wrong_kind", { wants: saysKind(accept) });
   }
   if (file.size > most) {
     return raise("platform.too_large", {
@@ -75,26 +87,86 @@ const refuse = (file: File, accept: readonly string[], most: number): Problem | 
   return null;
 };
 
-/** `image/png` → `a PNG`; two of them → `a PNG or a JPEG`. */
-const saying = (accept: readonly string[]): string => {
-  const names = accept.map((t) => `a ${(t.split("/")[1] ?? t).toUpperCase()}`);
+/**
+ * ⚠️ A WILDCARD IS A REAL `accept` VALUE AND THIS DID NOT KNOW IT. `image/*` is
+ * what every camera control in the world is written with — it is what makes a
+ * phone offer the camera at all — and an exact-match test against it refuses
+ * EVERY photograph, because a photograph's type is `image/jpeg`. On the screen
+ * that meant a camera whose every shot came back "that kind of file will not
+ * work", which is the control's own refusal path working perfectly on a file
+ * that was always fine.
+ */
+export const takes = (accept: readonly string[], type: string): boolean =>
+  accept.some((want) => (want.endsWith("/*")
+    ? type.startsWith(`${want.slice(0, -1)}`)
+    : want === type));
+
+/**
+ * `image/png` → `a PNG`; two of them → `a PNG or a JPEG`.
+ *
+ * ⚠️ AND A WILDCARD IS SAID AS ITS FAMILY, WHICH IS THE OTHER HALF OF THE SAME
+ * BUG. Split on `/` and upper-cased, `image/*` reads "It has to be a *." — a
+ * sentence that names no file anybody could produce, in a control whose whole
+ * argument is that the refusal is the hard part.
+ */
+export const saysKind = (accept: readonly string[]): string => {
+  const names = accept.map((t) => {
+    const [family = t, kind] = t.split("/");
+    return kind === "*" ? `${family === "image" ? "a picture" : `a ${family} file`}`
+      : `a ${(kind ?? t).toUpperCase()}`;
+  });
   return names.length < 2 ? names[0] ?? "another kind of file"
     : `${names.slice(0, -1).join(", ")} or ${names.at(-1)}`;
 };
 
+/**
+ * WHICH OF THE PICKED FILES LAND, AND WHAT THE CONTROL SAYS ABOUT THE REST.
+ *
+ * ⚠️ PURE, AND SEPARATE FROM THE CONTROL, BECAUSE THE DECISION IS THE WHOLE BUG
+ * SURFACE. Every fault this control has ever had was in here — an exact-match
+ * against a wildcard, a sentence naming no real file, a loop that stopped at the
+ * first refusal — and none of them needed a DOM to find. As a function it is
+ * checked directly; inside the component it was only reachable through a browser.
+ *
+ * ⚠️ EVERY FILE IS JUDGED AND THE GOOD ONES STILL LAND. The obvious loop stops at
+ * the first refusal, so somebody who picked five photographs and one video gets
+ * nothing and a sentence about the video — and has to work out which of the six
+ * it meant. The accepted ones are taken, the FIRST refusal is what the control
+ * says, and the two do not contradict each other because the files that landed
+ * are visible above the sentence.
+ *
+ * ⚠️ AND THE CEILING IS APPLIED BEFORE THE JUDGING, not after. Reading eight
+ * photographs into memory to use two is a phone paying for a limit it was told
+ * about first.
+ */
+export const sift = (
+  picked: readonly File[], accept: readonly string[], most: number, atOnce: number,
+): { readonly taking: readonly File[]; readonly why: Problem | null } => {
+  const taking: File[] = [];
+  let why: Problem | null = null;
+  for (const file of picked.slice(0, Math.max(1, atOnce))) {
+    const bad = refuse(file, accept, most);
+    if (bad) { why = why ?? bad; continue; }
+    taking.push(file);
+  }
+  return { taking, why };
+};
+
 export function PickFile({
-  accept, most, says, under, label, busy, onPick, onClear,
+  accept, most, says, under, label, busy, atOnce = 1, onPick, onClear,
 }: PickFileProps) {
   const input = React.useRef<HTMLInputElement>(null);
   const [over, setOver] = React.useState(false);
   const [why, setWhy] = React.useState<Problem | null>(null);
 
-  const take = async (file: File | undefined): Promise<void> => {
-    if (!file) return;
-    const bad = refuse(file, accept, most);
+  const take = async (picked: FileList | null): Promise<void> => {
+    /* ⚠️ `Array.from`, NOT A SPREAD. A `FileList` is array-LIKE and iterable
+       only on a DOM lib that says so — the spread typechecks against the browser
+       lib and not against the one the app is built with, which is a difference
+       that only appears at build time. */
+    const { taking, why: bad } = sift(Array.from(picked ?? []), accept, most, atOnce);
+    for (const file of taking) onPick(await file.arrayBuffer(), file);
     setWhy(bad);
-    if (bad) return;
-    onPick(await file.arrayBuffer(), file);
   };
 
   return (
@@ -109,7 +181,7 @@ export function PickFile({
         onDrop={(e) => {
           e.preventDefault();
           setOver(false);
-          void take(e.dataTransfer.files?.[0]);
+          void take(e.dataTransfer.files);
         }}
         /*
           ⚠️ A SURFACE, NOT AN OUTLINE — `ground.ts` bans both borders and
@@ -134,11 +206,12 @@ export function PickFile({
           ref={input}
           type="file"
           accept={accept.join(",")}
+          {...(atOnce > 1 ? { multiple: true } : {})}
           className="sr-only"
           /* ⚠️ RESET AFTER EVERY PICK. Choosing the same file twice fires no
              `change` event unless the value is cleared — so somebody who fixed
              their file and picked it again would watch nothing happen. */
-          onChange={(e) => { void take(e.target.files?.[0]); e.target.value = ""; }}
+          onChange={(e) => { void take(e.target.files); e.target.value = ""; }}
         />
 
         {/* ⚠️ No padding of its own — the column's gap is the rhythm. */}

@@ -5528,8 +5528,17 @@ export const INVENTORY: AppSpec = defineApp({
       nothing; it survives a reload, a share and the back gesture, and going back
       lands where you came from rather than nowhere.
     */
+    /*
+      ⚠️ `neon`, WHICH IS HOME'S, AND IT IS THE ONE OTHER SCREEN THAT MAY WEAR IT.
+      The note above says ambience everywhere is ambience nowhere, and that still
+      holds — this is not a second lit screen so much as the same one continuing.
+      Registering is the FIRST ACTION ON HOME: press it and the sky going out is
+      the light dropping on the step after the one somebody was standing in, which
+      reads as having left the product rather than as having gone one level in.
+      Every other screen here is work over a shelf and stays plain.
+    */
     { id: "register", route: "/register", label: "Add a product", nav: "none",
-      icon: "add", permission: "product:write" },
+      icon: "add", permission: "product:write", sky: "neon" },
     { id: "receive", route: "/receive", label: "Receive", nav: "none", icon: "add",
       permission: "stock:move" },
     /* ⚠️ A COUNT IS A JOB SOMEBODY SPENDS AN AFTERNOON ON, so it is a

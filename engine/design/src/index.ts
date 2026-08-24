@@ -17,6 +17,7 @@ export * from "./parts/beside.js";
 export * from "./parts/gated.js";
 export * from "./frame/runtime.js";
 export * from "./parts/surfaces.js";
+export * from "./parts/feedback.js";
 export * from "./parts/pick-file.js";
 /*
   ⚠️ LABELS ARE A SUBPATH AND NOT PART OF THE ENTRY: `@engine/design/labels`.

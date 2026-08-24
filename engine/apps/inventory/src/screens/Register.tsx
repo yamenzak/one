@@ -29,12 +29,26 @@
  * checklist step, an empty catalogue and a scan that resolved to nothing all
  * want to send somebody HERE — and a page survives a reload, a shared link and
  * the back gesture, landing where they came from rather than nowhere.
+ *
+ * ⚠️ FOUR STEPS, BECAUSE TWENTY-ODD FIELDS ON ONE PAGE IS A PAGE NOBODY FINISHES.
+ * As one scroll this was seven headings deep and every field looked equally
+ * required, so the two that actually are — a name and a unit — were somewhere in
+ * the middle of eighteen that are not. The steps are the natural joints of the
+ * thing rather than an arbitrary quartering: what it LOOKS like, what it IS, how
+ * it is COUNTED, and how it is KEPT and BOUGHT. Each one fits a phone without
+ * scrolling much, and each one can be answered without knowing the next.
+ *
+ * ⚠️ AND THE FIRST STEP IS THE FORK, NOT A QUESTION ABOUT THE FORK. "Photograph
+ * it or type it in" as a screen of its own is a decision somebody makes before
+ * they have seen either, and then has to remake. Step one IS the camera, with
+ * its own action saying `Next` — so photographing is the default path and
+ * skipping it is one press, which is the same choice without the extra screen.
  */
 
 import * as React from "react";
 import {
   ActionRow, Await, LongText, NoteRow, NumberInput, PickFile, RowsWaiting, Screen,
-  Section, Segmented, Stack, Tags, TextInput, ToggleRow, Viewfinder,
+  Section, Segmented, Stack, Steps, Tags, TextInput, ToggleRow, Viewfinder,
   asDataUrl, glyphOf, type Loaded, type Option,
 } from "@engine/design";
 import { Button } from "@heroui/react";
@@ -165,6 +179,41 @@ const EMPTY_CODE: CodeRow = { value: "", kind: "gtin", pack: 1 };
    second tells you never. */
 const numberOr = (of: number | null): number => (of === null ? 0 : of);
 
+/**
+ * ⚠️ THE JOINTS OF THE THING, NOT AN ARBITRARY QUARTERING. What it looks like,
+ * what it is, how it is counted, how it is kept — each answerable without
+ * knowing the next, which is the property that makes a step a step rather than a
+ * page break.
+ *
+ * ⚠️ AND THE LABELS ARE ONE WORD WHERE THEY CAN BE. Four of them share a phone's
+ * width with four numbers and three rules; `Steps` hides all but the current one
+ * below `sm`, and a word that would be truncated there is a word doing nothing.
+ */
+const STEPS = [
+  { id: "photos", label: "Photos" },
+  { id: "what", label: "What it is" },
+  { id: "counting", label: "Counting" },
+  { id: "keeping", label: "Keeping" },
+] as const;
+
+type Where = (typeof STEPS)[number]["id"];
+
+/**
+ * ⚠️ ONE LINE PER STEP, so the screen's subtitle says what THIS one wants.
+ *
+ * ⚠️ AND EACH IS SHORT ENOUGH FOR A PHONE'S HEM, WHICH IS A MEASUREMENT RATHER
+ * THAN A FEELING. The first draft of the photos line ran 51px past the chrome on
+ * a 390px viewport — legible on the machine it was written on and cut on every
+ * phone. `geometry.seen` reads the real box in a real browser, which is the only
+ * place a sentence's width is a fact.
+ */
+const UNDER: Readonly<Record<Where, string>> = {
+  photos: "Photograph it and the rest fills itself",
+  what: "What it is called, and what makes it that one",
+  counting: "Its barcodes, and what a number means",
+  keeping: "How long it keeps, and where more comes from",
+};
+
 export function Register({
   title, back, knownTags, suppliers, resembles, onLook, onIdentify,
   guessed, onRegister, busy, again,
@@ -189,6 +238,7 @@ export function Register({
   const [reorder, setReorder] = React.useState(false);
   const [reorderQty, setReorderQty] = React.useState<number | null>(null);
   const [anyway, setAnyway] = React.useState(false);
+  const [where, setWhere] = React.useState<Where>("photos");
 
   /*
     ⚠️ FILLS WHAT IS EMPTY AND ARGUES WITH NOTHING. Somebody who typed a name and
@@ -241,14 +291,38 @@ export function Register({
   const matches = resembles.status === "ready" ? resembles.data : null;
   const strong = (matches ?? []).some((m: Match) => m.why !== "similar name");
 
-  const short = !name.trim() ? "Give it a name"
-    : !unit.trim() ? "Say what it is counted in"
+  /*
+    ⚠️ THE REFUSAL IS PER STEP, AND THAT IS WHAT MAKES THE STEPS WORTH HAVING. One
+    sentence at the foot of the whole form told somebody on the last screen that
+    something three screens back was missing, and left them to find it. Held
+    against the step that owns the field, it appears where the fix is — and a
+    step whose own fields are fine goes forward even though the form as a whole
+    is not finished, which is the entire point of dividing it.
+
+    ⚠️ AND THE RESEMBLANCE BELONGS TO `what` BECAUSE THE NAME DOES. It is raised
+    while somebody is typing the name that caused it, in front of the list of
+    what already looks like that, with the answer beside it.
+  */
+  const missing: Readonly<Record<Where, string | undefined>> = {
+    photos: undefined,
+    what: !name.trim() ? "Give it a name"
       /* ⚠️ THE RESEMBLANCE IS NOT A REFUSAL UNTIL IT IS THE STRONG KIND, and even
          then it is answerable in place. A form somebody fills in completely and
          is then told to throw away is how people learn to press past a warning
          without reading it. */
       : strong && !anyway ? "Say it is a different thing, or open the one you have"
-        : undefined;
+        : undefined,
+    counting: !unit.trim() ? "Say what it is counted in" : undefined,
+    keeping: undefined,
+  };
+
+  /* ⚠️ THE LAST STEP ANSWERS FOR THE WHOLE FORM, because it is the one holding
+     the button that writes. A step somebody skipped forward past is still a
+     missing name, and the sentence has to say which step to go back to. */
+  const short = missing[where]
+    ?? (where === "keeping"
+      ? STEPS.map((s) => missing[s.id]).find(Boolean)
+      : undefined);
 
   const send = () => {
     onRegister({
@@ -266,31 +340,62 @@ export function Register({
     setCodes((held) => held.map((row, i) => (i === at ? { ...row, ...next } : row)));
   };
 
+  const at = STEPS.findIndex((one) => one.id === where);
+  const last = at === STEPS.length - 1;
+  const go = (to: number) => {
+    setWhere(STEPS[Math.min(STEPS.length - 1, Math.max(0, to))]!.id);
+  };
+
   return (
     <Screen
       shape="form"
       title={title}
-      back={back}
-      under="Photograph it and the form fills itself, or type it in"
+      /*
+        ⚠️ BACK IS A STEP BACK UNTIL THERE IS NO STEP TO GO BACK TO. The arrow in
+        the chrome and the phone's own gesture are the same affordance to
+        somebody using this, so an arrow that left the page from step three
+        would throw away three screens of typing on the press that means "undo
+        the last one".
+      */
+      back={at === 0 ? back : () => { go(at - 1); }}
+      under={UNDER[where]}
       /*
         ⚠️ THE ACT IS THE SCREEN'S, WHICH IS WHAT MAKES IT A PAGE. `does` puts it
         where every other primary action in the product lives — the bar on a
         phone, the crown on a desk — rather than in a footer only this surface
         has (DESIGN.md §4).
+
+        ⚠️ AND EVERY STEP NAMES `product.register`, INCLUDING THE THREE THAT DO
+        NOT CALL IT. `Next` calls nothing, so the first draft left its `op` off —
+        and that is the offer-and-refuse failure spread over four screens instead
+        of one. Somebody without `product:write` would photograph a box, name it,
+        scan three barcodes and be refused by the fourth button. Naming the
+        operation the whole form exists to reach means the gate answers on step
+        one, which is where it costs nobody anything.
       */
-      does={{
-        op: "product.register",
-        label: "Add it",
-        onDo: send,
-        disabled: busy === true || Boolean(short),
-      }}
+      does={last
+        ? {
+          op: "product.register",
+          label: "Add it",
+          onDo: send,
+          disabled: busy === true || Boolean(short),
+        }
+        : {
+          op: "product.register",
+          label: "Next",
+          onDo: () => { go(at + 1); },
+          disabled: busy === true || Boolean(short),
+        }}
     >
       <Stack>
+        <Steps at={where} steps={STEPS as unknown as readonly { id: string; label: string }[]} />
+
         {/*
           ⚠️ THE CAMERA IS FIRST BECAUSE IT IS THE FAST LANE, and it is a section
           rather than a step: nothing below it waits for it. Somebody who knows
           what they are adding scrolls past.
         */}
+        {where === "photos" ? (
         <Section label="Photos">
             <PickFile
               accept={["image/*"]}
@@ -308,6 +413,15 @@ export function Register({
                 : "The front, the back and the label. The label is where the detail is"}
               label="Take a photo"
               busy={busy}
+              /*
+                ⚠️ AS MANY AS THERE IS ROOM FOR, IN ONE TRIP. The six a person
+                takes of a box are adjacent in their camera roll a minute later,
+                and six trips through the picker to fetch six adjacent files was
+                the control charging somebody for a limit nobody had decided.
+                `MOST_PHOTOS − held` rather than `MOST_PHOTOS`, so the ceiling is
+                what may still be added rather than what may ever be.
+              */
+              atOnce={Math.max(1, MOST_PHOTOS - photos.length)}
               onPick={(bytes, file) => {
                 setPhotos((held) => (held.length >= MOST_PHOTOS
                   ? held : [...held, asDataUrl(bytes, file.type)]));
@@ -359,7 +473,10 @@ export function Register({
               }}
             />
         </Section>
+        ) : null}
 
+        {where === "what" ? (
+        <>
         <Section label="What it is">
             <TextInput
               label="Name"
@@ -466,7 +583,11 @@ export function Register({
               )
               : null}
         </Section>
+        </>
+        ) : null}
 
+        {where === "counting" ? (
+        <>
         {/*
           ⚠️ AS MANY BARCODES AS THE THING HAS, AND THE PACK IS WHY. A box of a
           hundred gloves and one glove are one product with two codes, and
@@ -491,6 +612,10 @@ export function Register({
             */}
             <Viewfinder
               says="Hold each barcode up in turn"
+              /* ⚠️ THE READ IS HEARD, WHICH IS WHY THIS SURFACE NEEDS NO CHANGE
+                 FOR IT — `Viewfinder` beeps for a read, a repeat and a refusal.
+                 A caller that turned it off here would be the one place in the
+                 product where scanning is silent. */
               typed={{
                 label: "Or type a code",
                 placeholder: "What is printed under the bars",
@@ -583,7 +708,11 @@ export function Register({
               help="Zero means never"
             />
         </Section>
+        </>
+        ) : null}
 
+        {where === "keeping" ? (
+        <>
         <Section label="Keeping it">
             <LongText
               label="How to store it"
@@ -713,7 +842,13 @@ export function Register({
               )
               : null}
         </Section>
+        </>
+        ) : null}
 
+        {/* ⚠️ UNDER THE STEP IT BELONGS TO, which is why it is outside the four
+            groups above rather than inside each of them. `short` already resolves
+            to this step's own refusal — or, on the last one, to whichever earlier
+            step is still short. */}
         {short ? <NoteRow icon={glyphOf("alert")}>{short}</NoteRow> : null}
       </Stack>
     </Screen>

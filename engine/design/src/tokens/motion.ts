@@ -660,6 +660,47 @@ export const BLOCK_MOTION = [
  * mark. Kept to two behaviours because a third is a screen with an opinion
  * about itself.
  */
+/**
+ * THE CODE READER'S OWN MOTION — one line, and it means the machine is looking.
+ *
+ * ⚠️ A LIVE PICTURE OF A SHELF IS INDISTINGUISHABLE FROM A CAMERA THAT IS MERELY
+ * ON. The viewfinder deliberately draws no guide box — the decoder reads the
+ * whole frame, so a rectangle somebody lines a barcode up inside is the interface
+ * lying about how it works. But with nothing drawn at all, a person holding a
+ * code in front of the lens has no way to tell whether anything is reading, and
+ * the honest answer to that is a mark about the MACHINE's state rather than an
+ * instruction to the person.
+ *
+ * ⚠️ IT IS HERE AND NOT IN A `className`, WHICH IS THE RULE THIS FILE EXISTS FOR.
+ * An `animate-[sweep_2s]` utility is only emitted if Tailwind has SEEN that exact
+ * string, and it carries none of the reduced-motion machinery below — so the line
+ * would go on sweeping for somebody who asked motion to stop, which is precisely
+ * the failure the header bans.
+ */
+export const READER_MOTION = [
+  /* ⚠️ IT CROSSES AND COMES BACK rather than looping top-to-bottom. A beam that
+     jumps back to the start is a progress bar, which claims the read is a
+     process with an end — it is not; it is eight attempts a second, for as long
+     as somebody points it at something. */
+  `@keyframes reader-sweep {`,
+  `  0% { top: 12% } 50% { top: 88% } 100% { top: 12% }`,
+  `}`,
+  `[data-reading="beam"] {`,
+  `  top: 12%;`,
+  /* ⚠️ `turn`, NOT A CONTROL DURATION — and that is the same distinction the
+     scale draws for a spinner. Every entry above `turn` describes a movement
+     with an END somebody is waiting for; this describes a TEMPO somebody watches
+     for as long as they are pointing the phone, and fast reads as anxious. */
+  `  animation: reader-sweep ${DURATION.turn} ${EASE.settle} infinite;`,
+  `}`,
+  /* ⚠️ STOPPED IN THE MIDDLE, NOT HIDDEN. The line still says a reader is on;
+     what it stops doing is moving. */
+  `@media (prefers-reduced-motion: reduce) {`,
+  `  [data-reading="beam"] { animation: none; top: 50% }`,
+  `}`,
+  `[data-reduce-motion="true"] [data-reading="beam"] { animation: none; top: 50% }`,
+].join("\n");
+
 export const DOOR_MOTION = [
   `[data-arrive="mark"] {`,
   `  animation: enter ${DURATION.stately} ${EASE.travel} var(--tw-animation-delay, 0s) both;`,
