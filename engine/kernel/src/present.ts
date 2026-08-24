@@ -461,6 +461,38 @@ export const sayMoment = (
   shown: Shown, at: Instant | Date, length: DateLength = "short",
 ): string => `${sayDate(shown, at, length)} · ${sayTime(shown, at)}`;
 
+/* ------------------------------------------------------------------ lists --- */
+
+/**
+ * SEVERAL THINGS, SAID AS A PERSON WOULD SAY THEM — "gloves, masks and gowns".
+ *
+ * ⚠️ A SENTENCE THAT NAMES THINGS NEEDS THIS OR IT IS NOT A SENTENCE. Joined
+ * with commas throughout, a clause reads as a database field printed out —
+ * "Filed under antibiotics, prescription, refrigerated" — and the whole point of
+ * saying a decision back to somebody is that they read it without deciding to.
+ *
+ * ⚠️ AND THE WORD IS THE LOCALE'S, WHICH IS THE ONLY REASON THIS TAKES `Shown`.
+ * "and" is "und" in German and the separator moves in Japanese; hardcoding the
+ * English is the kind of thing that survives translation review because it is
+ * inside a string somebody assembled rather than inside a string somebody wrote.
+ *
+ * ⚠️ `Intl.ListFormat` IS NOT UNIVERSAL, so a runtime without it falls back to
+ * commas rather than throwing. Every runtime this deployment targets has it; a
+ * sentence is not worth a crash on one that does not.
+ */
+export function sayList(
+  shown: Shown, of: readonly string[], joining: "and" | "or" = "and",
+): string {
+  const kept = of.filter((one) => one.trim().length > 0);
+  if (kept.length <= 1) return kept[0] ?? "";
+  const List = (Intl as { ListFormat?: typeof Intl.ListFormat }).ListFormat;
+  if (typeof List !== "function") return kept.join(", ");
+  return new List(shown.locale, {
+    style: "long",
+    type: joining === "or" ? "disjunction" : "conjunction",
+  }).format(kept);
+}
+
 /* ------------------------------------------------------------------- when --- */
 
 /**

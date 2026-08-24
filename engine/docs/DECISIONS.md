@@ -2782,3 +2782,55 @@ looks like padding. The pattern now only reads inside `class`/`className`.
 **What this forbids:** a guard over the shared tree that does not also read
 `appDirs()`. The rule it enforces is about screens, and the screens are in the
 apps.
+
+## D80 — A multi-step flow asks questions and says the answers back
+
+**The cost a wizard usually imposes is training, and it never appears in a diff.**
+OneInventory's register sheet was four steps, each a HEADING over a group of
+fields: "What it is", "Barcodes", "Counting", "Keeping". Under the third of them
+sat `Tracked as: [Listed] [Counted] [Batched] [Itemised]` — the most
+consequential field on the product record, offered as four words nobody can
+choose between without being taught. Taught is an induction, a wiki page, and a
+person in the warehouse who knows. All three are paid for per customer, per new
+employee, forever.
+
+**So a step is a question, and the answer is repeated in the same words.** "How
+closely do you follow it?" — and the moment somebody chooses, *"Each delivery is
+kept apart, so you can expire one or recall one"*. That is not help text: help
+text sits under a field explaining a word. This is the app restating the decision
+in the language the decision was made in, which is the only explanation nobody
+has to be told to read.
+
+**One string does both jobs, and that is the mechanism rather than a
+convenience.** `says` is the live echo under the control AND the line in the
+recap of everything answered so far. Written twice they drift the first time
+somebody edits one — and a recap that disagrees with the screen it summarises is
+worse than none, because it is the half people trust.
+
+**The recap is also the navigation, which is what makes a model's answer
+checkable.** Six photographs come back as a name, a brand, a unit, a rung, a
+shelf life and four filing words: twenty fields over nine screens, which nobody
+audits. As eight short sentences, each one press from the step that owns it,
+checking becomes reading.
+
+**A step that does not apply is skipped, never disabled.** `when: false` takes it
+out of the flow entirely — out of the count, out of the dots, out of the recap. A
+greyed-out step is a question somebody has to work out they are not being asked.
+
+**And the flow owns the phone's back gesture, once.** Forward pushes an entry,
+`popstate` steps back, the first step pushes nothing so the Nth Back leaves.
+Written per flow that is four subtle rules and most flows get one wrong; the
+failure is somebody on step five making the gesture that means "undo the last
+thing" and losing five screens of typing. The entries carry a marker rather than
+a URL, because the steps are ONE screen — a URL each would make every step
+shareable, bookmarkable and reloadable into a form with nothing in it.
+
+**The existing history guard could not see any of this.** `travel.test.mjs`
+derives its files from `engine/<dir>/src/main.tsx` — the browser halves with a
+router of their own — and an app under `engine/apps/*` has none, because it is
+loaded BY one. Every screen in every product was outside it, and the register
+sheet wrote raw `pushState` calls with the whole gate green.
+
+**What this forbids:** a step headed rather than asked; a step with no clause; a
+screen that hand-rolls the dock's Back; and history written anywhere but the
+router and the flow.

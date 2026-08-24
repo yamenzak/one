@@ -295,6 +295,38 @@ export interface ScreenProps<T> {
   readonly does?: Act;
   /** ⚠️ At most two, and they are crown chips. A third is a sheet. */
   readonly also?: readonly Slot[];
+  /**
+   * THAT THIS SCREEN IS ONE OF SEVERAL, AND THEREFORE HAS A WAY BACK AS WELL AS
+   * A WAY ON.
+   *
+   * ⚠️ THE DOCK HOLDS A PAIR HERE, AND IT IS THE ONE PLACE IT EVER WILL. Every
+   * other screen has exactly one act, because a page with two things it is for
+   * is two pages (see the header). A step is the exception that proves it: the
+   * two controls are not two purposes, they are one purpose and its reverse
+   * gear, and a flow without a visible reverse gear is a flow people abandon
+   * rather than back out of.
+   *
+   * ⚠️ AND THE ARGUMENT IS THE THUMB'S, WHICH IS WHY THIS IS THE DOCK AND NOT
+   * THE CROWN. Going back one step in a wizard is a FREQUENT move — it is how
+   * somebody checks what a model filled in two questions ago — and the chrome's
+   * back arrow is at the top-left corner, the furthest point on a phone from
+   * where the hand already is. The same reasoning that put the primary above
+   * the thumb puts its reverse beside it.
+   *
+   * ⚠️ ON A DESK THERE IS NO SECOND COPY. The crown carries the act and the
+   * chrome arrow is the way back, both already in the eye's path — a third
+   * button would be the same two affordances drawn twice on one screen.
+   *
+   * ⚠️ ABSENT `back` IS THE FIRST STEP, and it draws Next alone at full width
+   * rather than a disabled Back. A control that is present and refuses is read
+   * as broken; a control that is absent is read as "there is nothing behind
+   * this", which is the truth.
+   */
+  readonly step?: {
+    readonly back?: () => void;
+    /** ⚠️ Named only where "Back" is the wrong word for what is behind. */
+    readonly label?: string;
+  };
 
   /* --- the data, and therefore the four outcomes ------------------------- */
 
@@ -381,7 +413,7 @@ const shows = <T,>(
         : nothingIn(of.data, isNothing) ? "empty" : "act";
 
 export function Screen<T = unknown>({
-  shape, title, under, back, leave, does, also = [],
+  shape, title, under, back, leave, does, also = [], step,
   of, then, isNothing, again, waiting, nothing, refused, children,
 }: ScreenProps<T>) {
   const preset = SHAPES[shape];
@@ -601,15 +633,33 @@ export function Screen<T = unknown>({
                 one place the explanation could hide is the one place nobody on
                 this half of the breakpoint can reach. */}
             <div className={`flex flex-col ${SPACE.hair}`}>
-              <Button
-                className="w-full"
-                variant={does.tone === "danger" ? "danger" : "primary"}
-                isDisabled={does.disabled || Boolean(stopped)}
-                onPress={does.onDo}
-              >
-                {does.icon}
-                {does.label}
-              </Button>
+              {/* ⚠️ A ROW ONLY WHERE THERE IS A SECOND CONTROL — see `step`. One
+                  button in a flex row is one button; the row exists so the pair
+                  shares a baseline, and an empty half is not a layout. */}
+              <div className={`flex ${SPACE.tight}`}>
+                {step?.back ? (
+                  /* ⚠️ NARROWER, AND THE ASYMMETRY IS THE POINT. Two equal
+                     buttons ask somebody to read both before pressing either;
+                     the way ON is the one the flow is for, so it takes the room
+                     and the colour and the reverse gear takes what is left. */
+                  <Button
+                    className="shrink-0 basis-1/3"
+                    variant="secondary"
+                    onPress={step.back}
+                  >
+                    {step.label ?? "Back"}
+                  </Button>
+                ) : null}
+                <Button
+                  className="grow"
+                  variant={does.tone === "danger" ? "danger" : "primary"}
+                  isDisabled={does.disabled || Boolean(stopped)}
+                  onPress={does.onDo}
+                >
+                  {does.icon}
+                  {does.label}
+                </Button>
+              </div>
               {stopped
                 ? <span className={`${TYPE.note} text-center`}>{sayGate(stopped)}</span>
                 : null}

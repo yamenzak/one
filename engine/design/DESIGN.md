@@ -865,6 +865,56 @@ property at the same specificity, so the negative margin shifts the row left
 instead of widening it), and the width is spelled `w-[calc(100%_+_2rem)]` because
 CSS needs whitespace around the `+` and Tailwind spells that `_`.
 
+### A flow of several screens is a `Story`, and it narrates
+
+**The cost a wizard usually imposes is training, and it never shows up in a
+diff.** Four headings over groups of fields — "What it is", "Counting",
+"Keeping" — name the areas of the record being written and leave whoever is
+looking at them to work out what is wanted. That person is an induction, a wiki
+page and somebody in the warehouse who knows; all three are paid for per
+customer, per new employee, forever. It is the most expensive thing an interface
+can do and the cheapest thing to ship.
+
+**So a step asks a question, and the answer is repeated in the same words.**
+"How closely do you follow it?" — and the moment somebody chooses, *"Each
+delivery is kept apart, so you can expire one or recall one"*. That is not help
+text. Help text sits under a field explaining a word; this is the app restating
+the decision in the language the decision was made in, which is the only
+explanation nobody has to be told to read.
+
+**One string does both jobs, and that is the mechanism.** `says` is the live echo
+under the control AND the line in the recap of everything answered so far.
+Written twice they drift the first time somebody edits one, and a recap that
+disagrees with the screen it summarises is worse than none — it is the half
+people trust.
+
+**The recap is the navigation too**, which is what makes a model's answer
+checkable: twenty fields filled in across nine screens is something nobody
+audits; eight short sentences, each one press from the step that owns it, turns
+checking into reading.
+
+**A step that does not apply is skipped, never disabled.** `when: false` takes it
+out of the flow entirely — out of the count, out of the dots, out of the recap. A
+greyed-out step is a question somebody has to work out they are not being asked.
+
+**The dock holds a pair here and nowhere else.** Every other screen has one act,
+because a page with two things it is for is two pages. A step is the exception
+that proves it: Back is not a second purpose, it is the same purpose in reverse,
+and the argument for putting it in the dock is the thumb's. Going back one step
+is a FREQUENT move — it is how somebody checks what a model filled in two
+questions ago — and the chrome's arrow is the furthest point on a phone from
+where the hand already is. On a desk there is no second copy: the crown carries
+the act and the arrow is the way back, both already in the eye's path.
+
+**And the flow owns the phone's back gesture, once.** Forward pushes an entry,
+`popstate` steps back, the first step pushes nothing so the Nth Back leaves.
+Written per flow that is four subtle rules and most flows get one wrong — the
+failure is somebody on step five making the gesture that means "undo the last
+thing" and losing five screens of typing. The entries carry a marker rather than
+a URL, because the steps are ONE screen: a URL each would make every step
+shareable, bookmarkable and reloadable into a form with nothing in it.
+DECISIONS.md D80.
+
 ### Every mark animates, and it animates as its purpose
 
 **A bell rings by its clapper. A calendar turns its days over. Leaving is the
@@ -1179,6 +1229,7 @@ Some of this is guarded and some is judgement:
 - `space` — one API door, one door classifier, and no screen that is never drawn.
 - `spoken` — every refused mutation reaches a person; none returns into silence.
 - `states` — four outcomes, a placeholder the component draws itself, three kinds of motion, one rhythm.
+- `story` — a multi-step flow asks questions and says the answers back.
 - `surface` — every declaration reaches a screen, and every field kind has a control.
 - `tone` — one voice — label length, description length, sentence case, full stops.
 - `travel` — the route decides the direction and the world decides the gesture; nothing else moves the page.

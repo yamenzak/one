@@ -27,6 +27,7 @@
 
 import * as React from "react";
 import {
+  Button,
   Checkbox, CheckboxGroup, ComboBox, Description, FieldError, Input, InputGroup,
   InputOTP, Label, ListBox, NumberField, Radio, RadioGroup, REGEXP_ONLY_DIGITS, SearchField,
   Select, Skeleton, Slider, Tag, TagGroup, TextArea, TextField, TimeField, ToggleButton,
@@ -673,6 +674,127 @@ export function Tags({ items, onRemove, ...p }: Omit<Said, "error"> & {
       </TagGroup.List>
       {p.help ? <Description>{p.help}</Description> : null}
     </TagGroup>
+  );
+}
+
+/* -------------------------------------------------------------- words --- */
+
+/**
+ * A VOCABULARY: THE WORDS ALREADY IN USE HERE, PLUS ANY NEW ONE — ONE CONTROL.
+ *
+ * ⚠️ THIS REPLACES FOUR CONTROLS THAT WERE ONE QUESTION. The shape it supersedes
+ * was a `Tags` display, a text field, an Add button, and a stack of rows listing
+ * the words the workspace already uses — a third of a phone screen, four tab
+ * stops, and a person who has to work out that the rows and the field do the
+ * same thing by different means. "What do you file this under" is one question
+ * and deserves one control.
+ *
+ * ⚠️ THE KNOWN WORDS ARE OFFERED, NEVER ENFORCED, AND THAT IS THE ENTIRE POINT
+ * OF SHOWING THEM. Typed free, a catalogue collects "Cleaning", "Cleaning
+ * products" and "Janitorial" across three mornings — all defensible, and between
+ * them they make the catalogue unfilterable by the thing it was filed under. A
+ * word already in use is one press; a new one costs typing. Nothing is refused.
+ *
+ * ⚠️ AND THE OFFER NARROWS AS YOU TYPE, WHICH IS WHAT MAKES IT USABLE PAST
+ * TWENTY WORDS. Unfiltered, a workspace with sixty kinds shows an arbitrary
+ * eight and the person types the fifty-ninth from memory — the collision this
+ * exists to prevent, reached by the control that was supposed to prevent it.
+ *
+ * ⚠️ NOTHING TYPED IS LOST TO A PRESS OF Enter ON A WORD THAT ALREADY EXISTS.
+ * Enter takes the FIELD's text, not the first suggestion: a person who typed
+ * "Gloves" meaning to create it, over a list showing "Glove liners", gets what
+ * they typed. The suggestions are pressed, never defaulted into.
+ */
+export function Words({ value, onChange, known = [], placeholder, most = 8, ...p }:
+  Omit<Said, "error"> & {
+    readonly value: readonly string[];
+    readonly onChange: (next: readonly string[]) => void;
+    /** ⚠️ What this workspace already files things under. */
+    readonly known?: readonly Option[];
+    readonly placeholder?: string;
+    /** ⚠️ How many to offer with nothing typed. A vocabulary is not a list. */
+    readonly most?: number;
+  }) {
+  const [word, setWord] = React.useState("");
+  const said = word.trim();
+
+  /* ⚠️ CASE-INSENSITIVE THROUGHOUT, because `box` and `Box` are one word and a
+     catalogue that thinks otherwise is the fault this control exists to fix. */
+  const has = (one: string) => value.some((held) => held.toLowerCase() === one.toLowerCase());
+
+  const add = (one: string) => {
+    const trimmed = one.trim();
+    if (!trimmed || has(trimmed)) { setWord(""); return; }
+    onChange([...value, trimmed]);
+    setWord("");
+  };
+
+  const offer = known
+    .filter((one) => !has(one.label))
+    .filter((one) => !said || one.label.toLowerCase().includes(said.toLowerCase()))
+    .slice(0, most);
+
+  /* ⚠️ OFFERED ONLY WHERE IT WOULD ADD SOMETHING NEW. A "create" chip beside a
+     word the workspace already has is two ways to do one thing, and the person
+     cannot tell which of them they just used. */
+  const novel = Boolean(said) && !has(said)
+    && !known.some((one) => one.label.toLowerCase() === said.toLowerCase());
+
+  return (
+    <div className={`flex flex-col ${SPACE.tight}`}>
+      {/* ⚠️ BUILT ON `Tags` RATHER THAN BESIDE IT. What is chosen is drawn the
+          same way here as everywhere else in the product, and a removal behaves
+          the way a removal behaves — this control adds the way IN, not a second
+          way to wear a word. */}
+      {value.length
+        ? (
+          <Tags
+            label={p.label}
+            items={value.map((one) => ({ id: one, label: one }))}
+            onRemove={(id) => { onChange(value.filter((one) => one !== id)); }}
+          />
+        )
+        : <Naming>{p.label}</Naming>}
+
+      <TextInput
+        label=""
+        value={word}
+        onChange={setWord}
+        placeholder={placeholder}
+        onSubmit={() => { add(said); }}
+        help={p.help}
+      />
+
+      {/* ⚠️ CHIPS RATHER THAN ROWS, AND THE WIDTH IS THE ARGUMENT. Eight rows are
+          eight lines down a phone for eight words averaging nine characters; as
+          chips they are two lines, and a vocabulary read at a glance is a
+          vocabulary somebody uses instead of typing past. */}
+      {novel || offer.length
+        ? (
+          <div className={`flex flex-wrap ${SPACE.tight}`}>
+            {novel
+              ? (
+                <Button size="sm" variant="primary" onPress={() => { add(said); }}>
+                  {/* ⚠️ THE WORD ITSELF, NOT "Add". A button labelled with what it
+                      makes is a button nobody has to press to find out. */}
+                  {`Add “${said}”`}
+                </Button>
+              )
+              : null}
+            {offer.map((one) => (
+              <Button
+                key={one.id}
+                size="sm"
+                variant="secondary"
+                onPress={() => { add(one.label); }}
+              >
+                {one.label}
+              </Button>
+            ))}
+          </div>
+        )
+        : null}
+    </div>
   );
 }
 

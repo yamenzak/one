@@ -137,6 +137,42 @@ delivery's date on every future one.
 An itemised object has a second clock of its own: its **service**. It is a
 different working day from an expiry, which is why the two never share a list.
 
+### Registering a product is a story, not a form
+
+**Nine questions, one a screen, each phrased about the thing rather than about
+the record.** "What do you count it in?", "Does it come inside something?", "How
+closely do you follow it?" — and every answer is repeated straight back in the
+same words: *"Counted in tablets, whole ones only"*, *"A box of 10 sheets of 10
+tablets — 100 tablets in all"*, *"Each delivery is kept apart, so you can expire
+one or recall one"*.
+
+⚠️ **THE SENTENCES ARE THE DOCUMENTATION, AND THAT IS THE POINT.** This flow was
+four headings over groups of fields, and under the third of them sat `Tracked as:
+[Listed] [Counted] [Batched] [Itemised]` — the single most consequential field on
+a product, offered as four words that mean nothing to anybody who has not been
+taught them. Being taught is an induction, a wiki page and a person in the
+warehouse who knows; a new employee costs all three, every time. A question with
+its answer said back costs nothing and is read by everybody.
+
+The four explanations for those rungs had in fact been written, and reached
+nobody: the control was a `Segmented`, and `Segmented` draws `o.label` and
+nothing else. Its own header says segments are for a choice worn on the surface —
+a view, a period, a mode — and never for data entry. It is `OneOf` now, which
+draws the consequence beside each option.
+
+**The clauses are `src/saying.ts`, pure and tested**, because a sentence
+assembled inline in a screen reads "1 tablets in a box" on the one path nobody
+clicked through — and a customer meets that path on their first product.
+
+**The story so far stays on screen, and every line is one press from the step
+that wrote it.** That is what makes the camera lane checkable: six photographs
+come back as a name, a brand, a unit, a rung, a shelf life and four filing words,
+which as twenty fields across nine screens is something nobody audits, and as
+eight short sentences is something anybody reads.
+
+The frame is the engine's — `Story` in `@engine/design` (DESIGN.md). This app
+supplies the nine questions and their sentences and nothing else.
+
 ### Five verbs, not one with a parameter
 
 `receive`, `take`, `adjust`, `undo`, `move`. Collapsed into `change(delta)` they
@@ -428,14 +464,14 @@ container in `src/screens/live.tsx`, and rendered over a sample world by
 | `/ask` | Ask | secondary | `stock:read` | `screens/Ask.tsx:54` | `screens/live.tsx:1356` |
 | `/import` | Import | secondary | `product:write` | `screens/Import.tsx:131` | `screens/live.tsx:1806` |
 | `/suppliers` | Suppliers | secondary | `product:write` | `screens/Suppliers.tsx:77` | `screens/live.tsx:1806` |
-| `/register` | Add a product | none | `product:write` | `screens/Register.tsx:252` | `screens/live.tsx:2104` |
+| `/register` | Add a product | none | `product:write` | `screens/Register.tsx:232` | `screens/live.tsx:2104` |
 | `/start` | Getting started | secondary | `product:read` | `screens/Start.tsx:67` | `screens/live.tsx:1940` |
 
 ### The surfaces that are not routes
 
 | Where | What | File |
 |---|---|---|
-| `/register` | the six photographs, and what a model read off them | `screens/Register.tsx` — `Photos`, `What it is` |
+| `/register` | the nine questions, and the sentence each answer makes | `screens/Register.tsx` — `ASKS`; `src/saying.ts` |
 | `/suppliers` | the supplier editor (a tray) | `screens/Suppliers.tsx` — `SupplierTray` |
 | `/labels` | the printable sheet and the four templates | `screens/Labels.tsx` — `Template`, `TEMPLATES` |
 | `/labels` | the decant label's hazard diamonds | `screens/Labels.tsx` — `Diamond` |

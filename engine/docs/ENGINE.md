@@ -411,7 +411,7 @@ and a manifest that does not compose refuses to boot.
 | Module | What it is for | Ships | Waiting |
 |---|---|---|---|
 | `primitives` | ids, days, instants, slugs — the words everything else is spelled in | 12 | — |
-| `present` | how a date, a number, a price and a measurement are written for one reader | 17 | — |
+| `present` | how a date, a number, a price and a measurement are written for one reader | 18 | — |
 | `infra` | what a product needs underneath it, and what each kind can promise | 11 | — |
 | `field` | what a value is: its kind, its bounds, what it holds, whether it is the app's to keep | 9 | — |
 | `collection` | what a thing an app keeps is — and the six operations it gets for free | 18 | — |
@@ -441,7 +441,7 @@ and a manifest that does not compose refuses to boot.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**288 of them**, 287 reached by something today.
+**289 of them**, 288 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -973,6 +973,10 @@ its own header, cited by other files, and doing nothing.
 | `the-bar-keeps-its-pitch` | D10 | a nav drawn for five destinations that reads as five-minus-one whenever a product has four — the closed items are `grow basis-0`, so without a ceiling they divide whatever is left and the marks sit half again as far apart on one plan as on another |
 | `the-bar-centres-what-it-has` | D10 | every item capped and the whole leftover collecting at one end, which is a bar with a hole in it rather than a bar with fewer things in it |
 | `the-destination-somebody-is-on-is-lit` | D7 | the one place a product's colour touches the chrome, silently not painted — the light is a `color-mix` on the declared hue, so a manifest carrying an OKLCH triple instead of a colour makes the whole declaration invalid and nothing else about the bar changes |
+| `only-the-router-and-the-flow-write-history` | D80 | a history entry pushed with no step number on it, so the next back gesture cannot tell forward from back and one bad call corrupts every direction after it — and the existing history guard reads only the browser halves with a `main.tsx`, so every screen in every product was outside it |
+| `a-step-asks-rather-than-heads` | D80 | a flow that reads as a form again — a heading names the area of the record being written and leaves the person to work out what is wanted of them, which is the difference between a screen anybody can answer and one that needs an induction |
+| `every-step-carries-its-clause` | D80 | a step that vanishes from the recap without a trace: the screen draws, Next works, and the one answer somebody most wanted to check is the one they can never see again or get back to |
+| `the-docks-pair-belongs-to-the-flow` | D80 | a Back button over none of the wiring it implies — no recap, no per-step refusal, and no answer to the phone's own back gesture, which is the one that loses five screens of typing |
 <!-- /generated -->
 
 ### And how well each decision is defended
@@ -1059,6 +1063,7 @@ its own header, cited by other files, and doing nothing.
 | D77 | Moving stock is a verb of its own | 0 |
 | D78 | Some fields are set once, and the write is what says so | 0 |
 | D79 | A design guard that spares the apps is a guard about the wrong tree | 0 |
+| D80 | A multi-step flow asks questions and says the answers back | 4 |
 <!-- /generated -->
 
 ---
@@ -1173,8 +1178,9 @@ that names no stage, so this list cannot grow by forgetting.
 | 84 | A design rule is a guard, and the measuring is done in a browser | shipped |
 | 85 | The bar earns its material: bespoke marks, one lit destination, one movement | shipped |
 | 86 | A model is given something to hear, and the seconds are counted before they are spent | **planned** |
+| 87 | A wizard narrates: one question a screen, and what you answered stays said | shipped |
 
-**75 shipped, 11 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**76 shipped, 11 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---
