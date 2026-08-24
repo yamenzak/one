@@ -41,6 +41,16 @@ const ALIASES: Readonly<Record<Lane, readonly string[]>> = {
   text: ["text", "text-generation", "chat", "completion"],
   vision: ["vision", "image-to-text", "multimodal"],
   speech: ["speech", "tts", "text-to-speech"],
+  /*
+   * DEFER(engine-86) stage:86 — THIS LANE CAN BE FILLED AND CANNOT BE CALLED.
+   * A catalogue's speech-recognition rows resolve here, an operator can switch
+   * one on, and the console then reports the lane healthy — but `Ask` carries
+   * words and pictures and nothing to hear, so no app can hand it a sound. The
+   * missing half is not the message part: it is the RESERVE. Audio is metered
+   * by the second and a caller holds bytes, so counting it means reading a
+   * container's duration before the call — and a reserve is a ceiling on
+   * revenue, so a guess can only ever under-charge.
+   */
   listen: ["listen", "stt", "speech-to-text", "automatic-speech-recognition"],
   image: ["image", "text-to-image", "image-generation"],
   embed: ["embed", "embedding", "text-embeddings"],
@@ -71,6 +81,48 @@ export const taskKey = (task: string): string =>
 
 export const laneOf = (task: string): Lane | null =>
   (LANES.find((l) => ALIASES[l].includes(taskKey(task))) ?? null);
+
+/**
+ * THE LANES A MODEL ANSWERS BESIDE THE ONE IT IS FOR.
+ *
+ * ⚠️ ONE TASK COLUMN CANNOT SAY THAT A CHAT MODEL READS PICTURES, and almost
+ * every chat model now does. A catalogue publishes ONE task per row, so a
+ * modern Gemini, Claude or GPT lands in `text-generation` and the vision lane
+ * reports "nothing answers" while a dozen rows that would answer it sit enabled
+ * one lane over. The lane is then filled — if it is filled at all — by whatever
+ * small dedicated `Image-to-Text` model the catalogue carries, which is elected
+ * over every frontier model in the deployment.
+ *
+ * ⚠️ IT IS ADDITIVE, NEVER A REPLACEMENT. `task` stays what the row is FOR —
+ * what it is elected to do by default and what its price is quoted against.
+ *
+ * ⚠️ AND IT APPLIES TO CHAT MODELS ONLY. An embedder takes text and a voice
+ * model speaks it; claiming vision for either elects one to read a photograph.
+ *
+ * ⚠️ THE MATCH IS ON THE FAMILY, NOT ON A LIST OF IDS. A list is right on the
+ * day it is written and wrong at the vendor's next release, and the failure is
+ * silent — a new model arrives, syncs, prices, and is quietly the only frontier
+ * row that cannot see. The families are numbered, so this asks the number.
+ */
+const READS_PICTURES: readonly RegExp[] = [
+  /* ⚠️ 1.0 is the boundary, not 1.5: Gemini has taken an image in the same
+     request as the prompt since 1.5, and only the first generation cannot. */
+  /^gemini-(?!1\.0)/,
+  /^claude-(?!1|2)/,
+  /^gpt-(?:4o|4\.|5)|^o[134](?:-|$)/,
+  /^grok-(?!1)/,
+  /^pixtral|-vl(?:-|$)|vision/,
+  /* ⚠️ Llama and Qwen sight is per-model rather than per-generation, so it is
+     the name that says so — caught by `vision`/`-vl` above; this is the pair
+     whose whole generation reads pictures. */
+  /^llama-4|^gemma-3/,
+];
+
+export const alsoLanes = (id: string, task: string): readonly string[] => {
+  if (laneOf(task) !== "text") return [];
+  const name = id.slice(id.lastIndexOf("/") + 1).toLowerCase();
+  return READS_PICTURES.some((re) => re.test(name)) ? ["image-to-text"] : [];
+};
 
 /* ----------------------------------------------------------------- models --- */
 

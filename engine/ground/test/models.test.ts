@@ -69,6 +69,23 @@ const CATALOGUE = [
     task: { name: "Text-to-Image" },
     properties: [{ property_id: "price", value: [{ unit: "per 512x512 tile", price: 53 }] }],
   },
+  /*
+    ⚠️ A RESOLD GEMINI ROW, WHICH IS THE ONE THAT MATTERS FOR THE VISION LANE.
+    Cloudflare's unified catalogue carries other vendors' models under a
+    `vendor/model` id and publishes ONE task for each — `Text Generation`, even
+    though every one of these reads a picture in the same request as the prompt.
+    Without a row of this shape the fixture had no vision-capable chat model in
+    it at all, and the whole lane could be empty with every test green.
+  */
+  {
+    id: "e1c7d3b6-88ff-4c2b-9a1d-3b7f2e6c8d40",
+    name: "google/gemini-2.5-flash",
+    task: { name: "Text Generation" },
+    properties: [{ property_id: "price", value: [
+      { unit: "per M input tokens", price: 0.3 },
+      { unit: "per M output tokens", price: 2.5 },
+    ] }],
+  },
   /* ⚠️ Speech and embeddings, whose display names are the ones that did NOT
      resolve: two words and a space against a hyphenated alias table. */
   {
@@ -90,6 +107,8 @@ const ID = {
   small: "@cf/meta/llama-3.1-8b-instruct",
   big: "@cf/meta/llama-3.3-70b",
   image: "@cf/black-forest-labs/flux-1-schnell",
+  /* ⚠️ The vendor segment is stripped by `addressIn` — see there. */
+  sighted: "gemini-2.5-flash",
   listen: "@cf/openai/whisper",
   embed: "@cf/baai/bge-m3",
 } as const;
@@ -150,6 +169,7 @@ async function signIn(email: string): Promise<string> {
 
 interface Shown {
   readonly id: string; readonly lane: string | null;
+  readonly lanes: readonly string[];
   readonly enabled: boolean; readonly isDefault: boolean; readonly multiplier: number;
 }
 interface Fault { readonly of: string; readonly why: string }
@@ -199,6 +219,29 @@ describe("what the console is shown", () => {
     /* ⚠️ The two whose display names are two words — the shape that failed. */
     expect(row(at.models, ID.listen).lane).toBe("listen");
     expect(row(at.models, ID.embed).lane).toBe("embed");
+  });
+
+  /*
+    ⚠️ A CHAT MODEL THAT READS PICTURES IS IN TWO LANES, AND THE CATALOGUE SAYS
+    ONE. This is the fault that made the vision lane useless: every Gemini,
+    Claude and GPT row lands `Text Generation`, so `offeredIn(rows, "vision")`
+    saw only whatever small dedicated `Image-to-Text` model the catalogue
+    carried — and elected THAT to read a photograph, over every frontier model
+    in the deployment. Nothing failed anywhere; the lane was simply answered by
+    the wrong model, or by nothing.
+
+    ⚠️ AND THE LANE IT IS FOR IS STILL `text`. `also` is additive — what a row is
+    elected to do by default, and what its price is quoted against, do not move.
+  */
+  it("puts a chat model that reads pictures in the vision lane as well as text", async () => {
+    const at = await catalogue(ops);
+    expect(row(at.models, ID.sighted).lane).toBe("text");
+    expect(row(at.models, ID.sighted).lanes).toEqual(["text", "vision"]);
+    /* ⚠️ AND NOT EVERY ROW. An embedder takes text and a voice model speaks it,
+       and a text model without sight is still only a text model; claiming sight
+       for any of them elects one to read a photograph. */
+    const seeing = at.models.filter((m) => m.lanes.includes("vision")).map((m) => m.id);
+    expect(seeing).toEqual([ID.sighted]);
   });
 
   /* ⚠️ New rows arrive disabled — nothing starts answering because it appeared. */

@@ -23,7 +23,7 @@
  */
 
 import type { Meter, ModelRow } from "@engine/kernel";
-import { laneOf, lanesFor, milliFromUsd, taskKey } from "@engine/kernel";
+import { alsoLanes, laneOf, lanesFor, milliFromUsd, taskKey } from "@engine/kernel";
 import type { CatalogueRow } from "./cloudflare.js";
 import type { SchemaModule } from "./schema.js";
 import type { Db } from "./sql.js";
@@ -591,6 +591,12 @@ export const readCatalogue = (rows: readonly CatalogueRow[]): readonly Discovere
         task,
         provider: at.provider,
         meter: meterOf(task),
+        /* ⚠️ A CATALOGUE PUBLISHES ONE TASK AND A CHAT MODEL DOES TWO THINGS —
+           see `alsoLanes`. Without this the whole unified catalogue lands
+           text-only, and the vision lane holds nothing but the small dedicated
+           `Image-to-Text` rows, which are then elected over every frontier
+           model in the deployment. */
+        also: alsoLanes(at.model, task),
         ...pricing(row),
         ...(propOf(row, "reasoning") ? { thinks: true } : {}),
       } satisfies Discovered;

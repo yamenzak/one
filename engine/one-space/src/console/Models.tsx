@@ -46,7 +46,16 @@ interface Shown {
   readonly thinks: boolean;
   readonly maxOutput: number;
   readonly retired: boolean;
+  /** ⚠️ What it is FOR — one lane, and what its price is quoted against. */
   readonly lane: string | null;
+  /**
+   * ⚠️ AND EVERY LANE IT ANSWERS, WHICH IS NOT ALWAYS ONE. A modern chat model
+   * reads a picture in the same request as the prompt, so grouping the list by
+   * `lane` alone drew Vision empty over a catalogue full of models that serve
+   * it — and an operator went looking for a vision model to switch on, found
+   * only the small dedicated ones, and switched one of those on instead.
+   */
+  readonly lanes: readonly string[];
 }
 
 interface Fault {
@@ -74,7 +83,13 @@ interface Answer {
 /** ⚠️ Answers no lane of ours — a real group, and never a fault. See below. */
 const SPARE = "spare";
 
-const laneOf = (m: Shown): string => m.lane ?? SPARE;
+/**
+ * ⚠️ A ROW APPEARS UNDER EVERY LANE IT ANSWERS — see `Shown.lanes`. One row in
+ * two groups is the honest picture: the same model is what Text runs and what
+ * Vision runs, and showing it once would mean one of those lists lying.
+ */
+const answers = (m: Shown, lane: string): boolean =>
+  (lane === SPARE ? m.lanes.length === 0 : m.lanes.includes(lane));
 
 export function Models({ where, onGo }: {
   readonly where: Where & { at: "models" };
@@ -110,7 +125,7 @@ export function Models({ where, onGo }: {
 function Lanes({ at, onGo }: {
   readonly at: Answer; readonly onGo: (to: Where) => void;
 }) {
-  const spare = at.models.filter((m) => laneOf(m) === SPARE);
+  const spare = at.models.filter((m) => answers(m, SPARE));
 
   return (
     <>
@@ -118,7 +133,7 @@ function Lanes({ at, onGo }: {
 
       <Group label="Lanes" under="What an app asks for, and what answers it">
         {LANES.map((lane) => {
-          const rows = at.models.filter((m) => m.lane === lane);
+          const rows = at.models.filter((m) => answers(m, lane));
           const on = rows.filter((m) => m.enabled && !m.retired);
           const runs = on.find((m) => m.isDefault) ?? on[0];
           return (
@@ -159,7 +174,7 @@ function Lanes({ at, onGo }: {
 function InLane({ at, lane, onDone }: {
   readonly at: Answer; readonly lane: string; readonly onDone: () => void;
 }) {
-  const rows = at.models.filter((m) => laneOf(m) === lane);
+  const rows = at.models.filter((m) => answers(m, lane));
   const on = rows.filter((m) => m.enabled && !m.retired).length;
 
   /* ⚠️ CHEAPEST FIRST, AND THE ONES THAT RUN ABOVE THEM. What is switched on is
@@ -175,11 +190,20 @@ function InLane({ at, lane, onDone }: {
       <Faults of={at.faults.filter((f) => f.of === lane
         || rows.some((m) => m.id === f.of))} />
 
+      {/*
+        ⚠️ ONE SENTENCE FOR THE LIST, NOT A MARK ON EVERY ROW. Several of these
+        are chat models that also read pictures, and somebody who switches one
+        on here is switching it on for text as well — one row, one switch. A
+        chip per row would be texture on most of the list; this is the fact,
+        said once, and only where it is true.
+      */}
       <Group
         label={lane === SPARE ? "Answers no lane" : sentence(lane)}
         under={lane === SPARE
           ? "Nothing will ever select these — their task maps to no lane of ours"
-          : `${on} of ${rows.length} on`}
+          : rows.some((m) => m.lane !== lane)
+            ? `${on} of ${rows.length} on · some also answer another lane`
+            : `${on} of ${rows.length} on`}
       >
         {order.map((m) => (
           <Sold key={m.id} model={m} floor={at.floor} onDone={onDone} />

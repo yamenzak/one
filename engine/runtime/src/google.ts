@@ -32,6 +32,7 @@
  * would make every Google call resolve to nothing.
  */
 
+import { alsoLanes } from "@engine/kernel";
 import type { Discovered } from "./models.js";
 
 /** ⚠️ Cloudflare's name for the lane, because `/compat` is what addresses it. */
@@ -266,20 +267,6 @@ const taskOf = (it: Listed, id: string): string => {
 };
 
 /**
- * ⚠️ A GEMINI TEXT MODEL READS PICTURES TOO, AND ONE TASK CANNOT SAY SO. Every
- * model from 2.0 on takes an image in the same request as the prompt, so a
- * deployment whose vision lane reports "nothing answers" while eight Gemini rows
- * sit enabled in the text lane is describing our schema rather than the world.
- * A row therefore names the lanes it ALSO answers, and `text-generation` is
- * still its own — what it is asked for by default does not change.
- *
- * ⚠️ AND IT IS NOT EVERY MODEL. An embedder takes text, a voice model speaks it;
- * claiming vision for those would elect one to read a photograph.
- */
-const alsoOf = (id: string, task: string): readonly string[] =>
-  task === "text-generation" && !/^gemini-1\./.test(id) ? ["image-to-text"] : [];
-
-/**
  * ⚠️ A THINKING MODEL BILLS FOR TOKENS NOBODY REQUESTED, which is why the
  * reserve widens for one. Everything from 2.5 on reasons by default, and the
  * families are numbered, so this asks the number rather than listing them —
@@ -360,7 +347,11 @@ export async function listGeminiModels(
         name: it.displayName ?? id,
         ...(it.description ? { description: it.description } : {}),
         task,
-        also: alsoOf(id, task),
+        /* ⚠️ THE KERNEL'S, NOT THIS FILE'S — see `alsoLanes`. A Gemini row read
+           from Google's API and the same model resold in Cloudflare's catalogue
+           must land in the same lanes, or which vendor answered first decides
+           whether the vision lane can see it. */
+        also: alsoLanes(id, task),
         provider: PROVIDER,
         /* ⚠️ EVERY GEMINI RATE IS PER TOKEN, image models included — an image is
            charged as output tokens rather than per picture. */

@@ -32,7 +32,7 @@ import {
   refusePrompt,
   stalled,
 } from "@engine/kernel";
-import type { Residency } from "@engine/kernel";
+import type { Lane, Residency } from "@engine/kernel";
 import type { Account } from "./cloudflare.js";
 import { verify } from "./cloudflare.js";
 /* ⚠️ The store is its own module — `locate` reads it on every request and must
@@ -1137,6 +1137,14 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
             /* ⚠️ Which of OUR lanes it answers, resolved once here — a screen
                matching provider task names would be a second alias table. */
             lane: laneOf(m.task),
+            /* ⚠️ AND THE LANES IT ALSO ANSWERS, because one is not the whole
+               answer for a chat model that reads pictures. Sent as `lane` alone,
+               the console showed the vision lane empty over a catalogue full of
+               models that could serve it — so an operator went looking for a
+               vision model to switch on, found only the small dedicated ones,
+               and enabled one of those. See `alsoLanes`. */
+            lanes: [...new Set([laneOf(m.task), ...(m.also ?? []).map(laneOf)]
+              .filter((l): l is Lane => l !== null))],
           })),
           /* ⚠️ The catalogue's own faults, on the screen that can fix them. */
           /* ⚠️ Asked of the lanes the APPS actually declare — a fault about a

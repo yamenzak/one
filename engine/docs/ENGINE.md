@@ -436,11 +436,11 @@ and a manifest that does not compose refuses to boot.
 | `job` | scheduled work, and the record that it ran | 7 | — |
 | `brand` | which surfaces a workspace may put its own mark on | 9 | — |
 | `mark` | the logo as geometry, so the browser and the Worker draw one shape | 8 | — |
-| `ai` | a generating action: its lane, its prompt, its ceiling | 17 | — |
+| `ai` | a generating action: its lane, its prompt, its ceiling | 18 | — |
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**286 of them**, 285 reached by something today.
+**287 of them**, 286 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -1165,8 +1165,9 @@ that names no stage, so this list cannot grow by forgetting.
 | 83 | A product's colour is the product's, and one family commits | shipped |
 | 84 | A design rule is a guard, and the measuring is done in a browser | shipped |
 | 85 | The bar earns its material: bespoke marks, one lit destination, one movement | shipped |
+| 86 | A model is given something to hear, and the seconds are counted before they are spent | **planned** |
 
-**75 shipped, 10 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**75 shipped, 11 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---
