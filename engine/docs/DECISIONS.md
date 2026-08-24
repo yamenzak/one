@@ -2527,3 +2527,43 @@ optional again.
 **Therefore never:** a write with no `outcome`; a confirmation written in the
 screen that pressed the button; a silence that is a blank field rather than a
 stated reason; or a reason that is a label.
+
+## D72 — A duplicate is refused on a fact and asked about on a resemblance
+
+**A catalogue fills with duplicates one careful person at a time.** Somebody
+searches "gloves nitrile" in a hurry, finds nothing, and adds a second row; from
+then on half the stock lives under one and half under the other, every report is
+wrong, and neither row is obviously the mistake. Nothing failed. Nobody was
+careless.
+
+**So the check has two halves, and they are not the same kind of thing.** A
+barcode names one product — a second owner makes every future scan of that string
+ambiguous, and the resolver answers with whichever row it read first, wrongly, for
+ever. That is a FACT, so it is refused, and no "register anyway" may wave it
+through: a person may not press past a fact. A name that looks like another name
+is a QUESTION, and "yes, two brands make this" is a real answer, so it is put in
+front of somebody while they are still typing rather than after they have filled
+in a form.
+
+**`product.resembling` is a READ for exactly that reason.** Refusing the write
+instead would be a form somebody fills in completely and is then told to throw
+away, which is how people learn to press past a warning without reading it. It is
+cheap enough for a keystroke, debounced to the letter that matters, and it
+separates "same name and brand" from "similar name" — conflating them makes the
+strong signal weak, and a false match tells somebody their new product already
+exists when it does not.
+
+**The write keeps a backstop, and only for the certain half.** A queued write
+replaying after a day offline, an agent, a second tab: none of them saw the list.
+`inventory.resembles` is retryable, because the retry is the same request with
+the answer in it.
+
+**The normaliser is deliberately blunt.** An EAN-13 and the `(01)` of the
+DataMatrix on the same box differ by a leading zero, so codes are padded before
+they are compared or stored; names are lowercased and stripped to words, and
+nothing cleverer. An edit distance starts calling different products the same
+one, and this check exists to be believed.
+
+**Therefore never:** a barcode learned for a second product; a resemblance
+reported only after a form is complete; one sentence covering both halves; or a
+matcher clever enough to be wrong about things that are genuinely different.

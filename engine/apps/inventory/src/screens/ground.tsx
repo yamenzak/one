@@ -20,7 +20,7 @@
 import * as React from "react";
 import { Shell, whoFace } from "@engine/design";
 import { INVENTORY } from "../index.js";
-import { InventoryScreen } from "./index.js";
+import { InventoryScreen, InventorySurface } from "./index.js";
 
 /** ⚠️ Every permission a screen names, so none of them is undrawable here. */
 const EVERYTHING = new Set([
@@ -65,7 +65,22 @@ export function InventoryGround({ route, onGo }: {
       }}
       onGo={go}
     >
-      <InventoryScreen route={route} onGo={go} />
+      {/*
+        ⚠️ A SURFACE IS ASKED FOR THROUGH THE SAME STRING A ROUTE IS, and the
+        prefix is what keeps it one parameter. The harness passes one route down
+        a chain four deep — page, mount, ground, screen — and a second argument
+        for "or a sheet" would have to be threaded through every one of them and
+        defaulted at each, which is four places to forget it.
+
+        ⚠️ AND THE SCREEN BEHIND IT IS HOME, BECAUSE A SHEET IS OVER SOMETHING.
+        Measured against a blank page a drawer has no scrim to be legible over
+        and no page under it to push sideways — which is not the thing that
+        ships.
+      */}
+      <InventoryScreen route={route.startsWith("surface:") ? "/" : route} onGo={go} />
+      {route.startsWith("surface:")
+        ? <InventorySurface id={route.slice("surface:".length)} />
+        : null}
     </Shell>
   );
 }

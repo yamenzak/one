@@ -39,7 +39,16 @@ import {
   contrastOf, geometryOf, isLarge, mounted, sayTwins, strayTwins, scaleOf,
   stylesheet, tooSmall, unreadable,
 } from "@engine/design/measuring";
-import { INVENTORY_ROUTES } from "../src/screens/index.js";
+import { INVENTORY_ROUTES, INVENTORY_SURFACES } from "../src/screens/index.js";
+
+/*
+  ⚠️ THE SHEETS ARE SWEPT WITH THE SCREENS, because a drawer is not less of a
+  surface for being reachable from four screens instead of an address. Walking
+  the manifest's routes alone left every non-route surface drawn by nothing and
+  measured by nothing — its first contact with a real viewport would have been a
+  customer's, on a phone, holding a box.
+*/
+const EVERY = [...INVENTORY_ROUTES, ...INVENTORY_SURFACES.map((id) => `surface:${id}`)];
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -57,7 +66,7 @@ const at = (route: string, viewport: { width: number; height: number }) =>
   geometryOf(browser, { code, route }, css, viewport);
 
 describe("every screen, at a phone width", () => {
-  for (const route of INVENTORY_ROUTES) {
+  for (const route of EVERY) {
     it(`does not push the page sideways: ${route}`, async () => {
       const seen = await at(route, PHONE);
       expect(seen.worst, `${route}: <${seen.worst?.tag}> reaches ${seen.worst?.right}px `
@@ -68,7 +77,7 @@ describe("every screen, at a phone width", () => {
 });
 
 describe("every screen, at a desk width", () => {
-  for (const route of INVENTORY_ROUTES) {
+  for (const route of EVERY) {
     it(`does not push the page sideways: ${route}`, async () => {
       const seen = await at(route, DESK);
       expect(seen.worst, `${route}: <${seen.worst?.tag}> reaches ${seen.worst?.right}px `
@@ -87,7 +96,7 @@ describe("every screen, at a desk width", () => {
   what says it is still there and still reaches every control.
 */
 describe("every control somebody has to hit", () => {
-  for (const route of INVENTORY_ROUTES) {
+  for (const route of EVERY) {
     it(`is big enough for a finger: ${route}`, async () => {
       const seen = await at(route, PHONE);
       const small = tooSmall(seen.targets);
@@ -106,7 +115,7 @@ describe("every control somebody has to hit", () => {
   result is a page where nothing is emphatic because everything is.
 */
 describe("the type on every screen", () => {
-  for (const route of INVENTORY_ROUTES) {
+  for (const route of EVERY) {
     it(`is a scale with a top: ${route}`, async () => {
       const seen = await at(route, PHONE);
       const scale = scaleOf(seen.type);
@@ -142,7 +151,7 @@ describe("the type on every screen", () => {
   THE ONE NOBODY LOOKS AT. Dark had one fault class; light had four.
 */
 describe("everything on a screen can be read", () => {
-  for (const route of INVENTORY_ROUTES) {
+  for (const route of EVERY) {
     for (const theme of ["dark", "light"] as const) {
       it(`in ${theme}: ${route}`, async () => {
         const seen = await geometryOf(browser, { code, route }, css, PHONE, theme);
@@ -243,7 +252,7 @@ describe("the measurements bite", () => {
   ellipsis is the layout's own decision taken at 390 pixels.
 */
 describe("what the chrome says", () => {
-  for (const route of INVENTORY_ROUTES) {
+  for (const route of EVERY) {
     it(`says all of it: ${route}`, async () => {
       const seen = await at(route, PHONE);
       const chrome = seen.cut.filter((one) => one.where !== "");
@@ -262,7 +271,7 @@ describe("what the chrome says", () => {
   as, which is the fault that put this reading here (`Geometry.twins`).
 */
 describe("every name a screen puts in the document", () => {
-  for (const route of INVENTORY_ROUTES) {
+  for (const route of EVERY) {
     it(`calls each of them one thing: ${route}`, async () => {
       const seen = await at(route, PHONE);
       const stray = strayTwins(seen.twins);

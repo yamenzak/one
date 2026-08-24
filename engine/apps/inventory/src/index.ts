@@ -1567,6 +1567,18 @@ const register = operation<Registering, Registered>({
     }
 
     /*
+      ⚠️ THE PREFERRED SUPPLIER MUST BE ONE THE PRODUCT IS SOURCED FROM. An order
+      addressed to somebody the catalogue does not say sells it is an order
+      nobody can explain — and the two fields arrive independently, so nothing
+      but this makes them agree. The sheet already keeps them in step; a queued
+      write, an agent or a second tab never saw the sheet.
+    */
+    if (input.supplier && !sources.some((one) => one.supplier === input.supplier)) {
+      return c.fail("platform.invalid", {},
+        { fields: { supplier: "Order from somebody the product is sourced from" } });
+    }
+
+    /*
       ⚠️ THE BACKSTOP, NOT THE MECHANISM. `product.resembling` is what the sheet
       shows while somebody types; this catches the case where nothing was shown
       — an offline queue replaying, an agent, a second tab — and it refuses only
