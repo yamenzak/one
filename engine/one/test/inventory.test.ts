@@ -850,3 +850,136 @@ describe("a ladder of packaging, and carrying stock between shelves", () => {
     expect(JSON.stringify(said.body)).toContain("already");
   });
 });
+
+/* ------------------------------------------------- what a product is counted in --- */
+
+/**
+ * THE UNIT IS SET ONCE, AND THE GENERATED UPDATE CANNOT MOVE IT.
+ *
+ * ⚠️ A PRODUCT'S UNIT IS WHAT EVERY OTHER NUMBER IS IN. Edited from "box" to
+ * "sheet" it rewrites the meaning of every balance, every movement and every
+ * report without one write going anywhere near a quantity — twenty boxes on a
+ * shelf become twenty sheets, and nothing afterwards can say which rows meant
+ * which. The generated update is a column setter and has no way to know that.
+ *
+ * ⚠️ SO BOTH FIELDS ARE `settled` AND `product.recount` IS THE WAY. Each carries
+ * a different question: the unit asks whether anything has been counted yet, and
+ * the rung asks whether the change goes DEEPER — `promotes`, which was written,
+ * tested, and called by nothing at all until now.
+ *
+ * ⚠️ AND IT IS ASSERTED THROUGH THE DOOR RATHER THAN OVER THE FUNCTION, because
+ * the hole was that a generated verb existed and nobody had tried it.
+ */
+describe("changing what a product is counted in", () => {
+  const fresh = async (name: string, of: Record<string, unknown> = {}) =>
+    idOf(await write("product.create", {
+      name, unit: "box", tracking: "counted", ...of,
+    }));
+
+  const unitOf = async (product: string) => {
+    const said = await read("product.list");
+    const rows = said.body.items as { id: string; unit: string; tracking: string }[];
+    return rows.find((r) => r.id === product);
+  };
+
+  /*
+    ⚠️ THE BACK DOOR, AND IT IS THE WHOLE POINT OF THE `settled` FLAG. No screen
+    calls `product.update` — but it is a generated verb on the API, reachable by
+    an agent and by a queued write replaying after a day offline, and it changed
+    this field without a word.
+  */
+  it("refuses a unit change through the generated update", async () => {
+    const product = await fresh("Nitrile gloves, L");
+    const said = await write("product.update", { id: product, unit: "sheet" });
+    expect(said.status, JSON.stringify(said.body)).toBe(400);
+    expect(JSON.stringify(said.body)).toContain("unit");
+    expect((await unitOf(product))?.unit).toBe("box");
+  });
+
+  it("refuses a tracking change through the generated update", async () => {
+    const product = await fresh("Surgical tape");
+    const said = await write("product.update", { id: product, tracking: "batched" });
+    expect(said.status).toBe(400);
+    expect((await unitOf(product))?.tracking).toBe("counted");
+  });
+
+  /* ⚠️ AND EVERYTHING ELSE STILL EDITS. A guard that froze the whole record would
+     be a worse bug than the one it closes. */
+  it("leaves every other field editable", async () => {
+    const product = await fresh("Cotton swabs");
+    const said = await write("product.update", { id: product, brand: "Hartmann", par: 40 });
+    expect(said.status, JSON.stringify(said.body)).toBe(200);
+  });
+
+  /*
+    ⚠️ BEFORE ANYTHING IS COUNTED THE CHANGE IS FREE, which is when somebody who
+    mistyped it actually notices. A refusal here would make a typo permanent.
+  */
+  it("allows the unit while nothing has been counted", async () => {
+    const product = await fresh("Alcohol wipes");
+    const said = await write("product.recount", { product, unit: "sheet" });
+    expect(said.status, JSON.stringify(said.body)).toBe(200);
+    expect((await unitOf(product))?.unit).toBe("sheet");
+  });
+
+  it("refuses the unit once there is stock", async () => {
+    const place = idOf(await write("location.create", { name: "Cupboard 7", kind: "room" }));
+    const product = await fresh("Gauze pads");
+    await write("stock.receive", {
+      product, location: place, quantity: 20, day: TODAY, capture: "typed" });
+
+    const said = await write("product.recount", { product, unit: "sheet" });
+    expect(said.status).toBe(409);
+    expect(JSON.stringify(said.body)).toContain("box");
+    expect((await unitOf(product))?.unit).toBe("box");
+  });
+
+  /*
+    ⚠️ AND AN EMPTY SHELF IS NOT AN UNCOUNTED PRODUCT. Asked as "is there any
+    stock", every product that happens to be out today would pass — while its
+    ledger is full of numbers in the old unit, and a report over that mixes the
+    two without any row being wrong.
+  */
+  it("refuses the unit on an empty shelf that has history", async () => {
+    const place = idOf(await write("location.create", { name: "Cupboard 8", kind: "room" }));
+    const product = await fresh("Saline 10ml");
+    await write("stock.receive", {
+      product, location: place, quantity: 5, day: TODAY, capture: "typed" });
+    await write("stock.take", {
+      product, location: place, quantity: 5, day: TODAY, capture: "typed" });
+
+    const said = await write("product.recount", { product, unit: "ampoule" });
+    expect(said.status).toBe(409);
+    expect((await unitOf(product))?.unit).toBe("box");
+  });
+
+  /*
+    ⚠️ GOING DEEPER IS SAFE — forty gloves become forty gloves in an unrecorded
+    batch, which is honest and is what happened. This is the half a guard that
+    refused every change would have taken away.
+  */
+  it("promotes a product to a deeper rung, with stock on the shelf", async () => {
+    const place = idOf(await write("location.create", { name: "Cupboard 9", kind: "room" }));
+    const product = await fresh("Lidocaine 1%");
+    await write("stock.receive", {
+      product, location: place, quantity: 12, day: TODAY, capture: "typed" });
+
+    const said = await write("product.recount", { product, tracking: "batched" });
+    expect(said.status, JSON.stringify(said.body)).toBe(200);
+    expect((await unitOf(product))?.tracking).toBe("batched");
+  });
+
+  /* ⚠️ AND GOING SHALLOWER IS REFUSED, which is `promotes` — written, tested, and
+     reached by nothing at all before this. */
+  it("refuses a shallower rung", async () => {
+    const product = await fresh("Vaccine A", { tracking: "batched" });
+    const said = await write("product.recount", { product, tracking: "counted" });
+    expect(said.status).toBe(409);
+    expect((await unitOf(product))?.tracking).toBe("batched");
+  });
+
+  it("refuses a recount that asks for nothing", async () => {
+    const product = await fresh("Bandages");
+    expect((await write("product.recount", { product })).status).toBe(400);
+  });
+});

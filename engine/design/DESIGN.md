@@ -1173,6 +1173,7 @@ Some of this is guarded and some is judgement:
 - `renewal` — a deploy reaches a browser that is already open.
 - `rhythm` — one rhythm per container, and a screen's is the DOM's rather than a walk over React children.
 - `scene` — seeded, compositor-only, masked rather than washed, sized by area, bound rather than built.
+- `settled` — a settled field cannot be changed by the generated update.
 - `shape` — every screen declares one, the shape places the action, and no screen draws its own crown or pins its own dock.
 - `showcase` — everything this package ships is drawn somewhere, or the reason it is not is written down.
 - `space` — one API door, one door classifier, and no screen that is never drawn.

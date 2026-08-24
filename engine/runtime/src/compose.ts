@@ -232,8 +232,16 @@ function crudFor(
       what reaches SQL is a column name the declaration carries. `after` is the
       previous page's `next`, opaque. `limit` is bounded on the way in.
     */
-    input: verb === "create" || verb === "update"
+    /* ⚠️ AN UPDATE DOES NOT ADVERTISE A FIELD IT WILL REFUSE — see
+       `FieldSpec.settled`. `patch` is what ENFORCES it (the door's own input
+       check skips generated operations), but the tool catalogue, the OpenAPI and
+       the MCP surface are all built from this, and an agent offered a key that is
+       always refused will keep sending it. */
+    input: verb === "create"
       ? spec.fields
+      : verb === "update"
+        ? Object.fromEntries(
+          Object.entries(spec.fields).filter(([, one]) => !one.settled))
       : verb === "list"
         ? {
           limit: field.number({ label: "How many", holds: "none", min: 1, max: MOST_ROWS }),
@@ -287,6 +295,15 @@ function refuse(
   if (done.why === "out_of_reach") {
     ctx.fail("platform.out_of_reach", { places },
       { fields: { [spec.reachBy ?? "id"]: "You do not work there." } });
+  }
+  /* ⚠️ A SETTLED FIELD NAMES ITSELF, so the sentence lands under the control the
+     caller touched rather than over the form. It is the one refusal here whose
+     cause is a specific field the caller chose, and burying it in a general
+     "that does not look right" would leave them re-reading a form that is
+     correct. */
+  if (done.why === "settled") {
+    ctx.fail("platform.invalid", {},
+      { fields: Object.fromEntries(done.names.map((f) => [f, done.detail])) });
   }
   const named = done.why === "vault_only"
     ? Object.keys(spec.fields).filter((f) => spec.fields[f]?.vault)

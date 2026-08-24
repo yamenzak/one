@@ -2716,3 +2716,41 @@ a button whose entire promise is that nothing happened.
 
 **What this forbids:** recording a shelf-to-shelf move as `taken` plus
 `received`, and an undo that reaches one half of a pair.
+
+## D78 — Some fields are set once, and the write is what says so
+
+**A product's unit is what every other number is counted in.** Edited from "box"
+to "sheet" it rewrites the meaning of every balance, every movement and every
+report — twenty boxes on a shelf become twenty sheets — without one write going
+anywhere near a quantity. The generated update is a column setter and has no way
+to know that; it did exactly this, and nothing anywhere said a word.
+
+**So the declaration carries it and `patch` refuses.** `FieldSpec.settled` marks
+a field that may be given a value at create and never changed by the generated
+update. Not "the screen does not offer it" — a screen's rule is a courtesy, and
+these fields are reachable from an agent through MCP, from the API, and from a
+queued write replaying after a day offline.
+
+**`records.ts` is the only place it can hold.** The door's own input check skips
+generated operations by design, so dropping the field from the generated update's
+declared input hides it without refusing it. The generated update does drop it —
+an agent offered a key that is always refused will keep sending it — but that is
+politeness, not enforcement.
+
+**Refused, never silently dropped.** Ignoring the key answers 200 over a change
+that did not happen, which is D75 one table over. The refusal carries the field
+names so the sentence lands under the control the caller touched.
+
+**Changing one is a real thing to want, so it gets an operation that knows what
+else has to be true.** In OneInventory that is `product.recount`: the unit is
+refused once any stock OR any movement exists — an empty shelf still has a ledger
+full of numbers in the old unit — and the rung may only go DEEPER, which is
+`promotes`, a function that was written, tested, and called by nothing until this.
+
+**Converting instead of refusing was considered and rejected.** The factor is a
+guess only the person has, a wrong one is undetectable afterwards, and there is no
+undo. Before anything is counted the change is free, which is when somebody who
+mistyped it actually notices.
+
+**What this forbids:** a settled field in a patch, and a generated update that
+advertises one. `settled` fails on both.

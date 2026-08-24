@@ -93,6 +93,29 @@ cannot be recalled) or to the tablet (so the box row bought nothing). Nesting is
 right where a level has its own IDENTITY and lifecycle — and that is `item` and
 `kit`, which already exist.
 
+### What is set once
+
+**A product's `unit` and its `tracking` are `settled`** — given a value when the
+product is made, and refused by the generated update after that. The unit is what
+every other number is counted in: edited from "box" to "sheet" it turns twenty
+boxes on a shelf into twenty sheets, with no write anywhere near a quantity.
+
+`product.recount` is the deliberate change, and it asks a different question of
+each:
+
+- **the unit** is refused once any stock **or any movement** exists. An empty
+  shelf is not an uncounted product — its ledger is full of numbers in the old
+  unit, and a report over that mixes the two without any row being wrong. Before
+  anything is counted the change is free, which is when a typo is actually
+  noticed.
+- **the rung** may only go deeper — `promotes`. Forty gloves become forty gloves
+  in an unrecorded batch, which is what happened; the other way discards the
+  batches, their expiries and their suppliers.
+
+The way to count the same physical thing in a second unit is a second product.
+That is usually what somebody asking for this means: the sheets are a different
+thing from the boxes, ordered and counted separately.
+
 ### Four clocks, and the earliest one wins
 
 A delivery expires on the date **printed** on it; on the day it was **made** plus
@@ -308,7 +331,7 @@ somebody labelled and never filled.
 Erasure is derived from what each one declares; nothing here carries a
 hand-written cascade.
 
-### Forty-nine operations
+### Fifty operations
 
 Grouped by what they are about: the shelf (`stock.*`), the code book (`code.*`),
 deliveries (`batch.*`), objects (`unit.*`), kits (`kit.*`), counting

@@ -41,7 +41,16 @@ export type WriteRefusal =
    * is different: the record is their workspace's and the PLACE is not theirs,
    * so the person can be told which sites they work in and ask for another.
    */
-  | { readonly why: "out_of_reach"; readonly detail: string };
+  | { readonly why: "out_of_reach"; readonly detail: string }
+  /**
+   * ⚠️ A FIELD THAT MAY BE SET AND NOT CHANGED — see `FieldSpec.settled`. It is
+   * its own refusal because the answer is neither "no such field" nor "you may
+   * not": the field is real and the caller may edit this record. What is wrong is
+   * that changing THIS one reinterprets every number already recorded against it,
+   * and the way to do it deliberately is an operation that knows what else has to
+   * be true first.
+   */
+  | { readonly why: "settled"; readonly detail: string; readonly names: readonly string[] };
 
 /**
  * ⚠️ A VAULT-BACKED VALUE NEVER REACHES A PRODUCT COLUMN, AND THIS IS THE ONLY
@@ -171,6 +180,27 @@ export async function patch(
   const offered = erase ? { ...rest, [erase.column]: undefined } : rest;
   const wanted = Object.fromEntries(
     Object.entries(offered).filter(([, value]) => value !== undefined));
+
+  /*
+    ⚠️ BEFORE THE SHAPE CHECK, BECAUSE A SETTLED FIELD IS NOT A SHAPE PROBLEM. It
+    is a perfectly valid value for a field that may only be set once — see
+    `FieldSpec.settled`. Refused here rather than dropped: ignoring the key would
+    answer 200 over a change that did not happen.
+
+    ⚠️ AND IT NEEDS NO READ OF THE CURRENT ROW. "Present in a patch" is the whole
+    test — resending an unchanged value is still a caller asking to set it, and a
+    compare-against-stored would put a read before the write and a race between
+    them. The generated update stops advertising these fields, so nothing sends
+    one by accident.
+  */
+  const settled = Object.keys(wanted).filter((name) => spec.fields[name]?.settled);
+  if (settled.length) {
+    return {
+      why: "settled",
+      detail: `${settled.join(", ")} is set when the record is made and cannot be changed here`,
+      names: settled,
+    };
+  }
 
   const checked = checkSome(spec.fields, wanted);
   if (!checked.ok) return { why: "invalid", detail: checked.why };

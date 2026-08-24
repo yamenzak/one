@@ -1057,6 +1057,7 @@ its own header, cited by other files, and doing nothing.
 | D75 | A refusal that reaches nobody is a control that does nothing | 0 |
 | D76 | A packaging level is a named multiplier, never a product | 0 |
 | D77 | Moving stock is a verb of its own | 0 |
+| D78 | Some fields are set once, and the write is what says so | 0 |
 <!-- /generated -->
 
 ---

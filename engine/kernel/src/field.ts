@@ -84,6 +84,25 @@ export interface FieldSpec {
    * not something a screen decides.
    */
   readonly vault?: boolean;
+  /**
+   * SET WHEN THE RECORD IS MADE, AND NEVER BY THE GENERATED UPDATE.
+   *
+   * ⚠️ SOME FIELDS ARE THE UNIT EVERY OTHER NUMBER IS IN, and changing one does
+   * not change the record — it silently reinterprets every row that points at
+   * it. A product counted in boxes, edited to say "sheet", turns twenty boxes on
+   * a shelf into twenty sheets with no write anywhere near the balance. The
+   * generated update is a column setter and has no way to know that.
+   *
+   * ⚠️ SO THE DECLARATION CARRIES IT, and `patch` refuses. Not "the screen does
+   * not offer it" — a screen's rule is a courtesy, and this field is reachable
+   * from an agent, a queued write replaying after a day offline, and the API.
+   *
+   * ⚠️ AND IT IS A REFUSAL RATHER THAN A SILENT DROP. Ignoring the key answers
+   * 200 over a change that did not happen, which is the swallow this repository
+   * is a catalogue of. Changing one of these is a real thing to want; it belongs
+   * in an operation that knows what else has to be true first.
+   */
+  readonly settled?: boolean;
   readonly tone?: Tone;
 }
 

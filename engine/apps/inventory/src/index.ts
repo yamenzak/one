@@ -18,8 +18,9 @@ import {
   type AppSpec,
 } from "@engine/kernel";
 import {
-  LADDER, MOVES, applyMove, crossedOn, daysLeft, effectiveExpiry, refuseMove, standingOf,
-  type Move,
+  LADDER, MOVES, applyMove, crossedOn, daysLeft, effectiveExpiry, promotes, refuseMove,
+  standingOf,
+  type Move, type Tracking,
 } from "./ledger.js";
 /* ⚠️ ONLY THE TWO WORDS, BECAUSE THE MANIFEST DECLARES AND DOES NOT DECIDE. The
    reading and the precedence rules are the SCREEN's — a label is printed there,
@@ -111,15 +112,26 @@ const product = collection({
        counts still has a place, a photograph, a manual and a service date — which
        is most of what a home or an office actually needs, and what no inventory
        product offers. */
+    /* ⚠️ `settled`, AND `product.recount` IS THE WAY TO CHANGE IT. Going deeper
+       is safe; going shallower discards batches, their expiries and their
+       suppliers, and no arrangement of the data puts them back — `promotes` is
+       the rule and the generated update cannot ask it. */
     tracking: field.enum({
-      label: "Tracked as", required: true, holds: "none",
+      label: "Tracked as", required: true, holds: "none", settled: true,
       values: [...LADDER],
       help: "Listed is a thing you never count. Counted is a number. Batched keeps deliveries apart.",
     }),
     /* ⚠️ THE NAME OF THE THING A QUANTITY IS IN — "glove", "box", "kg". It is
        shown beside every number this product ever reports, so a workspace that
        counts boxes reads boxes everywhere rather than a bare figure. */
-    unit: field.text({ label: "Counted in", required: true, holds: "none", max: 24 }),
+    /* ⚠️ `settled`, BECAUSE IT IS THE UNIT EVERY OTHER NUMBER IS IN. Editing
+       "box" to "sheet" writes nothing near a balance and turns twenty boxes on a
+       shelf into twenty sheets — every stock row, every movement and every report
+       reinterpreted, silently, by a text field. `product.recount` is the way, and
+       it refuses once anything has been counted. */
+    unit: field.text({
+      label: "Counted in", required: true, holds: "none", max: 24, settled: true,
+    }),
     /* ⚠️ `whole` MEANS THE PACK IS THE BASE UNIT AND THERE IS NO SMALLER NUMBER.
        Tessa called it `divisible` and it was doing real work: it is what decides
        whether a half is a legitimate quantity or a fault. */
@@ -1404,6 +1416,119 @@ interface ShiftInput {
   product: string; from: string; to: string; quantity: number;
   day: string; capture: string; reason?: string; batch?: string; rung?: string;
 }
+
+/**
+ * CHANGING WHAT A PRODUCT IS COUNTED IN, OR HOW DEEPLY IT IS TRACKED.
+ *
+ * ⚠️ IT IS ITS OWN OPERATION BECAUSE THE GENERATED UPDATE CANNOT ASK THE
+ * QUESTION. Both fields are `settled` — a column setter that changed either
+ * would rewrite the meaning of every number already recorded against it without
+ * touching one of them. What is needed first is different for each, and neither
+ * check is a shape a declaration can carry.
+ *
+ * ⚠️ THE UNIT IS REFUSED ONCE ANYTHING HAS BEEN COUNTED. "Box" edited to "sheet"
+ * turns twenty boxes on a shelf into twenty sheets — every balance, every
+ * movement and every report reinterpreted, silently, with no write near a
+ * quantity. Converting instead was considered and rejected: the factor is a
+ * guess only the person has, a wrong one is undetectable afterwards, and there is
+ * no undo. Before anything is counted the change is free, which is when somebody
+ * who mistyped it actually notices.
+ *
+ * ⚠️ AND THE RUNG MAY ONLY GO DEEPER — `promotes`. Forty gloves become forty
+ * gloves in an unrecorded batch, which is honest and is what happened; going back
+ * the other way discards the batches, their expiries and their suppliers, and no
+ * arrangement of the data can put them back.
+ */
+const recount = operation<
+  { product: string; unit?: string; tracking?: string },
+  { product: string; unit: string; tracking: string }
+>({
+  id: "product.recount",
+  kind: "write",
+  summary: "Change what a product is counted in, or how deeply it is tracked",
+  input: {
+    product: field.ref({ label: "Product", required: true, holds: "none", to: "product" }),
+    unit: field.text({ label: "Counted in", holds: "none", max: 24 }),
+    tracking: field.enum({ label: "Tracked as", holds: "none", values: [...LADDER] }),
+  },
+  output: {
+    product: field.text({ label: "Product", holds: "none" }),
+    unit: field.text({ label: "Counted in", holds: "none" }),
+    tracking: field.text({ label: "Tracked as", holds: "none" }),
+  },
+  /* ⚠️ `product:write` AND NOT `stock:adjust`, because this is a fact about the
+     catalogue rather than about a number on a shelf — and the refusals below are
+     what stop it reaching one. */
+  permission: "product:write",
+  idempotency: { mode: "key" },
+  emits: ["product.recounted"],
+  outcome: {
+    message: "Changed.", tone: "success",
+    invalidates: ["product.list", "stock.list"],
+  },
+  fails: ["platform.not_found", "platform.invalid", "inventory.counted", "inventory.shallower"],
+  audit: (input) => ({ subject: input.product, verb: "recounted" }),
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const db = c.db as Db;
+
+    const of = await db.prepare(
+      `SELECT unit, tracking FROM product WHERE id = ? AND tenant_id = ?`)
+      .bind(input.product, c.tenantId).first<{ unit: string; tracking: string }>();
+    if (!of) return c.fail("platform.not_found");
+
+    const unit = (input.unit ?? "").trim();
+    const rung = (input.tracking ?? "").trim();
+    if (!unit && !rung) {
+      return c.fail("platform.invalid", {}, { fields: { unit: "Say what to change" } });
+    }
+
+    if (unit && unit !== of.unit) {
+      /*
+        ⚠️ STOCK **OR** HISTORY, AND THE SECOND IS THE ONE THAT MATTERS. A shelf
+        emptied back to zero still has a ledger full of numbers in the old unit,
+        and a report over it would mix the two without any row being wrong. Asked
+        as "is there any stock" this passes for every product that happens to be
+        out today.
+      */
+      /*
+        ⚠️ NOT NARROWED, AND NARROWING WOULD BE THE UNSAFE DIRECTION. This asks
+        whether the WORKSPACE has ever counted this product, which is a fact about
+        the product rather than about the shelves this person works on. Filtered
+        to the caller's reach, somebody narrowed to one empty site could change the
+        unit under four hundred boxes at another — and the refusal exists to
+        protect those rows, not theirs.
+      */
+      const counted = await db.prepare(
+        `SELECT 1 AS yes FROM stock WHERE tenant_id = ? AND product = ? AND quantity != 0
+          UNION ALL
+         SELECT 1 AS yes FROM ledger WHERE tenant_id = ? AND product = ?
+          LIMIT 1`)
+        .bind(c.tenantId, input.product, c.tenantId, input.product).first<{ yes: number }>();
+      if (counted) return c.fail("inventory.counted", { unit: of.unit, name: unit });
+    }
+
+    if (rung && rung !== of.tracking) {
+      if (!(LADDER as readonly string[]).includes(rung)) {
+        return c.fail("platform.invalid", {}, { fields: { tracking: "Choose how it is tracked" } });
+      }
+      /* ⚠️ THE RULE IS `promotes` AND IT IS CALLED HERE. It was written, tested
+         and reached by nothing — which is the shape this repository is a
+         catalogue of, and it is why a product could be demoted at all. */
+      if (!promotes(of.tracking as Tracking, rung as Tracking)) {
+        return c.fail("inventory.shallower", { name: of.tracking, tracking: rung });
+      }
+    }
+
+    await db.prepare(
+      `UPDATE product SET unit = ?, tracking = ?, edited_at = ?, edited_by = ?
+        WHERE id = ? AND tenant_id = ?`)
+      .bind(unit || of.unit, rung || of.tracking, c.now, c.accountId ?? null,
+        input.product, c.tenantId).run();
+
+    return { product: input.product, unit: unit || of.unit, tracking: rung || of.tracking };
+  },
+});
 
 const shift = operation<ShiftInput, Moved & { arrived: number }>({
   id: "stock.move",
@@ -5794,7 +5919,7 @@ export const INVENTORY: AppSpec = defineApp({
   ],
   operations: [
     resembling, register,
-    receive, take, adjust, shift, arrive, undo, starts, resolve, learn, open, due,
+    receive, take, adjust, shift, recount, arrive, undo, starts, resolve, learn, open, due,
     openCount, tallyUp, differs, closeCount,
     issue, giveBack, serve, retire, dueService,
     assemble, putIn, takeOut, checking, build, breakUp,
@@ -6077,6 +6202,34 @@ export const INVENTORY: AppSpec = defineApp({
       still had it on the picker; "there is no carton any more" is the whole
       explanation, and `plain` carries it when the value never arrives.
     */
+    /*
+      ⚠️ THE UNIT IS WHAT EVERY OTHER NUMBER IS IN, so changing it once anything
+      has been counted reinterprets the lot. Twenty boxes become twenty sheets
+      with no write near a balance, and nothing afterwards can tell which rows
+      meant which.
+
+      ⚠️ AND THE WAY FORWARD IS A SECOND PRODUCT, WHICH THE SENTENCE SAYS. It is
+      what somebody wanting this almost always means: the sheets are a different
+      thing from the boxes, sold and counted separately.
+    */
+    "inventory.counted": {
+      status: 409, retryable: false, tone: "warning",
+      title: "This is already counted in {unit}",
+      plain: "This has already been counted in something else",
+      detail: "Register {name} as its own product — the history stays true that way.",
+    },
+    /*
+      ⚠️ GOING DEEPER IS SAFE AND GOING BACK IS NOT — see `promotes`. Forty gloves
+      become forty gloves in an unrecorded batch, which is what actually happened;
+      the other direction discards the batches, their expiries and their
+      suppliers, and no arrangement of the data puts them back.
+    */
+    "inventory.shallower": {
+      status: 409, retryable: false, tone: "warning",
+      title: "That is less than {name}",
+      plain: "That tracks it less closely than it is tracked now",
+      detail: "Going to {tracking} would drop the deliveries and dates already recorded.",
+    },
     "inventory.no_rung": {
       status: 422, retryable: false, tone: "warning",
       title: "There is no {rung} on this one",
