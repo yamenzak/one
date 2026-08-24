@@ -251,6 +251,19 @@ const tinted = (l: number, pct: number) =>
  * component, and a workspace's own accent still reaches all of it because every
  * value below is a mix WITH `--accent` rather than a colour.
  */
+/**
+ * ⚠️ THE ONE TIER THAT IS STATED TWICE, AND THE SECOND PLACE IS THE ONE THAT
+ * WORKS. See the `[data-sky]` rules in `GROUND_CSS` for why a tier declared on
+ * `:root` can never carry a product's hue. It is still emitted in `tier()` so a
+ * surface outside a `Page` — a test specimen, a fragment rendered on its own —
+ * has a value rather than nothing.
+ */
+const chosen = (mode: "light" | "dark"): string => [
+  `--tier-chosen: ${tinted(GROUND[mode].chosen, CHOSEN_TINT[mode])};`,
+  `--accent-soft: var(--tier-chosen);`,
+  `--accent-soft-hover: var(--tier-chosen);`,
+].join(" ");
+
 function tier(mode: "light" | "dark"): string {
   const g = GROUND[mode];
   const t = TINT[mode];
@@ -435,6 +448,41 @@ export const GROUND_CSS = [
   `:root { --brand: oklch(0.6204 0.195 253.83); }`,
   `:root { ${tier("light")} }`,
   `[data-theme="dark"] { ${tier("dark")} }`,
+  /*
+    ⚠️ THE CHOSEN FILL IS RE-DERIVED ON THE PAGE, AND WITHOUT THIS IT CANNOT
+    CARRY A PRODUCT'S COLOUR AT ALL. A custom property is substituted where it is
+    DECLARED, and every tier above is declared on `:root` — so `var(--brand)` in
+    them resolves against the DEPLOYMENT's brand, once, and what descendants
+    inherit is an already-resolved colour. `Page` sets a product's own hue as an
+    inline `--brand` on itself (`PageProps.hue`), which is below `:root` and
+    therefore reaches nothing that was already resolved above it.
+
+    ⚠️ THE FAILURE IS SILENT AND LOOKS LIKE A TUNING PROBLEM, WHICH IS WHY IT
+    SURVIVED. One's own brand is MONO, so `tinted()` at `:root` mixes grey into
+    grey and every tier comes out a clean neutral — correct, and indistinguishable
+    from working. Raising `CHOSEN_TINT` to make the selected segment vivid then
+    made it a LIGHTER GREY, because 88% of a neutral is a neutral. The wash
+    escapes the same trap only by accident of where it lives: it re-declares
+    `--default` on `[data-wash]`, which is the page element, so the unselected
+    track picked the product's amber up and the chosen segment did not.
+
+    ⚠️ ONLY THIS TIER IS RE-DERIVED, AND THAT IS A DECISION RATHER THAN A
+    MINIMAL FIX. The surfaces staying on the deployment's brand is what makes an
+    OLED ground read as neutral dark rather than as a tinted slab; the mono rule
+    then says the one coloured control on the screen is the one carrying
+    information, and "this is the one you chose" is that. Surfaces mono, choice
+    in the product's hue.
+
+    ⚠️ `--accent-soft` IS RESTATED HERE TOO, NOT JUST THE TIER. It is declared on
+    `:root` as `var(--tier-chosen)` and so is ALREADY RESOLVED there — moving the
+    tier alone would change a value nothing reads again. This is the same trap
+    one level down, and it is the one that would have been missed.
+  */
+  `[data-sky] { ${chosen("light")} }`,
+  /* ⚠️ HIGHER SPECIFICITY, BECAUSE THE RULE ABOVE HITS EVERY PAGE IN BOTH THEMES.
+     A direct declaration on the element beats anything inherited from `:root`, so
+     without this a dark page would wear the light theme's chosen fill. */
+  `[data-theme="dark"] [data-sky], [data-theme="dark"][data-sky] { ${chosen("dark")} }`,
   /*
     ⚠️ AND SOMETHING HAS TO PAINT IT. Nothing did: `html`, `body`, the mount
     point and the `Page` were all transparent, so the ground was the BROWSER's
