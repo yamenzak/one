@@ -1051,6 +1051,7 @@ its own header, cited by other files, and doing nothing.
 | D70 | A design rule is a guard or it is not a rule | 6 |
 | D71 | Every write says what happened, or says why it does not | 1 |
 | D72 | A duplicate is refused on a fact and asked about on a resemblance | 0 |
+| D73 | A form that scrolls is a page, and a prop does not fix it | 0 |
 <!-- /generated -->
 
 ---

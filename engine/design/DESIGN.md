@@ -822,7 +822,7 @@ meaning.
 **A count is a chip in the corner of the row it belongs to**, never a sentence.
 Zero is not a chip — zero is nothing at all.
 
-### A tray is a stack of fields, and a tray that scrolls holds its height
+### A tray is a stack of fields, and a form that scrolls is a page
 
 **No cards inside a sheet.** `Section` is a heading and a gap and belongs
 anywhere; `Group` is a CARD, and a card inside a drawer is page furniture in a
@@ -830,18 +830,23 @@ surface that is not a page — it reads as a different component from every othe
 tray in the product. Every tray here is a flat stack: heading, fields, the act in
 the footer.
 
-**And a form-length tray takes `steady`.** The library's bottom drawer is
-`max-h-[85vh]` with AUTO height, which is right for the three-field kind — a
-confirmation the size of what it asks. It is wrong for a form: every field that
-appears or disappears resizes the sheet under the reader's thumb, and a long one
-crosses the ceiling and back as they work. The height is in `vh` rather than
-`dvh` on purpose — the drawer's own container tracks the VISUAL viewport, so on a
-phone it grows when the URL bar collapses, and a height that followed it would
-grow mid-scroll. `vh` is the large viewport and does not move.
+**A tray is the shape for a question the size of what it asks** — a
+confirmation, one field, a supplier's three. The moment it needs to scroll it is
+the wrong shape, and no prop fixes that. The library's bottom drawer is
+`max-h-[85vh]` with AUTO height, so a form resizes under the reader's thumb as
+fields appear and crosses the ceiling and back as they work; its container tracks
+the VISUAL viewport, so on a phone it also moves when the URL bar collapses. A
+fixed height was tried and it only made the symptom smaller.
 
-Nobody hit either of these until a tray was long enough to scroll, which is the
-shape of most of this section: a rule that was true of every surface built so far
-and false of the first one that was different.
+**The test is whether it deserves an address.** A form somebody spends a minute
+on can be linked to, reloaded, shared and returned from — and the things that
+want to send somebody there (a checklist step, an empty state, a scan that found
+nothing) all want a destination rather than a flag they have to pass down. If
+more than one surface would open it, it is a page.
+
+Nobody hit any of this until a tray was long enough to scroll, which is the shape
+of most of this section: a rule that was true of every surface built so far and
+false of the first one that was different. DECISIONS.md D73.
 
 **There is no line between rows.** Rows in a card are separated by rhythm: 24px
 between two rows against 4px inside one, and a six-to-one ratio already says

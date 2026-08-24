@@ -5515,6 +5515,21 @@ export const INVENTORY: AppSpec = defineApp({
       Somebody scanning forty boxes must be able to come back to where they were,
       and a modal has no address to come back to.
     */
+    /*
+      ⚠️ A PAGE RATHER THAN A SHEET, AND THE LENGTH IS WHY. Registering a product
+      is photographs, a name, tags, several barcodes, how it is counted, how it
+      keeps and who it is bought from — a form that scrolls for a while and is
+      worth coming back to. A drawer is the right shape for a question the size
+      of what it asks; put a form in one and the height, the scroll and the
+      keyboard all fight each other on a phone.
+
+      ⚠️ AND AN ADDRESS IS THE HALF A DRAWER CANNOT HAVE. A page can be linked to
+      from an empty catalogue, a checklist step and a scan that resolved to
+      nothing; it survives a reload, a share and the back gesture, and going back
+      lands where you came from rather than nowhere.
+    */
+    { id: "register", route: "/register", label: "Add a product", nav: "none",
+      icon: "add", permission: "product:write" },
     { id: "receive", route: "/receive", label: "Receive", nav: "none", icon: "add",
       permission: "stock:move" },
     /* ⚠️ A COUNT IS A JOB SOMEBODY SPENDS AN AFTERNOON ON, so it is a

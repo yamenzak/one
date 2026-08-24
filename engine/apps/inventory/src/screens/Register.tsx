@@ -1,5 +1,5 @@
 /**
- * REGISTER A PRODUCT — a sheet, not a page, and the camera is the fast lane.
+ * REGISTER A PRODUCT — a page, and the camera is the fast lane.
  *
  * ⚠️ THE ONBOARDING TAX IS WHY PEOPLE ABANDON INVENTORY APPS. Eight hundred
  * products typed in by hand is a project nobody finishes, so the first thing on
@@ -18,16 +18,23 @@
  * took photographs meant the name; a model overwriting it is the app arguing
  * with the person holding the box.
  *
- * ⚠️ IT IS A SHEET SO IT CAN BE OPENED FROM ANYWHERE — Home's first action, the
- * checklist, an empty catalogue, a scan that resolved to nothing. A page would
- * make each of those a journey somebody has to come back from, and "add the
- * thing I am holding" is never the journey somebody was on.
+ * ⚠️ A PAGE RATHER THAN A DRAWER, AND THE LENGTH IS THE ARGUMENT. This is
+ * photographs, a name, tags, several barcodes, how it is counted, how it keeps
+ * and who it is bought from. A drawer is the right shape for a question the size
+ * of what it asks — a confirmation, one field, a supplier's three. Put a form
+ * this long in one and the height, the scroll and the keyboard fight each other
+ * on the device it is most used on.
+ *
+ * ⚠️ AND AN ADDRESS IS THE HALF A DRAWER CANNOT HAVE. Home's first action, a
+ * checklist step, an empty catalogue and a scan that resolved to nothing all
+ * want to send somebody HERE — and a page survives a reload, a shared link and
+ * the back gesture, landing where they came from rather than nowhere.
  */
 
 import * as React from "react";
 import {
-  ActionRow, Await, LongText, NoteRow, NumberInput, PickFile, RowsWaiting,
-  Section, Segmented, Stack, Tags, TextInput, ToggleRow, Tray, Viewfinder,
+  ActionRow, Await, LongText, NoteRow, NumberInput, PickFile, RowsWaiting, Screen,
+  Section, Segmented, Stack, Tags, TextInput, ToggleRow, Viewfinder,
   asDataUrl, glyphOf, type Loaded, type Option,
 } from "@engine/design";
 import { Button } from "@heroui/react";
@@ -100,8 +107,10 @@ export interface Registering {
 }
 
 export interface RegisterProps {
-  readonly isOpen: boolean;
-  readonly onOpenChange: (open: boolean) => void;
+  /** ⚠️ The manifest's, not this file's — see every other screen here. */
+  readonly title?: string;
+  /** Where the back arrow goes. */
+  readonly back: () => void;
   /**
    * ⚠️ THE WORDS THIS WORKSPACE ALREADY FILES THINGS UNDER. Sent with the
    * photographs so a model CHOOSES from them, and offered under the tag field so
@@ -157,7 +166,7 @@ const EMPTY_CODE: CodeRow = { value: "", kind: "gtin", pack: 1 };
 const numberOr = (of: number | null): number => (of === null ? 0 : of);
 
 export function Register({
-  isOpen, onOpenChange, knownTags, suppliers, resembles, onLook, onIdentify,
+  title, back, knownTags, suppliers, resembles, onLook, onIdentify,
   guessed, onRegister, busy, again,
 }: RegisterProps) {
   const [photos, setPhotos] = React.useState<readonly string[]>([]);
@@ -258,25 +267,23 @@ export function Register({
   };
 
   return (
-    <Tray
-      isOpen={isOpen}
-      onOpenChange={onOpenChange}
+    <Screen
+      shape="form"
+      title={title}
+      back={back}
+      under="Photograph it and the form fills itself, or type it in"
       /*
-        ⚠️ A FORM HOLDS ITS HEIGHT — see `Tray`. Every field that appears here
-        (what resembles the name, the reorder quantity, another barcode) would
-        otherwise resize the whole sheet under somebody's thumb.
+        ⚠️ THE ACT IS THE SCREEN'S, WHICH IS WHAT MAKES IT A PAGE. `does` puts it
+        where every other primary action in the product lives — the bar on a
+        phone, the crown on a desk — rather than in a footer only this surface
+        has (DESIGN.md §4).
       */
-      steady
-      title="Add a product"
-      actions={
-        <Button
-          variant="primary"
-          isDisabled={busy === true || Boolean(short)}
-          onPress={send}
-        >
-          Add it
-        </Button>
-      }
+      does={{
+        op: "product.register",
+        label: "Add it",
+        onDo: send,
+        disabled: busy === true || Boolean(short),
+      }}
     >
       <Stack>
         {/*
@@ -709,6 +716,6 @@ export function Register({
 
         {short ? <NoteRow icon={glyphOf("alert")}>{short}</NoteRow> : null}
       </Stack>
-    </Tray>
+    </Screen>
   );
 }

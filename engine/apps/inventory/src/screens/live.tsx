@@ -2030,21 +2030,28 @@ const EMPTY_REPORT: Reported = {
 interface Named { readonly id: string; readonly name: string }
 
 /**
- * THE REGISTER SHEET'S WHOLE WIRING, IN ONE HOOK.
+ * REGISTERING A PRODUCT — a page, with an address of its own.
  *
- * ⚠️ A HOOK RATHER THAN A SCREEN, BECAUSE THE SHEET HAS MORE THAN ONE DOOR.
- * Home's first action opens it, the checklist sends people to it, and a scan
- * that resolved to nothing is the third — putting the state in one of those
- * screens would make the other two either a second copy or a route.
+ * ⚠️ IT WAS A DRAWER AND THE LENGTH IS WHY IT IS NOT. Photographs, a name, tags,
+ * several barcodes, how it is counted, how it keeps and who it is bought from is
+ * a form that scrolls for a while; a drawer is the shape for a question the size
+ * of what it asks. An address also gives it what a drawer cannot have — a
+ * checklist step, an empty catalogue and a scan that found nothing can all send
+ * somebody HERE, and the phone's own back gesture is a real move rather than a
+ * flag being set false two screens away.
  *
- * ⚠️ AND THE PHOTOGRAPHS ARE UPLOADED BEFORE THE PRODUCT IS WRITTEN, not after.
- * A media row the product never referenced is an orphan the quota counts and
+ * ⚠️ THE PHOTOGRAPHS ARE UPLOADED BEFORE THE PRODUCT IS WRITTEN, not after. A
+ * media row the product never referenced is an orphan the quota counts and
  * nothing points at; a product referencing a media id that failed to upload is a
  * broken picture on the one screen somebody checks a thing in their hand
  * against. Uploading first makes the failure happen before anything is claimed.
  */
-function useRegistering(api: Door, may: (one: string) => boolean, go: (route: string) => void) {
-  const [open, setOpen] = React.useState(false);
+const REGISTER = (api: Door) => function RegisterHere({ app, go }: Mounted) {
+  const held = React.useMemo(
+    () => new Set((app as { readonly permissions?: readonly string[] }).permissions ?? []),
+    [app],
+  );
+  const may = React.useCallback((one: string) => held.has(one), [held]);
   const [busy, setBusy] = React.useState(false);
   const [asked, setAsked] = React.useState<{ name: string; brand: string } | null>(null);
   const [guessed, setGuessed] = React.useState<Loaded<Guessed | null>>(ready(null));
@@ -2126,23 +2133,18 @@ function useRegistering(api: Door, may: (one: string) => boolean, go: (route: st
 
       setBusy(false);
       if (!made.ok) return;
-      setOpen(false);
-      setGuessed(ready(null));
-      setAsked(null);
       tags.again();
+      /* ⚠️ ONWARD TO THE THING THAT WAS JUST MADE, WHICH IS ALSO THE WAY BACK.
+         A page that returned to Home would leave somebody wondering whether it
+         landed; the product's own screen is the receipt. */
       go(`/thing/${made.value.product}`);
     })();
   }, [api, go, tags]);
 
-  const sheet = (
+  return (
     <Register
-      isOpen={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        /* ⚠️ CLOSING FORGETS THE GUESS, so opening it again for the next thing
-           does not fill the form with the last one's answer. */
-        if (!next) { setGuessed(ready(null)); setAsked(null); }
-      }}
+      title={nameOf("/register")}
+      back={() => go("/")}
       knownTags={(tags.of.status === "ready" ? tags.of.data.items : [])
         .map((t) => ({ id: t.id, label: t.name }))}
       suppliers={(suppliers.of.status === "ready" ? suppliers.of.data.items : [])
@@ -2156,8 +2158,6 @@ function useRegistering(api: Door, may: (one: string) => boolean, go: (route: st
       again={() => { setGuessed(ready(null)); }}
     />
   );
-
-  return { sheet, open: () => { setOpen(true); } };
 }
 
 /**
@@ -2185,10 +2185,6 @@ const HOME = (api: Door) => function HomeHere({ app, go }: Mounted) {
     [app],
   );
   const may = React.useCallback((one: string) => held.has(one), [held]);
-
-  /* ⚠️ THE SHEET IS MOUNTED BESIDE THE SCREEN, NOT INSIDE IT. It is a drawer
-     over whatever is behind it, and Home is only the first of its doors. */
-  const adding = useRegistering(api, may, go);
 
   const totals = useAsked<Totals>(api, "totals.read");
 
@@ -2264,7 +2260,6 @@ const HOME = (api: Door) => function HomeHere({ app, go }: Mounted) {
   const got = far.of.status === "ready" ? far.of.data : null;
 
   return (
-    <>
     <Home
       title={nameOf("/")}
       said={starts.of.status === "ready" ? starts.of.data.words.said : ""}
@@ -2282,7 +2277,7 @@ const HOME = (api: Door) => function HomeHere({ app, go }: Mounted) {
       raised={got ? { workspace: Object.keys(got.counts), person: got.mine } : null}
       held={held}
       onGo={go}
-      onRegister={adding.open}
+      onRegister={() => go("/register")}
       onLabels={() => go("/labels")}
       onImport={() => go("/import")}
       onSuppliers={() => go("/suppliers")}
@@ -2292,8 +2287,6 @@ const HOME = (api: Door) => function HomeHere({ app, go }: Mounted) {
       onReports={() => go("/reports")}
       onStart={() => go("/start")}
     />
-    {adding.sheet}
-    </>
   );
 };
 
@@ -2311,6 +2304,7 @@ export function mount({ register, api }: Mounting): void {
     ["/thing", THING(api)],
     ["/where", WHERE(api)],
     ["/scan", SCAN(api)],
+    ["/register", REGISTER(api)],
     ["/receive", RECEIVE(api)],
     ["/count", COUNT(api)],
     ["/ask", ASK(api)],

@@ -447,52 +447,37 @@ const under = (places: readonly Place[], here: string | null): ReadonlySet<strin
  * THE SURFACES THAT ARE NOT ROUTES, AND WHY THEY NEED A LIST OF THEIR OWN.
  *
  * ⚠️ EVERY MEASURED SUITE IN THIS APP WALKS `INVENTORY_ROUTES`, which comes from
- * the manifest — so a sheet, which has no route, is drawn by nothing, measured
- * by nothing and photographed by nothing. It renders correctly on the machine of
+ * the manifest — so a tray, which has no route, is drawn by nothing, measured by
+ * nothing and photographed by nothing. It renders correctly on the machine of
  * whoever wrote it and its first contact with a real viewport is a customer's.
- * A drawer is not less of a surface for being reachable from four screens
- * instead of an address.
+ * A drawer is not less of a surface for being reachable from a row instead of an
+ * address.
  *
  * ⚠️ AND IT IS A LIST RATHER THAN A CASE PER SUITE, so adding the next one is
  * one entry and the suites need no edit.
  */
-export const INVENTORY_SURFACES: readonly string[] = ["register"];
+export const INVENTORY_SURFACES: readonly string[] = ["supplier"];
 
 /** Draws one of them, open, with the same sample world the routes use. */
 export function InventorySurface({ id }: { readonly id: string }) {
   switch (id) {
-    case "register":
+    case "supplier":
+      /*
+        ⚠️ THE EDITOR, OPEN, OVER THE LIST IT BELONGS TO. The ground draws
+        `/suppliers` with `editing={null}` — the list and never the tray — so the
+        one surface in this app that is a drawer had nothing looking at it.
+      */
       return (
-        <Register
-          isOpen
-          onOpenChange={nothing}
-          /* ⚠️ A VOCABULARY THAT ALREADY EXISTS, because the empty case and the
-             furnished one are different screens and only one of them is what a
-             workspace looks like after a month. */
-          knownTags={[
-            { id: "t-ppe", label: "PPE" },
-            { id: "t-consumable", label: "Consumable" },
-            { id: "t-cleaning", label: "Cleaning" },
-            { id: "t-single", label: "Single use" },
-          ]}
-          suppliers={[
-            { id: "s-1", label: "Medline" },
-            { id: "s-2", label: "Henry Schein" },
-          ]}
-          /*
-            ⚠️ THE STATE WORTH LOOKING AT IS THE ONE WITH SOMETHING TO SAY. A
-            sheet over an empty catalogue photographs as a form; a sheet that has
-            just found two things resembling what is being typed photographs the
-            decision this screen exists to put in front of somebody.
-          */
-          resembles={ready([
-            { id: "p-1", name: "Nitrile gloves, blue", brand: "Ansell", why: "same name and brand" },
-            { id: "p-2", name: "Nitrile gloves, black", brand: "Unigloves", why: "similar name" },
-          ])}
-          onLook={nothing}
-          onIdentify={nothing}
-          guessed={ready(null)}
-          onRegister={nothing}
+        <Suppliers
+          title="Suppliers"
+          of={ready(SUPPLYING)}
+          standingDays={7}
+          editing={SUPPLYING[0] ?? null}
+          busy={false}
+          onOpen={nothing}
+          onNew={nothing}
+          onClose={nothing}
+          onSave={nothing}
           again={nothing}
         />
       );
@@ -657,6 +642,38 @@ export function InventoryScreen({ route, onGo }: {
           onUndo={nothing}
           onNote={nothing}
           onLine={nothing}
+          again={nothing}
+        />
+      );
+    /*
+      ⚠️ THE SHEET THAT BECAME A PAGE, AND THE STATE WORTH LOOKING AT IS THE ONE
+      WITH SOMETHING TO SAY. A form over an empty catalogue photographs as a
+      form; one that has just found two things resembling what is being typed
+      photographs the decision this screen exists to put in front of somebody.
+    */
+    case "/register":
+      return (
+        <Register
+          title={title}
+          back={() => go("/")}
+          knownTags={[
+            { id: "t-ppe", label: "PPE" },
+            { id: "t-consumable", label: "Consumable" },
+            { id: "t-cleaning", label: "Cleaning" },
+            { id: "t-single", label: "Single use" },
+          ]}
+          suppliers={[
+            { id: "s-1", label: "Medline" },
+            { id: "s-2", label: "Henry Schein" },
+          ]}
+          resembles={ready([
+            { id: "p-1", name: "Nitrile gloves, blue", brand: "Ansell", why: "same name and brand" },
+            { id: "p-2", name: "Nitrile gloves, black", brand: "Unigloves", why: "similar name" },
+          ])}
+          onLook={nothing}
+          onIdentify={nothing}
+          guessed={ready(null)}
+          onRegister={nothing}
           again={nothing}
         />
       );

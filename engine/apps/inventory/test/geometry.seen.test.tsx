@@ -42,9 +42,9 @@ import {
 import { INVENTORY_ROUTES, INVENTORY_SURFACES } from "../src/screens/index.js";
 
 /*
-  ⚠️ THE SHEETS ARE SWEPT WITH THE SCREENS, because a drawer is not less of a
-  surface for being reachable from four screens instead of an address. Walking
-  the manifest's routes alone left every non-route surface drawn by nothing and
+  ⚠️ THE TRAYS ARE SWEPT WITH THE SCREENS, because a drawer is not less of a
+  surface for being reachable from a row instead of an address. Walking the
+  manifest's routes alone left every non-route surface drawn by nothing and
   measured by nothing — its first contact with a real viewport would have been a
   customer's, on a phone, holding a box.
 */

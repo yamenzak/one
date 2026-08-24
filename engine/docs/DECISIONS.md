@@ -2567,3 +2567,36 @@ one, and this check exists to be believed.
 **Therefore never:** a barcode learned for a second product; a resemblance
 reported only after a form is complete; one sentence covering both halves; or a
 matcher clever enough to be wrong about things that are genuinely different.
+
+---
+
+## D73 — A form that scrolls is a page, and a prop does not fix it
+
+**A drawer is sized by what it contains, and that is the whole problem.** The
+library's bottom drawer is `max-h-[85vh]` with AUTO height: it grows as fields
+appear, crosses the ceiling and comes back as somebody works, and its container
+tracks the VISUAL viewport, so on a phone it also moves when the URL bar
+collapses under the thumb. Nothing is broken — the component is behaving as
+specified, over content it was never the shape for.
+
+**So a tray holds a question the size of what it asks** — a confirmation, one
+field, a supplier's three — and anything that scrolls is a page. Registering a
+product is seven sections, six photographs and a model's reading of them; it is
+not a question, it is work.
+
+**A fixed height was tried first and it is the wrong fix.** It stops the resize
+and keeps everything else: no address, no back, no way to link to it, a footer
+competing with the keyboard, and a surface that is a page in every respect
+except the one that would let a reader treat it like one. It also lands as a
+prop on a shared component, so the next long form gets a supported way to be the
+wrong shape.
+
+**The test is whether it deserves an address.** A form somebody spends a minute
+on can be linked to, reloaded, shared and returned from — and everything that
+wants to send somebody there (a checklist step, an empty state, a scan that
+found nothing) wants a destination rather than a flag threaded down through the
+screens between. If more than one surface would open it, it is a page.
+
+**Therefore never:** a prop that makes a tray tolerate being too big; a form in
+a drawer that scrolls; or a surface more than one place wants to open that has
+no route of its own.

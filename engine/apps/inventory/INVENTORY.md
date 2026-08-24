@@ -330,7 +330,7 @@ generated ones) — plus every platform guard in `pnpm engine:gate`.
 
 ## Part III — the screen index
 
-**Nineteen screens.** Each is a pure component in `src/screens/`, mounted by a
+**Twenty screens.** Each is a pure component in `src/screens/`, mounted by a
 container in `src/screens/live.tsx`, and rendered over a sample world by
 `src/screens/index.tsx`.
 
@@ -354,13 +354,14 @@ container in `src/screens/live.tsx`, and rendered over a sample world by
 | `/ask` | Ask | secondary | `stock:read` | `screens/Ask.tsx:54` | `screens/live.tsx:1302` |
 | `/import` | Import | secondary | `product:write` | `screens/Import.tsx:131` | `screens/live.tsx:1789` |
 | `/suppliers` | Suppliers | secondary | `product:write` | `screens/Suppliers.tsx:77` | `screens/live.tsx:1860` |
+| `/register` | Add a product | none | `product:write` | `screens/Register.tsx:168` | `screens/live.tsx:2049` |
 | `/start` | Getting started | secondary | `product:read` | `screens/Start.tsx:67` | `screens/live.tsx:1944` |
 
 ### The surfaces that are not routes
 
 | Where | What | File |
 |---|---|---|
-| `/` | **Register a product** — the sheet, and the first thing on Home | `screens/Register.tsx` — `Register` |
+| `/register` | the six photographs, and what a model read off them | `screens/Register.tsx` — `Photos`, `What it is` |
 | `/suppliers` | the supplier editor (a tray) | `screens/Suppliers.tsx` — `SupplierTray` |
 | `/labels` | the printable sheet and the four templates | `screens/Labels.tsx` — `Template`, `TEMPLATES` |
 | `/labels` | the decant label's hazard diamonds | `screens/Labels.tsx` — `Diamond` |
