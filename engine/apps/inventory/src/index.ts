@@ -154,7 +154,18 @@ const product = collection({
        burns" — and a reader holding it cannot look H314 up. */
     hazardText: field.long({ label: "Hazard statements", holds: "none", max: 2_000 }),
     precautions: field.long({ label: "Precautions", holds: "none", max: 2_000 }),
-    /* ⚠️ Days after opening, which is one of three clocks that can end a
+    /**
+     * ⚠️ HOW LONG IT KEEPS FROM THE DAY IT WAS MADE — the fourth clock, and the
+     * one that rescues a box printed with a manufacture date and no expiry.
+     * Counted from `batch.made`, which is the delivery's.
+     *
+     * ⚠️ MONTHS ARE WHAT LABELS SAY AND DAYS ARE WHAT ARITHMETIC NEEDS, so the
+     * field is days and the screen does the conversion. Storing months would
+     * put "how long is a month" into every comparison — and a shelf life is
+     * compared against a calendar date, which has no months in it.
+     */
+    shelfDays: field.number({ label: "Days from making", holds: "none", min: 0, max: 3_650 }),
+    /* ⚠️ Days after opening, which is one of four clocks that can end a
        batch — see `effectiveExpiry`. */
     openDays: field.number({ label: "Days once opened", holds: "none", min: 0, max: 3_650 }),
     /* ⚠️ THE THIRD CLOCK'S LENGTH, AND IT IS THE PRODUCT'S FOR THE SAME REASON
@@ -545,6 +556,19 @@ const batch = collection({
     /* ⚠️ A DAY, NEVER AN INSTANT — a shelf life has no time of day, and an
        instant would put one in. */
     printed: field.day({ label: "Expires", holds: "none" }),
+    /**
+     * ⚠️ WHEN IT WAS MADE, WHICH IS OFTEN ALL THE BOX SAYS. "MFD 2026-03-14"
+     * with "24 months from manufacture" on the back is a complete shelf life,
+     * and outside EU retail it is the ordinary way a product is labelled — so a
+     * delivery that arrived with only this had no expiry at all, and the sweep
+     * that exists to catch expiring stock never saw it.
+     *
+     * ⚠️ IT IS NOT AN EXPIRY AND MUST NOT BE READ AS ONE. The days it runs for
+     * are the PRODUCT's (`shelfDays`), for the same reason `opened` takes
+     * `openDays`: how long a thing keeps is a fact about the thing, and when
+     * this one was made is a fact about the delivery.
+     */
+    made: field.day({ label: "Made on", holds: "none" }),
     /* ⚠️ THE SECOND CLOCK STARTS HERE, and only once — see `batch.open`. The
        days it runs for are the PRODUCT's (`openDays`), because "use within 28
        days of opening" is a fact about the substance rather than the delivery. */
@@ -1306,6 +1330,8 @@ interface Registering {
   readonly par?: number;
   readonly storage?: string;
   readonly handling?: string;
+  readonly shelfDays?: number;
+  readonly openDays?: number;
   readonly photo?: string;
   readonly supplier?: string;
   readonly reorder?: boolean;
@@ -1497,6 +1523,11 @@ const register = operation<Registering, Registered>({
     par: field.number({ label: "Tell me below", holds: "none", min: 0 }),
     storage: field.long({ label: "How to store it", holds: "none", max: 2_000 }),
     handling: field.long({ label: "How to handle it", holds: "none", max: 2_000 }),
+    /* ⚠️ DURATIONS, NEVER DATES. A printed expiry belongs to the delivery that
+       carried it — `batch.made` plus `shelfDays` is what gives one an expiry
+       when its box shows only a manufacture date. */
+    shelfDays: field.number({ label: "Days from making", holds: "none", min: 0, max: 3_650 }),
+    openDays: field.number({ label: "Days once opened", holds: "none", min: 0, max: 3_650 }),
     photo: field.media({ label: "Photo", holds: "none", purpose: "product-photo" }),
     supplier: field.ref({ label: "Order from", holds: "none", to: "supplier" }),
     reorder: field.bool({ label: "Raise a reorder", holds: "none" }),
@@ -1599,13 +1630,18 @@ const register = operation<Registering, Registered>({
     const product = newId("prd", new Date(c.now));
     await db.prepare(
       `INSERT INTO product (id, tenant_id, name, brand, description, tracking, unit, whole,
-                            par, storage, handling, photo, supplier, reorder, reorderQty,
-                            unnamed, at, by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`)
+                            par, storage, handling, shelfDays, openDays, photo, supplier,
+                            reorder, reorderQty, unnamed, at, by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`)
       .bind(product, c.tenantId, name, brand || null, (input.description ?? "").trim() || null,
         input.tracking, unit, input.whole ? 1 : 0,
         Number.isFinite(Number(input.par)) ? Number(input.par) : null,
         (input.storage ?? "").trim() || null, (input.handling ?? "").trim() || null,
+        /* ⚠️ ABSENT IS NULL, NOT NOUGHT. "Nobody said how long it keeps" and "it
+           does not expire" are opposite facts, and a zero prints the second over
+           the first — which takes a real shelf life off the expiry sweep. */
+        Number(input.shelfDays) > 0 ? Number(input.shelfDays) : null,
+        Number(input.openDays) > 0 ? Number(input.openDays) : null,
         input.photo ?? null, input.supplier ?? null,
         input.reorder ? 1 : 0,
         Number.isFinite(Number(input.reorderQty)) ? Number(input.reorderQty) : null,
@@ -1761,20 +1797,24 @@ const due = operation<{ product?: string; today: string }, { items: readonly Due
 
     const rows = await db.prepare(
       `SELECT b.id AS id, b.product AS product, b.lot AS lot, b.printed AS printed,
-              b.opened AS opened, p.name AS name, p.openDays AS openDays
+              b.opened AS opened, b.made AS made,
+              p.name AS name, p.openDays AS openDays, p.shelfDays AS shelfDays
          FROM batch b JOIN product p ON p.id = b.product
         WHERE b.tenant_id = ?${input.product ? " AND b.product = ?" : ""}`)
       .bind(...(input.product ? [c.tenantId, input.product] : [c.tenantId]))
       .all<{ id: string; product: string; lot: string | null; printed: string | null;
-        opened: string | null; name: string; openDays: number | null }>();
+        opened: string | null; made: string | null; name: string;
+        openDays: number | null; shelfDays: number | null }>();
 
     const items: Due[] = [];
     for (const row of rows.results) {
       const ends = effectiveExpiry({
         printed: row.printed,
-        /* ⚠️ THE DAYS ARE THE PRODUCT'S, NOT THE DELIVERY'S. "Use within 28 days
-           of opening" is a fact about the substance; putting it on the batch
-           would let two deliveries of one thing disagree about it. */
+        /* ⚠️ THE DAYS ARE THE PRODUCT'S, NOT THE DELIVERY'S — both of them.
+           "Use within 28 days of opening" and "24 months from manufacture" are
+           facts about the substance; putting either on the batch would let two
+           deliveries of one thing disagree about it. */
+        made: row.made && row.shelfDays ? { on: row.made, days: row.shelfDays } : null,
         opened: row.opened && row.openDays
           ? { on: row.opened, days: row.openDays }
           : null,
@@ -3411,6 +3451,14 @@ const guessedOut = {
   storage: field.text({ label: "How to store it", holds: "none" }),
   handling: field.text({ label: "How to handle it", holds: "none" }),
   hazards: field.json({ label: "Hazards", holds: "none" }),
+  /* ⚠️ TWO SHELF LIVES, BOTH DURATIONS. A date read off a box belongs to the
+     delivery that carried it — see `Guessed.shelfDays`. */
+  shelfDays: field.number({ label: "Days from making", holds: "none" }),
+  openDays: field.number({ label: "Days once opened", holds: "none" }),
+  /* ⚠️ A PICTOGRAM WAS SEEN, WHICH IS NOT A CLASSIFICATION. It is what lets the
+     sheet send somebody to the label reader instead of registering a solvent as
+     though it were shampoo. */
+  hazardous: field.bool({ label: "Looks hazardous", holds: "none" }),
 } as const;
 
 type Guessing = ReturnType<typeof guessedIn>;
@@ -3592,7 +3640,7 @@ const seeProduct = operation<{ images: unknown; hint?: string; known?: string },
     lane: "vision",
     prompt: "You identify products from photographs for a stock system."
       + " Answer with JSON only: name, brand, description, unit, pack, tracking,"
-      + " why, storage, handling, tags."
+      + " why, storage, handling, tags, shelfDays, openDays, hazardous."
       + " `name` is what somebody would call it on a shelf, not marketing copy."
       + " `description` is one sentence: what it is, what size, what form."
       + " `unit` is what a quantity of it would be counted in — bottle, box, kg."
@@ -3604,9 +3652,39 @@ const seeProduct = operation<{ images: unknown; hint?: string; known?: string },
       + " `tags` are the kinds it belongs to. PREFER these words, which this"
       + " workspace already uses: {known}. Propose a new one only where none of"
       + " them fits. At most four."
-      + " Say nothing about hazard classes — a different reader does that from"
-      + " the printed label. Where the pictures do not show something, answer"
-      + " with an empty string rather than a guess."
+      /*
+        ⚠️ ONE OF THE PICTURES IS USUALLY THE LABEL, AND IT IS THE ONE CARRYING
+        THE FACTS. Net contents, the exact product name, the storage line and
+        the shelf life are printed there and nowhere else on the packaging —
+        told to ignore the label the model answered about the shape of a bottle
+        while holding a photograph of everything it needed.
+      */
+      + " If one of the pictures shows the label, READ IT: the printed name, the"
+      + " net contents, the storage line and any shelf life are the best facts"
+      + " you have, and they beat what the shape of the packaging suggests."
+      /*
+        ⚠️ A DURATION, NEVER A DATE — see `Guessed.shelfDays`. The date on the
+        box belongs to one delivery; how long the thing keeps belongs to the
+        product, and a date landing on a catalogue row would expire every future
+        delivery of it on the same day.
+      */
+      + " `shelfDays` is how long it keeps FROM THE DAY IT WAS MADE, in days:"
+      + " read \"24 months from manufacture\" as 730. `openDays` is how long"
+      + " after opening, in days — the open-jar symbol reading 12M is 365. Use 0"
+      + " for either where nothing says. NEVER answer with a date: a printed"
+      + " expiry belongs to one delivery, not to the product."
+      /*
+        ⚠️ SEEING A PICTOGRAM AND CLASSIFYING ONE ARE DIFFERENT ACTS, and only
+        the first is observation. Which hazard class an orange diamond declares
+        is a legal statement — `product.read` makes it against a label somebody
+        deliberately photographed, where the words are legible.
+      */
+      + " `hazardous` is true ONLY if you can see a hazard pictogram — an orange"
+      + " and white diamond — or a signal word. Do not say which hazard class it"
+      + " is, do not list H or P statements, and do not infer either from what"
+      + " the product is: a different reader does that from the printed label."
+      + " Where the pictures do not show something, answer with an empty string"
+      + " rather than a guess."
       + " The person adding it said: {hint}",
     variables: ["known", "hint"],
     maxOutput: 800,
@@ -5092,21 +5170,25 @@ const expirySweep = declareJob({
     const gone: Crossing[] = [];
 
     const batches = await db.prepare(
-      `SELECT b.printed AS printed, b.opened AS opened, b.received AS received,
-              p.name AS name, p.openDays AS openDays
+      `SELECT b.printed AS printed, b.opened AS opened, b.made AS made, b.received AS received,
+              p.name AS name, p.openDays AS openDays, p.shelfDays AS shelfDays
          FROM batch b JOIN product p ON p.id = b.product
         WHERE b.tenant_id = ?`)
       .bind(ctx.tenantId)
-      .all<{ printed: string | null; opened: string | null; received: string | null;
-        name: string; openDays: number | null }>();
+      .all<{ printed: string | null; opened: string | null; made: string | null;
+        received: string | null; name: string;
+        openDays: number | null; shelfDays: number | null }>();
 
     for (const row of batches.results) {
       /* ⚠️ THE SAME COMPOSITION `batch.due` READS, and it has to be: a sweep
          that only looked at the printed date would say nothing about a box
-         opened last month with a 2028 date on it, which is the case the three
-         clocks exist for. */
+         opened last month with a 2028 date on it, or one whose label carries a
+         manufacture date and nothing else — which is what the four clocks are
+         for. Two readings of the same question is how a screen and a
+         notification come to disagree about which shelf needs somebody. */
       const ends = effectiveExpiry({
         printed: row.printed,
+        made: row.made && row.shelfDays ? { on: row.made, days: row.shelfDays } : null,
         opened: row.opened && row.openDays ? { on: row.opened, days: row.openDays } : null,
       });
       if (!ends) continue;

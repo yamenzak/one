@@ -99,8 +99,9 @@ export const refuseMove = (move: Move, was: number, step: number): string | null
  * WHEN A BATCH ACTUALLY ENDS — the earliest of three clocks, and WHICH one won.
  *
  * ⚠️ THE ANSWER IS NEVER JUST A DATE. A shelf that says "expires Tuesday" and
- * cannot say why is a shelf nobody trusts, and the three reasons want different
- * actions: a printed date is the manufacturer's, an opened one is somebody's
+ * cannot say why is a shelf nobody trusts, and the four reasons want different
+ * actions: a printed date is the manufacturer's, a made one is counted from when
+ * it was made and can be checked against the box, an opened one is somebody's
  * decision this morning, and a processed one belongs to a run that can be
  * revoked by a result arriving later.
  *
@@ -109,10 +110,23 @@ export const refuseMove = (move: Move, was: number, step: number): string | null
  * a day out on one side of Greenwich or the other, and the wrong side is the one
  * that expires stock late.
  */
-export type Clock = "printed" | "opened" | "processed";
+export type Clock = "printed" | "made" | "opened" | "processed";
 
 export interface Clocks {
   readonly printed?: string | null;
+  /**
+   * ⚠️ THE ONE THE BOX OFTEN CARRIES INSTEAD OF A DATE. "MFD 2026-03-14" with
+   * "24 months from manufacture" on the back is a complete shelf life, and it
+   * is how most of the world outside EU retail labels a product — so a delivery
+   * that arrives with only a manufacture date had no expiry at all, and the
+   * sweep that exists to catch expiring stock never saw it.
+   *
+   * ⚠️ THE DAYS ARE THE PRODUCT'S AND THE DATE IS THE BATCH'S, which is the
+   * whole reason this is a pair rather than a date. Two deliveries of one thing
+   * were made on different days and expire on different days; how long it keeps
+   * is a fact about the thing.
+   */
+  readonly made?: { readonly on: string; readonly days: number } | null;
   readonly opened?: { readonly on: string; readonly days: number } | null;
   readonly processed?: { readonly on: string; readonly days: number } | null;
 }
@@ -130,6 +144,7 @@ export const effectiveExpiry = (
 ): { readonly on: string; readonly by: Clock } | null => {
   const runs: { on: string; by: Clock }[] = [];
   if (clocks.printed) runs.push({ on: clocks.printed, by: "printed" });
+  if (clocks.made) runs.push({ on: addDays(clocks.made.on, clocks.made.days), by: "made" });
   if (clocks.opened) runs.push({ on: addDays(clocks.opened.on, clocks.opened.days), by: "opened" });
   if (clocks.processed) {
     runs.push({ on: addDays(clocks.processed.on, clocks.processed.days), by: "processed" });

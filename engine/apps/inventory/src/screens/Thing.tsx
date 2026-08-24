@@ -95,6 +95,7 @@ export interface ThingProps {
 */
 const BY: Readonly<Record<string, string>> = {
   printed: "the date on the box",
+  made: "when it was made",
   opened: "when it was opened",
   processed: "when it was processed",
 };

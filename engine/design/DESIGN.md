@@ -822,6 +822,27 @@ meaning.
 **A count is a chip in the corner of the row it belongs to**, never a sentence.
 Zero is not a chip — zero is nothing at all.
 
+### A tray is a stack of fields, and a tray that scrolls holds its height
+
+**No cards inside a sheet.** `Section` is a heading and a gap and belongs
+anywhere; `Group` is a CARD, and a card inside a drawer is page furniture in a
+surface that is not a page — it reads as a different component from every other
+tray in the product. Every tray here is a flat stack: heading, fields, the act in
+the footer.
+
+**And a form-length tray takes `steady`.** The library's bottom drawer is
+`max-h-[85vh]` with AUTO height, which is right for the three-field kind — a
+confirmation the size of what it asks. It is wrong for a form: every field that
+appears or disappears resizes the sheet under the reader's thumb, and a long one
+crosses the ceiling and back as they work. The height is in `vh` rather than
+`dvh` on purpose — the drawer's own container tracks the VISUAL viewport, so on a
+phone it grows when the URL bar collapses, and a height that followed it would
+grow mid-scroll. `vh` is the large viewport and does not move.
+
+Nobody hit either of these until a tray was long enough to scroll, which is the
+shape of most of this section: a rule that was true of every surface built so far
+and false of the first one that was different.
+
 **There is no line between rows.** Rows in a card are separated by rhythm: 24px
 between two rows against 4px inside one, and a six-to-one ratio already says
 "these two lines are one thing and that is another". The hairline was the last

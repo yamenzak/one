@@ -2112,6 +2112,8 @@ function useRegistering(api: Door, may: (one: string) => boolean, go: (route: st
         unit: of.unit, tracking: of.tracking, whole: of.whole,
         storage: of.storage, handling: of.handling,
         reorder: of.reorder, anyway: of.anyway,
+        ...(of.shelfDays === null ? {} : { shelfDays: of.shelfDays }),
+        ...(of.openDays === null ? {} : { openDays: of.openDays }),
         ...(of.par === null ? {} : { par: of.par }),
         ...(of.reorderQty === null ? {} : { reorderQty: of.reorderQty }),
         ...(of.supplier ? { supplier: of.supplier } : {}),

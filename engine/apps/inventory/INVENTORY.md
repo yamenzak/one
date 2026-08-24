@@ -60,13 +60,23 @@ second chance at it.** A workspace that received forty drills as a *number* and
 wants them itemised afterwards has forty objects with no history and no way to
 tell them apart.
 
-### Two clocks, and the earlier one wins
+### Four clocks, and the earliest one wins
 
-A delivery expires on the date printed on it, on the day it was **opened** plus
-the product's own shelf life, or on the day it was **processed** plus that shelf
-life — whichever comes first. A box with a 2029 date that somebody opened last
-month is out next week, and the screen says *which clock decided*, because
-"expires Tuesday" with no reason is a shelf nobody trusts.
+A delivery expires on the date **printed** on it; on the day it was **made** plus
+how long the product keeps; on the day it was **opened** plus the same; or on the
+day it was **processed** plus that shelf life — whichever comes first. A box with
+a 2029 date that somebody opened last month is out next week, and the screen says
+*which clock decided*, because "expires Tuesday" with no reason is a shelf nobody
+trusts.
+
+⚠️ **THE DATE IS THE DELIVERY'S AND THE DURATION IS THE PRODUCT'S**, and that
+split is what makes the `made` clock work at all. "MFD 2026-03-14" on a box with
+"24 months from manufacture" on the back is a complete shelf life — and it is how
+most of the world outside EU retail labels a product, so a delivery that arrived
+with only a manufacture date had no expiry at all and the nightly sweep never saw
+it. `batch.made` carries the date; `product.shelfDays` carries the duration. A
+sheet that asked for an expiry DATE against a catalogue row would put one
+delivery's date on every future one.
 
 An itemised object has a second clock of its own: its **service**. It is a
 different working day from an expiry, which is why the two never share a list.
@@ -332,13 +342,13 @@ container in `src/screens/live.tsx`, and rendered over a sample world by
 | `/receive` | Receive | primary | `stock:move` | `screens/Receive.tsx:100` | `screens/live.tsx:795` |
 | `/count` | Count | primary | `stock:move` | `screens/Count.tsx:80` | `screens/live.tsx:948` |
 | `/work` | Work | primary | `process:read` | `screens/Work.tsx:65` | `screens/live.tsx:1355` |
-| `/thing` | A product | none | `product:read` | `screens/Thing.tsx:129` | `screens/live.tsx:478` |
+| `/thing` | A product | none | `product:read` | `screens/Thing.tsx:130` | `screens/live.tsx:478` |
 | `/where` | A location | none | `location:read` | `screens/Where.tsx:34` | `screens/live.tsx:625` |
 | `/item` | An item | none | `stock:read` | `screens/Item.tsx:84` | `screens/live.tsx:1105` |
 | `/kit` | A kit | none | `stock:read` | `screens/Kit.tsx:66` | `screens/live.tsx:1212` |
 | `/run` | A run | none | `process:read` | `screens/Run.tsx:73` | `screens/live.tsx:1412` |
 | `/case` | A job | none | `process:read` | `screens/Case.tsx:58` | `screens/live.tsx:1495` |
-| `/due` | Running out | secondary | `stock:read` | `screens/Due.tsx:79` | `screens/live.tsx:1555` |
+| `/due` | Running out | secondary | `stock:read` | `screens/Due.tsx:80` | `screens/live.tsx:1555` |
 | `/labels` | Labels | secondary | `location:read` | `screens/Labels.tsx:248` | `screens/live.tsx:1662` |
 | `/reports` | Reports | none | `ledger:read` | `screens/Reports.tsx:84` | `screens/live.tsx:1623` |
 | `/ask` | Ask | secondary | `stock:read` | `screens/Ask.tsx:54` | `screens/live.tsx:1302` |

@@ -100,6 +100,28 @@ describe("when a batch ends", () => {
     expect(found?.by).toBe("printed");
   });
 
+  /*
+    ⚠️ A BOX PRINTED WITH A MANUFACTURE DATE AND NOTHING ELSE HAD NO EXPIRY AT
+    ALL, and outside EU retail that is the ordinary way a product is labelled —
+    "MFD 2026-03-14" with "24 months from manufacture" on the back. The sweep
+    that exists to catch expiring stock never saw one of them, and nothing
+    failed: the delivery simply was not on any list.
+  */
+  it("counts a shelf life from the day it was made", () => {
+    const found = effectiveExpiry({ made: { on: "2026-03-14", days: 730 } });
+    expect(found).toEqual({ on: "2028-03-13", by: "made" });
+  });
+
+  /* ⚠️ AND IT COMPOSES WITH THE OTHERS RATHER THAN REPLACING THEM. A tub made
+     two years ago and opened last week is out this week, not next year. */
+  it("still loses to an earlier clock", () => {
+    const found = effectiveExpiry({
+      made: { on: "2026-03-14", days: 730 },
+      opened: { on: "2026-08-20", days: 7 },
+    });
+    expect(found).toEqual({ on: "2026-08-27", by: "opened" });
+  });
+
   it("answers nothing when nothing ends", () => {
     /* ⚠️ `null` RATHER THAN A FAR-OFF DATE. A screw has no expiry, and a
        sentinel would put it on an expiry report at the bottom of the list. */

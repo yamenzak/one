@@ -33,7 +33,7 @@ import { PRESENTED_PAD } from "../tokens/metrics.js";
 
 /* ------------------------------------------------------------------- tray --- */
 
-export function Tray({ trigger, title, children, actions, isOpen, onOpenChange }: {
+export function Tray({ trigger, title, children, actions, isOpen, onOpenChange, steady }: {
   /**
    * ⚠️ OPTIONAL, BECAUSE THE THING THAT OPENS A TRAY IS OFTEN A WHOLE ROW. A
    * trigger has to be a single pressable element, so a list whose subject is a
@@ -48,13 +48,29 @@ export function Tray({ trigger, title, children, actions, isOpen, onOpenChange }
   readonly actions?: React.ReactNode;
   readonly isOpen?: boolean;
   readonly onOpenChange?: (open: boolean) => void;
+  /**
+   * ⚠️ A TRAY THAT SCROLLS HOLDS ITS HEIGHT; ONE THAT FITS HUGS ITS CONTENT.
+   * The library's bottom drawer is `max-h-[85vh]` with AUTO height, which is
+   * right for the three-field kind — a confirmation the size of what it asks.
+   * It is wrong for a form: every field that appears or disappears resizes the
+   * whole sheet under the reader's thumb, and a long one crosses the 85vh
+   * ceiling and back as they work. Somebody scrolling a form does not expect
+   * the form to move.
+   *
+   * ⚠️ AND IT IS `vh`, NOT `dvh`, WHICH IS THE OTHER HALF OF THE SAME BUG. The
+   * drawer's own container tracks the VISUAL viewport, so on a phone it grows
+   * when the URL bar collapses; a height in `dvh` would follow it and the sheet
+   * would grow mid-scroll. `vh` is the large viewport and does not move, so the
+   * sheet keeps its size while its foot stays where the browser puts it.
+   */
+  readonly steady?: boolean;
 }) {
   return (
     <Drawer isOpen={isOpen} onOpenChange={onOpenChange}>
       {trigger}
       <Drawer.Backdrop>
         <Drawer.Content>
-          <Drawer.Dialog>
+          <Drawer.Dialog className={steady ? "h-[85vh]" : undefined}>
             <Drawer.Handle />
             <Drawer.Header>
               <Drawer.Heading>{title}</Drawer.Heading>

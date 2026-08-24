@@ -101,11 +101,35 @@ export interface Guessed {
    * one who has to answer for it.
    */
   readonly hazards: readonly string[];
+  /**
+   * ⚠️ HOW LONG IT KEEPS FROM THE DAY IT WAS MADE, IN DAYS. Labels say "24
+   * months from manufacture" or print an open-jar symbol reading `12M`, and
+   * both are shelf lives a photograph can read — so a delivery whose box shows
+   * only a manufacture date gets an expiry instead of none at all.
+   *
+   * ⚠️ IT IS A DURATION AND NEVER A DATE. The date on the box belongs to the
+   * DELIVERY, and two deliveries of one thing expire on different days; how
+   * long the thing keeps is a fact about the thing. A model answering with a
+   * date would put one delivery's expiry on the whole catalogue row.
+   */
+  readonly shelfDays: number;
+  /** ⚠️ Days after opening — the PAO symbol, and "use within 28 days". */
+  readonly openDays: number;
+  /**
+   * ⚠️ A PICTOGRAM WAS SEEN, WHICH IS NOT A CLASSIFICATION AND MUST NOT BECOME
+   * ONE. Reading "there is an orange diamond on this" off a photograph is
+   * observation; deciding WHICH hazard class it declares is a legal statement,
+   * and it is `product.read`'s to make against a label somebody deliberately
+   * photographed. This is what lets the sheet say "read the label" instead of
+   * quietly registering a solvent as if it were shampoo.
+   */
+  readonly hazardous: boolean;
 }
 
 const EMPTY: Guessed = {
   name: "", brand: "", category: "", unit: "", pack: 0, tracking: "", why: "",
   storage: "", handling: "", description: "", tags: [], hazards: [],
+  shelfDays: 0, openDays: 0, hazardous: false,
 };
 
 export function guessedIn(of: unknown): Guessed {
@@ -134,6 +158,16 @@ export function guessedIn(of: unknown): Guessed {
     hazards: Array.isArray(at(of, "hazards"))
       ? (at(of, "hazards") as readonly unknown[]).map((h) => words(h, 80)).filter(Boolean).slice(0, 12)
       : [],
+    /* ⚠️ CLAMPED TO TEN YEARS, THE SAME CEILING THE FIELD DECLARES. A model
+       answering `36500` for "10 years" and one answering `36500` for a typo are
+       the same number; what stops the second is the column's own bound, and a
+       reader that let it through would be handing the door a value it refuses. */
+    shelfDays: Math.min(count(at(of, "shelfDays")), 3_650),
+    openDays: Math.min(count(at(of, "openDays")), 3_650),
+    /* ⚠️ ONLY EXACTLY `true`. A model answering "maybe" or "1" is a model that
+       did not answer this question, and a truthiness test would read either as
+       yes — which puts a hazard warning on a box of gloves. */
+    hazardous: at(of, "hazardous") === true,
   };
 }
 

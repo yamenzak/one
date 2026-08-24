@@ -155,8 +155,32 @@ describe("asking what a thing is from photographs of it", () => {
     it is legible.
   */
   it("never asks a photograph about hazard classes", () => {
-    expect(see.ai?.prompt).toMatch(/Say nothing about hazard classes/);
+    /* ⚠️ SEEING ONE AND CLASSIFYING IT ARE DIFFERENT ACTS, and the prompt has to
+       ask for the first while forbidding the second — an earlier version
+       forbade both, and the model then answered about the shape of a bottle
+       while holding a photograph of the label. */
+    expect(see.ai?.prompt).toMatch(/Do not say which hazard class it/);
+    expect(see.ai?.prompt).toMatch(/do not list H or P statements/);
     expect(see.ai?.prompt).not.toMatch(/\bhazards\b/);
+  });
+
+  /*
+    ⚠️ THE LABEL IS WHERE THE FACTS ARE, and asking the model to ignore it threw
+    away the net contents, the exact printed name, the storage line and the
+    shelf life — all of which are printed there and nowhere else on the box.
+  */
+  it("reads the label where one is among the pictures", () => {
+    expect(see.ai?.prompt).toMatch(/If one of the pictures shows the label, READ IT/);
+  });
+
+  /*
+    ⚠️ A DURATION, NEVER A DATE. A printed expiry belongs to the delivery that
+    carried it; put on the catalogue row it would expire every future delivery
+    of that product on the same day.
+  */
+  it("asks for a shelf life as days and refuses a date", () => {
+    expect(see.ai?.prompt).toMatch(/NEVER answer with a date/);
+    expect(see.ai?.prompt).toMatch(/`shelfDays` is how long it keeps FROM THE DAY IT WAS MADE/);
   });
 
   /*

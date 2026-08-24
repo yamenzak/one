@@ -312,6 +312,30 @@ describe("what one press writes", () => {
     expect(rows("code")).toHaveLength(1);
   });
 
+  /*
+    ⚠️ A SHELF LIFE NOBODY GAVE IS `null`, AND A ZERO IS NOT THE SAME FACT.
+    "Nobody said how long it keeps" and "it does not expire" are opposites; a
+    zero prints the second over the first, and `effectiveExpiry` then has no
+    clock at all for a delivery whose box carried a manufacture date — which
+    takes it off the expiry sweep silently, in the direction that matters.
+  */
+  it("keeps a shelf life, and stores an absent one as nothing", async () => {
+    const { c, rows } = world();
+    await register.handler(c as never, {
+      ...GOOD, shelfDays: 730, openDays: 0,
+    } as never);
+    /* ⚠️ BY POSITION, BECAUSE THE ROW LEGITIMATELY BINDS ZEROES. `whole` and
+       `reorder` are booleans stored as 0 or 1; searching the whole list for a
+       zero would pass on a handler that wrote one into the wrong column. */
+    const wrote = rows("product")[0]!.values;
+    const at = (col: string) => {
+      const cols = /INSERT INTO product \(([^)]*)\)/.exec(rows("product")[0]!.sql)![1]!;
+      return wrote[cols.split(",").map((one) => one.trim()).indexOf(col)];
+    };
+    expect(at("shelfDays")).toBe(730);
+    expect(at("openDays")).toBeNull();
+  });
+
   /* ⚠️ A pack is at least one: a code printed on a thing holding none of it
      would make every scan of that code record nothing. */
   it("never records a pack below one", async () => {

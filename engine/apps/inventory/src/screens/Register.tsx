@@ -26,9 +26,9 @@
 
 import * as React from "react";
 import {
-  ActionRow, Await, Group, LongText, NoteRow, NumberInput, PickFile, RowsWaiting,
-  Section, Segmented, Stack, Tags, TextInput, ToggleRow, Tray, asDataUrl, glyphOf,
-  type Loaded, type Option,
+  ActionRow, Await, LongText, NoteRow, NumberInput, PickFile, RowsWaiting,
+  Section, Segmented, Stack, Tags, TextInput, ToggleRow, Tray, Viewfinder,
+  asDataUrl, glyphOf, type Loaded, type Option,
 } from "@engine/design";
 import { Button } from "@heroui/react";
 
@@ -47,6 +47,11 @@ export interface Guessed {
   readonly storage: string;
   readonly handling: string;
   readonly tags: readonly string[];
+  /** ⚠️ Durations, never dates — a printed expiry belongs to one delivery. */
+  readonly shelfDays: number;
+  readonly openDays: number;
+  /** ⚠️ A pictogram was SEEN. Which class it declares is the label reader's. */
+  readonly hazardous: boolean;
 }
 
 /** Something already in the catalogue that looks like the one being typed. */
@@ -82,6 +87,8 @@ export interface Registering {
   readonly par: number | null;
   readonly storage: string;
   readonly handling: string;
+  readonly shelfDays: number | null;
+  readonly openDays: number | null;
   readonly supplier: string;
   readonly reorder: boolean;
   readonly reorderQty: number | null;
@@ -163,6 +170,8 @@ export function Register({
   const [par, setPar] = React.useState<number | null>(null);
   const [storage, setStorage] = React.useState("");
   const [handling, setHandling] = React.useState("");
+  const [shelfDays, setShelfDays] = React.useState<number | null>(null);
+  const [openDays, setOpenDays] = React.useState<number | null>(null);
   const [tags, setTags] = React.useState<readonly string[]>([]);
   const [word, setWord] = React.useState("");
   const [codes, setCodes] = React.useState<readonly CodeRow[]>([EMPTY_CODE]);
@@ -187,6 +196,9 @@ export function Register({
     setUnit((held) => held || answer.unit);
     setStorage((held) => held || answer.storage);
     setHandling((held) => held || answer.handling);
+    /* ⚠️ ZERO IS "NOTHING SAID SO", NOT A SHELF LIFE OF NONE — see the field. */
+    if (answer.shelfDays > 0) setShelfDays((held) => held ?? answer.shelfDays);
+    if (answer.openDays > 0) setOpenDays((held) => held ?? answer.openDays);
     if (answer.tracking) setTracking((held) => (held === "counted" ? answer.tracking : held));
     setTags((held) => {
       const seen = new Set(held.map((t) => t.toLowerCase()));
@@ -234,6 +246,7 @@ export function Register({
       name: name.trim(), brand: brand.trim(), description: description.trim(),
       unit: unit.trim(), tracking, whole, par,
       storage: storage.trim(), handling: handling.trim(),
+      shelfDays, openDays,
       supplier, reorder, reorderQty,
       codes: codes.filter((one) => one.value.trim().length > 0),
       tags, sources, photos, anyway,
@@ -248,6 +261,12 @@ export function Register({
     <Tray
       isOpen={isOpen}
       onOpenChange={onOpenChange}
+      /*
+        ⚠️ A FORM HOLDS ITS HEIGHT — see `Tray`. Every field that appears here
+        (what resembles the name, the reorder quantity, another barcode) would
+        otherwise resize the whole sheet under somebody's thumb.
+      */
+      steady
       title="Add a product"
       actions={
         <Button
@@ -266,14 +285,20 @@ export function Register({
           what they are adding scrolls past.
         */}
         <Section label="Photos">
-          <Group>
             <PickFile
               accept={["image/*"]}
               most={2 * 1024 * 1024}
-              says={photos.length ? "Add another angle" : "Photograph the thing"}
+              says={photos.length ? "Add another angle" : "Take a photo of the product"}
+              /*
+                ⚠️ THE LABEL IS NAMED, BECAUSE IT IS THE PICTURE THAT PAYS. Net
+                contents, the printed name, the storage line and the shelf life
+                are on the label and nowhere else on the packaging — somebody
+                who photographs three sides of a box and not the back gets a
+                worse answer and never learns why.
+              */
               under={photos.length
-                ? `${photos.length} of ${MOST_PHOTOS}. The first one is the picture of record`
-                : "The front, the back and the cap say more than any one of them"}
+                ? `${photos.length} of ${MOST_PHOTOS}. The first one is the one people check against`
+                : "The front, the back and the label. The label is where the detail is"}
               label="Take a photo"
               busy={busy}
               onPick={(bytes, file) => {
@@ -326,11 +351,9 @@ export function Register({
                 );
               }}
             />
-          </Group>
         </Section>
 
         <Section label="What it is">
-          <Group>
             <TextInput
               label="Name"
               value={name}
@@ -383,7 +406,6 @@ export function Register({
                 </>
               )
               : null}
-          </Group>
         </Section>
 
         {/*
@@ -394,7 +416,6 @@ export function Register({
           away and a new one takes typing.
         */}
         <Section label="Kinds">
-          <Group>
             <Tags
               label="Filed under"
               items={tags.map((t) => ({ id: t, label: t }))}
@@ -437,7 +458,6 @@ export function Register({
                 </>
               )
               : null}
-          </Group>
         </Section>
 
         {/*
@@ -448,14 +468,48 @@ export function Register({
           here.
         */}
         <Section label="Barcodes">
-          <Group>
+            {/*
+              ⚠️ SCANNED, NOT TYPED, BECAUSE A BARCODE IS FOURTEEN DIGITS AND
+              NOBODY TYPES FOURTEEN DIGITS TWICE. A product often has two or
+              three — the item, the inner, the carton — and the way to record
+              them is to hold each one up in turn, which is the same gesture
+              Receive and Count already use. Every scan appends a row; the
+              typed field under the frame is the way that always works.
+
+              ⚠️ AND A CODE ALREADY ON THE LIST IS IGNORED RATHER THAN ADDED
+              TWICE. A label sits in front of a lens for a second and decodes
+              thirty times; `Viewfinder` collapses that into one read, and this
+              is what stops the second deliberate scan of the same box from
+              making a duplicate row nobody asked for.
+            */}
+            <Viewfinder
+              says="Hold each barcode up in turn"
+              typed={{
+                label: "Or type a code",
+                placeholder: "What is printed under the bars",
+                help: "The item, the inner box and the carton can all be added",
+              }}
+              onRead={(code) => {
+                const said = code.trim();
+                if (!said) return;
+                setCodes((held) => (held.some((one) => one.value === said)
+                  ? held
+                  /* ⚠️ INTO THE FIRST EMPTY ROW BEFORE APPENDING, so the row the
+                     sheet opens with is the one that fills rather than being
+                     left blank above the scan. */
+                  : held.some((one) => !one.value.trim())
+                    ? held.map((one) => (one.value.trim() ? one : { ...one, value: said }))
+                    : [...held, { ...EMPTY_CODE, value: said }]));
+              }}
+            />
+
             {codes.map((row, at) => (
               <React.Fragment key={at}>
                 <TextInput
                   label={at === 0 ? "Code" : `Code ${at + 1}`}
                   value={row.value}
                   onChange={(next) => { setCode(at, { value: next }); }}
-                  placeholder="Scan it, or type what is printed"
+                  placeholder="Scan it above, or type what is printed"
                   name={`code-${at}`}
                 />
                 <Segmented
@@ -491,11 +545,9 @@ export function Register({
             >
               Another barcode
             </Button>
-          </Group>
         </Section>
 
         <Section label="Counting">
-          <Group>
             <TextInput
               label="Counted in"
               value={unit}
@@ -523,11 +575,9 @@ export function Register({
               min={0}
               help="Zero means never"
             />
-          </Group>
         </Section>
 
         <Section label="Keeping it">
-          <Group>
             <LongText
               label="How to store it"
               value={storage}
@@ -541,20 +591,52 @@ export function Register({
               placeholder="Gloves, two people, keep flat"
             />
             {/*
-              ⚠️ HAZARDS ARE NOT HERE, AND THAT IS THE RULE RATHER THAN AN
-              OMISSION. A classification is a legal declaration copied off a
-              safety data sheet — the label reader answers it against the printed
-              label, where it is legible, and this sheet never asks somebody to
-              recall one.
+              ⚠️ HOW LONG IT KEEPS IS THE PRODUCT'S; WHEN THIS ONE EXPIRES IS THE
+              DELIVERY'S. Two boxes of the same thing made in March and in
+              September go off six months apart — so this sheet asks for the
+              DURATION and never for a date, and the date is read off each box
+              as it arrives. A field here holding "expires 2027-03-31" would put
+              one delivery's date on every future one.
             */}
-            <NoteRow>
-              Hazard classes are read off the label, on the product itself
-            </NoteRow>
-          </Group>
+            <NumberInput
+              label="Keeps for, from making"
+              value={numberOr(shelfDays)}
+              onChange={(next) => { setShelfDays(next > 0 ? next : null); }}
+              min={0}
+              help={shelfDays ? `About ${Math.round(shelfDays / 30)} months. Zero means it does not expire`
+                : "In days. 730 is two years. Zero means it does not expire"}
+            />
+            <NumberInput
+              label="Keeps for, once opened"
+              value={numberOr(openDays)}
+              onChange={(next) => { setOpenDays(next > 0 ? next : null); }}
+              min={0}
+              help="The open-jar symbol on the label — 12M is 365 days"
+            />
+
+            {/*
+              ⚠️ A PICTOGRAM WAS SEEN, AND SAYING SO IS THE WHOLE VALUE. Which
+              class an orange diamond declares is a legal statement the label
+              reader makes against a photograph of the printed label, where the
+              words are legible — but a sheet that stayed silent would let
+              somebody register a solvent as though it were shampoo and find out
+              the first time they decant it.
+            */}
+            {answer?.hazardous
+              ? (
+                <NoteRow icon={glyphOf("alert")}>
+                  There is a hazard symbol on this. Read its label from the
+                  product page — a class has to come off the printed words
+                </NoteRow>
+              )
+              : (
+                <NoteRow>
+                  Hazard classes are read off the label, on the product itself
+                </NoteRow>
+              )}
         </Section>
 
         <Section label="Getting more">
-          <Group>
             {suppliers.length
               ? (
                 <>
@@ -623,7 +705,6 @@ export function Register({
                 />
               )
               : null}
-          </Group>
         </Section>
 
         {short ? <NoteRow icon={glyphOf("alert")}>{short}</NoteRow> : null}

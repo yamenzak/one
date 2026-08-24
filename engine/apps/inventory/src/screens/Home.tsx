@@ -155,8 +155,15 @@ export function Home({
       draws four and silently drops a fifth, and receiving has its own door on
       Stock — which is where "put some of this away" is actually thought of.
     */
+    /*
+      ⚠️ THE NOUN, NOT THE SENTENCE. A quick action's label gets a 64px column
+      under a circle at note size — about nine characters — and "Add a product"
+      is thirteen. The row beside it is nouns already (Labels, Import,
+      Suppliers); the plus in the circle is the verb, and the word underneath
+      says what it is a plus for.
+    */
     mayCatalogue
-      ? { id: "register", label: "Add a product", icon: glyphOf("add"), onDo: onRegister }
+      ? { id: "register", label: "Product", icon: glyphOf("add"), onDo: onRegister }
       : null,
     held.has("location:read")
       ? { id: "labels", label: "Labels", icon: glyphOf("tag"), onDo: onLabels }

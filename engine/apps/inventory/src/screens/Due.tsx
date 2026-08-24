@@ -69,6 +69,7 @@ export const sayDays = (days: number): string => {
    month is out next week. */
 const SAID_BY: Readonly<Record<string, string>> = {
   printed: "printed on it",
+  made: "since it was made",
   opened: "since it was opened",
   processed: "since it was released",
 };
