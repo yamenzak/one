@@ -58,6 +58,7 @@ import { Stack } from "./arrange.js";
 import { say, wakeSound } from "./feedback.js";
 import { TextInput } from "./forms.js";
 import { Nothing } from "./state.js";
+import { siftFrame, type Votes } from "./reading.js";
 import { SPACE } from "../tokens/metrics.js";
 import { TYPE } from "../tokens/type.js";
 import { MOTION } from "../tokens/motion.js";
@@ -163,6 +164,28 @@ export interface ViewfinderProps {
   readonly quiet?: boolean;
   /** ⚠️ The app's words for what to point at. This package has no nouns. */
   readonly says?: string;
+  /**
+   * ⚠️ WHAT THE CALLER ALREADY HOLDS, SO A REPEAT IS A REPEAT. Without it a
+   * surface that collects several codes has no way to tell "you already scanned
+   * this one" from "this is new" — the reader compares against the last thing it
+   * saw, so A, B, A adds A twice. Pointing at a code that is already in the list
+   * should say so, out loud, rather than silently doing nothing or silently
+   * doing it again.
+   */
+  readonly held?: readonly string[];
+  /**
+   * ⚠️ THE ONE PLACE A PRODUCT'S MEANING IS ALLOWED IN — see `useReading`. A
+   * retail pack carries two symbols that mean the same item; only the app knows
+   * that. Return `""` to ignore a symbol entirely.
+   */
+  readonly fold?: (raw: string) => string;
+  /**
+   * ⚠️ OPTIONAL, BECAUSE THE COMMON CASE IS ALREADY HANDLED. A repeat says so
+   * out loud and on screen without the caller writing anything; this is for a
+   * caller with something EXTRA to do — bringing the existing row into view,
+   * counting a second box off the same pallet.
+   */
+  readonly onAgain?: (code: string) => void;
   /**
    * ⚠️ THE WAY IN THAT ALWAYS WORKS, AND IT IS REQUIRED. Every caller gets a
    * field under the frame that reads the same `onRead`, so a camera that is
@@ -300,29 +323,29 @@ const GAP = A_SECOND / READS_PER_SECOND;
 function useReading(
   live: boolean,
   video: React.RefObject<HTMLVideoElement | null>,
+  /** ⚠️ Called once per read, not once per frame — see `ViewfinderProps`. */
   onRead: (code: string) => void,
-  /**
-   * ⚠️ THE REPEAT IS REPORTED, NOT SWALLOWED. The de-duplication window exists so
-   * a label held in front of a lens is ONE read rather than thirty — but from the
-   * person's side, pointing at a code and getting nothing at all is what a broken
-   * scanner looks like, so they move the phone, try again, and lose the count.
-   * Saying "that one again" is a different sound and a different sentence, and it
-   * is the difference between a window and a fault.
-   */
+  /** ⚠️ The repeat is reported, never swallowed — see `ViewfinderProps.held`. */
   onAgain: (code: string) => void,
   again: number,
+  /**
+   * ⚠️ A REF, NOT A PROP. The decode loop reads the current list without being
+   * torn down and rebuilt on every collected code — a rebuild loses every
+   * part-built agreement in `votes`, so the read after a read is slower.
+   */
+  held: React.RefObject<readonly string[]>,
+  fold: (raw: string) => string,
+  /** ⚠️ A line for the person, so a reader that is working looks like one. */
+  onNote: (note: string) => void,
 ) {
-  /* ⚠️ IN A REF, NOT IN STATE. Re-arming the loop on every read would restart
-     the detector, and a re-render mid-scan would forget what was just read. */
-  const last = React.useRef<{ code: string; at: number }>({ code: "", at: 0 });
   const said = React.useRef(onRead);
   said.current = onRead;
   const twice = React.useRef(onAgain);
   twice.current = onAgain;
-  /* ⚠️ A SEPARATE, LONGER WINDOW FOR SAYING "AGAIN", because the read window is
-     short enough that a label held steady would otherwise announce a repeat eight
-     times a second. This is about the PERSON's rhythm rather than the decoder's. */
-  const told = React.useRef(0);
+  const folded = React.useRef(fold);
+  folded.current = fold;
+  const noted = React.useRef(onNote);
+  noted.current = onNote;
 
   React.useEffect(() => {
     if (!live) return;
@@ -338,6 +361,10 @@ function useReading(
        comparison; a timer instead would drift away from paint and go on firing
        in a tab nobody is looking at, which `requestAnimationFrame` does not. */
     let read = 0;
+    /* ⚠️ THE READER'S MEMORY, OUTSIDE REACT AND OUTSIDE THE FRAME. Held in
+       state it would re-render eight times a second while somebody lines up a
+       shot; rebuilt per frame there is nothing to agree with. */
+    const state: Votes = { votes: new Map(), told: new Map() };
 
     const look = async () => {
       if (stopped) return;
@@ -346,16 +373,15 @@ function useReading(
         read = Date.now();
         try {
           const found = await detector.detect(at);
-          const code = found[0]?.rawValue ?? "";
-          const now = Date.now();
-          if (code && (code !== last.current.code || now - last.current.at > again)) {
-            last.current = { code, at: now };
-            told.current = now;
-            said.current(code);
-          } else if (code && now - told.current > again) {
-            told.current = now;
-            twice.current(code);
-          }
+          const seen = siftFrame(state, found.map((f) => f.rawValue ?? ""), {
+            now: Date.now(),
+            again,
+            held: held.current ?? [],
+            fold: folded.current,
+          });
+          for (const code of seen.read) said.current(code);
+          for (const code of seen.again) twice.current(code);
+          noted.current(seen.working ? "Hold it there" : "");
         } catch {
           /* ⚠️ A FRAME THAT WILL NOT DECODE IS THE ORDINARY CASE — a hand across
              the lens, a frame between resolutions. Reporting it would put a
@@ -367,13 +393,14 @@ function useReading(
 
     frame = requestAnimationFrame(() => { void look(); });
     return () => { stopped = true; cancelAnimationFrame(frame); };
-  }, [live, video, again]);
+  }, [live, video, again, held]);
 }
 
 /* ------------------------------------------------------------------ surface --- */
 
 export function Viewfinder({
   onRead, again = 1_500, paused = false, quiet = false, says, typed,
+  held, fold, onAgain,
 }: ViewfinderProps) {
   const video = React.useRef<HTMLVideoElement>(null);
 
@@ -390,13 +417,53 @@ export function Viewfinder({
   /* ⚠️ THE READ AND THE REPEAT BOTH SPEAK — see `feedback.tsx`. The caller hears
      only the read, because "that one again" is the SAME code and handing it over
      would be every caller writing the de-duplication this control exists to do. */
+  /*
+    ⚠️ THE LAST THING THAT HAPPENED, IN WORDS, UNDER THE FRAME. Somebody using a
+    scanner for the first time cannot tell a reader that is working from one that
+    is not: both are a rectangle of video. Three sounds are the right channel at
+    the shelf and the wrong one at a desk, on a muted phone, or for anybody who
+    cannot hear them — and none of them says WHICH code was read, which is the
+    thing that turns "it beeped" into trust.
+  */
+  const [note, setNote] = React.useState("");
+  const [beat, setBeat] = React.useState(0);
+
   const heard = React.useCallback((code: string) => {
     say("yes", quiet);
+    setNote(`Read ${code}`);
+    setBeat((n) => n + 1);
     onRead(code);
   }, [onRead, quiet]);
-  const twice = React.useCallback(() => { say("again", quiet); }, [quiet]);
 
-  useReading(live && !paused, video, heard, twice, again);
+  /* ⚠️ AND THE CALLER MAY WANT TO KNOW TOO. It is optional because the common
+     case is handled here — the sound and the sentence — and a caller that has
+     nothing extra to do should not have to write an empty function. */
+  const twice = React.useCallback((code: string) => {
+    say("again", quiet);
+    setNote(`Already added ${code}`);
+    setBeat((n) => n + 1);
+    onAgain?.(code);
+  }, [onAgain, quiet]);
+
+  /* ⚠️ A REF, NOT THE PROP, so a collected code does not tear down the decoder
+     and rebuild it — which loses every part-built agreement in `votes` and makes
+     the read after a read measurably slower. */
+  const holding = React.useRef<readonly string[]>(held ?? []);
+  holding.current = held ?? [];
+
+  /* ⚠️ IDENTITY, NOT `?? ((r) => r)` INLINE. A new function every render is a
+     new dependency every render, which restarts the loop on every frame. */
+  const asIs = React.useCallback((raw: string) => raw.trim(), []);
+  const folding = fold ?? asIs;
+
+  /* ⚠️ THE WORKING NOTE IS ONLY SHOWN WHILE NOTHING BETTER IS. "Hold it there"
+     over the top of "Read 4023500047203" would replace the one sentence somebody
+     is waiting for with a hint they no longer need. */
+  const working = React.useCallback((says: string) => {
+    setNote((was) => (was.startsWith("Read ") || was.startsWith("Already ") ? was : says));
+  }, []);
+
+  useReading(live && !paused, video, heard, twice, again, holding, folding, working);
 
   /* ⚠️ A FAULT IS HEARD TOO, ONCE. Somebody who pressed the button and put the
      phone to a shelf is not reading the screen, so a refused camera that only
@@ -577,10 +644,28 @@ export function Viewfinder({
         ) : null}
       </div>
 
-      {/* ⚠️ THE LINE UNDER THE FRAME IS THE STATE, not a repeat of the label. Off,
-          the words are already inside the panel beside the button that opens it;
-          on, this is what tells somebody the reader is running. */}
-      {wanted ? <p className={TYPE.note}>{says ?? "Point it at a code"}</p> : null}
+      {/*
+        ⚠️ THE LINE UNDER THE FRAME IS THE STATE, not a repeat of the label. Off,
+        the words are already inside the panel beside the button that opens it;
+        on, this is what tells somebody the reader is running.
+
+        ⚠️ AND IT REPORTS THE LAST READ BY ITS DIGITS, WHICH IS WHAT BUILDS TRUST
+        IN A SCANNER. Three sounds are the right channel at a shelf and no channel
+        at all on a muted phone, at a desk, or for somebody who cannot hear them —
+        and none of them says WHICH code was read. Somebody who has just watched a
+        reader invent two codes off one box needs to see the number, and somebody
+        using one for the first time needs to know it is looking at all.
+
+        ⚠️ `key` ON THE BEAT SO A REPEAT OF THE SAME SENTENCE STILL ARRIVES.
+        Scanning the same code twice produces the same string, and React reuses
+        the node — so the one case where somebody most needs the confirmation to
+        be visible is the one case where nothing on screen moves.
+      */}
+      {wanted ? (
+        <p key={beat} className={TYPE.note} aria-live="polite" data-arrive="note">
+          {note || says || "Point it at a code"}
+        </p>
+      ) : null}
       {port}
     </Stack>
   );

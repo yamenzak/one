@@ -27,6 +27,7 @@ export * from "./parts/pick-file.js";
   to render a symbol that appears on one screen in one product. Importing it
   from the sheet keeps it in that screen's chunk.
 */
+export * from "./parts/reading.js";
 export * from "./parts/viewfinder.js";
 export * from "./parts/permission.js";
 export * from "./parts/state.js";

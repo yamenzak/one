@@ -27,6 +27,9 @@ import {
 import { MOST_BYTES, sayDate, type Instant } from "@engine/kernel";
 import { Button } from "@heroui/react";
 import type { Seen } from "./Scan.js";
+/* ⚠️ ONE BOX IS ONE CODE — the fold the reader has no way to know. */
+import { foldScan } from "../code.js";
+
 
 /**
  * ONE LINE A DELIVERY NOTE APPEARS TO CARRY.
@@ -152,6 +155,9 @@ export function Receive({
           for a number and putting it back for the next item is a permission
           prompt and a black flash per item — see `Scan`. */}
       <Viewfinder
+              /* ⚠️ ONE BOX IS ONE CODE — see `foldScan`. A pack carrying an EAN-13
+                 and a DataMatrix decodes as both, in an unstable order. */
+              fold={foldScan}
         says={place ? "Scan the next thing, or another shelf" : "Scan the shelf you are standing at"}
         onRead={onRead}
         typed={{

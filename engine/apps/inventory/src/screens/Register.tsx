@@ -54,6 +54,8 @@ import {
 } from "@engine/design";
 import { Button } from "@heroui/react";
 import { MOST_BYTES } from "@engine/kernel";
+/* ⚠️ ONE BOX IS ONE CODE — the fold the reader has no way to know. */
+import { foldScan } from "../code.js";
 
 /** ⚠️ Up to six — see `product.see`: past that the answer stops improving. */
 export const MOST_PHOTOS = 6;
@@ -687,6 +689,17 @@ export function Register({
             */}
             <Viewfinder
               says="Hold each barcode up in turn"
+              /*
+                ⚠️ WHAT IS ALREADY ON THE LIST, SO A SECOND LOOK SAYS SO. Without
+                it the reader compares against the last thing it saw, and two
+                boxes on a bench alternating in front of a lens each look new
+                every time the other one intervenes.
+              */
+              held={codes.map((one) => one.value)}
+              /* ⚠️ ONE BOX IS ONE CODE — see `foldScan`. This pack carries an
+                 EAN-13 and a DataMatrix, and without this it registered as two
+                 products. */
+              fold={foldScan}
               typed={{
                 label: "Or type a code",
                 placeholder: "What is printed under the bars",

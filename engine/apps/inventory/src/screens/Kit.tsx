@@ -20,6 +20,9 @@ import {
   Viewfinder, glyphOf, type Loaded,
 } from "@engine/design";
 import { Button } from "@heroui/react";
+/* ⚠️ ONE BOX IS ONE CODE — the fold the reader has no way to know. */
+import { foldScan } from "../code.js";
+
 
 /** One object in the kit. */
 export interface Member {
@@ -95,6 +98,9 @@ export function Kit({
           {state === "open"
             ? (
               <Viewfinder
+              /* ⚠️ ONE BOX IS ONE CODE — see `foldScan`. A pack carrying an EAN-13
+                 and a DataMatrix decodes as both, in an unstable order. */
+              fold={foldScan}
                 says="Scan an item's label to put it in"
                 onRead={onRead}
                 typed={{

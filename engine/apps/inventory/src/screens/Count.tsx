@@ -23,6 +23,9 @@ import {
   Section, Unit, Viewfinder, glyphOf, type Loaded,
 } from "@engine/design";
 import { Button } from "@heroui/react";
+/* ⚠️ ONE BOX IS ONE CODE — the fold the reader has no way to know. */
+import { foldScan } from "../code.js";
+
 
 /** What the session has found so far — one row per thing. */
 export interface Counted {
@@ -105,6 +108,9 @@ export function Count({
       then={(rows) => (
         <>
           <Viewfinder
+              /* ⚠️ ONE BOX IS ONE CODE — see `foldScan`. A pack carrying an EAN-13
+                 and a DataMatrix decodes as both, in an unstable order. */
+              fold={foldScan}
             says={counting ? "Scan what is on the shelf" : "Scan the shelf label"}
             onRead={onRead}
             typed={{

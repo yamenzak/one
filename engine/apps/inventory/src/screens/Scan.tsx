@@ -34,6 +34,9 @@ import {
 } from "@engine/design";
 import { Button } from "@heroui/react";
 import { MOST_BYTES } from "@engine/kernel";
+/* ⚠️ ONE BOX IS ONE CODE — the fold the reader has no way to know. */
+import { foldScan } from "../code.js";
+
 
 /** What `code.resolve` answered — the app's shape, narrowed at the point of use. */
 export interface Seen {
@@ -170,6 +173,9 @@ export function Scan({
   return (
     <Screen shape="detail" title={title} does={does}>
       <Viewfinder
+              /* ⚠️ ONE BOX IS ONE CODE — see `foldScan`. A pack carrying an EAN-13
+                 and a DataMatrix decodes as both, in an unstable order. */
+              fold={foldScan}
         says="Point it at a barcode, or at one of our shelf labels"
         onRead={onRead}
         typed={{

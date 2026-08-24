@@ -344,3 +344,29 @@ export const stillNeeded = (
       ...(of.lot ? [] : ["lot" as const]),
       ...(of.expiry ? [] : ["expiry" as const]),
     ]);
+
+/**
+ * ONE BOX IS ONE CODE — what a reader should hand back for a symbol it saw.
+ *
+ * ⚠️ THIS EXISTS BECAUSE A RETAIL PACK CARRIES TWO SYMBOLS AND A CAMERA SEES
+ * BOTH. A frame containing an EAN-13 and the GS1 DataMatrix printed a few
+ * millimetres from it decodes both, in an order that is not stable frame to
+ * frame — so a reader that reports what it saw reports two products for one box.
+ * It was reported with a photograph: one pack held still, a growing list of
+ * barcodes nobody had scanned.
+ *
+ * ⚠️ AND THE READER CANNOT KNOW. `@engine/design` has no nouns — a GTIN means
+ * nothing to a component that also serves a ticket scanner — so `Viewfinder`
+ * takes this as `fold` and the knowledge stays here, where `readScan` already
+ * resolves a DataMatrix's `(01)` element and a printed EAN-13 to the same
+ * fourteen digits.
+ *
+ * ⚠️ `""` IS A REFUSAL AND IT IS DOING REAL WORK. A twelve-to-fourteen digit
+ * number whose check digit is wrong is a MIS-SCAN, not a product — accepting it
+ * writes a number nobody typed into somebody's catalogue. So is a marketing QR
+ * on the same pack, which is a URL with a checksum.
+ */
+export const foldScan = (raw: string): string => {
+  const seen = readScan(raw, new Date().getUTCFullYear());
+  return unread(seen) ? "" : seen.value;
+};
