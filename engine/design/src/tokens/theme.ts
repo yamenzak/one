@@ -89,30 +89,68 @@ const TONED_CHIPS = `
 }`;
 
 /**
- * THE INK ON THE THREE THINGS FILLED WITH `--accent-soft`.
+ * EVERY CONTROL THAT IS ON, AND THE ONE THAT IS THE ACTION.
  *
- * ⚠️ IT IS BY SELECTOR RATHER THAN BY VARIABLE, AND THAT IS THE LIBRARY'S DOING.
- * `--chip-fg` and `--badge-fg` are set INSIDE `.chip--accent.chip--soft` and
- * `.badge--soft.badge--accent`; a `:root` declaration of the same name loses to
- * every one of them. Written as a token it would resolve, compute, and change
- * nothing — the shape of bug this package keeps finding.
+ * ⚠️ THE INK IS DARK IN BOTH THEMES BECAUSE THE FILL IS LIGHT IN BOTH. `--on` is
+ * the product's hue at a value chosen to be nearer the viewer than the track it
+ * sits in, which in light means down from white and in dark means well up from
+ * the control tier; the ink follows the fill rather than the theme. It is a bet
+ * on the hue being mid-to-bright — the same bet every tier in `ground.ts` makes —
+ * and the grey left in the mix is a floor rather than a guarantee. CSS cannot
+ * decide this properly until `contrast-color()` ships.
  *
- * ⚠️ AND IT IS DARK IN BOTH THEMES BECAUSE THE FILL IS LIGHT IN BOTH. `chosen`
- * means nearer the viewer, so it goes UP from the control tier in dark and stays
- * near the top in light; the ink follows the fill rather than the theme.
+ * ⚠️ AND "ON" IS NOT "THE ACTION", WHICH IS THE DISTINCTION THE LIBRARY DOES NOT
+ * DRAW. HeroUI paints a checked switch, a ticked box, a chosen radio, an open tab
+ * and a slider's travelled part with `--accent` — the same token as the primary
+ * button. That is defensible in a coloured theme and wrong in this one: our
+ * `--accent` is MONO, deliberately, because the near-white "Next" at the foot of
+ * a screen is the one call to action and has to be unmissable. Sharing the token
+ * meant every one of those states inherited the mono rule and came out grey.
  *
- * ⚠️ THE FILL IS NOW MOSTLY THE WORKSPACE'S BRAND (`CHOSEN_TINT`), WHICH MAKES
- * THIS INK A BET ON THE BRAND BEING A MID-TO-BRIGHT COLOUR. It is the same bet
- * every tier in `ground.ts` already makes — the surfaces are mixes WITH `--brand`
- * and assume it is a colour rather than a near-black — and the grey left in the
- * mix is what holds a dark brand up. A workspace that picks something very deep
- * would want this ink to flip, and CSS cannot decide that until `contrast-color()`
- * ships: the honest state is that the floor is a floor, not a guarantee.
+ * ⚠️ AND THE MONO RULE IS THE ARGUMENT FOR SPLITTING THEM, NOT AGAINST. It says
+ * the interface is values SO THAT colour becomes information — and "this is on"
+ * is information, in the most literal sense the product has. A switch nobody can
+ * tell the state of at a glance is the whole failure that rule exists to prevent,
+ * reached by obeying it too far.
+ *
+ * ⚠️ BY SELECTOR, BECAUSE THE LIBRARY SETS THESE INSIDE ITS OWN COMPONENT RULES.
+ * `--chip-fg`, `--badge-fg` and the checked fills are declared on
+ * `.chip--accent.chip--soft` and friends; a `:root` declaration of the same name
+ * resolves, computes, and changes nothing — the shape of bug this package keeps
+ * finding. Where the library DOES expose a token on a component root
+ * (`--switch-control-bg-checked`, `--input-bg-focus`) the token is set instead,
+ * which is the sanctioned half of D7.
  */
-const CHOSEN_INK = `
-.toggle-button[data-selected="true"] { --toggle-button-fg-selected: oklch(0.18 0 0); }
-.chip--accent.chip--soft { --chip-fg: oklch(0.18 0 0); }
-.badge--soft.badge--accent { --badge-fg: oklch(0.18 0 0); }`;
+const ON_STATE = `
+.toggle-button[data-selected="true"] { --toggle-button-fg-selected: var(--on-ink); }
+.chip--accent.chip--soft { --chip-fg: var(--on-ink); }
+.badge--soft.badge--accent { --badge-fg: var(--on-ink); }
+
+.switch { --switch-control-bg-checked: var(--on); --switch-control-bg-checked-hover: var(--on); }
+
+.checkbox[aria-checked="true"] .checkbox__control::before,
+.checkbox[data-selected="true"] .checkbox__control::before,
+.checkbox[data-indeterminate="true"] .checkbox__control::before { background-color: var(--on); }
+.checkbox[aria-checked="true"] .checkbox__control,
+.checkbox[data-selected="true"] .checkbox__control { color: var(--on-ink); }
+
+.radio[data-selected] .radio__control,
+.radio:has([data-slot="radio-content"][aria-checked="true"]) .radio__control,
+.radio:has(input:checked) .radio__control { background-color: var(--on); }
+
+.tabs--secondary > .tabs__list-container .tabs__indicator { background-color: var(--on); }
+.slider .slider__fill { background-color: var(--on); }
+.slider[data-orientation="horizontal"] .slider__track[data-fill-start="true"] { border-inline-start-color: var(--on); }
+.slider[data-orientation="horizontal"] .slider__track[data-fill-end="true"] { border-inline-end-color: var(--on); }
+
+.input--secondary { --input-bg-focus: var(--on-lit); }
+.select--secondary .select__trigger { --select-trigger-bg-focus: var(--on-lit); }
+.input-otp-slot { --input-otp-slot-bg-focus: var(--on-lit); }
+.autocomplete__trigger { --autocomplete-trigger-bg-focus: var(--on-lit); }
+.input-group { --input-group-bg-focus: var(--on-lit); --color-input-group-bg-focus: var(--on-lit); }
+.date-input-group { --date-input-group-bg-focus: var(--on-lit); }
+.number-field-group { --number-field-group-bg-focus: var(--on-lit); }
+.textarea--secondary:focus, .textarea--secondary[data-focused="true"] { background-color: var(--on-lit); }`;
 
 const NEUTRAL_CHIP = `
 .chip--default.chip--soft { color: var(--muted); }`;
@@ -206,7 +244,7 @@ export const TONE_CSS = `${QUIET_INK}
 [data-ink="danger"] { color: color-mix(in oklab, var(--danger) ${INK_PULL.danger}%, var(--foreground)); }
 ${TONED_CHIPS}
 ${NEUTRAL_CHIP}
-${CHOSEN_INK}`;
+${ON_STATE}`;
 
 /* -------------------------------------------------------------------- sky --- */
 

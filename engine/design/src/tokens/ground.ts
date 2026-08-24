@@ -260,8 +260,29 @@ const tinted = (l: number, pct: number) =>
  */
 const chosen = (mode: "light" | "dark"): string => [
   `--tier-chosen: ${tinted(GROUND[mode].chosen, CHOSEN_TINT[mode])};`,
-  `--accent-soft: var(--tier-chosen);`,
-  `--accent-soft-hover: var(--tier-chosen);`,
+  /*
+    ⚠️ `--on` IS THE SEMANTIC NAME, AND IT IS WORTH HAVING ONE. `--accent-soft`
+    is the library's word for the fill of a selected toggle and nothing else;
+    what a switch, a ticked box, a chosen radio, an open tab and a slider's
+    travelled part all share is that they are ON. Named once, every rule in
+    `ON_STATE` reads as the same statement rather than as eight overrides.
+  */
+  `--on: var(--tier-chosen);`,
+  /* ⚠️ THE INK ON IT, AS A TOKEN RATHER THAN A LITERAL REPEATED PER SELECTOR —
+     `ON_STATE` sets it on seven things now, and seven copies of a colour is
+     six chances to change one of them. */
+  `--on-ink: ${grey(0.18)};`,
+  /*
+    ⚠️ AND A FIELD SOMEBODY IS TYPING IN IS LIT, NOT FILLED. The library's
+    `--input-bg-focus` is `var(--default)` — the SAME value as the resting
+    field, so a focused field changed by nothing but its ring, which is what
+    "the input is still grey when selected" is. A full `--on` fill would be a
+    text field the colour of a button; a fifth of it over the field tier reads
+    as warm without touching legibility.
+  */
+  `--on-lit: color-mix(in oklab, var(--tier-chosen) 18%, var(--tier-field));`,
+  `--accent-soft: var(--on);`,
+  `--accent-soft-hover: var(--on);`,
 ].join(" ");
 
 function tier(mode: "light" | "dark"): string {
