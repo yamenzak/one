@@ -168,12 +168,12 @@ part that is not. Refresh with `node engine/scripts/docs.test.mjs --write`.
 | `tokens/` | colour, type, spacing, motion, the chrome and hem rules | 82 |
 | `scene/` | the ambience engine — families, marks, the world behind a screen | 1 |
 | `frame/` | page, shape, crown, nav, dock, overlays — what wraps a screen | 61 |
-| `parts/` | rows, cards, lists, controls, the four outcomes | 169 |
+| `parts/` | rows, cards, lists, controls, the four outcomes | 170 |
 | `rendered/` | whole surfaces drawn from a kernel declaration | 53 |
 | `chart/` | the data vocabulary — a number as a shape | 39 |
 | `measure/` | what a screen actually lays out, in a real browser — the harness every app sweeps its own screens with | 1 |
 
-**406 exports.** Every one is reachable as `import { … } from "@engine/design"`;
+**407 exports.** Every one is reachable as `import { … } from "@engine/design"`;
 there is no deep import, and a guard says so.
 
 ### `tokens/`
@@ -219,7 +219,7 @@ there is no deep import, and a guard says so.
 - `parts/logo.tsx` — `Lockup`, `LockupProps`
 - `parts/opening.tsx` — `Opening`, `OpeningProps`
 - `parts/permission.tsx` — `Permission`, `PermissionRow`, `PermissionRowProps`
-- `parts/pick-file.tsx` — `asDataUrl`, `PickFile`, `PickFileProps`, `saysKind`, `sift`, `takes`
+- `parts/pick-file.tsx` — `asDataUrl`, `PickFile`, `PickFileProps`, `saysKind`, `shrunk`, `sift`, `takes`
 - `parts/recall.tsx` — `Block`, `seedShapes`, `shapeFor`, `ShapeWaiting`, `useRecalledShape`
 - `parts/said.tsx` — `Amount`, `Clock`, `Dated`, `machineHere`, `Num`, `Presenting`, `Size`, `Unit`, `useAmount`, `useDay`, `useDays`, `useFigures`, `useShown`, `When`
 - `parts/settle.tsx` — `SettledProps`, `SettledSwitch`

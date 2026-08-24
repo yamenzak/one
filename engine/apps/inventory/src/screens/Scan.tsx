@@ -29,9 +29,11 @@
 import * as React from "react";
 import {
   Await, FieldRow, Group, Lookup, NoteRow, PickFile, RowsWaiting, Screen, Section,
-  Viewfinder, asDataUrl, glyphOf, type Loaded,
+  Viewfinder, glyphOf, type Loaded,
+  shrunk,
 } from "@engine/design";
 import { Button } from "@heroui/react";
+import { MOST_BYTES } from "@engine/kernel";
 
 /** What `code.resolve` answered — the app's shape, narrowed at the point of use. */
 export interface Seen {
@@ -283,12 +285,21 @@ export function Scan({
                    NEED MORE. The ceiling is here rather than at the door because
                    a file refused after it was uploaded is a wait somebody sat
                    through for nothing. */
-                most={6 * 1024 * 1024}
+                /*
+                  ⚠️ THE TRANSPORT'S CEILING, BECAUSE THE PICTURE IS SHRUNK ON THE
+                  WAY IN — see `shrunk`. Six megabytes was a guess at what a phone
+                  produces, and it refuses the ones that produce more; the reason
+                  the number was here at all was that nothing was making the
+                  photograph smaller.
+                */
+                most={MOST_BYTES}
                 says="Photograph the label"
                 under="It reads the name, the size and the hazard symbols"
                 label="Choose a photo"
                 busy={busy}
-                onPick={(bytes, file) => { onLabel(asDataUrl(bytes, file.type)); }}
+                onPick={(bytes, file) => {
+                  void (async () => { onLabel(await shrunk(bytes, file.type)); })();
+                }}
               />
             </Group>
           </Section>

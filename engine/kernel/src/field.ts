@@ -23,6 +23,22 @@ import type { Tone } from "./primitives.js";
 
 /* --------------------------------------------------------------- the kinds --- */
 
+/**
+ * THE MOST BYTES AN UPLOAD MAY BE, AND IT IS THE PLATFORM'S NUMBER.
+ *
+ * ⚠️ A CEILING IN THE PLATFORM, NOT IN A PRODUCT. A Worker's memory is the real
+ * limit and it is the same for every app here, so an app free to set its own
+ * would be an app free to set one its isolate cannot survive — and the failure is
+ * an out-of-memory kill, which has no error message and no stack.
+ *
+ * ⚠️ AND IT IS IN THE KERNEL BECAUSE BOTH SIDES NEED IT. The worker refuses at
+ * the door; the picker refuses before spending somebody's upload on a file that
+ * was never going to land. Two copies of that number is one number that drifts,
+ * and the direction it drifts matters: a picker whose ceiling is HIGHER lets an
+ * upload run to completion and fail, on the connection least able to afford it.
+ */
+export const MOST_BYTES = 25 * 1024 * 1024;
+
 export type FieldKind =
   | "text" | "long" | "number" | "money" | "bool" | "instant" | "day"
   | "enum" | "json" | "media" | "ref" | "email" | "url" | "colour";

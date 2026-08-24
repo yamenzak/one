@@ -266,3 +266,97 @@ export function asDataUrl(bytes: ArrayBuffer, type: string): string {
   }
   return `data:${type || "application/octet-stream"};base64,${btoa(raw)}`;
 }
+
+/* ------------------------------------------------------------- shrinking --- */
+
+/**
+ * ⚠️ THE LONG EDGE, AND IT IS CHOSEN FOR WHAT READS A PHOTOGRAPH RATHER THAN FOR
+ * WHAT TOOK IT. A phone hands over 4000×3000; a vision model tiles its input at a
+ * few hundred pixels a side and gains nothing past about this, and a person
+ * checking a thing in their hand against a picture on a phone gains nothing past
+ * it either. Everything above it is upload time in a basement, storage that is
+ * metered, and — because an image is priced by tile — credits.
+ */
+const LONG_EDGE = 1_600;
+
+/**
+ * ⚠️ 0.82 IS WHERE JPEG STOPS BEING WORTH IT. Below about 0.75 the artefacts
+ * start eating small printed type, which on a LABEL is the whole content of the
+ * photograph; above about 0.9 the file doubles for a difference nothing here can
+ * see. It is a decision rather than a default, which is why it is named.
+ */
+const QUALITY = 0.82;
+
+/**
+ * A PHOTOGRAPH, SMALL ENOUGH TO SEND.
+ *
+ * ⚠️ THIS IS THE FUNCTION TWO COMMENTS IN THE INVENTORY APP ALREADY CLAIMED
+ * EXISTED. `product.see` refuses a batch over eight megabytes and says "the sheet
+ * downscales before it asks" — and nothing downscaled anything, so the only way
+ * to stay under the ceiling was a picker cap so tight it refused every photograph
+ * a modern phone produces. The cap was the symptom; this is the thing that was
+ * missing.
+ *
+ * ⚠️ ORIENTATION COMES FROM THE FILE, AND LEAVING IT OUT IS THE SUBTLE ONE. A
+ * phone writes the sensor's pixels and an EXIF rotation beside them; a canvas
+ * draws the pixels and ignores the tag unless asked. So a portrait photograph
+ * arrives on its side — which a person notices and shrugs at, and which a model
+ * reading a LABEL is simply worse at, silently, with no way to tell from the
+ * answer that the picture was sideways.
+ *
+ * ⚠️ AND A PICTURE ALREADY SMALL ENOUGH IS LEFT ALONE. Re-encoding it would spend
+ * a generation of JPEG loss on a file that needed nothing, and would turn a
+ * lossless screenshot of a spec sheet into a blurry one.
+ *
+ * ⚠️ EVERY FAILURE FALLS BACK TO THE ORIGINAL BYTES. A browser that cannot decode
+ * HEIC, a canvas the platform refuses, an image too large to rasterise: none of
+ * those is a reason to lose the photograph somebody just took. The size ceiling
+ * on the picker is what catches the ones that come through whole, which is a
+ * refusal with a sentence rather than a silent loss.
+ */
+export async function shrunk(
+  bytes: ArrayBuffer, type: string,
+  of: { readonly edge?: number; readonly quality?: number } = {},
+): Promise<string> {
+  const edge = of.edge ?? LONG_EDGE;
+  const quality = of.quality ?? QUALITY;
+  if (!type.startsWith("image/")) return asDataUrl(bytes, type);
+
+  try {
+    const made = await createImageBitmap(new Blob([bytes], { type }), {
+      /* ⚠️ See the header — without this a portrait photograph is landscape. */
+      imageOrientation: "from-image",
+    });
+    const { width, height } = made;
+    if (!width || !height) { made.close(); return asDataUrl(bytes, type); }
+
+    const over = Math.max(width, height) / edge;
+    if (over <= 1) { made.close(); return asDataUrl(bytes, type); }
+
+    const w = Math.round(width / over);
+    const h = Math.round(height / over);
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const at = canvas.getContext("2d");
+    if (!at) { made.close(); return asDataUrl(bytes, type); }
+
+    /* ⚠️ WHITE UNDER IT, BECAUSE JPEG HAS NO ALPHA. A transparent PNG drawn onto
+       an untouched canvas and encoded as JPEG comes out on BLACK — which is a
+       photograph of a product turned into a photograph of a product at night. */
+    at.fillStyle = "#ffffff";
+    at.fillRect(0, 0, w, h);
+    /* ⚠️ THE BROWSER'S OWN RESAMPLER, ASKED FOR ITS BEST. Left at the default a
+       four-times reduction aliases printed type into noise, which is the one
+       thing on the label that has to survive. */
+    at.imageSmoothingEnabled = true;
+    at.imageSmoothingQuality = "high";
+    at.drawImage(made, 0, 0, w, h);
+    made.close();
+
+    return canvas.toDataURL("image/jpeg", quality);
+  } catch {
+    /* ⚠️ See the header — a photograph is never lost to a decoder. */
+    return asDataUrl(bytes, type);
+  }
+}

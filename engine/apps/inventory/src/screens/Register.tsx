@@ -49,9 +49,10 @@ import * as React from "react";
 import {
   ActionRow, Await, LongText, NoteRow, NumberInput, PickFile, RowsWaiting, Screen,
   Section, Segmented, Stack, Steps, Tags, TextInput, ToggleRow, Viewfinder,
-  asDataUrl, glyphOf, type Loaded, type Option,
+  glyphOf, shrunk, type Loaded, type Option,
 } from "@engine/design";
 import { Button } from "@heroui/react";
+import { MOST_BYTES } from "@engine/kernel";
 
 /** ⚠️ Up to six — see `product.see`: past that the answer stops improving. */
 export const MOST_PHOTOS = 6;
@@ -399,7 +400,16 @@ export function Register({
         <Section label="Photos">
             <PickFile
               accept={["image/*"]}
-              most={2 * 1024 * 1024}
+              /*
+                ⚠️ THE TRANSPORT'S OWN CEILING, NOT A NUMBER PICKED HERE. This was
+                two megabytes, which refuses every photograph a phone has taken
+                since about 2015 — chosen because `product.see` caps a batch at
+                eight and nothing was making the pictures smaller. `shrunk` is
+                what was missing; with it, six photographs off any phone come to
+                well under that, and the only ceiling left is what `media.upload`
+                will actually accept.
+              */
+              most={MOST_BYTES}
               says={photos.length ? "Add another angle" : "Take a photo of the product"}
               /*
                 ⚠️ THE LABEL IS NAMED, BECAUSE IT IS THE PICTURE THAT PAYS. Net
@@ -422,9 +432,18 @@ export function Register({
                 what may still be added rather than what may ever be.
               */
               atOnce={Math.max(1, MOST_PHOTOS - photos.length)}
+              /*
+                ⚠️ SHRUNK ON THE WAY IN, ONCE, RATHER THAN ON THE WAY OUT. Held at
+                full size the six would be forty megabytes in React state on a
+                phone — and the two places that send them (the upload and the
+                model) would each have to remember to reduce, which is two chances
+                to forget and one of them is the one that costs credits.
+              */
               onPick={(bytes, file) => {
-                setPhotos((held) => (held.length >= MOST_PHOTOS
-                  ? held : [...held, asDataUrl(bytes, file.type)]));
+                void (async () => {
+                  const small = await shrunk(bytes, file.type);
+                  setPhotos((held) => (held.length >= MOST_PHOTOS ? held : [...held, small]));
+                })();
               }}
             />
 

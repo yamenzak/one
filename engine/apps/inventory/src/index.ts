@@ -3603,10 +3603,11 @@ const SEEN_MOST = 6;
 /**
  * ⚠️ THE TOTAL, IN `data:` URL CHARACTERS, AND IT IS NOT THE SAME AS SIX TIMES
  * ONE. Six photographs straight off a phone are tens of megabytes and no
- * provider accepts the request — which arrives as a timeout or a wall of
- * gateway text, minutes after somebody pressed a button, having explained
- * nothing. The sheet downscales before it asks; this is the refusal for
- * everything that does not, and it is worth roughly a megabyte of JPEG each.
+ * provider accepts the request — which arrives as a timeout or a wall of gateway
+ * text, minutes after somebody pressed a button, having explained nothing. The
+ * screen shrinks each one to a 1600px edge before it asks (`shrunk`), which puts
+ * six comfortably inside this; the ceiling is the refusal for an AGENT or a
+ * queued call that does not, and it is worth roughly a megabyte of JPEG each.
  */
 const SEEN_BYTES = 8_000_000;
 
@@ -3708,8 +3709,8 @@ const seeProduct = operation<{ images: unknown; hint?: string; known?: string },
       return c.fail("platform.invalid", {}, { fields: { images: "One of those is not a photo" } });
     }
     /* ⚠️ AND THE TOTAL, BECAUSE SIX PHONE PHOTOGRAPHS ARE FORTY MEGABYTES. The
-       sheet downscales before it asks; this is what happens when something else
-       calls the operation and does not. */
+       screen shrinks them first (`shrunk`); this is what happens when an agent or
+       a replayed write calls the operation and does not. */
     const bytes = pictures.reduce((all, one) => all + one.length, 0);
     if (bytes > SEEN_BYTES) {
       return c.fail("platform.too_large",

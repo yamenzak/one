@@ -15,7 +15,8 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { saysKind, sift, takes } from "../src/parts/pick-file.js";
+import { MOST_BYTES } from "@engine/kernel";
+import { saysKind, shrunk, sift, takes } from "../src/parts/pick-file.js";
 
 const MB = 1024 * 1024;
 
@@ -122,5 +123,41 @@ describe("how many at once", () => {
     );
     expect(taking.map((f) => f.name)).toEqual(["front.jpg"]);
     expect(why?.title ?? "").toBeTruthy();
+  });
+});
+
+describe("a photograph on the way in", () => {
+  /*
+    ⚠️ THIS IS THE FUNCTION TWO COMMENTS ALREADY CLAIMED EXISTED. `product.see`
+    refuses a batch over eight megabytes and said "the sheet downscales before it
+    asks" — and nothing downscaled anything, so the only way under the ceiling was
+    a picker cap that refused every photograph a modern phone produces. The cap
+    was the symptom.
+  */
+  it("leaves anything that is not an image alone", async () => {
+    const bytes = new Uint8Array([1, 2, 3, 4]).buffer;
+    expect(await shrunk(bytes, "application/pdf")).toMatch(/^data:application\/pdf;base64,/);
+  });
+
+  /* ⚠️ A DECODER THAT REFUSES IS NOT A LOST PHOTOGRAPH. `createImageBitmap` is
+     absent under vitest, so this exercises the fallback the header promises —
+     which is also what a browser with no HEIC support does. */
+  it("falls back to the original bytes when it cannot decode", async () => {
+    const bytes = new Uint8Array([0xff, 0xd8, 0xff, 0xe0]).buffer;
+    const out = await shrunk(bytes, "image/jpeg");
+    expect(out).toMatch(/^data:image\/jpeg;base64,/);
+  });
+
+  /*
+    ⚠️ AND THE CEILING THE PICKER USES IS THE TRANSPORT'S OWN. Two copies of that
+    number is one number that drifts, and the direction matters: a picker whose
+    ceiling is HIGHER than the door's lets an upload run to completion and fail,
+    on the connection least able to afford it.
+  */
+  it("takes a photograph the size a phone actually produces", () => {
+    const phone = fileOf("IMG_4021.jpg", "image/jpeg", 6 * MB);
+    expect(sift([phone], ["image/*"], MOST_BYTES, 6).taking).toHaveLength(1);
+    /* ⚠️ The old ceiling, and what it did to that same photograph. */
+    expect(sift([phone], ["image/*"], 2 * MB, 6).taking).toHaveLength(0);
   });
 });

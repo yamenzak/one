@@ -20,10 +20,11 @@
 import * as React from "react";
 import {
   AmountRow, Await, Group, FieldRow, NoteRow, Num, NumberInput, PickFile, RowsWaiting,
-  Screen, Section, Steps, TextInput, Viewfinder, asDataUrl, glyphOf, useShown, notice,
+  Screen, Section, Steps, TextInput, Viewfinder, glyphOf, useShown, notice,
   type Loaded, type Step,
+  shrunk,
 } from "@engine/design";
-import { sayDate, type Instant } from "@engine/kernel";
+import { MOST_BYTES, sayDate, type Instant } from "@engine/kernel";
 import { Button } from "@heroui/react";
 import type { Seen } from "./Scan.js";
 
@@ -265,12 +266,21 @@ export function Receive({
             <Group>
               <PickFile
                 accept={["image/*"]}
-                most={6 * 1024 * 1024}
+                /*
+                  ⚠️ THE TRANSPORT'S CEILING, BECAUSE THE PICTURE IS SHRUNK ON THE
+                  WAY IN — see `shrunk`. Six megabytes was a guess at what a phone
+                  produces, and it refuses the ones that produce more; the reason
+                  the number was here at all was that nothing was making the
+                  photograph smaller.
+                */
+                most={MOST_BYTES}
                 says="Photograph the delivery note"
                 under="Its lines become a list to work through"
                 label="Choose a photo"
                 busy={busy}
-                onPick={(bytes, file) => { onNote(asDataUrl(bytes, file.type)); }}
+                onPick={(bytes, file) => {
+                  void (async () => { onNote(await shrunk(bytes, file.type)); })();
+                }}
               />
 
               <Await

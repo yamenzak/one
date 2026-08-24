@@ -23,13 +23,11 @@ import type { Resolved } from "./compose.js";
 import type { PlatformCtx } from "./member-ops.js";
 import { eraseObjects, mediaFor, mediaOf, putMedia, type Bucket } from "./storage.js";
 
-/**
- * ⚠️ A CEILING IN THE PLATFORM, NOT IN A PRODUCT. A Worker's memory is the real
- * limit and it is the same for every app here, so an app free to set its own
- * would be an app free to set one its isolate cannot survive — and the failure
- * is an out-of-memory kill, which has no error message and no stack.
- */
-export const MOST_BYTES = 25 * 1024 * 1024;
+/* ⚠️ THE KERNEL'S, RE-EXPORTED — see `MOST_BYTES` there. It moved because the
+   BROWSER needs the same number: a picker that refuses before the upload spends
+   somebody's connection on a file that was never going to land. */
+export { MOST_BYTES } from "@engine/kernel";
+import { MOST_BYTES } from "@engine/kernel";
 
 export function mediaOps(app: AppSpec): Readonly<Record<string, Resolved>> {
   /* ⚠️ The purposes an app actually declared. A caller-supplied purpose would be

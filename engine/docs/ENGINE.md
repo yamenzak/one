@@ -412,7 +412,7 @@ and a manifest that does not compose refuses to boot.
 | `primitives` | ids, days, instants, slugs — the words everything else is spelled in | 12 | — |
 | `present` | how a date, a number, a price and a measurement are written for one reader | 17 | — |
 | `infra` | what a product needs underneath it, and what each kind can promise | 11 | — |
-| `field` | what a value is: its kind, its bounds, what it holds, whether it is the app's to keep | 8 | — |
+| `field` | what a value is: its kind, its bounds, what it holds, whether it is the app's to keep | 9 | — |
 | `collection` | what a thing an app keeps is — and the six operations it gets for free | 18 | — |
 | `operation` | one declaration carrying every cross-cutting concern (D12) | 11 | — |
 | `access` | permissions, roles, and what an app may never claim | 15 | — |
@@ -440,7 +440,7 @@ and a manifest that does not compose refuses to boot.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**287 of them**, 286 reached by something today.
+**288 of them**, 287 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -484,7 +484,7 @@ env or a binding.
 | `audit` | what happened, and the replay that stops it happening twice | 7 | — |
 | `jobs` | the scheduler and the record that it ran | 10 | 1 |
 | `branding` | a workspace's own theme and marks | 4 | — |
-| `icon` | the picture a business uploads, and where a public route can read it | 8 | — |
+| `icon` | the picture a business uploads, and where a public route can read it | 9 | — |
 | `raster` | a PNG drawn in a Worker, for the tabs and home screens an SVG cannot reach | 5 | — |
 | `ai-actions` | which model an action runs on, and in whose words | 7 | — |
 | `models` | the model catalogue — what exists, what it costs us, what a workspace pays | 15 | — |
@@ -516,7 +516,7 @@ env or a binding.
 | `storage` | files: the object, the row that knows its key, and the erasure of both | 7 | — |
 | `move` | a workspace's records change shard — the only way its jurisdiction can | 9 | — |
 | `renewal` | what this deployment is serving, so a tab running an old build finds out | 3 | — |
-| `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
+| `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 1 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 9 | — |
 
 **460 of them**, 459 reached by something today.
