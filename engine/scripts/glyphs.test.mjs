@@ -252,6 +252,13 @@ if (!stolen) ok(`no screen draws a registered mark itself (${looked} files, ${KN
     "apps/inventory/src/screens/Scan.tsx",
     /* And `Receive`, over the lines a model read off a photographed page. */
     "apps/inventory/src/screens/Receive.tsx",
+    /*
+      ⚠️ AND `Register`, ONCE, OVER A FORM A MODEL FILLED IN FROM PHOTOGRAPHS.
+      It is the same claim `Scan` makes and it is made in the same place — one
+      line above the fields, rather than a badge per row, because a mark on
+      everything a model touched is texture and this one has to be read.
+    */
+    "apps/inventory/src/screens/Register.tsx",
   ]);
 
   let uses = 0;

@@ -276,12 +276,21 @@ const readProblem = async (res: Response): Promise<Problem> => {
  */
 async function call<T>(
   id: string, method: "GET" | "POST", body?: unknown, contentType?: string,
+  beside?: Readonly<Record<string, string>>,
 ): Promise<Answer<T>> {
-  const query = method === "GET" && body
-    ? `?${new URLSearchParams(Object.entries(body as Record<string, string>)).toString()}`
-    : "";
-
   const raw_ = body instanceof ArrayBuffer || ArrayBuffer.isView(body);
+
+  /*
+    ⚠️ AND A BYTES POST CARRIES ITS FIELDS IN THE QUERY, because the body is the
+    file. The runtime reads them there (`serve.ts`, the BYTES branch) and it was
+    the CLIENT that could not send them — so `media.upload`, which needs a
+    `purpose` beside the bytes, was a platform operation no app could reach.
+    Every other POST puts its fields in the body and takes no query at all.
+  */
+  const asked = method === "GET" ? body as Record<string, string> | undefined : beside;
+  const query = asked && Object.keys(asked).length
+    ? `?${new URLSearchParams(Object.entries(asked)).toString()}`
+    : "";
 
   /* ⚠️ Only a bare GET can have been asked ahead of time — see `early`. */
   const ahead = method === "GET" && !body ? await early(id) : null;
@@ -521,9 +530,16 @@ export const api = {
    */
   known,
 
-  /** ⚠️ `contentType` only for BYTES — see `call`. JSON needs none. */
-  post: <T>(id: string, input?: unknown, as?: { readonly contentType: string }): Promise<Answer<T>> =>
-    call<T>(id, "POST", input, as?.contentType),
+  /**
+   * ⚠️ `contentType` AND `with` ARE BOTH ONLY FOR BYTES — see `call`. A JSON
+   * post needs neither: its fields are the body. When the body IS the file,
+   * `with` is the only way anything else reaches the operation.
+   */
+  post: <T>(
+    id: string, input?: unknown,
+    as?: { readonly contentType: string; readonly with?: Readonly<Record<string, string>> },
+  ): Promise<Answer<T>> =>
+    call<T>(id, "POST", input, as?.contentType, as?.with),
 
   /**
    * ⚠️ THE ONE REQUEST THAT IS NOT AN OPERATION. `/health` is outside `/api/`

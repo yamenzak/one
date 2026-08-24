@@ -5982,12 +5982,20 @@ export const INVENTORY: AppSpec = defineApp({
      `done` nothing emits is a box that can never be crossed off, and the
      manifest refuses one at composition rather than letting it sit there. */
   guide: {
-    "first-place": { id: "first-place", label: "Name a place to keep things",
-      why: "Everything sits somewhere, and the shelf is what a scan finds first.",
-      done: "location.created", link: "/stock", order: 1 },
+    /*
+      ⚠️ THE PRODUCT COMES FIRST, AND IT USED TO COME SECOND. Naming a shelf is
+      the answer to "where", which is a question nobody has until they are
+      holding something the catalogue knows about — and a first step that asks
+      somebody to describe their building is a first step they put off. Adding a
+      thing takes six photographs and one press, and it is the gesture that
+      shows what the product is for.
+    */
     "first-thing": { id: "first-thing", label: "Add your first product",
       why: "A product is the type; how many there are comes next.",
-      done: "product.created", link: "/stock", order: 2 },
+      done: "product.created", link: "/stock", order: 1 },
+    "first-place": { id: "first-place", label: "Name a place to keep things",
+      why: "Everything sits somewhere, and the shelf is what a scan finds first.",
+      done: "location.created", link: "/stock", order: 2 },
     /* ⚠️ THE ONE STEP THAT IS EACH PERSON'S. Naming a place and building the
        catalogue happen once for the whole workspace; putting something on a
        shelf is the gesture this product IS, and somebody who has not done it has

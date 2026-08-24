@@ -11,8 +11,15 @@
  * ⚠️ THE QUICK ROW IS WHAT THE BAR DOES NOT ALREADY HOLD. A shortcut to
  * something a thumb reaches in one tap from every screen in the product is a
  * second answer to the same question, and the pair drift the day either moves.
- * Scanning and counting are destinations; receiving, printing, importing and the
- * people it is bought from are not, so those are the ones offered here.
+ * Scanning and counting are destinations; adding a product, printing, importing
+ * and the people it is bought from are not, so those are the ones offered here.
+ *
+ * ⚠️ AND THE ROW HOLDS FOUR, NOT AS TASTE BUT AS ARITHMETIC — `QuickActions`
+ * draws four and DROPS a fifth without a word, because at 80px with a 24px gap
+ * five do not fit a phone. So adding one here means removing one, which is why
+ * receiving is now reached from Stock: "put some of this away" is thought of
+ * while looking at the shelf, and the catalogue has to exist before anything
+ * can go on it.
  *
  * ⚠️ AND A NUMBER NOBODY MAY SEE IS `null`, NEVER `0`. "Nothing is waiting" and
  * "you are not allowed to know" are opposite sentences, and a zero prints the
@@ -106,7 +113,12 @@ export interface HomeProps {
   /** Where a step sends them. The guide's links are routes. */
   readonly onGo: (route: string) => void;
 
-  readonly onReceive: () => void;
+  /**
+   * ⚠️ THE FIRST THING SOMEBODY DOES, AND IT OPENS A SHEET RATHER THAN GOING
+   * ANYWHERE. Adding the thing you are holding is never the journey you were
+   * on — see `Register`.
+   */
+  readonly onRegister: () => void;
   readonly onLabels: () => void;
   readonly onImport: () => void;
   readonly onSuppliers: () => void;
@@ -119,7 +131,7 @@ export interface HomeProps {
 
 export function Home({
   title, said, of, again, needs, moving, raised, held, onGo,
-  onReceive, onLabels, onImport, onSuppliers,
+  onRegister, onLabels, onImport, onSuppliers,
   onDue, onCounts, onRuns, onReports, onStart,
 }: HomeProps) {
   const figures = useFigures();
@@ -137,8 +149,14 @@ export function Home({
      destination does not use is a control that appears for people it refuses and
      hides from people it would have served. */
   const acts = [
-    held.has("stock:move")
-      ? { id: "receive", label: "Receive", icon: glyphOf("add"), onDo: onReceive }
+    /*
+      ⚠️ FIRST, BECAUSE A CATALOGUE COMES BEFORE ANYTHING CAN BE PUT ON A SHELF.
+      It took Receive's place here rather than sitting beside it: `QuickActions`
+      draws four and silently drops a fifth, and receiving has its own door on
+      Stock — which is where "put some of this away" is actually thought of.
+    */
+    mayCatalogue
+      ? { id: "register", label: "Add a product", icon: glyphOf("add"), onDo: onRegister }
       : null,
     held.has("location:read")
       ? { id: "labels", label: "Labels", icon: glyphOf("tag"), onDo: onLabels }

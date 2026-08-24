@@ -46,6 +46,9 @@ import { Start } from "./Start.js";
    one — the same reason `Got` is not called `Answer` above. */
 import { Import, MAPPABLE, type Done, type Seen as Seeing } from "./Import.js";
 import { NOBODY, Suppliers, type Supplier as SupplierLine } from "./Suppliers.js";
+import {
+  Register, type Guessed, type Match, type Registering,
+} from "./Register.js";
 import type { Line, Place, Tracking } from "./sample.js";
 
 /* ------------------------------------------------------------------ seams --- */
@@ -59,8 +62,16 @@ import type { Line, Place, Tracking } from "./sample.js";
 export interface Door {
   get<T>(op: string, input?: Record<string, string>): Promise<
     { ok: true; value: T } | { ok: false; problem: Problem }>;
-  post<T>(op: string, input?: unknown): Promise<
-    { ok: true; value: T } | { ok: false; problem: Problem }>;
+  /**
+   * ⚠️ THE THIRD ARGUMENT IS ONLY FOR BYTES. When the body IS a file, its type
+   * is a header and everything else the operation declared travels in the
+   * query — which is why `with` exists at all: without it `media.upload` could
+   * be called and could never be told what the file is FOR.
+   */
+  post<T>(
+    op: string, input?: unknown,
+    as?: { readonly contentType: string; readonly with?: Readonly<Record<string, string>> },
+  ): Promise<{ ok: true; value: T } | { ok: false; problem: Problem }>;
   /**
    * ⚠️ WHAT THIS TAB HAS ALREADY BEEN TOLD, SYNCHRONOUSLY. The door holds one
    * answer per operation-and-input; this is how a screen seeds its first render
@@ -2013,6 +2024,158 @@ const EMPTY_REPORT: Reported = {
  * `totals.read` answers all of them at once and counts with the SAME filters the
  * lists use, so the hero cannot disagree with the screen behind it (D57).
  */
+/* ------------------------------------------------------------- registering --- */
+
+/** A row as `tag.list` and `supplier.list` answer it. */
+interface Named { readonly id: string; readonly name: string }
+
+/**
+ * THE REGISTER SHEET'S WHOLE WIRING, IN ONE HOOK.
+ *
+ * ⚠️ A HOOK RATHER THAN A SCREEN, BECAUSE THE SHEET HAS MORE THAN ONE DOOR.
+ * Home's first action opens it, the checklist sends people to it, and a scan
+ * that resolved to nothing is the third — putting the state in one of those
+ * screens would make the other two either a second copy or a route.
+ *
+ * ⚠️ AND THE PHOTOGRAPHS ARE UPLOADED BEFORE THE PRODUCT IS WRITTEN, not after.
+ * A media row the product never referenced is an orphan the quota counts and
+ * nothing points at; a product referencing a media id that failed to upload is a
+ * broken picture on the one screen somebody checks a thing in their hand
+ * against. Uploading first makes the failure happen before anything is claimed.
+ */
+function useRegistering(api: Door, may: (one: string) => boolean, go: (route: string) => void) {
+  const [open, setOpen] = React.useState(false);
+  const [busy, setBusy] = React.useState(false);
+  const [asked, setAsked] = React.useState<{ name: string; brand: string } | null>(null);
+  const [guessed, setGuessed] = React.useState<Loaded<Guessed | null>>(ready(null));
+
+  const tags = useAsked<{ items: readonly Named[] }>(
+    api, may("product:read") ? "tag.list" : null, undefined, { items: [] });
+  const suppliers = useAsked<{ items: readonly Named[] }>(
+    api, may("product:read") ? "supplier.list" : null, undefined, { items: [] });
+
+  /* ⚠️ THE QUESTION IS THE STATE, so the read re-runs when the name changes and
+     not when the sheet re-renders. `useAsked` keys on the input's string, which
+     is what makes a debounced setter enough. */
+  const resembling = useAsked<{ matches: readonly Match[] }>(
+    api, asked && may("product:read") ? "product.resembling" : null,
+    asked ? { name: asked.name, brand: asked.brand } : undefined,
+  );
+
+  const resembles: Loaded<readonly Match[] | null> = asked === null
+    ? ready(null)
+    : resembling.of.status === "ready" ? ready(resembling.of.data.matches)
+      : resembling.of as Loaded<readonly Match[] | null>;
+
+  const onLook = React.useCallback((of: { name: string; brand: string }) => {
+    setAsked(of);
+  }, []);
+
+  const onIdentify = React.useCallback((photos: readonly string[]) => {
+    setGuessed(waiting());
+    void api.post<Guessed>("product.see", {
+      images: photos,
+      /* ⚠️ THE WORKSPACE'S OWN WORDS GO WITH THE PICTURES. Asking a model to
+         categorise against nothing produces four spellings of one kind across
+         four mornings — see `product.see`. */
+      known: (tags.of.status === "ready" ? tags.of.data.items : []).map((t) => t.name).join(", "),
+    }).then((got) => {
+      setGuessed(got.ok ? ready(got.value) : trouble(got.problem));
+    });
+  }, [api, tags.of]);
+
+  const onRegister = React.useCallback((of: Registering) => {
+    setBusy(true);
+    void (async () => {
+      /*
+        ⚠️ EVERY PICTURE, OR NONE OF THEM. A partial gallery is a product whose
+        second angle is missing with nothing saying why, and the person who took
+        six photographs has no way to tell which one did not land.
+      */
+      const kept: string[] = [];
+      for (const one of of.photos) {
+        const bytes = bytesOf(one);
+        if (!bytes) continue;
+        const put = await api.post<{ id: string }>("media.upload", bytes.body, {
+          contentType: bytes.type,
+          /* ⚠️ THE PURPOSE TRAVELS IN THE QUERY BECAUSE THE BODY IS THE FILE —
+             see `api.post`. It is a path segment in R2 and a closed set at the
+             door, so a typo here is a refusal rather than a stray bucket. */
+          with: { purpose: "product-photo" },
+        });
+        if (!put.ok) { setBusy(false); return; }
+        kept.push(put.value.id);
+      }
+
+      const made = await api.post<{ product: string }>("product.register", {
+        name: of.name, brand: of.brand, description: of.description,
+        unit: of.unit, tracking: of.tracking, whole: of.whole,
+        storage: of.storage, handling: of.handling,
+        reorder: of.reorder, anyway: of.anyway,
+        ...(of.par === null ? {} : { par: of.par }),
+        ...(of.reorderQty === null ? {} : { reorderQty: of.reorderQty }),
+        ...(of.supplier ? { supplier: of.supplier } : {}),
+        /* ⚠️ THE FIRST ONE IS THE PICTURE OF RECORD AND THE REST ARE THE
+           GALLERY. `product.photo` is what somebody checks the thing in their
+           hand against, so it is the one they took first and deliberately. */
+        ...(kept.length ? { photo: kept[0], shots: kept.slice(1) } : {}),
+        codes: of.codes, tags: of.tags, sources: of.sources,
+      });
+
+      setBusy(false);
+      if (!made.ok) return;
+      setOpen(false);
+      setGuessed(ready(null));
+      setAsked(null);
+      tags.again();
+      go(`/thing/${made.value.product}`);
+    })();
+  }, [api, go, tags]);
+
+  const sheet = (
+    <Register
+      isOpen={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        /* ⚠️ CLOSING FORGETS THE GUESS, so opening it again for the next thing
+           does not fill the form with the last one's answer. */
+        if (!next) { setGuessed(ready(null)); setAsked(null); }
+      }}
+      knownTags={(tags.of.status === "ready" ? tags.of.data.items : [])
+        .map((t) => ({ id: t.id, label: t.name }))}
+      suppliers={(suppliers.of.status === "ready" ? suppliers.of.data.items : [])
+        .map((one) => ({ id: one.id, label: one.name }))}
+      resembles={resembles}
+      onLook={onLook}
+      onIdentify={onIdentify}
+      guessed={guessed}
+      onRegister={onRegister}
+      busy={busy}
+      again={() => { setGuessed(ready(null)); }}
+    />
+  );
+
+  return { sheet, open: () => { setOpen(true); } };
+}
+
+/**
+ * ⚠️ A `data:` URL BACK INTO BYTES, because the camera hands the sheet a string
+ * and the store takes a file. Decoded here rather than kept as bytes all along:
+ * the identify lane needs the URL, an `<img>` needs the URL, and holding both
+ * shapes of six photographs is twice the memory on the device least able to
+ * spare it.
+ */
+function bytesOf(url: string): { body: ArrayBuffer; type: string } | null {
+  const at = url.indexOf(",");
+  if (!url.startsWith("data:") || at < 0) return null;
+  const head = url.slice(5, at);
+  if (!head.endsWith(";base64")) return null;
+  const raw = atob(url.slice(at + 1));
+  const out = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+  return { body: out.buffer, type: head.slice(0, -";base64".length) || "application/octet-stream" };
+}
+
 const HOME = (api: Door) => function HomeHere({ app, go }: Mounted) {
   const today = dayHere();
   const held = React.useMemo(
@@ -2020,6 +2183,10 @@ const HOME = (api: Door) => function HomeHere({ app, go }: Mounted) {
     [app],
   );
   const may = React.useCallback((one: string) => held.has(one), [held]);
+
+  /* ⚠️ THE SHEET IS MOUNTED BESIDE THE SCREEN, NOT INSIDE IT. It is a drawer
+     over whatever is behind it, and Home is only the first of its doors. */
+  const adding = useRegistering(api, may, go);
 
   const totals = useAsked<Totals>(api, "totals.read");
 
@@ -2095,6 +2262,7 @@ const HOME = (api: Door) => function HomeHere({ app, go }: Mounted) {
   const got = far.of.status === "ready" ? far.of.data : null;
 
   return (
+    <>
     <Home
       title={nameOf("/")}
       said={starts.of.status === "ready" ? starts.of.data.words.said : ""}
@@ -2112,7 +2280,7 @@ const HOME = (api: Door) => function HomeHere({ app, go }: Mounted) {
       raised={got ? { workspace: Object.keys(got.counts), person: got.mine } : null}
       held={held}
       onGo={go}
-      onReceive={() => go("/receive")}
+      onRegister={adding.open}
       onLabels={() => go("/labels")}
       onImport={() => go("/import")}
       onSuppliers={() => go("/suppliers")}
@@ -2122,6 +2290,8 @@ const HOME = (api: Door) => function HomeHere({ app, go }: Mounted) {
       onReports={() => go("/reports")}
       onStart={() => go("/start")}
     />
+    {adding.sheet}
+    </>
   );
 };
 

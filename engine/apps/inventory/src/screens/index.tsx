@@ -43,10 +43,11 @@ import { Thing, type Batch, type Movement } from "./Thing.js";
 import { Where } from "./Where.js";
 import { Import, MAPPABLE, type Seen as Seeing } from "./Import.js";
 import { Suppliers, type Supplier } from "./Suppliers.js";
+import { Register } from "./Register.js";
 
 export {
-  Ask, Case, Count, Due, Item, Kit, Labels, Receive, Reports, Run, Scan, Start, Stock,
-  Thing, Where, Work,
+  Ask, Case, Count, Due, Item, Kit, Labels, Receive, Register, Reports, Run, Scan, Start,
+  Stock, Thing, Where, Work,
 };
 export * from "./sample.js";
 export type {
@@ -442,6 +443,64 @@ const under = (places: readonly Place[], here: string | null): ReadonlySet<strin
  * Every screen with the sample world behind it, keyed by its declared route.
  * This is what the test ground renders and what a screenshot sweep walks.
  */
+/**
+ * THE SURFACES THAT ARE NOT ROUTES, AND WHY THEY NEED A LIST OF THEIR OWN.
+ *
+ * ⚠️ EVERY MEASURED SUITE IN THIS APP WALKS `INVENTORY_ROUTES`, which comes from
+ * the manifest — so a sheet, which has no route, is drawn by nothing, measured
+ * by nothing and photographed by nothing. It renders correctly on the machine of
+ * whoever wrote it and its first contact with a real viewport is a customer's.
+ * A drawer is not less of a surface for being reachable from four screens
+ * instead of an address.
+ *
+ * ⚠️ AND IT IS A LIST RATHER THAN A CASE PER SUITE, so adding the next one is
+ * one entry and the suites need no edit.
+ */
+export const INVENTORY_SURFACES: readonly string[] = ["register"];
+
+/** Draws one of them, open, with the same sample world the routes use. */
+export function InventorySurface({ id }: { readonly id: string }) {
+  switch (id) {
+    case "register":
+      return (
+        <Register
+          isOpen
+          onOpenChange={nothing}
+          /* ⚠️ A VOCABULARY THAT ALREADY EXISTS, because the empty case and the
+             furnished one are different screens and only one of them is what a
+             workspace looks like after a month. */
+          knownTags={[
+            { id: "t-ppe", label: "PPE" },
+            { id: "t-consumable", label: "Consumable" },
+            { id: "t-cleaning", label: "Cleaning" },
+            { id: "t-single", label: "Single use" },
+          ]}
+          suppliers={[
+            { id: "s-1", label: "Medline" },
+            { id: "s-2", label: "Henry Schein" },
+          ]}
+          /*
+            ⚠️ THE STATE WORTH LOOKING AT IS THE ONE WITH SOMETHING TO SAY. A
+            sheet over an empty catalogue photographs as a form; a sheet that has
+            just found two things resembling what is being typed photographs the
+            decision this screen exists to put in front of somebody.
+          */
+          resembles={ready([
+            { id: "p-1", name: "Nitrile gloves, blue", brand: "Ansell", why: "same name and brand" },
+            { id: "p-2", name: "Nitrile gloves, black", brand: "Unigloves", why: "similar name" },
+          ])}
+          onLook={nothing}
+          onIdentify={nothing}
+          guessed={ready(null)}
+          onRegister={nothing}
+          again={nothing}
+        />
+      );
+    default:
+      return null;
+  }
+}
+
 export function InventoryScreen({ route, onGo }: {
   readonly route: string;
   /** ⚠️ Absent on the ground, where there is no router to go anywhere with. */
@@ -489,7 +548,7 @@ export function InventoryScreen({ route, onGo }: {
           raised={RAISED}
           held={HELD}
           onGo={go}
-          onReceive={() => go("/receive")}
+          onRegister={nothing}
           onLabels={() => go("/labels")}
           onImport={() => go("/import")}
           onSuppliers={() => go("/suppliers")}
