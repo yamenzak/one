@@ -57,6 +57,7 @@ export * from "./frame/overlay.js";
 export * from "./frame/reading.js";
 export * from "./parts/blocks.js";
 export * from "./parts/prose.js";
+export * from "./frame/telling.js";
 export * from "./rendered/edit.js";
 export * from "./rendered/settings.js";
 export * from "./rendered/policy.js";

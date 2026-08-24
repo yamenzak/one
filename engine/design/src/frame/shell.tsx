@@ -37,6 +37,7 @@ import {
   RefreshMark, ScanMark, SearchMark, ShareMark, ShieldMark, TallyMark,
 } from "../parts/marks.js";
 import { Page } from "./page.js";
+import { TellingProvider } from "./telling.js";
 import { Island } from "./chrome.js";
 import type { Way } from "./travel.js";
 import {
@@ -685,9 +686,18 @@ export function Shell(props: ShellProps) {
             40px from the edge on Settings and 16px on its list screen. Nothing
             failed; the screens simply did not line up with each other, which is
             the kind of thing nobody can point at and everybody feels. */}
-        <main className="flex flex-1 min-w-0 flex-col">
-          <CrownSocketProvider onClaim={setClaim} foot={foot}>{children}</CrownSocketProvider>
-        </main>
+        {/*
+          ⚠️ EVERY APP GETS THE ANNOUNCEMENT CHANNEL WITHOUT WIRING IT, which is
+          the whole reason it is mounted here. Four products each growing their
+          own toast is four rhythms, four placements and four ideas of what a
+          failure looks like — and the one that skips it is the one where a
+          five-minute form ends in a button that appears to do nothing.
+        */}
+        <TellingProvider>
+          <main className="flex flex-1 min-w-0 flex-col">
+            <CrownSocketProvider onClaim={setClaim} foot={foot}>{children}</CrownSocketProvider>
+          </main>
+        </TellingProvider>
       </div>
     </Page>
   );

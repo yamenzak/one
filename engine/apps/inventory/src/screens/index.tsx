@@ -662,6 +662,11 @@ export function InventoryScreen({ route, onGo }: {
             { id: "t-cleaning", label: "Cleaning" },
             { id: "t-single", label: "Single use" },
           ]}
+          knownUnits={[
+            { id: "box", label: "box" },
+            { id: "glove", label: "glove" },
+            { id: "kg", label: "kg" },
+          ]}
           suppliers={[
             { id: "s-1", label: "Medline" },
             { id: "s-2", label: "Henry Schein" },

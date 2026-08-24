@@ -49,7 +49,7 @@ import * as React from "react";
 import {
   ActionRow, Await, Bars, Group, NoteRow, NumberInput, PickFile, Row,
   RowsWaiting, SAYS_KIND, Screen, Section, Segmented, Spacer, Stack, Steps, Tags,
-  TextInput, ToggleRow, Viewfinder, Written, kindOf,
+  Lookup, TextInput, ToggleRow, Viewfinder, Written, kindOf,
   glyphOf, shrunk, type Loaded, type Option,
 } from "@engine/design";
 import { Button } from "@heroui/react";
@@ -135,6 +135,13 @@ export interface RegisterProps {
    * a person does too — one vocabulary, reached two ways.
    */
   readonly knownTags: readonly Option[];
+  /**
+   * ⚠️ THE UNITS THIS WORKSPACE ALREADY COUNTS IN. Same argument as the tags one
+   * word over: typed free, a catalogue collects `box`, `Box`, `boxes` and `BX`
+   * as four units that are one, on products that can then never be totalled.
+   * Offered rather than enforced — anything typed is still accepted.
+   */
+  readonly knownUnits: readonly Option[];
   readonly suppliers: readonly Option[];
   /**
    * ⚠️ WHAT ALREADY LOOKS LIKE THIS, WHILE IT IS STILL BEING TYPED. `null` means
@@ -230,7 +237,7 @@ const UNDER: Readonly<Record<Where, string>> = {
 };
 
 export function Register({
-  title, back, knownTags, suppliers, resembles, onLook, onIdentify,
+  title, back, knownTags, knownUnits, suppliers, resembles, onLook, onIdentify,
   guessed, onRegister, busy, again,
 }: RegisterProps) {
   const [photos, setPhotos] = React.useState<readonly string[]>([]);
@@ -266,6 +273,15 @@ export function Register({
   const answer = guessed.status === "ready" ? guessed.data : null;
   React.useEffect(() => {
     if (!answer) return;
+    /*
+      ⚠️ AN ANSWER MOVES SOMEBODY ON, RATHER THAN FILLING IN A SCREEN THEY ARE NOT
+      LOOKING AT. Pressing "fill this in from the photographs" and staying on the
+      photographs is a button whose whole effect is somewhere else: the fields it
+      wrote are a step away, and the only thing that changed here is a line of
+      small print. It lands on the first step the answer actually touched, with
+      the values in place, which is also where they have to be checked.
+    */
+    setWhere((held) => (held === "photos" ? "what" : held));
     setName((held) => held || answer.name);
     setBrand((held) => held || answer.brand);
     setDescription((held) => held || answer.description);
@@ -363,6 +379,48 @@ export function Register({
     setWhere(STEPS[Math.min(STEPS.length - 1, Math.max(0, to))]!.id);
   };
 
+  /*
+    ⚠️ THE PHONE'S OWN BACK IS THE SAME AFFORDANCE AS THE ARROW, AND IT WAS NOT
+    WIRED. `Screen`'s `back` catches the arrow in the chrome; the browser's
+    button and an Android swipe go to the router, which knows nothing about a
+    step — so somebody on step three who made the gesture that means "undo the
+    last thing" lost four steps of typing and every photograph. There is no
+    warning available that is worth having here: the gesture is not a mistake,
+    the destination was.
+
+    ⚠️ SO EACH STEP PUSHES A HISTORY ENTRY AND `popstate` READS IT BACK. The
+    entry is a `state` marker rather than a URL, because the four steps are one
+    screen — a URL per step would make each one shareable, bookmarkable and
+    reloadable into a form with nothing in it.
+
+    ⚠️ AND THE FIRST STEP PUSHES NOTHING, so Back from there leaves the screen,
+    which is what it should do. `at > 0` is the whole condition: N steps forward
+    is N entries, and the Nth Back is the one that leaves.
+  */
+  const stepped = React.useRef(where);
+  React.useEffect(() => {
+    if (stepped.current === where) return;
+    const wasAt = STEPS.findIndex((one) => one.id === stepped.current);
+    stepped.current = where;
+    /* ⚠️ FORWARD ONLY. Going BACK is what consumed an entry; pushing one there
+       would make the next Back land on the step just left. */
+    if (at > wasAt) globalThis.history.pushState({ step: where }, "");
+  }, [where, at]);
+
+  React.useEffect(() => {
+    const back = () => {
+      setWhere((held) => {
+        const i = STEPS.findIndex((one) => one.id === held);
+        /* ⚠️ AT THE FIRST STEP THERE IS NOTHING OF OURS LEFT ON THE STACK, so
+           this entry belongs to whatever came before the screen and the default
+           behaviour is correct. */
+        return i > 0 ? STEPS[i - 1]!.id : held;
+      });
+    };
+    globalThis.addEventListener("popstate", back);
+    return () => { globalThis.removeEventListener("popstate", back); };
+  }, []);
+
   return (
     <Screen
       shape="form"
@@ -393,7 +451,11 @@ export function Register({
       does={last
         ? {
           op: "product.register",
-          label: "Add it",
+          /* ⚠️ THE NOUN, BECAUSE "IT" IS ONLY OBVIOUS TO WHOEVER WROTE IT. Four
+             steps and a scroll later, the last button on the screen says what it
+             adds — and "Add it" reads as a fragment of a sentence the interface
+             started somewhere the person cannot see. */
+          label: "Add product",
           onDo: send,
           disabled: busy === true || Boolean(short),
         }
@@ -485,7 +547,12 @@ export function Register({
               word, and it is also the one they will want to look at.
             */}
             {photos.length ? (
-              <div className="grid grid-cols-3 gap-2">
+              /* ⚠️ FOUR ACROSS, NOT THREE. At three columns with the first
+                 spanning two, the picture of record was two-thirds of a phone's
+                 width — a thumbnail the size of a hero, pushing the button that
+                 uses them below the fold. Four keeps the first one clearly the
+                 first and gives the rest back the screen. */
+              <div className="grid grid-cols-4 gap-2">
                 {photos.map((one, at) => (
                   <div
                     key={one.slice(-24)}
@@ -780,10 +847,19 @@ export function Register({
         </Section>
 
         <Section label="Counting">
-            <TextInput
+            {/*
+              ⚠️ WHAT THIS WORKSPACE ALREADY COUNTS IN, OFFERED RATHER THAN
+              REMEMBERED. Typed free, one catalogue ends up with `box`, `Box`,
+              `boxes` and `BX` — four units that are one unit, on four products
+              that can never be compared or totalled. `Lookup` still takes
+              anything typed, so a new unit costs nothing; it just stops the
+              fifth spelling of an old one being the path of least resistance.
+            */}
+            <Lookup
               label="Counted in"
               value={unit}
               onChange={setUnit}
+              options={knownUnits}
               placeholder="glove, box, kg"
               help="Shown beside every number this product ever reports"
               name="unit"
@@ -936,7 +1012,7 @@ export function Register({
             */}
             <ToggleRow
               label="Put it on the reorder list"
-              under="Nothing is sent — the list is somewhere to work from"
+              under="It joins Reports · To reorder. Nothing is ordered and nobody is emailed"
               value={reorder}
               onChange={setReorder}
             />

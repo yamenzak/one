@@ -19,7 +19,7 @@
  */
 
 import * as React from "react";
-import { ready, trouble, waiting, type Loaded } from "@engine/design";
+import { ready, trouble, useTelling, waiting, type Loaded } from "@engine/design";
 import { dayPlus, type Day, type Problem } from "@engine/kernel";
 import { INVENTORY } from "../index.js";
 import { hazardsIn, signalIn } from "../hazard.js";
@@ -2052,6 +2052,9 @@ const REGISTER = (api: Door) => function RegisterHere({ app, go }: Mounted) {
     [app],
   );
   const may = React.useCallback((one: string) => held.has(one), [held]);
+  /* ⚠️ THE ONE CHANNEL — see `telling.tsx`. Registering a product is six uploads
+     and a write, and every one of those could fail into nothing before this. */
+  const tell = useTelling();
   const [busy, setBusy] = React.useState(false);
   const [asked, setAsked] = React.useState<{ name: string; brand: string } | null>(null);
   const [guessed, setGuessed] = React.useState<Loaded<Guessed | null>>(ready(null));
@@ -2060,6 +2063,11 @@ const REGISTER = (api: Door) => function RegisterHere({ app, go }: Mounted) {
     api, may("product:read") ? "tag.list" : null, undefined, { items: [] });
   const suppliers = useAsked<{ items: readonly Named[] }>(
     api, may("product:read") ? "supplier.list" : null, undefined, { items: [] });
+  /* ⚠️ THE CATALOGUE, READ FOR ITS UNITS ALONE — see `knownUnits`. It is already
+     cached by every list screen in the product, so this costs nothing on any
+     path somebody reaches this screen by. */
+  const kinds = useAsked<{ items: readonly Row[] }>(
+    api, may("product:read") ? "product.list" : null, undefined, { items: [] });
 
   /* ⚠️ THE QUESTION IS THE STATE, so the read re-runs when the name changes and
      not when the sheet re-renders. `useAsked` keys on the input's string, which
@@ -2091,6 +2099,19 @@ const REGISTER = (api: Door) => function RegisterHere({ app, go }: Mounted) {
     });
   }, [api, tags.of]);
 
+  /* ⚠️ WHAT THIS WORKSPACE ALREADY COUNTS IN — see the prop. */
+  const units = React.useMemo(() => {
+    const rows = kinds.of.status === "ready" ? kinds.of.data.items : [];
+    const seen = new Map<string, string>();
+    for (const row of rows) {
+      const said = String((row as { unit?: unknown }).unit ?? "").trim();
+      /* ⚠️ FOLDED FOR THE COMPARISON, KEPT AS WRITTEN FOR THE OFFER. `Box` and
+         `box` are one unit and the one to show is the one already in use. */
+      if (said && !seen.has(said.toLowerCase())) seen.set(said.toLowerCase(), said);
+    }
+    return [...seen.values()].map((one) => ({ id: one, label: one }));
+  }, [kinds.of]);
+
   const onRegister = React.useCallback((of: Registering) => {
     setBusy(true);
     void (async () => {
@@ -2100,9 +2121,24 @@ const REGISTER = (api: Door) => function RegisterHere({ app, go }: Mounted) {
         six photographs has no way to tell which one did not land.
       */
       const kept: string[] = [];
-      for (const one of of.photos) {
+      const sending = of.photos.filter((one) => bytesOf(one));
+      for (const [i, one] of sending.entries()) {
         const bytes = bytesOf(one);
         if (!bytes) continue;
+        /*
+          ⚠️ COUNTED, BECAUSE SIX PHOTOGRAPHS TAKE FIFTEEN SECONDS. With nothing
+          on screen that is indistinguishable from a button that did not fire,
+          which is exactly what it was reported as. The share is per FILE rather
+          than per byte: a determinate bar that jumps in sixths is honest, and
+          per-byte progress across six requests needs the upload hook this path
+          does not use.
+        */
+        tell.working(
+          sending.length > 1
+            ? `Sending photograph ${i + 1} of ${sending.length}`
+            : "Sending the photograph",
+          i / sending.length,
+        );
         const put = await api.post<{ id: string }>("media.upload", bytes.body, {
           contentType: bytes.type,
           /* ⚠️ THE PURPOSE TRAVELS IN THE QUERY BECAUSE THE BODY IS THE FILE —
@@ -2110,9 +2146,23 @@ const REGISTER = (api: Door) => function RegisterHere({ app, go }: Mounted) {
              door, so a typo here is a refusal rather than a stray bucket. */
           with: { purpose: "product-photo" },
         });
-        if (!put.ok) { setBusy(false); return; }
+        /*
+          ⚠️ AND A FAILED UPLOAD SAYS SO. This was `setBusy(false); return;` — the
+          spinner stopped, the form stayed exactly as it was, and nothing
+          anywhere said a photograph had been refused. A person pressing the only
+          button on the screen and getting a screen back is the definition of a
+          control that does nothing.
+        */
+        if (!put.ok) {
+          setBusy(false);
+          tell.failed(put.problem, sending.length > 1
+            ? `Photograph ${i + 1} did not go up`
+            : "The photograph did not go up");
+          return;
+        }
         kept.push(put.value.id);
       }
+      if (sending.length) tell.working("Adding the product", 1);
 
       const made = await api.post<{ product: string }>("product.register", {
         name: of.name, brand: of.brand, description: of.description,
@@ -2132,14 +2182,21 @@ const REGISTER = (api: Door) => function RegisterHere({ app, go }: Mounted) {
       });
 
       setBusy(false);
-      if (!made.ok) return;
+      /* ⚠️ THE OTHER SILENT RETURN, AND THE ONE THAT WAS REPORTED. Everything
+         about the form was fine, the write was refused, and the handler said
+         nothing at all. */
+      if (!made.ok) { tell.failed(made.problem); return; }
+      /* ⚠️ ARRIVING SOMEWHERE IS NOT A CONFIRMATION. Landing on the product's
+         own screen looks the same whether it was just created or was already
+         there — the sentence is what says which. */
+      tell.did(`${of.name.trim() || "The product"} is in the catalogue`);
       tags.again();
       /* ⚠️ ONWARD TO THE THING THAT WAS JUST MADE, WHICH IS ALSO THE WAY BACK.
          A page that returned to Home would leave somebody wondering whether it
          landed; the product's own screen is the receipt. */
       go(`/thing/${made.value.product}`);
     })();
-  }, [api, go, tags]);
+  }, [api, go, tags, tell]);
 
   return (
     <Register
@@ -2147,6 +2204,15 @@ const REGISTER = (api: Door) => function RegisterHere({ app, go }: Mounted) {
       back={() => go("/")}
       knownTags={(tags.of.status === "ready" ? tags.of.data.items : [])
         .map((t) => ({ id: t.id, label: t.name }))}
+      /*
+        ⚠️ DERIVED FROM THE CATALOGUE RATHER THAN FROM A LIST NOBODY MAINTAINS.
+        There is no `unit.list` for units of MEASURE — `unit.list` is serialised
+        items — and adding one to hold a handful of words the products already
+        carry would be a second place for them to disagree. Distinct, in the
+        order they first appear, which puts the workspace's commonest first
+        without anybody ranking anything.
+      */
+      knownUnits={units}
       suppliers={(suppliers.of.status === "ready" ? suppliers.of.data.items : [])
         .map((one) => ({ id: one.id, label: one.name }))}
       resembles={resembles}
