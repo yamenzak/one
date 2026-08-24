@@ -3340,6 +3340,16 @@
       "lane": "seen",
       "proves": "everything the space says can be read",
       "fails": "ink under the contrast floor on the screens that carry a refusal, an arrears and a deletion — measured in both themes, because a palette that clears in one can fail in the other"
+    },
+    {
+      "id": "no-name-is-used-twice",
+      "protects": "D7",
+      "stage": "84",
+      "status": "live",
+      "impl": "one-space/test/space.seen.test.tsx",
+      "lane": "seen",
+      "proves": "calls each of them one thing",
+      "fails": "a control rendered as two — a wrapper pressable around the real one, sharing its `id`, so a screen reader is handed the wrong element and the keyboard stops on a div that looks like nothing. Every other reading passes over it: the box is the right size, the ink clears the floor, the page does not spill"
     }
   ]
 }
