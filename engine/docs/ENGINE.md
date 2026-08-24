@@ -1055,6 +1055,8 @@ its own header, cited by other files, and doing nothing.
 | D73 | A form that scrolls is a page, and a prop does not fix it | 0 |
 | D74 | "On" is not "the action", and one token was doing both | 0 |
 | D75 | A refusal that reaches nobody is a control that does nothing | 0 |
+| D76 | A packaging level is a named multiplier, never a product | 0 |
+| D77 | Moving stock is a verb of its own | 0 |
 <!-- /generated -->
 
 ---
