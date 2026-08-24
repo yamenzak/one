@@ -2600,3 +2600,52 @@ screens between. If more than one surface would open it, it is a page.
 **Therefore never:** a prop that makes a tray tolerate being too big; a form in
 a drawer that scrolls; or a surface more than one place wants to open that has
 no route of its own.
+
+## D74 — "On" is not "the action", and one token was doing both
+
+**The mono rule says the interface is values SO THAT colour becomes information.**
+Obeyed to the letter it produced the opposite: HeroUI paints a checked switch, a
+ticked box, a chosen radio, an open tab and a slider's travelled part from
+`--accent`, which is also the primary button — and our `--accent` is monochrome
+on purpose, because the near-white button at the foot of a screen is the one call
+to action. So every state inherited the mono rule and a person could not tell a
+switch's state at a glance, which is the exact failure the rule exists to prevent.
+
+**So `--on` is the product's hue and `--accent` stays the action.** "This is on"
+is information in the most literal sense the product has. The library hardcodes
+its accent inside its own component rules, so the seven places are bound by
+selector; where it exposes a token on a component root, the token is set instead.
+
+**The focused field is the same decision one step quieter.** `--input-bg-focus`
+is `var(--default)` — byte-identical to a resting field — so typing changed
+nothing but the ring. `--on-lit` is a fifth of the hue over the field tier: a
+lift, not a fill, because a fill here is a text field the colour of a button.
+
+**What this forbids:** binding `--accent` to a hue to fix a state. It colours
+every state AND the primary button, and a screen whose loudest thing is no longer
+the thing to press is worse than the fault being fixed.
+
+## D75 — A refusal that reaches nobody is a control that does nothing
+
+**`if (!got.ok) return;` passes every check in this repository.** The types are
+right, the `Problem` is handled — it is checked, which is what `ok` is for — and
+the branch that drops it is one line that reads like caution. Nine of them were
+in one file. What a person sees is a button pressed, a spinner stopped, and the
+same screen back.
+
+**So every mutation reaches somebody on both outcomes**, through one channel
+(`telling.tsx`) mounted by `Shell` so an app gets it without wiring anything.
+Four products each growing their own toast is four rhythms, four placements and
+four ideas of what a failure looks like, and the one that skips it is the one
+where a five-minute form ends in silence.
+
+**`failed` takes a `Problem`, never a string.** The sentence is the one the
+runtime already wrote where the refusal was made; a caller composing its own is
+inventing wording for a refusal it did not make, and the two drift.
+
+**Four doors count as reaching somebody**: the channel, a `Loaded` trouble state,
+handing the whole problem on, and RETURNING an answer by value — a function that
+answers `"refused"` is reporting to the caller that has a screen to say it on.
+What is silent is a bare `return`, which ends the work and tells nobody.
+
+**What this forbids:** a bare return in a refusal branch. `spoken` fails on it.

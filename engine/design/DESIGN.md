@@ -1095,6 +1095,15 @@ catalogue where each line names the check that would fail is an index into the
 gate. If a fault here matters and nothing checks it, the row does not go in — the
 guard does.
 
+⚠️ **THREE ROWS BELOW SAY "A PERSON LOOKING AT IT", AND THAT IS AN ADMISSION
+RATHER THAN AN EXEMPTION.** The One-Line Essay, the Stepless History and the
+Borrowed Verb are all real, all shipped, and none is mechanical: whether a field
+is tall enough for what goes in it, whether a gesture lands where somebody meant,
+and whether a mark says the right thing are judgements. They are named anyway
+because naming makes them sayable in review, which is the next best thing to a
+gate — but a row that stays in this state is a guard somebody has not thought of
+yet, not a rule that cannot have one.
+
 | The failure | What it looks like | Caught by |
 |---|---|---|
 | **The Accretion** | Nine sizes of type on one page. Every one named a role; together they are not a scale. | `motion`, and the type reading in the browser sweeps |
@@ -1111,6 +1120,15 @@ guard does.
 | **The Improvised Refusal** | A control writing its own three sentences for a failure the catalogue already has words for, in its own colour. | `problem` |
 | **The Silent Action** | A button pressed, a round trip waited for, and the screen looks exactly the same — because nothing declared what it says when it works. | `manifest` |
 | **The Silent Save** | A write that fails into nothing, or a control left showing a value the server refused. | `problem` |
+| **The Silent Return** | `if (!got.ok) return;` — the refusal is checked, which is what `ok` is for, and then dropped. The spinner stops, the screen is unchanged, and the control reads as dead. Nine of these were in one file. | `spoken` |
+| **The Unfelt State** | A control whose ON is the same value as its OFF, because the library paints both from one token and that token went monochrome. A switch nobody can read at a glance. | `on-state.seen` |
+| **The Resolved Too High** | A `color-mix` with `var(--brand)` declared on `:root` while the hue is set on the page — substitution happens where a property is DECLARED, so the mix resolves against the deployment's own value and the product's colour reaches nothing. Every reading of the file says it should work. | `chosen.seen` |
+| **The Ambient Brand** | A hue set on a wrapper rather than on `documentElement`, so modals, drawers, popovers and tooltips — portalled to `body` — wear a different palette from the screen behind them. | `chosen.seen` |
+| **The Arbitrary Symbol** | A decoder handed a frame with two codes in it, and `found[0]` taken. The order is not stable, so one box reads as an endless stream of new products. | `reading` |
+| **The Single Frame** | A decode believed on one frame. A glare decodes confidently and wrong, and a number nobody typed enters the catalogue. | `reading` |
+| **The One-Line Essay** | A field a model fills with headed paragraphs and a list of warnings, drawn at one line. The control is the brief: at one line, people write one line. | a person looking at it |
+| **The Enthusiastic Mark** | A glyph that spread until it meant "this feature is new" rather than anything — the sparkle, on four screens, two console sections and a nav destination. | `glyphs` |
+| **The Stepless History** | A wizard whose steps are state, so the phone's Back gesture — the same affordance as the arrow in the chrome — leaves the screen and discards every step. | a person looking at it |
 | **The Bare Key** | `eu`, `no_tenant`, `owner` printed where a place, a reason or a role was meant. | `present`, `tone` |
 | **The Wall** | A paragraph under a control, explaining what the control should have said. | `tone` |
 | **The Unmeasured** | A surface that renders, ships, and is in no sweep — so every rule about pixels is true of it only by luck. | `geometry.seen`, `space.seen` |

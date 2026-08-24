@@ -551,7 +551,68 @@ to describe the one that is there.
 
 ---
 
-## 8. The six-minute checklist, before a commit
+## 8. Before a screen is finished
+
+⚠️ **THIS SECTION EXISTS BECAUSE A ROUND OF FEEDBACK ARRIVED WITH ELEVEN ITEMS ON
+IT AND EVERY ONE WAS PREVENTABLE FROM THE LIST BELOW.** Not one of them was
+subtle, and not one was caught by a type, a test or a review: a save that failed
+into nothing, a switch whose ON was grey, a field for three paragraphs one line
+tall, a reader that invented barcodes, a wizard the phone's Back button walked
+out of. The point of writing them here is that the next screen answers these
+before somebody has to use it to find out.
+
+**What happens when it works, and when it does not.**
+
+- Every mutation reaches a person on both outcomes. `tell.did` on the way out,
+  `tell.failed(problem)` on a refusal — never a bare `return`. `spoken` refuses
+  the bare one, and it exists because nine of them shipped in one file.
+- Work that takes more than a moment is COUNTED. Six uploads with nothing on
+  screen is a dead button, and it was reported as one.
+- Arriving somewhere is not a confirmation. Landing on a record looks the same
+  whether it was just made or was already there.
+
+**Controls.**
+
+- A control that is ON looks on, in both themes. The library paints a checked
+  switch, a ticked box, a chosen radio and a slider fill from `--accent`, which
+  is monochrome here — so `--on` is bound by selector and `on-state.seen`
+  measures it. A control added to the library next year will need the same.
+- A field being typed in is not identical to a resting one.
+- A field's HEIGHT is its brief. One line asks for one line.
+- Long-form text is `Written`, and what a model wrote is `Markdown`.
+
+**Anything a person picks from a set.**
+
+- Offer what the workspace already uses. A free-typed unit becomes `box`, `Box`,
+  `boxes` and `BX` — four units that are one, on products that can never be
+  totalled again.
+
+**Anything with steps.**
+
+- The phone's Back gesture is the same affordance as the arrow in the chrome.
+  Steps held in state alone are steps that gesture discards.
+- A step that fills in the next one MOVES there. A button whose only effect is on
+  another screen reads as a button that did nothing.
+
+**Anything a camera reads.**
+
+- A frame can contain more than one symbol, and their order is not stable.
+- One frame is not a read. Agreement across frames is.
+- What one BOX means is the app's to decide, never the reader's.
+
+**Colour.**
+
+- A token that mixes `var(--brand)` resolves where it is DECLARED. On `:root`
+  that is the deployment's value, not the product's — see The Resolved Too High.
+- A hue belongs on `documentElement`, or every portalled overlay wears a
+  different palette from the screen behind it.
+
+**Marks.**
+
+- A glyph that would suit three unrelated rows is not carrying a meaning. The
+  sparkle is banned for reaching that state; `glyphs` holds the list.
+
+## 9. The six-minute checklist, before a commit
 
 1. `pnpm engine:typecheck`
 2. `pnpm engine:test` — and `pnpm engine:seen` too, if you touched a screen. The
