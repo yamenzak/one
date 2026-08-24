@@ -545,8 +545,31 @@ export async function geometryOf(
           };
         }
       }
+      /* ⚠️ A CONTROL NOBODY CAN SEE IS NOT A FINGER TARGET, and leaving that out
+         made this reading useless on every screen that opens over something.
+         React Aria gives an overlay a screen-reader "Dismiss" — a 1×1
+         `tabindex="-1"` button inside the standard clip-rect wrapper — so the
+         account centre, which is presented inside a modal, reported the same
+         anonymous one-pixel fault on all thirty-nine of its screens at once. A
+         reading that fails identically everywhere is one nobody reads.
+
+         ⚠️ THE TELL IS THE CLIP RECIPE, NOT THE SIZE. Shrinking a real control
+         to a pixel is exactly the fault this measures, so "small" cannot be the
+         exemption; what makes this one different is that it is deliberately
+         removed from sight — `clip-path: inset(50%)`, the ancient `clip` rect,
+         or `visibility: hidden` — on itself or on anything above it. */
+      const outOfSight = (el: Element): boolean => {
+        for (let up: Element | null = el; up; up = up.parentElement) {
+          const style = getComputedStyle(up);
+          if (style.visibility === "hidden") return true;
+          if (style.clipPath === "inset(50%)") return true;
+          if (/^rect\(\s*0(px)?[,\s]/.test(style.clip)) return true;
+        }
+        return false;
+      };
       const targets = (Array.prototype.slice.call(
         document.querySelectorAll("button, a[href], [role='button']")) as Element[])
+        .filter((el) => !outOfSight(el))
         .map((el) => {
           const box = el.getBoundingClientRect();
           return {

@@ -960,6 +960,14 @@ its own header, cited by other files, and doing nothing.
 | `no-screen-paints-a-tone-with-a-utility` | D5 | `text-danger` on a screen — the library's FILL colour used as ink, measured at 3.39:1 in light and 3.65 in dark, and a second way of saying danger that is a different red from the one the tone channel carries |
 | `one-renderer-draws-every-refusal` | D5 | a control drawing its own refusal — re-deciding the tone, whether a retry is offered and whether the reference is shown, so the same failure reads differently depending on which screen you hit it from |
 | `every-write-reports-or-says-why-not` | D71 | a button pressed, a round trip waited for, and a screen that looks exactly the same — fifteen of fifty writes, none of them silent on purpose, because a field nobody has to fill is a field that stays empty |
+| `no-vague-transition` | D70 | a transition written for one property animating whatever a later commit happens to add — a colour, a size, a shadow easing into place because nobody named what was meant to move |
+| `every-hover-waits-for-a-pointer` | D70 | a hover state a touch screen enters on tap and never leaves, so the last thing somebody pressed stays lit for the rest of the session |
+| `easing-is-a-curve-somebody-chose` | D70 | `ease` and `linear` beside a vocabulary of tuned curves — motion that is individually defensible and collectively arrhythmic, because half of it never asked what the product moves like |
+| `a-trigger-names-no-slot` | D7 | a blank page: the slot is resolved against whatever encloses the SCREEN, so a control that is correct in a fixture throws during render inside a presented surface and takes the whole account centre down with it |
+| `the-space-measures-its-own-screens` | D7 | the twenty operator-console screens and the nineteen in the account centre — the surfaces with the most controls per page in this deployment — shipping with every rule about pixels true of them only by luck, which is how one of them came to render a blank page |
+| `every-control-the-space-asks-for-is-reachable` | D7 | a control an operator cannot hit on the phone they are holding, on the screens where a workspace is suspended, a plan is edited and an account is closed |
+| `the-spaces-type-is-a-scale-with-a-top` | D7 | a console page where nothing outranks the body, so an operator scanning for the one figure that matters reads every line to find it |
+| `everything-the-space-says-can-be-read` | D7 | ink under the contrast floor on the screens that carry a refusal, an arrears and a deletion — measured in both themes, because a palette that clears in one can fail in the other |
 <!-- /generated -->
 
 ### And how well each decision is defended
@@ -973,7 +981,7 @@ its own header, cited by other files, and doing nothing.
 | D4 | Composition is lazy: a request composes the app it is for, and no other | 3 |
 | D5 | Storage is placed, not owned. The directory carries every cross-tenant fact | 15 |
 | D6 | Jurisdiction is a workspace fact, derived from the business's country | 5 |
-| D7 | HeroUI v3 is the component layer, and its components are not restyled | 64 |
+| D7 | HeroUI v3 is the component layer, and its components are not restyled | 69 |
 | D8 | Declarations are typed object literals; not decorators, not a custom format | 3 |
 | D9 | Libraries encode decisions; we write invariants | 3 |
 | D10 | Five primary destinations, maximum | 5 |
@@ -1036,7 +1044,7 @@ its own header, cited by other files, and doing nothing.
 | D67 | The tab's store is bounded, and stops being trusted when it stops being datable | 0 |
 | D68 | A tab switch is not a journey, and only the journey still running may land | 0 |
 | D69 | Nothing reads the camera with the thread a person is waiting on | 0 |
-| D70 | A design rule is a guard or it is not a rule | 3 |
+| D70 | A design rule is a guard or it is not a rule | 6 |
 | D71 | Every write says what happened, or says why it does not | 1 |
 <!-- /generated -->
 
@@ -1149,8 +1157,9 @@ that names no stage, so this list cannot grow by forgetting.
 | 81 | The navigation is five destinations, and the chrome carries the rest | shipped |
 | 82 | A home screen, and a checklist that knows whose step it is | shipped |
 | 83 | A product's colour is the product's, and one family commits | shipped |
+| 84 | A design rule is a guard, and the measuring is done in a browser | shipped |
 
-**73 shipped, 10 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**74 shipped, 10 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---

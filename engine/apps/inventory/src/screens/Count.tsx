@@ -201,7 +201,7 @@ export function Count({
                 does={(
                   <Confirm
                     trigger={
-                      <Button slot="trigger" variant="secondary">Close the shelf</Button>
+                      <Button variant="secondary">Close the shelf</Button>
                     }
                     title="Close the shelf?"
                     /* ⚠️ `danger`, BECAUSE THIS IS THE ONE GESTURE IN THE PRODUCT

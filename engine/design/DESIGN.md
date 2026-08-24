@@ -1087,10 +1087,11 @@ guard does.
 | **The Silent Save** | A write that fails into nothing, or a control left showing a value the server refused. | `problem` |
 | **The Bare Key** | `eu`, `no_tenant`, `owner` printed where a place, a reason or a role was meant. | `present`, `tone` |
 | **The Wall** | A paragraph under a control, explaining what the control should have said. | `tone` |
-| **The Unmeasured** | A surface that renders, ships, and is in no sweep — so every rule about pixels is true of it only by luck. | `geometry.seen` |
+| **The Unmeasured** | A surface that renders, ships, and is in no sweep — so every rule about pixels is true of it only by luck. | `geometry.seen`, `space.seen` |
 | **The Unreachable** | A capability built, wired, and mounted by nothing — tables applied, no route, every suite green. | `reached`, `showcase`, `surface` |
 | **The Unmarked Mark** | A registered glyph drawn by a screen itself, or one animated because it could be. | `glyphs` |
 | **The Dead Attribute** | A `data-` attribute stamped on markup that no selector, variant or query reads. | `attrs` |
+| **The Borrowed Slot** | A control handed across a prop naming a `slot` — resolved against whatever encloses the *screen*, not the component it was written for. Harmless in a fixture, a blank page inside a presented surface. | `heroui` |
 
 ### What is checked today
 

@@ -308,7 +308,7 @@ export function Run({
           {state === "recalled"
             ? (
               <Confirm
-                trigger={<Button slot="trigger" variant="ghost">What now?</Button>}
+                trigger={<Button variant="ghost">What now?</Button>}
                 title="Called back"
                 act={{ label: "Close", tone: "primary", onDo: back }}
               >

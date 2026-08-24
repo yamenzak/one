@@ -56,7 +56,12 @@ const WHERE: readonly Where[] = [
   ...OF_AI.map((at) => ({ at }) as Where),
   { at: "you" }, { at: "inbox" }, { at: "told" }, { at: "data" },
   { at: "formats" }, { at: "looks" }, { at: "agreed" }, { at: "workspaces" },
-  ...OF_WORKSPACE_SCREEN.map((at) => ({ at, slug: "a-workspace" }) as Where),
+  /* ⚠️ AND THE ID FIXTURE IS NOT SPARE — `tried` addresses ONE invitation, so
+     without it `pathOf` builds `/tried/undefined` and the sweep measures a
+     screen looking up a record called "undefined". It passed, which is the
+     point: a route built out of a missing field is still a route. */
+  ...OF_WORKSPACE_SCREEN.map((at) =>
+    ({ at, slug: "a-workspace", id: "an-invitation" }) as Where),
 ];
 
 const ROUTES = WHERE.map(pathOf);

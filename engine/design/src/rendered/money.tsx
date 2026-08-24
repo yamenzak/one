@@ -545,7 +545,7 @@ function JobTray({ job, last, onRun, onSchedule, onClose }: {
         ? job.rerunnable
           ? (
             <Confirm
-              trigger={<Button slot="trigger" variant="primary" isPending={busy}>Run it now</Button>}
+              trigger={<Button variant="primary" isPending={busy}>Run it now</Button>}
               title="Run it again?"
               act={{ label: "Run it", onDo: () => { void run(); } }}
             >

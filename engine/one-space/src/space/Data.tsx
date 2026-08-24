@@ -165,7 +165,7 @@ export function Data() {
           : (
             <Confirm
               trigger={(
-                <Button slot="trigger" variant="secondary" isDisabled={busy || nextAt === undefined}>
+                <Button variant="secondary" isDisabled={busy || nextAt === undefined}>
                   {busy ? "Working…" : "Email me a link"}
                 </Button>
               )}
@@ -210,7 +210,7 @@ export function Data() {
         under="This cannot be undone"
         does={(
           <Confirm
-            trigger={<Button slot="trigger" variant="danger-soft">Delete my account</Button>}
+            trigger={<Button variant="danger-soft">Delete my account</Button>}
             title="Delete everything?"
             act={{ label: "Delete", onDo: () => { void destroy(); } }}
           >

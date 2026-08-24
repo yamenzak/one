@@ -11,7 +11,7 @@ import { Confirm } from "../src/frame/overlay.js";
 
 createRoot(document.getElementById("root")!).render(
   <Confirm
-    trigger={<Button slot="trigger">Open it</Button>}
+    trigger={<Button>Open it</Button>}
     title="Delete everything?"
     act={{ label: "Delete", onDo: () => { document.title = "did"; } }}
   >

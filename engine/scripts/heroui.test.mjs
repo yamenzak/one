@@ -859,6 +859,64 @@ if (!uneven) ok(`peers: ${EQUALS.length} group(s) of equals share their width`);
   if (!loose) ok(`press: ${switches} file(s) composing a Switch, every track inside the control`);
 }
 
+/* ------------------------------------------------------------------ slots --- */
+
+/**
+ * ⚠️ A `slot` NAMES A PLACE IN THE NEAREST CONTEXT, WHICH IS NOT THE ONE YOU ARE
+ * LOOKING AT. React Aria resolves a slotted control against the innermost
+ * provider above it, and if that provider does not offer the name it THROWS —
+ * not a warning, not a fallback: an exception during render, which React turns
+ * into an unmounted tree. A white screen.
+ *
+ * ⚠️ THE OVERLAY COMPONENTS TAKE A `trigger` AND RENDER IT AS THE LIBRARY'S OWN
+ * FIRST CHILD, WHICH ASKS FOR NO SLOT. `Drawer`, `Dropdown` and `Popover` each
+ * document a bare control there; inside them the only slot on offer is `close`.
+ * So a trigger that names one reaches PAST the overlay it belongs to and asks
+ * whatever encloses the screen — and whether that is fatal depends entirely on
+ * where the screen happens to be drawn.
+ *
+ * ⚠️ WHICH IS WHY THIS WAS INVISIBLE FOR AS LONG AS IT WAS. Six sites carried
+ * `slot="trigger"`; the design package's own mounted test carried it too and
+ * passed, because nothing encloses a component mounted on its own. The account
+ * centre is presented inside a `Modal` — so the same six characters that are
+ * inert in a test fixture took `/space/data` down to a blank page, and the four
+ * checks measuring that screen all failed as a twenty-second timeout waiting for
+ * a page that was never going to draw.
+ *
+ * ⚠️ `Reveal` IS THE ONE THAT MAY, AND IT IS NOT AN EXEMPTION. Its trigger sits
+ * inside `Disclosure.Heading`, which provides the name — the innermost provider
+ * is the right one, so the lookup resolves where it was meant to. The rule is
+ * not "no slots"; it is that a trigger handed ACROSS a prop boundary has left
+ * the context that would have answered for it.
+ */
+{
+  const TAKES_A_TRIGGER = /\btrigger=\{([\s\S]{0,400}?)\}\s*\n/g;
+  /* ⚠️ THE MOUNTED FIXTURES TOO, AND THEY ARE THE HALF THAT MATTERS. The other
+     checks here ask about shipped screens; this one asks about a shape that is
+     harmless in isolation, and a fixture is isolation by definition. The
+     design package's `confirm.mount.tsx` carried the fault and its four
+     browser assertions passed — so a fixture left out of this corpus is a
+     worked example of the bug, kept green, next to the component. */
+  const HANDING = [...FILES, ...filesIn("design/test"), ...filesIn("one-space/test")];
+  let handed = 0;
+  let reaching = 0;
+  for (const file of HANDING) {
+    const src = readFileSync(file, "utf8");
+    for (const m of src.matchAll(TAKES_A_TRIGGER)) {
+      handed++;
+      if (!/\bslot=/.test(m[1])) continue;
+      reaching++;
+      const line = src.slice(0, m.index).split("\n").length;
+      fail(`${rel(file)}:${line}: a trigger handed across a prop carries a \`slot\`.\n` +
+           `       The overlay renders it as the library's first child, where no slot is\n` +
+           `       offered — so the name is resolved against whatever encloses the SCREEN.\n` +
+           `       Inside a presented surface that is the Modal, which offers "close" only,\n` +
+           `       and an unmatched slot throws during render: a blank page, not a warning.`);
+    }
+  }
+  if (!reaching) ok(`slots: ${handed} trigger(s) handed across a prop, none naming a slot`);
+}
+
 console.log(bad
   ? `\nheroui: ${bad} finding(s) — a screen branding will not reach.`
   : `\nheroui: components as they ship, themed through tokens.`);

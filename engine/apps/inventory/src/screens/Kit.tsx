@@ -182,7 +182,7 @@ export function Kit({
                 under="Everything in it goes back to the shelf"
                 does={(
                   <Confirm
-                    trigger={<Button slot="trigger" variant="secondary">Break it up</Button>}
+                    trigger={<Button variant="secondary">Break it up</Button>}
                     title="Break this kit up?"
                     act={{ op: "kit.break", label: "Break it up", tone: "danger", onDo: onBreak }}
                   >
