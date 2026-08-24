@@ -12,7 +12,9 @@ import type { Sky, World } from "../tokens/ambience.js";
 import { HEM_HOLD, skyWorld, worldCss } from "../tokens/ambience.js";
 import { useScrolling } from "./scrolling.js";
 import { TYPE } from "../tokens/type.js";
-import { BAND_PAD, GUTTER, NAV_SPACE, SAFE_TOP, WIDTH } from "../tokens/metrics.js";
+import {
+  BAND_INSET, BAND_PAD, GUTTER, NAV_SPACE, SAFE_TOP, WIDTH,
+} from "../tokens/metrics.js";
 import type { Width } from "../tokens/metrics.js";
 import { transition, useMotion } from "../tokens/motion.js";
 import type { Density } from "../scene/index.js";
@@ -519,6 +521,18 @@ export interface BandProps {
    * the viewport blank beneath it. Opt-in, because a run of bands each claiming
    * the leftover room would share it and space a page out like a menu.
    */
+  /**
+   * ⚠️ A BAND SETS A WIDTH AND NO VERTICAL PADDING, which is right — it is a
+   * column, not a card — and it leaves a band holding ONE component with nothing
+   * between that component and its neighbours. Two screens wrapped their child in
+   * a `py-2` div and agreed on the number, which is the good outcome of a missing
+   * step and exactly why nothing looked wrong.
+   *
+   * ⚠️ IT IS A FLAG RATHER THAN A CLASS, so the step stays the system's. A prop
+   * taking a class would make this a `div` with extra ceremony, which is what the
+   * wrappers already were.
+   */
+  readonly inset?: boolean;
   readonly grow?: boolean;
   readonly children?: React.ReactNode;
 }
@@ -531,18 +545,21 @@ export interface BandProps {
  * stays readable — and doing it per screen is how you get a product where some
  * sections are inset and some are not, for no reason anybody remembers.
  */
-export function Band({ bleed = "hold", width = "read", sky, seedling, grow, children }: BandProps) {
+export function Band(
+  { bleed = "hold", width = "read", sky, seedling, inset, grow, children }: BandProps,
+) {
   /* ⚠️ THE SAME ENGINE A PAGE USES, because a section that lifts is a scene at a
      smaller reach and not a second mechanism — and now literally the same call,
      rather than the same three lines written twice. */
   const own = useScenery({ sky, seedling, reach: "card" });
   const lit = own.css !== undefined;
 
+  const room = inset ? ` ${BAND_INSET}` : "";
   const inner = bleed === "flush"
-    ? "w-full"
+    ? `w-full${room}`
     : bleed === "edge"
-      ? `w-full ${GUTTER}`
-      : `w-full ${WIDTH[width]} mx-auto ${GUTTER}`;
+      ? `w-full ${GUTTER}${room}`
+      : `w-full ${WIDTH[width]} mx-auto ${GUTTER}${room}`;
 
   return (
     <section

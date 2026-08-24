@@ -199,9 +199,7 @@ function Screen({ where, onGo, onLeave }: {
                 {onLeave ? <LeaveChip leave="dismiss" onDo={onLeave} /> : null}
               </div>
             </Band>
-            <Band width="read">
-              <div className="py-2"><SpaceHome person={person} onGo={onGo} /></div>
-            </Band>
+            <Band width="read" inset><SpaceHome person={person} onGo={onGo} /></Band>
             {/* ⚠️ Only the root needs one — every `Screen` owns its own
                 (`screen.tsx`), and two would split the slack and leave the dock
                 halfway up. */}

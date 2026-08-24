@@ -2754,3 +2754,31 @@ mistyped it actually notices.
 
 **What this forbids:** a settled field in a patch, and a generated update that
 advertises one. `settled` fails on both.
+
+## D79 — A design guard that spares the apps is a guard about the wrong tree
+
+**`metrics` swept `design/src` and nothing else.** That is the package where the
+rule is least likely to be broken: it is where the scale lives, and everybody
+editing it can see the file. The screens that actually get written are in
+`apps/`, and there a hand-picked `gap-3` was invisible.
+
+Widened, it found seven — including two strips in one screen that had
+**re-implemented `Rail`** by copying its bleed, snap, gutter and gap out by hand,
+and both wrote `-mx-4 … px-4`: right on a phone and eight pixels short from `md`
+up, where the page gutter is 24. Nothing failed. A horizontal scroller simply
+stopped short of the edge it exists to run off, on desktop only.
+
+**The fix was not a token, it was a prop.** `Rail` had one fixed item width, so a
+screen wanting a narrower card rebuilt the component instead of using it — and
+`Band` had no vertical padding at all, so two screens wrapped their child in a
+`py-2` div and agreed on the number. A primitive that cannot express the second
+case is a primitive people copy. `Rail` takes `wide` from a closed set; `Band`
+takes `inset`.
+
+**And a widened guard finds bugs in itself first.** Two of the first nine
+findings were `{ id: "p-1" }` in a screen's own sample data — a record id that
+looks like padding. The pattern now only reads inside `class`/`className`.
+
+**What this forbids:** a guard over the shared tree that does not also read
+`appDirs()`. The rule it enforces is about screens, and the screens are in the
+apps.

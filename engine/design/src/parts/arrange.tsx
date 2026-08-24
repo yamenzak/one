@@ -128,8 +128,31 @@ export function Columns({ aside, side = "end", space = "roomy", children }: {
  * ⚠️ AND THE SCROLLBAR IS THE LIBRARY'S `scrollbar-none`, not a hand-rolled
  * `::-webkit-scrollbar` — HeroUI ships the utility and it covers Firefox too.
  */
-export function Rail({ space = "snug", children }: {
+/**
+ * ⚠️ HOW WIDE ONE ITEM IS, NAMED RATHER THAN PASSED AS A CLASS. Two screens in
+ * this repository re-implemented this whole component to get a narrower card —
+ * bleed, snap, gutter and gap copied out by hand — and both wrote `-mx-4 … px-4`,
+ * which is right on a phone and eight pixels short from `md` up, where the page
+ * gutter is 24. A rail with one fixed width is a rail people rebuild.
+ *
+ * ⚠️ AND IT IS A CLOSED SET, because the point of the component is that the sizes
+ * agree across the product. A free class here would make it a `div` with extra
+ * steps, which is what it already lost to twice.
+ */
+const WIDE = {
+  /** A card meant to be read — the next one peeks. */
+  card: "w-[85%] sm:w-72",
+  /** A panel of fields or a barcode: enough for a line of text. */
+  panel: "w-60",
+  /** A photograph or a swatch — several visible at once. */
+  tile: "w-28",
+} as const;
+
+export type Wide = keyof typeof WIDE;
+
+export function Rail({ space = "snug", wide = "card", children }: {
   readonly space?: Space;
+  readonly wide?: Wide;
   readonly children: React.ReactNode;
 }) {
   return (
@@ -138,7 +161,7 @@ export function Rail({ space = "snug", children }: {
         ${GUTTER} ${SCROLL_GUTTER} ${SPACE[space]}`}
     >
       {React.Children.map(children, (child) => (
-        <div className="w-[85%] shrink-0 snap-start sm:w-72">{child}</div>
+        <div className={`${WIDE[wide]} shrink-0 snap-start`}>{child}</div>
       ))}
     </div>
   );

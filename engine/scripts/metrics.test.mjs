@@ -1,6 +1,14 @@
 /**
  * ONE FILE HOLDS EVERY MEASUREMENT, AND NOTHING ELSE WRITES ONE.
  *
+ * ⚠️ AND "NOTHING ELSE" MEANS THE APPS TOO, WHICH IT DID NOT UNTIL IT DID. This
+ * swept `design/src` alone — the package where the rule is least likely to be
+ * broken, because it is where the scale lives and everybody editing it can see
+ * the file. The screens that actually get written are in `apps/`, and there a
+ * hand-picked `gap-3` was invisible. Seven were, including two strips that had
+ * re-implemented `Rail` by copying its numbers out and getting the desktop
+ * breakpoint wrong in both.
+ *
  * @design one source for every measurement: no screen picks its own padding, gap or tap target, and a pressable row has a floor under it.
  *
  * ⚠️ THIS IS THE GUARD THAT WOULD HAVE PREVENTED THE MESS IT WAS WRITTEN AFTER.
@@ -17,6 +25,7 @@
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { appDirs } from "./lib/trees.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ENGINE = join(HERE, "..");
@@ -46,7 +55,12 @@ const filesIn = (dir) => {
  * something by hand; a COMPONENT everything is built from may not, because its
  * choice is repeated everywhere and its drift is the product's.
  */
-const FILES = filesIn("design/src");
+const FILES = [
+  ...filesIn("design/src"),
+  ...filesIn("one-space/src"),
+  ...filesIn("ground/src"),
+  ...appDirs().flatMap((d) => filesIn(d)),
+];
 const SOURCE = "design/src/tokens/metrics.ts";
 
 const strip = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
@@ -61,12 +75,23 @@ const strip = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$
  */
 const SPACING = /\b(?:p|px|py|pt|pb|pl|pr|gap|gap-x|gap-y)-(?:\d+|\[[^\]]+\])/g;
 
+/**
+ * ⚠️ ONLY WHERE A CLASS CAN BE, WHICH THE FIRST WIDENED DRAFT DID NOT DO. Swept
+ * across the apps, the bare pattern matched `{ id: "p-1" }` in a screen's own
+ * sample data — a record id that happens to look like padding. Two of the nine
+ * findings on the first run were the guard's, not the code's, which is what
+ * widening a check always turns up first.
+ */
+const CLASSES = /class(?:Name)?\s*=\s*(?:"([^"]*)"|'([^']*)'|\{`([^`]*)`\}|\{"([^"]*)"\})/g;
+const classesIn = (src) => [...src.matchAll(CLASSES)]
+  .map((m) => m[1] ?? m[2] ?? m[3] ?? m[4] ?? "").join(" ");
+
 let loose = 0;
 for (const file of FILES) {
   const name = rel(file);
   if (name === SOURCE) continue;
   const src = strip(readFileSync(file, "utf8"));
-  const found = new Set([...src.matchAll(SPACING)].map((m) => m[0]));
+  const found = new Set([...classesIn(src).matchAll(SPACING)].map((m) => m[0]));
   /* ⚠️ `gap-1` and `gap-0.5` are INSIDE a component — the distance between a
      label and its own caption — rather than between components. They are the one
      scale a component legitimately owns, because nothing else can see them. */

@@ -91,7 +91,7 @@ export function Product({ path, onGo, onOpenSpace, onOpenInbox }: {
                 name={view.tenant.name}
                 under="One"
               />
-              <Band width="read"><div className="py-2"><Choose view={view} onGo={onGo} /></div></Band>
+              <Band width="read" inset><Choose view={view} onGo={onGo} /></Band>
               <Spacer />
             </Layout>
           );

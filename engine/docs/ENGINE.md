@@ -1058,6 +1058,7 @@ its own header, cited by other files, and doing nothing.
 | D76 | A packaging level is a named multiplier, never a product | 0 |
 | D77 | Moving stock is a verb of its own | 0 |
 | D78 | Some fields are set once, and the write is what says so | 0 |
+| D79 | A design guard that spares the apps is a guard about the wrong tree | 0 |
 <!-- /generated -->
 
 ---

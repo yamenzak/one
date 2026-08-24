@@ -49,7 +49,7 @@ import * as React from "react";
 import {
   ActionRow, Await, Bars, Group, NoteRow, NumberInput, PickFile, Row,
   RowsWaiting, SAYS_KIND, Screen, Section, Segmented, Spacer, Stack, Steps, Tags,
-  Lookup, TextInput, ToggleRow, Viewfinder, Written, kindOf,
+  Lookup, Rail, TextInput, ToggleRow, Viewfinder, Written, kindOf,
   glyphOf, shrunk, useTelling, type Loaded, type Option,
 } from "@engine/design";
 import { Button } from "@heroui/react";
@@ -597,13 +597,19 @@ export function Register({
                 column's edge looks like a row that happens to be too long; one
                 that runs off the screen says there is more, which is the whole
                 affordance.
+
+                ⚠️ AND IT IS `Rail`, WHICH IS WHERE ALL OF THAT ALREADY LIVES.
+                Written by hand this was `-mx-4 … px-4` — right on a phone and
+                eight pixels short from `md` up, where the page gutter is 24 —
+                plus a snap, a gap and a scroll-padding copied out of the
+                component it was reimplementing. The first tile no longer sizes
+                itself either; it is first, and it carries the badge.
               */
-              <div className="-mx-4 overflow-x-auto px-4">
-                <div className="flex w-max gap-2">
+              <Rail wide="tile" space="tight">
                   {photos.map((one, at) => (
                     <div
                       key={one.slice(-24)}
-                      className={`relative shrink-0 overflow-hidden rounded-xl ${at === 0 ? "w-40" : "w-28"}`}
+                      className="relative overflow-hidden rounded-xl"
                     >
                       <img
                         src={one}
@@ -656,8 +662,7 @@ export function Register({
                       )}
                     </div>
                   ))}
-                </div>
-              </div>
+              </Rail>
             ) : null}
 
             {/*
@@ -892,14 +897,18 @@ export function Register({
               somebody checks against the box.
             */}
             {codes.length ? (
-              <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1">
+              /* ⚠️ AND `SCROLL_GUTTER` ON THE SNAPPING ONE. `snap-start` aligns
+                 to the scroller's BORDER edge, so without it the browser pulls
+                 the first card flush against the screen and undoes the padding
+                 the gutter just restored. */
+              <Rail wide="panel">
                 {/* ⚠️ THE SIZING IS OUTSIDE THE CARD AND THE COLUMN IS THE CARD'S.
                     A `Stack` inside a `Group` is a second column in something that
                     is already one — a second inset and a second gap, which is what
                     "double padding" means (`rhythm`). The div carries a width and
                     nothing else. */}
                 {codes.map((row, at) => (
-                  <div key={row.value || at} className="w-60 shrink-0 snap-start">
+                  <div key={row.value || at}>
                     <Group label={sayKind(row.value)}>
                         {/*
                           ⚠️ DRAWN WHERE IT CAN BE, AND ONLY THERE. `Bars` answers
@@ -932,7 +941,7 @@ export function Register({
                     </Group>
                   </div>
                 ))}
-              </div>
+              </Rail>
             ) : null}
         </Section>
 

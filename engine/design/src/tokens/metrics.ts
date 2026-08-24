@@ -552,6 +552,23 @@ export const DROP_PAD = "px-6 py-8" as const;
 export const BAND_PAD = "py-6" as const;
 
 /**
+ * THE SMALLEST VERTICAL INSET — a block that must not touch what is above and
+ * below it, inside a container with no rhythm of its own.
+ *
+ * ⚠️ `Band` SETS A WIDTH AND NO PADDING, which is right — it is a column, not a
+ * card — and it leaves any band holding one component with nothing between that
+ * component and its neighbours. Two screens reached for `py-2` independently and
+ * agreed, which is the good outcome of a missing step and is exactly why nothing
+ * looked wrong. A rung nobody can name is a rung that drifts the first time
+ * somebody has a reason.
+ *
+ * ⚠️ AND IT IS NOT `BAND_PAD`. That is the room a band gives a SECTION; this is
+ * the hair's breadth a single block needs so it does not read as welded to the
+ * one above it.
+ */
+export const BAND_INSET = "py-2" as const;
+
+/**
  * THE ROOM A HERO CLAIMS, AND IT IS MORE BELOW THAN A SECTION GETS.
  *
  * ⚠️ A HERO IS SEPARATED FROM THE PAGE BY MORE THAN IT USES INSIDE ITSELF, OR IT

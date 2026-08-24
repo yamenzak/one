@@ -19,7 +19,8 @@
  */
 
 import {
-  ActionRow, AmountRow, Group, NavRow, Num, Screen, Tree, Unit, glyphOf, useFigures, useGate,
+  ActionRow, AmountRow, Group, NavRow, Num, SPACE, Screen, Tree, Unit, glyphOf, useFigures,
+  useGate,
   type Branch, type Loaded,
 } from "@engine/design";
 import { Button } from "@heroui/react";
@@ -139,7 +140,7 @@ export function Stock({
           shelf.
         */
         does: (
-          <div className="flex flex-col items-center gap-2">
+          <div className={`flex flex-col items-center ${SPACE.tight}`}>
             <Button variant="primary" onPress={onAdd}>Add stock</Button>
             {mayImport
               ? <Button variant="ghost" onPress={onImport}>Import a spreadsheet</Button>
