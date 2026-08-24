@@ -24,7 +24,8 @@ import { chromium, type Browser } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   DESK, ENOUGH_TO_RANK, PHONE, SCALE_CEILING,
-  contrastOf, geometryOf, isLarge, mounted, scaleOf, stylesheet, tooSmall, unreadable,
+  contrastOf, geometryOf, isLarge, mounted, sayTwins, scaleOf,
+  stylesheet, tooSmall, unreadable,
 } from "@engine/design/measuring";
 import { GROUND } from "@engine/ground";
 
@@ -133,6 +134,23 @@ describe("what the chrome says", () => {
       const chrome = seen.cut.filter((one) => one.where !== "");
       expect(chrome, chrome.map((c) => `${c.where}: "${c.text}" cut by ${c.by}px`).join(", "))
         .toEqual([]);
+    }, 30_000);
+  }
+});
+
+/*
+  ⚠️ AND NO NAME IS USED TWICE. An `id` is HTML's one namespace: `getElementById`
+  takes the first match and stops, and so does every `aria-labelledby`,
+  `aria-controls` and `<label for>` resolved through it — so a duplicate hands a
+  screen reader the wrong element for a control, on a page that photographs
+  perfectly. It is also what a control wrapped in a second pressable comes out
+  as, which is the fault that put this reading here (`Geometry.twins`).
+*/
+describe("every name the frame puts in the document", () => {
+  for (const route of ROUTES) {
+    it(`calls each of them one thing: ${route}`, async () => {
+      const seen = await at(route, PHONE);
+      expect(seen.twins, `${route}: ${sayTwins(seen.twins)}`).toEqual([]);
     }, 30_000);
   }
 });

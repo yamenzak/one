@@ -332,6 +332,29 @@ export interface Geometry {
     readonly px: number; readonly weight: number;
     readonly count: number; readonly text: string;
   }[];
+  /**
+   * EVERY `id` THE DOCUMENT USES TWICE, AND WHAT WEARS IT.
+   *
+   * ⚠️ AN `id` IS A NAME, AND HTML HAS ONE NAMESPACE FOR THEM. `getElementById`
+   * takes the first match and stops; so does every `aria-labelledby`,
+   * `aria-controls`, `aria-describedby` and `<label for>` resolved under it. A
+   * duplicate is therefore not untidiness — it is a screen reader being handed
+   * the wrong element for a control, on a page that photographs perfectly.
+   *
+   * ⚠️ AND IT IS WHAT A DOUBLED CONTROL LOOKS LIKE FROM THE OUTSIDE, which is
+   * the reason this reading exists. `Peek` put a `Button` inside
+   * `Popover.Trigger`, so react-aria wrapped one control in a second pressable
+   * and gave BOTH the same id — two tab stops, two `role="button"`s, and the
+   * popover's own `aria-*` wiring pointing at whichever came first. Nothing in
+   * this harness could see it: the box was the right size, the words were
+   * readable, the page did not spill. It took a hand-written probe of the DOM,
+   * and this is that probe, kept.
+   *
+   * ⚠️ ONE ENTRY PER REPEATED `id`, NOT PER ELEMENT — the same rule `type`
+   * follows. What is under test is the SET of names used twice; listing both
+   * halves of each would report the fault as though it were two.
+   */
+  readonly twins: readonly { readonly id: string; readonly tags: string }[];
 }
 
 /**
@@ -357,6 +380,13 @@ export const INSIDE_A_CONTROL = ["tag__remove-button", "search-field__clear-butt
 export const tooSmall = (targets: Geometry["targets"]): Geometry["targets"] =>
   targets.filter((t) => t.height < FINGER
     && !INSIDE_A_CONTROL.some((one) => t.kind.includes(one)));
+
+/**
+ * ⚠️ HOW A DOUBLED CONTROL READS, PUT INTO WORDS A FAILURE CAN PRINT. One answer
+ * for every product, for the reason `tooSmall` gives one paragraph up.
+ */
+export const sayTwins = (twins: Geometry["twins"]): string =>
+  twins.map((t) => `"${t.id}" is on ${t.tags}`).join("; ");
 
 /**
  * ⚠️ HOW MANY SIZES A SCREEN MAY SET, AND IT IS A CEILING RATHER THAN A TARGET.
@@ -580,6 +610,19 @@ export async function geometryOf(
           };
         })
         .filter((t) => t.width > 0 && t.height > 0);
+      /* ⚠️ EVERY NAME THE DOCUMENT USES TWICE — see `Geometry.twins`. Cheap
+         (one pass, no layout read) and it is the only thing here that can see a
+         control wrapped in a second pressable, which is what a doubled trigger
+         comes out as. */
+      const byId = new Map<string, string[]>();
+      for (const el of Array.prototype.slice.call(
+        document.querySelectorAll("[id]")) as Element[]) {
+        if (!el.id) continue;
+        (byId.get(el.id) ?? byId.set(el.id, []).get(el.id)!).push(el.tagName.toLowerCase());
+      }
+      const twins = Array.from(byId.entries())
+        .filter(([, tags]) => tags.length > 1)
+        .map(([id, tags]) => ({ id, tags: tags.join(" in ") }));
       /* ⚠️ ELLIPSIS ONLY, NOT EVERY OVERFLOW. A scroller's content is wider than
          its box on purpose, and a clipped decoration is not text somebody was
          meant to read; what this is looking for is the layout deciding, on its
@@ -732,7 +775,7 @@ export async function geometryOf(
           ({ px: s.px, weight: s.weight, count: s.count, text: s.text }))
         .sort((a: { px: number }, b: { px: number }) => b.px - a.px);
       const ink = Array.from(inks.values());
-      return { spill, worst, targets, cut, type, ink };
+      return { spill, worst, targets, cut, type, ink, twins };
     }, viewport.width);
   } finally {
     await page.close();
