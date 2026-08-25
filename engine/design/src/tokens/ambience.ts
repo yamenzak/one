@@ -1152,6 +1152,21 @@ export function ambienceStylesheet(): string {
     `[data-glass="true"]:hover { background-color: color-mix(in oklab, var(--tier-dock) 84%, transparent); }`,
     `[data-glass="true"][data-pressed="true"] { background-color: color-mix(in oklab, var(--tier-dock) 92%, transparent); }`,
     /*
+      ⚠️ PAPER IS NOT A SURFACE, AND IT IS THE ONE OUTPUT THIS PRODUCT MAKES
+      THAT CANNOT BE RE-RENDERED. A shelf label is black ink on white stock
+      whatever the screen was set to; a dark-mode label is a sheet of toner
+      nobody can read. `Bars` already draws its symbol that way — the `fill` on
+      its path — and the human-readable digits beneath it are the same object
+      and take the same ink.
+
+      ⚠️ AND IT IS HERE RATHER THAN IN THE COMPONENT, which is the whole of D7
+      and also the difference between this and an exemption. `labels.tsx` is
+      waived by `ground.test.mjs` for precisely this reason; a rule in the token
+      layer is one place, checkable, and available to everything else that has
+      to print — so the waiver can shrink instead of growing a second entry.
+    */
+    `[data-print="true"] { color: #000; }`,
+    /*
       ⚠️ THE ONE PLACE A PRODUCT'S OWN COLOUR TOUCHES THE CHROME, AND IT IS A
       LIGHT RATHER THAN A SURFACE. The bar carries no fill by design — every
       plate and pill it used to have was removed, and each was removed for a

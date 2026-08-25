@@ -256,6 +256,26 @@ export function Glass({ icon, label, only, onDo }: {
      control in the accessibility tree that refuses every press, and on a phone
      it takes a tap that was meant for the card under it. */
   if (!onDo) {
+    /*
+      ⚠️ AND `only` MEANS THE SAME THING HERE AS IT DOES ON THE CONTROL. It was
+      read on the pressable branch alone, so a caller asking for the mark by
+      itself on a caption got the mark AND the words — a pill reading "Save this
+      one" where a circle was asked for, which is the one arrangement the
+      shape's own note says neither form survives. `label` stays the accessible
+      name, which is what it is for on the round control too.
+    */
+    if (round) {
+      return (
+        <span
+          data-glass="true"
+          role="img"
+          aria-label={label}
+          className={`inline-flex items-center justify-center ${QUICK_CIRCLE}`}
+        >
+          {mark}
+        </span>
+      );
+    }
     return (
       <span
         data-glass="true"
@@ -1429,8 +1449,21 @@ export interface TileSpec {
  * it waits behind cannot disagree — which is the fault `TILE.tall` was made a
  * token to prevent. A caller that could pass `deep` could pass the wrong one.
  */
+/*
+  ⚠️ AND A LINE UNDER THE NAME IS NOT WHAT MAKES A TILE DEEP. `under` was in this
+  list, so a grid of glyph + name + "6 notes" — the ordinary case, and the one
+  most grids in the product are — took the 192px height meant for a photograph
+  AND the `hero` rung for its mark. Measured: a 39px glyph in a 192px card
+  carrying two short lines, which is a grid of mostly-empty boxes with the
+  loudest icons on the screen in them.
+
+  ⚠️ WHAT EARNS THE DEPTH IS SOMETHING THAT NEEDS THE ROOM — a face (which draws
+  at 80px), a control in the corner, or a foot under the name. Each of those is
+  an object in the tile; a second line of text is the name finishing its
+  sentence, and `tall` has room for it.
+*/
 const deepIn = (tiles: readonly TileSpec[]): boolean =>
-  tiles.some((t) => t.under || t.foot || t.face || t.control);
+  tiles.some((t) => t.foot || t.face || t.control);
 
 export function TileGrid({ tiles }: { readonly tiles: readonly TileSpec[] }) {
   /* ⚠️ THE SAME CONTAINER, SO THE COLUMNS CANNOT DISAGREE. What a placeholder

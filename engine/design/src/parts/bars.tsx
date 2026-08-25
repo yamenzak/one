@@ -1,4 +1,6 @@
 import * as React from "react";
+import { SPACE } from "../tokens/metrics.js";
+import { TYPE } from "../tokens/type.js";
 
 /**
  * A PRODUCT BARCODE, DRAWN — and the code's own kind, read off the digits.
@@ -224,27 +226,78 @@ export interface BarsProps {
  * form is a hole. `onScreen` is that difference, and it is the caller's because
  * only the caller knows which it is making.
  */
+/**
+ * ⚠️ THE HUMAN-READABLE LINE IS PART OF THE SYMBOL, NOT A CAPTION. GS1 specifies
+ * it, every printed barcode in a shop has it, and the reason is the case the
+ * whole component exists for: the scanner does not read, the light is bad, the
+ * label is scuffed — and a person reads the digits out instead. A symbol without
+ * them is a picture of a barcode.
+ *
+ * ⚠️ AND THE GROUPS ARE THE STANDARD'S, PER SYMBOLOGY. EAN-13 prints its first
+ * digit outside the bars and then two sixes, because that first digit is not
+ * drawn in the symbol at all — it is carried in the PARITY of the left six (see
+ * the encoder). Grouping is not decoration here: it is what tells a reader which
+ * digit belongs to which half.
+ */
+const GROUPS: Readonly<Record<string, readonly number[]>> = {
+  ean_13: [1, 6, 6],
+  upc_a: [1, 5, 5, 1],
+  ean_8: [4, 4],
+};
+
+const spoken = (code: string, kind: string): string => {
+  const cuts = GROUPS[kind];
+  if (!cuts) return code;
+  const out: string[] = [];
+  let at = 0;
+  for (const n of cuts) { out.push(code.slice(at, at + n)); at += n; }
+  return out.filter(Boolean).join(" ");
+};
+
 export function Bars({ of, mm, onScreen }: BarsProps) {
   const drawn = React.useMemo(() => barsFor(of), [of]);
   if (!drawn) return null;
   return (
-    <svg
-      viewBox={`0 0 ${drawn.span} ${drawn.tall}`}
-      {...(mm === undefined ? {} : { width: `${mm}mm` })}
-      /* ⚠️ `crispEdges` FOR THE SAME REASON THE QR HAS IT. A bar is a rectangle of
-         ink; anti-aliasing its edges produces greys a low-contrast scan reads as
-         neither colour. */
-      shapeRendering="crispEdges"
-      role="img"
-      aria-label={of}
-      style={{ display: "block", width: mm === undefined ? "100%" : undefined, height: "auto" }}
-    >
-      {onScreen
-        ? null
-        /* ⚠️ THE QUIET ZONE IS PAINTED, NOT LEFT TRANSPARENT — see `Code`. */
-        : <rect width={drawn.span} height={drawn.tall} fill="#fff" />}
-      <path d={drawn.path} fill={onScreen ? "currentColor" : "#000"} />
-    </svg>
+    /*
+      ⚠️ THE SYMBOL AND ITS DIGITS ARE ONE OBJECT, CENTRED, AND SIZED BY THE
+      SYMBOL. `inline-flex` with `w-fit` is what stops a 48mm barcode sitting at
+      the left edge of a 358px card with the rest of the row empty — which is
+      what it did, and it read as a picture somebody had dropped in rather than
+      as the code for the thing the card is about.
+    */
+    <span className={`inline-flex w-fit flex-col items-center ${SPACE.hair}`}>
+      <svg
+        viewBox={`0 0 ${drawn.span} ${drawn.tall}`}
+        {...(mm === undefined ? {} : { width: `${mm}mm` })}
+        /* ⚠️ `crispEdges` FOR THE SAME REASON THE QR HAS IT. A bar is a rectangle of
+           ink; anti-aliasing its edges produces greys a low-contrast scan reads as
+           neither colour. */
+        shapeRendering="crispEdges"
+        /* ⚠️ `presentation`, BECAUSE THE DIGITS BELOW ARE NOW THE ACCESSIBLE
+           NAME. Labelled here as well, a screen reader reads the number twice —
+           once as an image and once as text — which is the double-announcement
+           the media card's own `alt` note warns about one file over. */
+        role="presentation"
+        style={{ display: "block", width: mm === undefined ? "100%" : undefined, height: "auto" }}
+      >
+        {onScreen
+          ? null
+          /* ⚠️ THE QUIET ZONE IS PAINTED, NOT LEFT TRANSPARENT — see `Code`. */
+          : <rect width={drawn.span} height={drawn.tall} fill="#fff" />}
+        <path d={drawn.path} fill={onScreen ? "currentColor" : "#000"} />
+      </svg>
+      {/* ⚠️ ON PAPER IT IS BLACK LIKE THE BARS, for the reason the bars are: a
+          label is printed and the theme is not a thing the paper has. On a
+          screen it takes the interface's ink, and `TYPE.code` is the one role
+          that tracks OPEN so the digits can be read one at a time. */}
+      {/* ⚠️ `data-print`, NOT A STYLE — the rule is in `ambienceStylesheet` for
+          the D7 reason every fill in this package is. A component that names a
+          colour is a component nothing can re-theme, and `ground.test.mjs`
+          refuses one. */}
+      <span className={TYPE.printed} {...(onScreen ? {} : { "data-print": "true" })}>
+        {spoken(of.trim(), drawn.kind)}
+      </span>
+    </span>
   );
 }
 

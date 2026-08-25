@@ -126,12 +126,36 @@ const LIFT = 0.02;
     room under it rather than a value tuned to what today happens to render. */
 const FILLED = 0.05;
 
+/**
+ * ⚠️ THE SAME MARKUP WITH NO `data-sky`, AND IT IS THE CASE MOST OF THE PRODUCT
+ * ACTUALLY IS. That attribute is stamped by a `Page`; a modal and a drawer are
+ * PORTALLED TO `body` and are outside it entirely — so every ticked box, chosen
+ * radio and checked switch inside a tray, a dialog or a confirmation resolves
+ * its fill against `:root` and not against a page.
+ *
+ * ⚠️ AND THE SUITE ABOVE COULD NOT SEE THAT, BY CONSTRUCTION. Its specimen
+ * carries `data-sky` on purpose — without it there is no product hue to measure
+ * and every chroma assertion reports the deployment's neutral — which is right
+ * for the question it asks and made it blind to the one asked here. Measured
+ * while it was: `--on` was declared ONLY inside `[data-sky]`, so
+ * `background-color: var(--on)` on `:root`'s side of the tree was an EMPTY
+ * variable, which is not a fallback but `transparent`. A selected checkbox drew
+ * its `::before` at opacity 1, scale 1, and filled with nothing.
+ *
+ * ⚠️ SO WHAT THIS ASKS IS "IS IT PAINTED", NOT "IS IT COLOURED". Outside a page
+ * there is no hue to expect and demanding one would be a second suite arguing
+ * with the first. An alpha of zero on a state fill is the whole finding.
+ */
+const BARE = SPECIMEN
+  .replace(` data-sky="glow" style="--brand: ${HUE}"`, "");
+
 const paintedIn = async (
   theme: "dark" | "light", selector: string, part: "" | "::before",
+  markup: string = SPECIMEN,
 ): Promise<Painted> => {
   const page = await browser.newPage({ viewport: { width: PHONE.width, height: PHONE.height } });
   try {
-    await page.setContent(pageFor(SPECIMEN, css, theme));
+    await page.setContent(pageFor(markup, css, theme));
     const channels = await page.evaluate(([sel, which]: readonly string[]) => {
       const el = document.querySelector(sel!);
       if (!el) return null;
@@ -211,5 +235,21 @@ describe("a control that is on", () => {
         `the primary button is ${seen.rgb} — the one call to action has taken a hue`)
         .toBeLessThan(LIFT);
     }, 60_000);
+
+    /*
+      ⚠️ AND EVERY ONE OF THEM OFF A PAGE, WHICH IS WHERE A TRAY LIVES — see
+      `BARE`. This asks only whether the fill was painted at all, because outside
+      a page there is no hue to expect; an alpha of zero is the finding, and it
+      is what shipped.
+    */
+    for (const [says, selector, part] of ON) {
+      it(`${says} is still filled off a page — ${theme}`, async () => {
+        const seen = await paintedIn(theme, selector, part, BARE);
+        expect(seen.rgb,
+          `${says} in a portalled surface painted with an EMPTY token, which is `
+          + `transparent — the state is drawn and filled with nothing`)
+          .not.toBe("transparent");
+      }, 60_000);
+    }
   }
 });

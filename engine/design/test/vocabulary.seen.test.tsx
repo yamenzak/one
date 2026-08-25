@@ -127,16 +127,24 @@ describe("the blocks a photograph could not reach", () => {
     const page = await open(PHONE.width);
     try {
       const bars = await page.evaluate(() => {
-        const svg = document.querySelector('svg[role="img"][aria-label="5901234123457"]');
-        /* ⚠️ ONE `path`, MANY SUBPATHS — see `Bars`. Every bar is an `M` in the
-           same `d` because a symbol drawn as ninety-five sibling rects is
-           ninety-five nodes the browser composites separately. */
-        return (svg?.querySelector("path")?.getAttribute("d") ?? "").split("M").length - 1;
+        const svg = document.querySelector('svg[shape-rendering="crispEdges"]');
+        return {
+          /* ⚠️ ONE `path`, MANY SUBPATHS — see `Bars`. Every bar is an `M` in the
+             same `d` because a symbol drawn as ninety-five sibling rects is
+             ninety-five nodes the browser composites separately. */
+          groups: (svg?.querySelector("path")?.getAttribute("d") ?? "").split("M").length - 1,
+          says: svg?.parentElement?.textContent ?? "",
+        };
       });
       /* ⚠️ AN EAN-13 IS THIRTY BAR GROUPS, so a handful is a symbol that would
          scan as nothing. The floor sits far below the real count and far above
          anything a placeholder would produce. */
-      expect(bars).toBeGreaterThan(20);
+      expect(bars.groups).toBeGreaterThan(20);
+      /* ⚠️ AND THE DIGITS, IN THE STANDARD'S OWN GROUPING. They are not a
+         caption — GS1 specifies them, and they are what a person reads out when
+         the scanner will not read. `1 6 6` for an EAN-13, because the first
+         digit is carried in the PARITY of the left six rather than drawn. */
+      expect(bars.says).toBe("5 901234 123457");
     } finally { await page.close(); }
   }, 120_000);
 

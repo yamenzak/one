@@ -358,6 +358,22 @@ export const TYPE = {
    */
   figures: "tabular-nums",
   /**
+   * THE DIGITS PRINTED UNDER A SYMBOL — a barcode's human-readable line.
+   *
+   * ⚠️ TRACKING OPEN RATHER THAN CLOSED, WHICH IS THE ONE ROLE HERE THAT GOES
+   * THAT WAY. Every other role pulls its letters together, because a WORD is
+   * read as a shape and tight tracking sharpens it. This is not read as a shape
+   * — it is read one digit at a time, out loud, off a shelf, into a field — and
+   * characters that touch are characters somebody transposes.
+   *
+   * ⚠️ AND IT IS NOT `code`, WHICH IS MONO. That role's own note is the
+   * argument: a monospaced face earns its place on `req_8f21c04`, where `0`/`O`
+   * and `1`/`l`/`I` have to be told apart, and it is the WRONG connotation on a
+   * string that is only ever digits. `tabular-nums` on the brand face buys the
+   * even advances without making a shelf label look like terminal output.
+   */
+  printed: `${at("aside")} tabular-nums tracking-[0.18em] text-foreground`,
+  /**
    * ⚠️ THE FRACTIONAL PART OF AN AMOUNT, RELATIVE TO ITS WHOLE. `€1,051.70` at
    * one size is a number; with a smaller `.70` it is a sum of money, because the
    * eye lands on the part that matters. `em` rather than a fixed size, so the

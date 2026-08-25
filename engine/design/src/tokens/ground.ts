@@ -476,6 +476,31 @@ function tier(mode: "light" | "dark"): string {
     `--accent-soft: var(--tier-chosen);`,
     `--accent-soft-hover: var(--tier-chosen);`,
     /*
+      ⚠️ AND THE `--on` FAMILY WITH THEM, FOR THE REASON `--tier-chosen` IS
+      STATED TWICE. It was declared ONLY in `chosen()`, which is emitted inside
+      `[data-sky]` and nowhere else — so `var(--on)` computed to nothing on
+      every surface outside a `Page`, and `background-color: var(--on)` with an
+      empty variable is not a fallback, it is `transparent`.
+
+      ⚠️ WHICH MADE THE WHOLE "ON" CHANNEL INERT WHERE MOST OF IT LIVES. A modal
+      and a drawer are PORTALLED TO `body` — the `[data-sky]` comment below says
+      so in as many words — so every ticked box, chosen radio, checked switch and
+      open tab inside a tray, a dialog or a confirmation painted with an empty
+      token. Measured on a selected checkbox: `::before` at opacity 1, scale 1
+      and `rgba(0, 0, 0, 0)`, which is a selection state drawn perfectly and
+      filled with nothing. The tick glyph alone was carrying it.
+
+      ⚠️ AND DECLARING THEM HERE DOES NOT COST THE SCOPED VALUE. Each is
+      `var(--tier-chosen)`-relative, and a custom property substitutes at the
+      element it is declared on — so `[data-sky]` restating the tier AND this
+      family (which `chosen()` still does) is what carries a nested product's
+      hue, while these give every surface outside one a real value instead of an
+      empty string.
+    */
+    `--on: var(--tier-chosen);`,
+    `--on-ink: ${grey(0.18)};`,
+    `--on-lit: color-mix(in oklab, var(--tier-chosen) 18%, var(--tier-field));`,
+    /*
       ⚠️ AND THE INK FOR IT IS NOT SET HERE, WHICH IS THE PART THAT BIT. The
       obvious move is `--accent-soft-foreground`, and that token is OVERLOADED in
       the library: it is the ink on an `--accent-soft` fill AND the ink on a

@@ -37,6 +37,7 @@ import { dayOf, instant } from "@engine/kernel";
 /* ⚠️ The one glyph registry — a switch does not draw its own tick. */
 import { glyphOf } from "../frame/shell.js";
 import { CODE_SLOT, SPACE } from "../tokens/metrics.js";
+import { TYPE } from "../tokens/type.js";
 
 /**
  * ⚠️ EVERY DATE SURFACE ARRIVES IN ONE CHUNK — see `pickers.tsx`. A calendar
@@ -774,29 +775,38 @@ export function Words({ value, onChange, known = [], placeholder, most = 8, ...p
     && !known.some((one) => one.label.toLowerCase() === said.toLowerCase());
 
   return (
-    <div className={`flex flex-col ${SPACE.tight}`}>
-      {/* ⚠️ BUILT ON `Tags` RATHER THAN BESIDE IT. What is chosen is drawn the
-          same way here as everywhere else in the product, and a removal behaves
-          the way a removal behaves — this control adds the way IN, not a second
-          way to wear a word. */}
-      {value.length
-        ? (
-          <Tags
-            label={p.label}
-            items={value.map((one) => ({ id: one, label: one }))}
-            onRemove={(id) => { onChange(value.filter((one) => one !== id)); }}
-          />
-        )
-        : <Naming>{p.label}</Naming>}
+    /*
+      ⚠️ TWO GROUPS, NOT THREE STRIPS, AND THE GAPS ARE WHAT SAY SO. What is
+      chosen and the field that extends it are ONE control — `tight` — and the
+      vocabulary underneath is a second thing, at `snug`. Written at one gap
+      throughout, the three read as three unrelated rows of pills and a reader
+      has to work out which of them is the answer.
+    */
+    <div className={`flex flex-col ${SPACE.snug}`}>
+      <div className={`flex flex-col ${SPACE.tight}`}>
+        {/* ⚠️ BUILT ON `Tags` RATHER THAN BESIDE IT. What is chosen is drawn the
+            same way here as everywhere else in the product, and a removal behaves
+            the way a removal behaves — this control adds the way IN, not a second
+            way to wear a word. */}
+        {value.length
+          ? (
+            <Tags
+              label={p.label}
+              items={value.map((one) => ({ id: one, label: one }))}
+              onRemove={(id) => { onChange(value.filter((one) => one !== id)); }}
+            />
+          )
+          : <Naming>{p.label}</Naming>}
 
-      <TextInput
-        label=""
-        value={word}
-        onChange={setWord}
-        placeholder={placeholder}
-        onSubmit={() => { add(said); }}
-        help={p.help}
-      />
+        <TextInput
+          label=""
+          value={word}
+          onChange={setWord}
+          placeholder={placeholder}
+          onSubmit={() => { add(said); }}
+          help={p.help}
+        />
+      </div>
 
       {/* ⚠️ CHIPS RATHER THAN ROWS, AND THE WIDTH IS THE ARGUMENT. Eight rows are
           eight lines down a phone for eight words averaging nine characters; as
@@ -804,26 +814,54 @@ export function Words({ value, onChange, known = [], placeholder, most = 8, ...p
           vocabulary somebody uses instead of typing past. */}
       {novel || offer.length
         ? (
-          <div className={`flex flex-wrap ${SPACE.tight}`}>
-            {novel
-              ? (
-                <Button size="sm" variant="primary" onPress={() => { add(said); }}>
-                  {/* ⚠️ THE WORD ITSELF, NOT "Add". A button labelled with what it
-                      makes is a button nobody has to press to find out. */}
-                  {`Add “${said}”`}
+          <div className={`flex flex-col ${SPACE.hair}`}>
+            {/*
+              ⚠️ THE VOCABULARY IS INTRODUCED, BECAUSE OTHERWISE IT IS A SECOND
+              SET OF CHOSEN WORDS. A row of pills under a row of pills says
+              nothing about which is which — and the one underneath is the one
+              somebody has NOT picked, which is the opposite of what a reader
+              assumes about the thing nearest the bottom of a control.
+            */}
+            <span className={TYPE.note}>Already used here</span>
+            <div className={`flex flex-wrap ${SPACE.tight}`}>
+              {novel
+                ? (
+                  <Button variant="primary" onPress={() => { add(said); }}>
+                    {/* ⚠️ THE WORD ITSELF, NOT "Add". A button labelled with what it
+                        makes is a button nobody has to press to find out. */}
+                    {`Add “${said}”`}
+                  </Button>
+                )
+                : null}
+              {offer.map((one) => (
+                <Button
+                  key={one.id}
+                  /*
+                    ⚠️ `tertiary`, AND THE VARIANT IS THE WHOLE FIX. These were
+                    `secondary` — a filled pill — under chips drawn soft and
+                    small, so the words somebody had NOT chosen were the loudest
+                    thing in the control and the ones they had read as leftovers.
+                    That is the same inversion the chosen fill has one component
+                    over: the interface drawing "recessed" for "chosen".
+
+                    ⚠️ AND NOT `ghost`, WHICH OVERSHOOTS. A ghost pill has NO
+                    fill, so a row of them reads as loose words with big gaps and
+                    nothing says they can be pressed — the opposite mistake, made
+                    while fixing the first one. `tertiary` is the quiet FILLED
+                    control: present, obviously pressable, and below the chips.
+
+                    ⚠️ AND FULL HEIGHT RATHER THAN `sm`. A vocabulary is pressed
+                    with a thumb, and `sm` is 32px against the 44 floor every
+                    other pressable pill in this product clears — the reason
+                    `Filters` is built on `Button` and not on `Chip`.
+                  */
+                  variant="tertiary"
+                  onPress={() => { add(one.label); }}
+                >
+                  {one.label}
                 </Button>
-              )
-              : null}
-            {offer.map((one) => (
-              <Button
-                key={one.id}
-                size="sm"
-                variant="secondary"
-                onPress={() => { add(one.label); }}
-              >
-                {one.label}
-              </Button>
-            ))}
+              ))}
+            </div>
           </div>
         )
         : null}
