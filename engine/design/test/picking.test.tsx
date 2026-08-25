@@ -1,163 +1,109 @@
 /**
- * WHAT A FILE PICKER TAKES, AND WHAT IT SAYS WHEN IT WILL NOT.
+ * A LIST'S ROW ACTIONS AND ITS SELECTION, ON THE PHONE SHAPE.
  *
- * ⚠️ THIS EXISTS BECAUSE THE CONTROL REFUSED EVERY PHOTOGRAPH A CAMERA PRODUCED.
- * `accept={["image/*"]}` is what makes a phone offer the camera at all, and the
- * refusal was an exact-match `accept.includes(file.type)` — so a JPEG straight
- * off the lens came back "that kind of file will not work", and the sentence
- * under it read "It has to be a *." Both halves of that were the control's own
- * careful refusal path, working perfectly, on a file that was always fine.
+ * ⚠️ THE WHOLE ARGUMENT FOR `Listing` IS THAT A LIST AND A TABLE ARE TWO
+ * RENDERINGS OF ONE LIST, and the fault that argument exists to prevent is a
+ * capability reaching one of them. It is invisible from either side: the phone
+ * shape is `md:hidden` and the table is `hidden md:block`, so a screenshot at
+ * any width shows one of them looking perfectly correct. Every screen that ever
+ * hand-rolled row actions put them in the `aside` and forgot the columns.
  *
- * ⚠️ AND NEITHER HALF NEEDED A BROWSER TO FIND. Every fault this control has ever
- * had has been in the DECISION rather than in the markup, which is why the
- * decision is `sift` and lives outside the component. Nothing here mounts
- * anything.
+ * ⚠️ THIS FILE IS THE PHONE HALF, AND THE TABLE IS A BROWSER'S. The table is
+ * behind `React.lazy` — its weight stays out of the entry chunk — so a static
+ * render contains the list and the table's SKELETON, and nothing a string can
+ * be asked about. `picking.seen.test.tsx` is the other half, at a desk width,
+ * where the chunk has arrived.
+ *
+ * ⚠️ AND THE COUNTS ARE THE POINT RATHER THAN THE PRESENCE. One occurrence would
+ * pass on a component that renders the actions for the first row and drops them
+ * from the rest, which is exactly what a misplaced `.map` produces.
  */
 
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { MOST_BYTES } from "@engine/kernel";
-import { saysKind, shrunk, sift, takes } from "../src/parts/pick-file.js";
+import { Listing } from "../src/index.js";
 
-const MB = 1024 * 1024;
+interface Row { readonly id: string; readonly name: string }
 
-/** ⚠️ A real `File`, because `type` and `size` are what is being judged. */
-const fileOf = (name: string, type: string, size = 8) =>
-  new File([new Uint8Array(size)], name, { type });
+const ROWS: readonly Row[] = [
+  { id: "a", name: "Priya Raman" },
+  { id: "b", name: "Tomas Novak" },
+];
 
-describe("what an accept list takes", () => {
-  /*
-    ⚠️ THE ONE THAT WAS BROKEN, AND IT IS THE COMMONEST `accept` IN THE WORLD.
-    Every camera control is written `image/*`; an exact-match test against it
-    refuses `image/jpeg`, which is every photograph.
-  */
-  it("takes a photograph when the list is a wildcard", () => {
-    expect(takes(["image/*"], "image/jpeg")).toBe(true);
-    expect(takes(["image/*"], "image/png")).toBe(true);
-    expect(takes(["image/*"], "image/heic")).toBe(true);
+const draw = (extra: Record<string, unknown>) => renderToStaticMarkup(
+  <Listing<Row>
+    label="People"
+    of={{ status: "ready", data: ROWS }}
+    rowKey={(r) => r.id}
+    asRow={(r) => ({ name: r.name })}
+    cols={[{ id: "name", label: "Name", cell: (r) => r.name }]}
+    {...extra}
+  />,
+);
+
+/** ⚠️ How many times a string appears — the count is what proves both shapes. */
+const times = (of: string, what: string): number => of.split(what).length - 1;
+
+describe("what a row can do", () => {
+  it("reaches the list and the table from one declaration", () => {
+    const html = draw({
+      acts: () => [{ id: "x", label: "Remove", onDo: () => undefined }],
+    });
+    /* ⚠️ THE TRIGGER'S OWN NAME, once per row. The `Hint` around it renders
+       nothing until somebody hovers, which is why this counts the label rather
+       than the tooltip's words. */
+    expect(times(html, 'aria-label="What can be done here"')).toBe(ROWS.length);
   });
 
-  /* ⚠️ AND STILL REFUSES ANOTHER FAMILY. A test proving only the first half
-     would pass over an `accept` that had come to take everything. */
-  it("refuses a family the wildcard does not name", () => {
-    expect(takes(["image/*"], "video/mp4")).toBe(false);
-    expect(takes(["image/*"], "application/pdf")).toBe(false);
-  });
-
-  /* ⚠️ AN EXACT LIST IS UNCHANGED — the wildcard is an addition, not a loosening.
-     A prefix test written carelessly makes `image/png` take `image/png-xyz`. */
-  it("keeps matching an exact type exactly", () => {
-    expect(takes(["image/png"], "image/png")).toBe(true);
-    expect(takes(["image/png"], "image/jpeg")).toBe(false);
-    expect(takes(["image/png", "image/jpeg"], "image/jpeg")).toBe(true);
-  });
-});
-
-describe("what the refusal calls it", () => {
-  /*
-    ⚠️ "IT HAS TO BE A *." IS THE SENTENCE THIS PINS. Split on `/` and
-    upper-cased, `image/*` names no file anybody could produce — in a control
-    whose whole argument is that the refusal is the hard part.
-  */
-  it("says a wildcard as its family", () => {
-    expect(saysKind(["image/*"])).toBe("a picture");
-    expect(saysKind(["image/*"])).not.toContain("*");
-  });
-
-  it("still names an exact type by its extension", () => {
-    expect(saysKind(["image/png"])).toBe("a PNG");
-    expect(saysKind(["image/png", "image/jpeg"])).toBe("a PNG or a JPEG");
+  it("draws nothing at all when a row has no actions", () => {
+    /* ⚠️ AN EMPTY LIST OF ACTS IS NOT AN EMPTY MENU. A trigger that opens onto
+       nothing is a control that costs a press and answers with a blank sheet —
+       and `acts` returning `[]` per row is the ordinary case for a list where
+       only some rows can be acted on. */
+    const html = draw({ acts: () => [] });
+    expect(times(html, 'aria-label="What can be done here"')).toBe(0);
   });
 });
 
-describe("how many at once", () => {
-  const shots = [
-    fileOf("front.jpg", "image/jpeg"),
-    fileOf("back.jpg", "image/jpeg"),
-    fileOf("label.jpg", "image/jpeg"),
-  ];
+describe("choosing rows", () => {
+  const picking = {
+    chosen: ["a"],
+    onChoose: () => undefined,
+    bulk: [{ id: "rm", label: "Remove", onDo: () => undefined }],
+  };
 
-  /*
-    ⚠️ SIX ADJACENT PHOTOGRAPHS ARE ONE TRIP THROUGH THE PICKER. Written for one
-    file, this made somebody fetch six adjacent files from their camera roll six
-    times — a limit nobody had decided, enforced on the person.
-  */
-  it("takes several when the caller allows several", () => {
-    const { taking, why } = sift(shots, ["image/*"], MB, 6);
-    expect(taking.map((f) => f.name)).toEqual(["front.jpg", "back.jpg", "label.jpg"]);
-    expect(why).toBeNull();
+  it("names every box after its own row", () => {
+    const html = draw(picking);
+    /* ⚠️ AFTER THE ROW, NOT AFTER ITSELF. Twelve controls all called "Choose
+       this one" is twelve identical names and no way to tell which is which —
+       and the row already knows what it is called. */
+    for (const row of ROWS) expect(html).toContain(`Choose ${row.name}`);
   });
 
-  /* ⚠️ THE CEILING IS APPLIED BEFORE THE JUDGING, so nothing past it is read. */
-  it("stops at the ceiling", () => {
-    expect(sift(shots, ["image/*"], MB, 2).taking.map((f) => f.name))
-      .toEqual(["front.jpg", "back.jpg"]);
+  it("says how many are chosen before it offers anything", () => {
+    const html = draw(picking);
+    /* ⚠️ THE COUNT, IN WORDS, AND BEFORE THE ACT IN THE DOCUMENT ORDER. A
+       destructive control beside a selection somebody scrolled away from is the
+       one thing in a list that loses data; the number is what makes it a
+       decision. */
+    expect(html).toContain("1 chosen");
+    expect(html.indexOf("1 chosen")).toBeLessThan(html.indexOf(">Remove<"));
   });
 
-  /* ⚠️ A CEILING OF NONE IS STILL ONE. `MOST − held` reaches zero the moment a
-     caller is full, and a zero that took nothing would be a picker that opens,
-     accepts a file and silently drops it. */
-  it("never falls below one", () => {
-    expect(sift(shots, ["image/*"], MB, 0).taking).toHaveLength(1);
+  it("offers nothing while nothing is chosen", () => {
+    const html = draw({ ...picking, chosen: [] });
+    expect(html).not.toContain("chosen<");
+    /* ⚠️ AND THE BOXES STAY, which is the half that is easy to get wrong. A
+       column that appears only once something is chosen is a column nobody can
+       use to choose the first thing. */
+    for (const row of ROWS) expect(html).toContain(`Choose ${row.name}`);
   });
 
-  /*
-    ⚠️ ONE BAD FILE DOES NOT THROW THE GOOD ONES AWAY, which is the shape a loop
-    that stopped at the first refusal would have: somebody who picked five
-    photographs and a video gets nothing, plus a sentence about the video, and no
-    way to tell which of the six it meant.
-  */
-  it("takes the good ones and reports the first refusal", () => {
-    const { taking, why } = sift(
-      [shots[0]!, fileOf("clip.mp4", "video/mp4"), shots[1]!], ["image/*"], MB, 6,
-    );
-    expect(taking.map((f) => f.name)).toEqual(["front.jpg", "back.jpg"]);
-    expect(why?.detail ?? "").toContain("a picture");
-  });
-
-  /* ⚠️ THE SIZE CEILING IS PER FILE AND SURVIVES THE BATCH. A multi-pick that
-     checked only the first would send a ten-megabyte photograph to a route that
-     refuses it, after the upload. */
-  it("refuses one that is too large without losing the rest", () => {
-    const { taking, why } = sift(
-      [shots[0]!, fileOf("huge.jpg", "image/jpeg", 4 * MB)], ["image/*"], MB, 6,
-    );
-    expect(taking.map((f) => f.name)).toEqual(["front.jpg"]);
-    expect(why?.title ?? "").toBeTruthy();
-  });
-});
-
-describe("a photograph on the way in", () => {
-  /*
-    ⚠️ THIS IS THE FUNCTION TWO COMMENTS ALREADY CLAIMED EXISTED. `product.see`
-    refuses a batch over eight megabytes and said "the sheet downscales before it
-    asks" — and nothing downscaled anything, so the only way under the ceiling was
-    a picker cap that refused every photograph a modern phone produces. The cap
-    was the symptom.
-  */
-  it("leaves anything that is not an image alone", async () => {
-    const bytes = new Uint8Array([1, 2, 3, 4]).buffer;
-    expect(await shrunk(bytes, "application/pdf")).toMatch(/^data:application\/pdf;base64,/);
-  });
-
-  /* ⚠️ A DECODER THAT REFUSES IS NOT A LOST PHOTOGRAPH. `createImageBitmap` is
-     absent under vitest, so this exercises the fallback the header promises —
-     which is also what a browser with no HEIC support does. */
-  it("falls back to the original bytes when it cannot decode", async () => {
-    const bytes = new Uint8Array([0xff, 0xd8, 0xff, 0xe0]).buffer;
-    const out = await shrunk(bytes, "image/jpeg");
-    expect(out).toMatch(/^data:image\/jpeg;base64,/);
-  });
-
-  /*
-    ⚠️ AND THE CEILING THE PICKER USES IS THE TRANSPORT'S OWN. Two copies of that
-    number is one number that drifts, and the direction matters: a picker whose
-    ceiling is HIGHER than the door's lets an upload run to completion and fail,
-    on the connection least able to afford it.
-  */
-  it("takes a photograph the size a phone actually produces", () => {
-    const phone = fileOf("IMG_4021.jpg", "image/jpeg", 6 * MB);
-    expect(sift([phone], ["image/*"], MOST_BYTES, 6).taking).toHaveLength(1);
-    /* ⚠️ The old ceiling, and what it did to that same photograph. */
-    expect(sift([phone], ["image/*"], 2 * MB, 6).taking).toHaveLength(0);
+  it("draws no boxes at all unless all three props are given", () => {
+    /* ⚠️ CHOOSING WITH NOTHING TO DO ABOUT IT IS A COLUMN OF BOXES THAT DOES
+       NOTHING — see `ListingProps`. The partial call is the one somebody writes
+       while wiring it up, and it must render the list it had before. */
+    expect(draw({ chosen: ["a"] })).not.toContain("Choose Priya");
+    expect(draw({ chosen: ["a"], onChoose: () => undefined })).not.toContain("Choose Priya");
   });
 });

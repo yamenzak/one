@@ -3238,7 +3238,34 @@ and the foot slot for nothing; and `Filters` wanted a pressable `Chip`, which is
 24px, against a 44px floor a browser sweep enforces. A chip is what a value
 WEARS; a control is what a person HITS.
 
+**A list and a table are two renderings of one list, so what a row can DO is
+stated once.** `Listing` grew `acts` (a menu at the end of the row, and the last
+column on a desk) and `chosen`/`onChoose`/`bulk` (a box per row, and `Chosen`
+above them). The fault this closes is invisible from either side: the list is
+`md:hidden` and the table is `hidden md:block`, so a screenshot at any width
+shows one of them looking perfectly correct — and every screen that hand-rolled
+row actions put them in the `aside` and forgot the columns.
+
+**Three things about the selection are decisions rather than defaults.** The
+chosen ids are the SCREEN's, because a list holding its own keeps somebody
+chosen after a filter removed them and the act then runs over a row nobody can
+see. There is no "choose all", because a header checkbox chooses the rows on
+*this page* — which is not what anybody reads it as, and the honest version is
+the one that loses data. And `Chosen` sits in the flow above the rows rather
+than pinned to the foot, where the island already stands with the screen's one
+action: what makes that work is that a listing PAGES, so the bar is never more
+than a page of rows away.
+
+**A rail is a carousel on a phone and was nothing on a desk.** Swiping is the
+whole interaction and a desk has no swipe — a mouse user could not reach the
+second card at all. The steppers are `md:` and up; the dots are everywhere,
+because what a thumb needs is not a button but to know there is more and how
+much. The position is read off `scrollLeft` rather than held beside it: a rail
+with its own `at` disagrees with itself the moment somebody swipes.
+
 **Therefore never:** a filter row, a facepile, a byte size, a rating, a
-before-and-after or a standing message written inside a screen. If the shape is
-genuinely new, it is a component in `@engine/design` with its own entry here —
-not a private copy in the one screen that needed it first.
+before-and-after or a standing message written inside a screen; a row capability
+declared per shape; a selection a list remembers for itself; or a rail with
+paging controls a mouse cannot use. If the shape is genuinely new, it is a
+component in `@engine/design` with its own entry here — not a private copy in
+the one screen that needed it first.

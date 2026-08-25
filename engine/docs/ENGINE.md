@@ -925,6 +925,8 @@ its own header, cited by other files, and doing nothing.
 | `a-checklist-is-ticked-by-what-happened` | D12 | three unticked steps for ever, shown to a workspace that finished all three last week — and a screen ticking them instead would leave them undone for anybody who did the same thing from the API or from a second screen |
 | `a-congratulation-is-said-once` | D12 | recognition repeated on every load, which is not recognition but furniture — and then the one that matters is not read either |
 | `a-step-only-the-clock-can-complete-is-refused` | D12 | a checklist item nobody can take, passing composition because a nightly sweep does raise the event — the tally counts what people did, so the step sits unticked with nothing anywhere saying why |
+| `a-row-capability-reaches-both-shapes` | D90 | row actions in the phone list and not in the table, or a choosing column on the desk and no box on a phone - the list is `md:hidden` and the table is `hidden md:block`, so a screenshot at any width shows one of them looking perfectly correct |
+| `a-chosen-row-is-counted-before-anything-is-offered` | D90 | `Delete` beside a selection somebody scrolled away from, which is the one control in a list that loses data - and a choosing box named `Choose this one` twelve times over, where the row already knows what it is called |
 | `a-screen-does-not-rebuild-a-block-the-library-ships` | D90 | three filter rows at three heights with `All` meaning no-filter on one screen and a real value on the next, two byte formatters that each say `0KB` for a small file, and a facepile whose overlap is a number somebody typed - every one of which passes the restyle check, the contrast floor and the token rules, because the copy is made of the same primitives |
 | `the-vocabulary-rule-names-components-that-exist` | D90 | a rule pointing at a component a rename retired, which is a rule nobody can obey and which reports nothing forever |
 | `every-size-is-a-rung-of-one-ladder` | D89 | ten hand-picked sizes in six mechanisms, each defensible where it was written and none in a relationship with any other - a product where nothing is broken, everything is slightly out of step, and no reviewer can name the fault |
@@ -1131,7 +1133,7 @@ its own header, cited by other files, and doing nothing.
 | D87 | Two data marks the vocabulary was missing: a position, and a texture | 0 |
 | D88 | Magnitude carries the brand, identity never does | 0 |
 | D89 | One ladder, and a rung has to reach the page | 5 |
-| D90 | A screen composes the vocabulary; it does not re-derive it | 2 |
+| D90 | A screen composes the vocabulary; it does not re-derive it | 4 |
 <!-- /generated -->
 
 ---

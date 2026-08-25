@@ -44,6 +44,10 @@ export function People({ title, of, again, onInvite, onOpen }: {
   const [email, setEmail] = React.useState("");
   const [role, setRole] = React.useState<string | null>("writer");
   const [told, setTold] = React.useState(true);
+  /* ⚠️ THE CHOSEN IDS ARE THE SCREEN'S, NOT THE LIST'S — see `ListingProps`. A
+     list that held its own would keep somebody chosen after a filter removed
+     them, and the act would then run over a row nobody can see. */
+  const [chosen, setChosen] = React.useState<readonly string[]>([]);
 
   return (
     <>
@@ -83,6 +87,20 @@ export function People({ title, of, again, onInvite, onOpen }: {
             rowKey={(p) => p.id}
             onOpen={(p) => { setOpen(p); onOpen(p); }}
             says={{ icon: glyphOf("people"), nothing: "Nobody here yet" }}
+            /* ⚠️ ONE DEFINITION, BOTH SHAPES — a menu at the end of the row on a
+               phone and the last column on a desk. Written per shape they drift,
+               and neither side can see the other. */
+            acts={(p) => [
+              { id: "resend", label: "Send the invitation again", onDo: () => undefined },
+              { id: "role", label: "Change what they can do", onDo: () => { setOpen(p); } },
+              { id: "remove", label: "Remove from the workspace", tone: "danger", onDo: () => undefined },
+            ]}
+            chosen={chosen}
+            onChoose={setChosen}
+            bulk={[
+              { id: "reader", label: "Make readers", onDo: () => { setChosen([]); } },
+              { id: "remove", label: "Remove", tone: "danger", onDo: () => { setChosen([]); } },
+            ]}
             asRow={(p) => ({
               name: p.name,
               face: p.pending ? undefined : whoFace(p.id),

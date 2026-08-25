@@ -112,7 +112,7 @@ export function Notes({ title, of, again, density = "comfortable", onNew, onOpen
             {pinned.length ? (
               <Stack space="snug">
                 <SectionTitle>Pinned</SectionTitle>
-                <Rail space="snug">
+                <Rail space="snug" label="pinned note">
                   {pinned.map((n) => (
                     <Place
                       key={n.id}

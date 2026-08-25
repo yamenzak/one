@@ -39,15 +39,19 @@
  */
 
 import * as React from "react";
-import { Pagination } from "@heroui/react";
+import { Button, Checkbox, Pagination } from "@heroui/react";
+import { MoreHorizontal } from "lucide-react";
 import { Await, Nothing, TableWaiting, type Loaded } from "./state.js";
 import type { ListingTableProps } from "./listing-table.js";
 import type { FaceOf } from "./face.js";
 import { Group, PersonRow } from "./surfaces.js";
 import { TextInput } from "./forms.js";
 import { glyphOf } from "../frame/shell.js";
+import { Menu, type MenuItem } from "../frame/overlay.js";
 import { SPACE } from "../tokens/metrics.js";
 import { TYPE } from "../tokens/type.js";
+import { Tally } from "./tally.js";
+import { Hint } from "./beside.js";
 
 /**
  * ⚠️ THE GRID ARRIVES WHEN ONE IS DRAWN — see `listing-table.tsx`. Naming
@@ -120,10 +124,137 @@ export interface ListingProps<T> {
     /** What somebody is looking for here. Two or three words. */
     readonly label?: string;
   };
+  /**
+   * WHAT CAN BE DONE TO ONE ROW, IN A MENU AT THE END OF IT.
+   *
+   * ⚠️ ONE DEFINITION FOR BOTH SHAPES, WHICH IS THE WHOLE ARGUMENT FOR THIS
+   * COMPONENT. Every screen that wanted row actions put a `Menu` in its `aside`
+   * on the phone and forgot it in `cols` on the desk — or the other way — and
+   * the fault is invisible from either side. A list and a table are two
+   * renderings of one list, so what a row can DO is stated once.
+   *
+   * ⚠️ AND IT IS A MENU RATHER THAN BUTTONS. Two trailing controls on a row is
+   * a row with three press targets on a phone, one of which is the row itself
+   * — measured at 390, the row's own tap area drops to a third of its width.
+   * The exception a caller wants is "one very common act", and that is what
+   * `aside` on `asRow` is for.
+   *
+   * ⚠️ ABSENT MEANS NO ACTIONS AT ALL. A menu that opens onto one item is a
+   * control that costs two presses to do what a button does in one.
+   */
+  readonly acts?: (row: T) => readonly MenuItem[];
+  /**
+   * ROWS SOMEBODY HAS CHOSEN, AND WHAT TO DO WITH THEM — see `Chosen`.
+   *
+   * ⚠️ CHOOSING IS STATE THE SCREEN OWNS, NOT THE LIST. A list that remembers
+   * its own selection is a list whose selection survives a filter that removed
+   * the rows — so an act runs over ids nobody can see, which is the one bug in
+   * this whole shape that loses data. Passing it in makes clearing it on a
+   * narrowing the screen's decision, where the narrowing lives.
+   *
+   * ⚠️ AND ALL THREE OR NONE. Choosing with nothing to do about it is a column
+   * of boxes that does nothing.
+   */
+  readonly chosen?: readonly string[];
+  readonly onChoose?: (ids: readonly string[]) => void;
+  readonly bulk?: readonly {
+    readonly id: string;
+    readonly label: string;
+    readonly tone?: "danger";
+    readonly onDo: (ids: readonly string[]) => void;
+  }[];
+}
+
+/* ------------------------------------------------------------------ acts --- */
+
+/**
+ * ⚠️ THE ROW'S OWN END, WITH ITS ACTIONS ADDED TO WHATEVER IS ALREADY THERE.
+ * A state chip and a way to act are two different facts; swapping one for the
+ * other is how adding actions comes to silently drop the state.
+ */
+function sayActs<T>(
+  row: T,
+  acts: ((row: T) => readonly MenuItem[]) | undefined,
+  already: React.ReactNode,
+): React.ReactNode {
+  const items = acts?.(row) ?? [];
+  if (!items.length) return already;
+  const menu = (
+    <Menu
+      trigger={
+        /* ⚠️ NAMED AND HINTED, BECAUSE THREE DOTS ARE NOT A WORD. A row of
+           unlabelled triggers reads as "button, button, button" to anybody
+           listening and as a decoration to anybody hovering — the label is for
+           the first and the hint is for the second, and D7 refuses an icon-only
+           control that has neither. */
+        <Hint says="What can be done here">
+          <Button variant="tertiary" size="sm" isIconOnly aria-label="What can be done here">
+            <MoreHorizontal />
+          </Button>
+        </Hint>
+      }
+      items={items}
+    />
+  );
+  if (!already) return menu;
+  return <span className={`flex items-center ${SPACE.tight}`}>{already}{menu}</span>;
+}
+
+/* -------------------------------------------------------------- choosing --- */
+
+/**
+ * WHAT IS CHOSEN, AND WHAT CAN BE DONE WITH IT.
+ *
+ * ⚠️ IN THE FLOW, DIRECTLY ABOVE THE ROWS, AND NOT PINNED TO ANYTHING. The
+ * obvious shape is a bar floating at the foot of the screen — and the foot is
+ * where the island already stands with the screen's one action on it, so a
+ * second floating bar is two things competing for the same edge (`chrome`
+ * refuses the pin outright, for that reason). What makes the in-flow version
+ * work here is that a listing PAGES: the bar is never more than `pageSize` rows
+ * away from whatever somebody just ticked.
+ *
+ * ⚠️ AND IT SAYS THE COUNT BEFORE IT OFFERS ANYTHING. "Delete" beside a
+ * selection somebody has scrolled away from is the one control in a list that
+ * can lose data — the number is what makes it a decision rather than a reflex.
+ */
+function Chosen({ count, acts, onClear }: {
+  readonly count: number;
+  readonly acts: readonly {
+    readonly id: string; readonly label: string;
+    readonly tone?: "danger"; readonly onDo: () => void;
+  }[];
+  readonly onClear: () => void;
+}) {
+  return (
+    <div
+      role="group"
+      aria-label="What is chosen"
+      className={`flex flex-wrap items-center ${SPACE.tight}`}
+    >
+      <span className={TYPE.label}>
+        <Tally value={count} format={(n) => `${n} chosen`} count />
+      </span>
+      {acts.map((a) => (
+        <Button
+          key={a.id}
+          size="sm"
+          variant="secondary"
+          {...(a.tone === "danger" ? { "data-ink": "danger" } : {})}
+          onPress={a.onDo}
+        >
+          {a.label}
+        </Button>
+      ))}
+      <Button size="sm" variant="tertiary" onPress={onClear}>Clear</Button>
+    </div>
+  );
 }
 
 export function Listing<T>(
-  { of, cols, rowKey, onOpen, pageSize = 10, says, again, label, asRow, find }: ListingProps<T>,
+  {
+    of, cols, rowKey, onOpen, pageSize = 10, says, again, label, asRow, find,
+    acts, chosen, onChoose, bulk,
+  }: ListingProps<T>,
 ) {
   const [order, setOrder] = React.useState<{ readonly id: string; readonly up: boolean } | null>(null);
   const [page, setPage] = React.useState(1);
@@ -156,6 +287,62 @@ export function Listing<T>(
         const sorted = sorter
           ? [...found].sort((a, b) => (order?.up ? sorter(a, b) : sorter(b, a)))
           : found;
+        /*
+          ⚠️ CHOOSING IS A COLUMN ON A DESK AND A TRAILING BOX ON A PHONE, and
+          both come from one prop. A leading checkbox on a phone eats the mark
+          column — the face or the glyph that is how somebody finds the row — so
+          the box goes where the row's other controls are; on a desk the column
+          is the convention and there is room for it.
+
+          ⚠️ AND THERE IS NO "CHOOSE ALL". A header checkbox chooses the rows on
+          THIS page, which is not what anybody reads it as, and the shape that
+          would be honest — choosing rows a filter is hiding — is the one that
+          loses data. `Chosen` says the count instead.
+        */
+        const picking = chosen !== undefined && onChoose !== undefined && bulk !== undefined;
+        const ticked = new Set(chosen ?? []);
+        const tick = (id: string) => {
+          onChoose?.(ticked.has(id) ? (chosen ?? []).filter((c) => c !== id) : [...(chosen ?? []), id]);
+        };
+        /*
+          ⚠️ THE BOX IS NAMED AFTER THE ROW, NOT AFTER ITSELF. "Choose this one"
+          is what every one of them says, so a page of them is a page of
+          identically-named controls and the one fact somebody listening needs —
+          WHICH one — is the one the name leaves out. The row already knows.
+
+          ⚠️ AND THE NAME IS A CHILD RATHER THAN AN `aria-label`. Written as the
+          attribute it reached the markup nowhere: HeroUI's `Checkbox` is the
+          react-aria anatomy, and a bare `<Checkbox aria-label>` with no
+          `Content` renders a plate with no control and no accessible name at
+          all. Found by reading the rendered string, which is what
+          `picking.test.tsx` does.
+        */
+        const named = (row: T) => asRow?.(row).name ?? rowKey(row);
+        const box = (row: T) => (
+          <Checkbox
+            isSelected={ticked.has(rowKey(row))}
+            onChange={() => { tick(rowKey(row)); }}
+          >
+            <Checkbox.Content>
+              <Checkbox.Control><Checkbox.Indicator /></Checkbox.Control>
+              <span className="sr-only">Choose {named(row)}</span>
+            </Checkbox.Content>
+          </Checkbox>
+        );
+        /* ⚠️ AND THE ACTS ARE THE LAST COLUMN, unnamed — a heading over a column
+           of identical triggers is a word repeated once per row for a column
+           whose contents say what they are. */
+        const columns: readonly Col<T>[] = [
+          ...(picking ? [{ id: "__chosen", label: "Chosen", cell: box } as Col<T>] : []),
+          ...cols,
+          ...(acts ? [{
+            id: "__acts",
+            label: "",
+            numeric: true,
+            cell: (row: T) => sayActs(row, acts, null),
+          } as Col<T>] : []),
+        ];
+
         const pages = Math.max(1, Math.ceil(sorted.length / pageSize));
         const at = Math.min(page, pages);
         const shown = sorted.slice((at - 1) * pageSize, at * pageSize);
@@ -167,7 +354,7 @@ export function Listing<T>(
              own edge and the whole screen scrolled sideways, while the
              `ScrollContainer` that exists to prevent exactly that sat there
              with nothing to do. */
-          <div className={`flex min-w-0 flex-col ${finding ? SPACE.snug : ""}`}>
+          <div className={`flex min-w-0 flex-col ${finding || picking ? SPACE.snug : ""}`}>
             {finding ? (
               <TextInput
                 label={finding.label ?? "Find one"}
@@ -183,6 +370,19 @@ export function Listing<T>(
               table that visibly becomes a list every time somebody opens the
               screen — and it is wrong in every server-rendered test.
             */}
+            {picking && (chosen ?? []).length ? (
+              <Chosen
+                count={(chosen ?? []).length}
+                acts={(bulk ?? []).map((b) => ({
+                  id: b.id,
+                  label: b.label,
+                  ...(b.tone ? { tone: b.tone } : {}),
+                  onDo: () => { b.onDo(chosen ?? []); },
+                }))}
+                onClear={() => { onChoose?.([]); }}
+              />
+            ) : null}
+
             {asRow ? (
               <div className="md:hidden">
                 <Group>
@@ -194,7 +394,18 @@ export function Listing<T>(
                         goes={onOpen !== undefined}
                         name={it.name}
                         under={it.under}
-                        aside={it.aside}
+                        /* ⚠️ THE MENU JOINS WHATEVER THE ROW ALREADY PUTS AT ITS
+                           END rather than replacing it: a state chip and a way
+                           to act on the row are two different facts, and a
+                           component that swapped one for the other would make
+                           adding actions silently drop the state. */
+                        aside={sayActs(
+                          row,
+                          acts,
+                          picking
+                            ? <span className={`flex items-center ${SPACE.tight}`}>{it.aside}{box(row)}</span>
+                            : it.aside,
+                        )}
                         face={it.face}
                         onOpen={() => onOpen?.(row)}
                       />
@@ -209,11 +420,11 @@ export function Listing<T>(
                   wait for the chunk and the wait for the rows look like one
                   wait rather than two different faults. */}
               <React.Suspense
-                fallback={<TableWaiting cols={cols.length} rows={Math.min(pageSize, 6)} />}
+                fallback={<TableWaiting cols={columns.length} rows={Math.min(pageSize, 6)} />}
               >
                 <Grid
                   rows={shown}
-                  cols={cols}
+                  cols={columns}
                   rowKey={rowKey}
                   label={label}
                   onOpen={onOpen}

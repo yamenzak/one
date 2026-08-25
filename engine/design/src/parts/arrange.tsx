@@ -12,6 +12,9 @@
  */
 
 import * as React from "react";
+import { Button } from "@heroui/react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Hint } from "./beside.js";
 import {
   BAND_PAD, BLEED_PULL, GUTTER, SCROLL_GUTTER, SPACE,
 } from "../tokens/metrics.js";
@@ -150,19 +153,111 @@ const WIDE = {
 
 export type Wide = keyof typeof WIDE;
 
-export function Rail({ space = "snug", wide = "card", children }: {
+/**
+ * ⚠️ A RAIL IS A CAROUSEL ON A PHONE AND WAS NOTHING ON A DESK. Swiping is the
+ * whole interaction, and a desk has no swipe: a trackpad user can scroll a rail
+ * sideways and a mouse user cannot reach the second card at all. Nothing
+ * reported it, because the rail is correct — it is the input that is missing.
+ *
+ * ⚠️ SO THE STEPPERS ARE `md:` AND UP, AND THE DOTS ARE EVERYWHERE. On a phone a
+ * chevron is a 44px target stealing width from the cards it pages; what a thumb
+ * needs is not a button, it is to know there is more and how much — which is
+ * what the dots say and the peeking card only hints at.
+ *
+ * ⚠️ AND THE POSITION IS READ FROM THE SCROLLER, NEVER HELD BESIDE IT. A rail
+ * with its own `at` state is a rail whose dots disagree with it the moment
+ * somebody swipes, which is every time. `scrollLeft` is the truth; the state
+ * here is a cache of it, updated by the event that changes it.
+ */
+export function Rail({ space = "snug", wide = "card", label, children }: {
   readonly space?: Space;
   readonly wide?: Wide;
+  /**
+   * ⚠️ WHAT THE RAIL IS, AND WITHOUT IT THERE ARE NO CONTROLS. A stepper named
+   * "Next" on a page with three rails is three identical buttons; named "Next
+   * pinned note" it is one control somebody can find. Absent is the old
+   * behaviour exactly — a bare scroller — which is right where a rail holds
+   * three swatches nobody pages through.
+   */
+  readonly label?: string;
   readonly children: React.ReactNode;
 }) {
-  return (
+  const at = React.useRef<HTMLDivElement>(null);
+  const [seen, setSeen] = React.useState({ left: 0, width: 1, all: 1 });
+  const read = React.useCallback(() => {
+    const el = at.current;
+    if (el) setSeen({ left: el.scrollLeft, width: el.clientWidth, all: el.scrollWidth });
+  }, []);
+  /* ⚠️ ONCE ON MOUNT, because the first paint is the one state nothing has
+     scrolled — and a rail whose dots appear only after the first swipe is a rail
+     that looks broken until somebody uses it. */
+  React.useEffect(read, [read]);
+
+  const pages = Math.max(1, Math.round(seen.all / Math.max(1, seen.width)));
+  const page = Math.min(pages - 1, Math.round(seen.left / Math.max(1, seen.width)));
+  const step = (by: number) => {
+    at.current?.scrollBy({ left: by * seen.width, behavior: "smooth" });
+  };
+
+  const scroller = (
     <div
+      ref={at}
+      onScroll={read}
       className={`${BLEED_PULL} flex snap-x snap-mandatory overflow-x-auto scrollbar-none
         ${GUTTER} ${SCROLL_GUTTER} ${SPACE[space]}`}
     >
       {React.Children.map(children, (child) => (
         <div className={`${WIDE[wide]} shrink-0 snap-start`}>{child}</div>
       ))}
+    </div>
+  );
+
+  if (!label || pages < 2) return scroller;
+
+  return (
+    <div className={`flex flex-col ${SPACE.tight}`}>
+      {scroller}
+      {/* ⚠️ UNDER THE RAIL RATHER THAN OVER IT. Controls laid on top of the cards
+          cover the picture on the one card somebody is looking at, and on a
+          phone they land where a thumb swipes. */}
+      <div className={`flex items-center justify-between ${SPACE.tight}`}>
+        <span role="img" aria-label={`${label}: ${page + 1} of ${pages}`} className="flex items-center gap-1.5">
+          {Array.from({ length: pages }, (_, i) => (
+            <span
+              key={i}
+              aria-hidden="true"
+              data-here={i === page ? "true" : undefined}
+              className="block size-1.5 rounded-full bg-current opacity-30 data-[here=true]:opacity-100"
+            />
+          ))}
+        </span>
+        <span className="hidden items-center gap-1 md:flex">
+          <Hint says={`Previous ${label}`}>
+            <Button
+              variant="tertiary"
+              size="sm"
+              isIconOnly
+              aria-label={`Previous ${label}`}
+              isDisabled={page === 0}
+              onPress={() => { step(-1); }}
+            >
+              <ChevronLeft />
+            </Button>
+          </Hint>
+          <Hint says={`Next ${label}`}>
+            <Button
+              variant="tertiary"
+              size="sm"
+              isIconOnly
+              aria-label={`Next ${label}`}
+              isDisabled={page >= pages - 1}
+              onPress={() => { step(1); }}
+            >
+              <ChevronRight />
+            </Button>
+          </Hint>
+        </span>
+      </div>
     </div>
   );
 }

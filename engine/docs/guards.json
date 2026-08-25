@@ -2929,6 +2929,25 @@
       "fails": "a checklist item nobody can take, passing composition because a nightly sweep does raise the event — the tally counts what people did, so the step sits unticked with nothing anywhere saying why"
     },
     {
+      "id": "a-row-capability-reaches-both-shapes",
+      "protects": "D90",
+      "stage": "88",
+      "status": "live",
+      "impl": "design/test/picking.seen.test.tsx",
+      "lane": "seen",
+      "proves": "one declaration, both shapes",
+      "fails": "row actions in the phone list and not in the table, or a choosing column on the desk and no box on a phone - the list is `md:hidden` and the table is `hidden md:block`, so a screenshot at any width shows one of them looking perfectly correct"
+    },
+    {
+      "id": "a-chosen-row-is-counted-before-anything-is-offered",
+      "protects": "D90",
+      "stage": "88",
+      "status": "live",
+      "impl": "design/test/picking.test.tsx",
+      "proves": "says how many are chosen before it offers anything",
+      "fails": "`Delete` beside a selection somebody scrolled away from, which is the one control in a list that loses data - and a choosing box named `Choose this one` twelve times over, where the row already knows what it is called"
+    },
+    {
       "id": "a-screen-does-not-rebuild-a-block-the-library-ships",
       "protects": "D90",
       "stage": "88",
