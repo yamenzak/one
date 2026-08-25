@@ -153,3 +153,19 @@ export const SEPARATOR = "var(--surface)";
  */
 export const emphasis = (isSubject: boolean): string =>
   (isSubject ? DATA : QUIET);
+
+/**
+ * ⚠️ ONE SERIES IS MAGNITUDE, NOT IDENTITY, AND THE SLOT PALETTE IS FOR IDENTITY.
+ * A categorical hue answers "which of these is which" — a question a plot with
+ * one line on it does not ask. Handing that line slot 1 anyway paints every
+ * single-series chart in the product the FIRST fixed hue, which is a colour
+ * chosen for its distance from seven others rather than for anything about the
+ * page it is on: measured on the reports screen, a lone trend and a lone ranked
+ * bar both came out in a hue the rest of the interface does not contain.
+ *
+ * ⚠️ AND THE LEGEND CANNOT DISAGREE, because there is never one below a single
+ * series (`Legend`). A rule that has to be mirrored in two places is a rule that
+ * gets mirrored in one of them.
+ */
+export const seriesOf = (slot: number, count: number, dark: boolean): string =>
+  (count === 1 ? DATA : seriesColour(slot, dark));

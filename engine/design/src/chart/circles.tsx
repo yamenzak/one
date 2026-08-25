@@ -35,7 +35,7 @@
 import * as React from "react";
 import { CHART_TYPE, TYPE } from "../tokens/type.js";
 import { SPACE } from "../tokens/metrics.js";
-import { GRID, QUIET, assign, seriesColour } from "./palette.js";
+import { GRID, QUIET, assign, seriesOf } from "./palette.js";
 import { arcPath, arcs, compact, polar } from "./scale.js";
 import { useFigures } from "../parts/said.js";
 
@@ -331,7 +331,7 @@ export function Rings({ items, describes }: {
               <path
                 {...draw}
                 d={arcPath(MID, MID, r, 0, t)}
-                fill="none" stroke={seriesColour(i, dark)}
+                fill="none" stroke={seriesOf(i, shown.length, dark)}
                 strokeWidth={THICK} strokeLinecap="round"
               />
             </g>
@@ -345,7 +345,7 @@ export function Rings({ items, describes }: {
               <span
                 aria-hidden="true"
                 className="inline-flex size-2 shrink-0 rounded-full"
-                style={{ background: seriesColour(i, dark) }}
+                style={{ background: seriesOf(i, shown.length, dark) }}
               />
               <span className="grow">{item.label}</span>
               <span className="tabular-nums">

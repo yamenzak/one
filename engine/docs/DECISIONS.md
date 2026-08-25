@@ -3075,3 +3075,43 @@ scale to put it on and is the whole failure mode of a gauge; a knob that can be
 dragged, which is a control and needs a `slider` role, a step and a commit; and a
 hatch fading toward `transparent`, which is transparent BLACK and puts a grey
 haze over the ruled part of a light card.
+
+---
+
+## D88 — Magnitude carries the brand, identity never does
+
+**A single series is magnitude, and magnitude is `--data`, and `--data` is the
+workspace's own colour.**
+
+`palette.ts` has always said this: identity is the platform's and magnitude is
+the brand's. The categorical eight are eight fixed hues in a fixed order,
+validated to stay separable under protanopia and deuteranopia — a workspace that
+recoloured them would be a workspace whose charts a colourblind reader cannot
+use, and nothing would report it. Magnitude has no such requirement, because
+there is nothing to tell apart.
+
+**It stopped being true when the accent went monochrome.** `--data` was
+`--accent`, and a grey magnitude ramp and a grey de-emphasis are the same
+language on one plot — so it was cut loose to a fixed hue and left there.
+`--brand` is where the accent's colour went; this is where the data belongs.
+
+**And a lone series was still asking the identity question.** A plot with one
+line on it does not ask "which of these is which", but it was handed slot 1
+anyway — so every single-series chart in the product was painted the first fixed
+hue: a colour chosen for its distance from seven others rather than for anything
+about the page it is on. Measured on the reports screen, a lone trend and a lone
+ranked bar both came out in a hue the rest of the interface does not contain.
+`seriesOf` is the rule, and the legend cannot disagree with it because there is
+never a legend below one series.
+
+**The brand is somebody else's choice, so the contrast is not left to it.** Pale
+yellow on a near-white page and deep navy on a near-black one are both a chart
+line nobody can see, and neither is a state a workspace can be expected to
+notice. A fixed share of the ground's opposite end guarantees the DIRECTION of
+the contrast without hand-picking a value per theme — which is the half a
+selected pair could not do once the hue stopped being ours.
+
+**Therefore never:** a branded categorical slot; a validated palette re-picked
+for taste; a lone series in an identity colour; or a `--data` taken from
+`--brand` raw, which is a chart that disappears on some workspaces and on no
+deployment anybody tests.

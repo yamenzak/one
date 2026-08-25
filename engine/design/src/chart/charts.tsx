@@ -27,6 +27,7 @@ import { SPACE } from "../tokens/metrics.js";
 import { MOTION } from "../tokens/motion.js";
 import {
   AXIS, DATA, GRID, QUIET, SEPARATOR, assign, emphasis, magnitude, polarity, pole, seriesColour,
+  seriesOf,
 } from "./palette.js";
 import {
   type Point, type Span, areaPath, band, barPath, barPathX, clipTo, extent, linePath, norm, place, stack, stackSpan, ticks,
@@ -218,7 +219,7 @@ export function LineChart({ describes, series, zero = false }: {
     <Frame describes={describes} y={y} under={<Legend series={series} dark={dark} emphasised={some} />}>
       {series.map((s, i) => {
         const placed = place(s.points, x, y, PLOT.w, PLOT.h);
-        const colour = some ? emphasis(!!s.subject) : seriesColour(i, dark);
+        const colour = some ? emphasis(!!s.subject) : seriesOf(i, series.length, dark);
         const last = [...placed].reverse().find(Boolean);
         return (
           <g key={s.id}>
@@ -431,7 +432,7 @@ export function StackedChart({ describes, groups, series }: {
                 d={cap
                   ? barPath(gi * step + offset, top, thick, h, 4, true)
                   : barPath(gi * step + offset, top, thick, h, 0, true)}
-                fill={seriesColour(si, dark)}
+                fill={seriesOf(si, series.length, dark)}
               />
             );
           })}
@@ -634,7 +635,7 @@ export function ScatterChart({ describes, series }: {
               {...draw}
               key={pi}
               cx={norm(p.x, x) * PLOT.w} cy={PLOT.h - norm(p.y, y) * PLOT.h}
-              r={4} fill={seriesColour(i, dark)} stroke={SEPARATOR} strokeWidth={2}
+              r={4} fill={seriesOf(i, shown.length, dark)} stroke={SEPARATOR} strokeWidth={2}
             />
           )))}
         </g>

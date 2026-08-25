@@ -523,18 +523,30 @@ function tier(mode: "light" | "dark"): string {
     */
     `--focus: ${FOCUS};`,
     /*
-      ⚠️ THE ONE HUE THE DATA IS ALLOWED TO BE WHEN IT IS NOT NAMING ANYTHING.
-      A line, an area, a meter fill, an emphasised series: marks that measure
-      rather than identify. It used to be `--accent`, which made it grey the
-      moment the interface went monochrome — and grey is already de-emphasis on
-      a chart, so "more of it" and "not the subject" would have been the same
-      language on the same plot.
+      THE ONE HUE THE DATA IS ALLOWED TO BE WHEN IT IS NOT NAMING ANYTHING —
+      a line, an area, a meter fill, an emphasised series: marks that MEASURE
+      rather than identify.
 
-      ⚠️ LIGHTER IN DARK, WHICH IS SELECTED RATHER THAN DERIVED — the same rule
-      the categorical eight follow. One hue at one lightness reads correctly in
-      exactly one theme.
+      ⚠️ IT IS THE WORKSPACE'S, AND THAT IS THE ORIGINAL INTENT RATHER THAN A NEW
+      ONE. `palette.ts` has always said magnitude carries the brand while
+      identity does not; this was `--accent` for exactly that reason, and it was
+      cut loose to a fixed hue when the accent went monochrome, because a grey
+      magnitude ramp and a grey de-emphasis are the same language on one plot.
+      `--brand` is where the accent's colour went, so this is where the data
+      belongs. The categorical eight are untouched: they are validated for CVD
+      separation, they only appear once there are two series to tell apart, and a
+      workspace recolouring THOSE would be a workspace whose charts a colourblind
+      reader cannot use.
+
+      ⚠️ AND IT IS PULLED TOWARD THE FAR END OF THE GROUND, WHICH IS WHAT THE
+      SELECTED PAIR WAS DOING. A brand is somebody else's choice: pale yellow on
+      a near-white page and deep navy on a near-black one are both a chart line
+      nobody can see, and neither is a state the workspace can be expected to
+      notice. Mixing a fixed share of the opposite end guarantees the DIRECTION of
+      the contrast without hand-picking a value per theme — which is the half a
+      selected pair could not do once the hue stopped being ours.
     */
-    `--data: ${mode === "light" ? "oklch(0.55 0.15 250)" : "oklch(0.66 0.15 250)"};`,
+    `--data: color-mix(in oklab, var(--brand) 72%, ${mode === "light" ? "black" : "white"});`,
   ].join(" ");
 }
 
