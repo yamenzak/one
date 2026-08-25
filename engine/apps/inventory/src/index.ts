@@ -5968,6 +5968,23 @@ const manifest = (): AppSpec => defineApp({
     */
     { id: "every-supplier", of: "supplier", sort: { by: "name", dir: "up" }, limit: 200,
       tally: [{ as: "products", of: "product", by: "supplier" }] },
+    /*
+      ⚠️ WHAT IS DIRECTLY INSIDE THIS ONE, AND HOW MUCH IS ON EACH — one level,
+      not a tree. The tree is how somebody GOT here; this is the list of what is
+      in front of them. `here` is what makes one declaration serve every shelf.
+    */
+    { id: "inside-here", of: "location", where: [{ field: "within", is: { here: "record" } }],
+      sort: { by: "name", dir: "up" }, limit: 200,
+      tally: [{ as: "lines", of: "stock", by: "location" }] },
+    /* ⚠️ THE LINES ON THIS SHELF, WITH WHAT EACH ONE IS. Without the hop every
+       row would be a product id, which is the fault `keys` is about. */
+    { id: "stock-here", of: "stock", where: [{ field: "location", is: { here: "record" } }],
+      limit: 200 },
+    /* ⚠️ THE RUNS, AND HOW MUCH IS IN EACH — the count the hand-written screen
+       fetched a whole collection to build in a `Map`. */
+    { id: "every-run", of: "process", sort: { by: "started", dir: "down" }, limit: 100,
+      tally: [{ as: "items", of: "process-item", by: "process" }] },
+    { id: "every-job", of: "job", sort: { by: "opened", dir: "down" }, limit: 100 },
   ],
 
   /*
@@ -6116,7 +6133,53 @@ const manifest = (): AppSpec => defineApp({
       they are gated at all because a detail screen is reachable by typing.
     */
     { id: "work", route: "/work", label: "Work", nav: "primary", icon: "list",
-      permission: "process:read", features: ["processes", "jobs"] },
+      permission: "process:read", features: ["processes", "jobs"],
+      /*
+        ⚠️ THE ITEM COUNT PER RUN IS WHY THIS SCREEN IS WORTH OPENING, and it was
+        a `Map` built from every process-item in the workspace, fetched to the
+        phone to be counted there. It is one grouped statement now.
+      */
+      body: {
+        shape: "list",
+        layout: { as: "stack" },
+        blocks: [
+          {
+            group: "Runs",
+            of: [{
+              block: "Listing",
+              shows: [
+                { field: "kind", label: "What kind" },
+                { field: "state", label: "How it is going" },
+                { field: "items", label: "Items" },
+              ],
+              nothing: { says: "No runs yet", under: "Start one and it appears here" },
+              goes: "run",
+              does: ["process.open"],
+              bind: {
+                label: { from: { of: "words", says: "Runs" } },
+                of: { from: { of: "view", view: "every-run" } },
+              },
+            }],
+          },
+          {
+            group: "Jobs",
+            of: [{
+              block: "Listing",
+              shows: [
+                { field: "ref", label: "Reference" },
+                { field: "label", label: "What it is about" },
+                { field: "state", label: "How it is going" },
+              ],
+              nothing: { says: "No jobs open", under: "Raise one and it appears here" },
+              goes: "case",
+              bind: {
+                label: { from: { of: "words", says: "Jobs" } },
+                of: { from: { of: "view", view: "every-job" } },
+              },
+            }],
+          },
+        ],
+      } },
     { id: "run", route: "/run", label: "A run", nav: "none", icon: "check",
       permission: "process:read", features: ["processes"] },
     { id: "case", route: "/case", label: "A job", nav: "none", icon: "note",
@@ -6124,7 +6187,60 @@ const manifest = (): AppSpec => defineApp({
     /* ⚠️ `etch` — ruled geometry, which is what a shelf is. Seeded on the
        location, so every shelf in the workspace has a ground of its own. */
     { id: "location", route: "/where", label: "A location", nav: "none", icon: "pin",
-      permission: "location:read", sky: "etch" },
+      permission: "location:read", sky: "etch", of: "location",
+      /*
+        ⚠️ TWO LISTS AND A COPYABLE CODE, and the code is copyable because
+        somebody types it into a label printer — one they have to read off a
+        screen and retype is one that will be wrong once.
+      */
+      body: {
+        shape: "detail",
+        layout: { as: "stack" },
+        blocks: [
+          {
+            block: "CopyRow",
+            when: { has: { of: "field", field: "code" } },
+            bind: {
+              label: { from: { of: "words", says: "Code" } },
+              value: { from: { of: "field", field: "code" } },
+            },
+          },
+          {
+            group: "Inside",
+            of: [{
+              block: "Listing",
+              shows: [
+                { field: "name", label: "Where" },
+                { field: "kind", label: "What it is" },
+                { field: "lines", label: "Lines" },
+              ],
+              nothing: { says: "Nothing inside it", under: "Add a shelf and it appears here" },
+              goes: "location",
+              bind: {
+                label: { from: { of: "words", says: "Inside" } },
+                of: { from: { of: "view", view: "inside-here" } },
+              },
+            }],
+          },
+          {
+            group: "On it",
+            of: [{
+              block: "Listing",
+              shows: [
+                { field: "product.name", label: "Product" },
+                { field: "quantity", label: "How many" },
+                { field: "product.unit", label: "Unit" },
+              ],
+              nothing: { says: "Nothing here yet", under: "Put something on it and it appears here" },
+              goes: "product",
+              bind: {
+                label: { from: { of: "words", says: "On it" } },
+                of: { from: { of: "view", view: "stock-here" } },
+              },
+            }],
+          },
+        ],
+      } },
     { id: "product", route: "/thing", label: "A product", nav: "none", icon: "box",
       permission: "product:read" },
     /* ⚠️ ONE OBJECT, AND IT IS A DESTINATION RATHER THAN A SHEET. Its history is
