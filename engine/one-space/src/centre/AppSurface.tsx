@@ -56,6 +56,18 @@ export interface AppScreen {
 
 const MOUNTS = new Map<string, React.ComponentType<AppScreen>>();
 
+/**
+ * ⚠️ BEHIND A BOUNDARY, BECAUSE THE RENDERER IS EVERY BLOCK IT CAN DRAW.
+ * `Declared` reaches `@engine/design/body`, which reaches the whole block
+ * registry — imported statically it put 14 KiB into the module the first paint
+ * blocks on, for a page that is only ever reached after somebody has opened a
+ * product. Measured, by doing it: `weight.test.ts` went over its ceiling on the
+ * commit that added the import, which is the only reason this was noticed at
+ * all.
+ */
+const Declared = React.lazy(() => import("./Declared.js")
+  .then((m) => ({ default: m.Declared })));
+
 export const mountScreen = (
   appId: string, route: string, screen: React.ComponentType<AppScreen>,
 ): void => { MOUNTS.set(`${appId}${route}`, screen); };
@@ -98,6 +110,31 @@ export function AppSurface({ app, route, onGo }: {
     (to: string) => onGo(routeIn(app.id, to)),
     [app.id, onGo],
   );
+
+  /*
+    ⚠️ A DECLARED BODY OUTRANKS A MOUNTED COMPONENT, AND THE ORDER IS WHAT MAKES
+    A PORT A DELETION. A screen gains a `body`, the file that used to draw it
+    stops being reached, and the day somebody removes that file nothing changes
+    — which is the only way twenty-five screens move without a flag day. The
+    other order would make a stale mount silently win over the declaration it
+    was replaced by, and the screen would go on looking correct.
+
+    ⚠️ AND IT DOES NOT WAIT FOR THE PRODUCT'S CHUNK. A declared body needs the
+    manifest and the renderer, both of which are already here; holding it behind
+    `asked` would pay for a download it does not read.
+  */
+  if (declared?.body) {
+    return (
+      <Allowed may={app.may}>
+        {/* ⚠️ THE SAME WAIT THE SCREEN ITSELF DRAWS. The chunk and the screen's
+            own data land at about the same moment, so a different placeholder
+            here would be a second shape flashing in front of the first. */}
+        <React.Suspense fallback={<RowsWaiting />}>
+          <Declared screen={declared} at={beneath(declared.route, route)} go={go} />
+        </React.Suspense>
+      </Allowed>
+    );
+  }
 
   const Mounted = declared && asked ? MOUNTS.get(`${app.id}${declared.route}`) : undefined;
   if (Mounted) {

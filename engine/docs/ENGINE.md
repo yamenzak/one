@@ -420,7 +420,7 @@ and a manifest that does not compose refuses to boot.
 | `access` | permissions, roles, and what an app may never claim | 15 | — |
 | `reach` | how far one person works inside a workspace — where, as against what (D45) | 4 | — |
 | `gate` | the eight gates, in the order that decides which sentence somebody reads first | 3 | — |
-| `surface` | a screen declared — its shape, its blocks, and the closed vocabulary they bind through | 11 | — |
+| `surface` | a screen declared — its shape, its blocks, and the closed vocabulary they bind through | 12 | — |
 | `blocks` | which blocks a screen may name at all | 1 | — |
 | `manifest` | the whole app, and the composition that refuses a broken one | 13 | — |
 | `entitlement` | what a plan includes, and the allowance algebra over it | 17 | — |
@@ -444,7 +444,7 @@ and a manifest that does not compose refuses to boot.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**301 of them**, 300 reached by something today.
+**302 of them**, 301 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -498,7 +498,7 @@ env or a binding.
 | `reconcile` | the check on the money that is not our own arithmetic | 6 | — |
 | `ai-ops` | which model a workspace picked, and what it will cost them | 1 | — |
 | `ai-run` | the seam an operation generates through — values in, a metered answer out | 2 | — |
-| `screen` | what a declared screen is handed: its record, its views, and the permission every one of them needs | 3 | — |
+| `screen` | what a declared screen is handed: its record, its views, and the permission every one of them needs | 2 | — |
 | `search` | what is findable: the ledger a write leaves, and the pass that carries it | 17 | — |
 | `views` | a declared view, run: narrowed, sorted, bounded, and counted whole | 3 | — |
 | `search-ops` | the find operation a searchable collection gets, with its boundary already in it | 1 | — |
@@ -525,7 +525,7 @@ env or a binding.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 1 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 9 | — |
 
-**470 of them**, 469 reached by something today.
+**469 of them**, 468 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 

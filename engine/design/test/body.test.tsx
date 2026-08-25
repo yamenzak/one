@@ -27,10 +27,18 @@ const RECORD = { name: "Sodium chloride", held: 48, worth: 125_00, standing: "he
 const has = (over: Partial<Has> = {}): Has => ({
   record: RECORD,
   views: {
-    shelves: ready([
-      { id: "s1", name: "Cold room" }, { id: "s2", name: "Bay four" },
-      { id: "s3", name: "Trolley" },
-    ]),
+    shelves: ready({
+      items: [
+        { id: "s1", name: "Cold room" }, { id: "s2", name: "Bay four" },
+        { id: "s3", name: "Trolley" },
+      ],
+      /* ⚠️ NOT THREE. The `count` binding below asserts the SCREEN reports how
+         many there are rather than how many came back — a view is bounded, and a
+         renderer deriving the figure from `items.length` answers the limit. Made
+         distinguishable here on purpose: with the two equal, the test passes
+         either way. */
+      count: 41,
+    }),
   },
   ...over,
 });
@@ -76,14 +84,22 @@ describe("a binding reaches the prop it names", () => {
     expect(html, "the list drew none of its three rows").toContain("Cold room");
   });
 
+  /*
+    ⚠️ AND IT COUNTS WHAT THERE IS, NOT WHAT ARRIVED. The fixture holds three
+    rows and says there are forty-one; a renderer reading `items.length` draws
+    "3", which is a screen confidently reporting its own ceiling as a fact about
+    the workspace — and the number somebody acts on.
+  */
   it("counts a view rather than listing it", () => {
-    expect(drawn(one({
+    const html = drawn(one({
       block: "Stat",
       bind: {
         label: { from: { of: "words", says: "Shelves" } },
         value: { from: { of: "count", view: "shelves" } },
       },
-    }))).toContain("3");
+    }));
+    expect(html).toContain("41");
+    expect(html, "the count was derived from the rows in hand").not.toContain(">3<");
   });
 
   /*
@@ -201,7 +217,7 @@ describe("a block waits on the view it reads, and only that", () => {
     loop — every empty list in every product saying the same nothing.
   */
   it("says what emptiness means, in the words the declaration carries", () => {
-    const html = drawn(screen, { views: { shelves: ready([]) } });
+    const html = drawn(screen, { views: { shelves: ready({ items: [], count: 0 }) } });
     expect(html).toContain("Always here");
     expect(html).toContain("No shelves yet");
   });

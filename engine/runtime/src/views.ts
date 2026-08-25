@@ -21,7 +21,7 @@
  * which is not a declaration.
  */
 
-import type { AppSpec, CollectionSpec, ViewSpec } from "@engine/kernel";
+import type { AppSpec, CollectionSpec, Viewed, ViewSpec } from "@engine/kernel";
 import { eraseBy } from "@engine/kernel";
 import { narrow, type Here } from "./records.js";
 import { column, table, type Db } from "./sql.js";
@@ -29,15 +29,9 @@ import { column, table, type Db } from "./sql.js";
 /** ⚠️ The same ceiling a list has. A view is a screen's block, not an export. */
 const MOST = 200;
 
-export interface Viewed {
-  readonly items: readonly Record<string, unknown>[];
-  /**
-   * ⚠️ HOW MANY THERE ARE, WHICH IS NOT `items.length` THE MOMENT A LIMIT BITES.
-   * A block saying "12" over a view capped at 12 is a screen confidently
-   * reporting its own ceiling, and the number a person acts on.
-   */
-  readonly count: number;
-}
+/* ⚠️ `Viewed` IS THE KERNEL'S — see its header. The renderer reads it, so the
+   shape has one home rather than one at each end of the wire. */
+export type { Viewed };
 
 /**
  * ⚠️ THE COLLECTION IS RESOLVED HERE RATHER THAN TRUSTED, even though

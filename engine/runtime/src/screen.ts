@@ -23,18 +23,14 @@
  */
 
 import type { AppSpec, ScreenSpec } from "@engine/kernel";
-import { permissionFor, viewsIn } from "@engine/kernel";
+import { SCREEN_PATH, permissionFor, viewsIn } from "@engine/kernel";
 import { readOne } from "./records.js";
 import { runViews, type Viewed } from "./views.js";
 import { type Db } from "./sql.js";
 
-/**
- * ⚠️ THE PATH SEGMENT, NAMED ONCE. An operation id may not contain a slash, so
- * `screen/<id>` cannot collide with one — and naming the prefix here rather
- * than spelling it at the door is what stops the browser and the worker
- * disagreeing about the address by one character.
- */
-export const SCREEN_PATH = "screen";
+/* ⚠️ `SCREEN_PATH` IS THE KERNEL'S — see its header. The browser speaks it too,
+   and a constant each end declares is two strings kept in step by nothing. */
+export { SCREEN_PATH };
 
 export interface Drawn {
   readonly record: Record<string, unknown> | null;

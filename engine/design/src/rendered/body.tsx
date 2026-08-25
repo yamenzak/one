@@ -29,7 +29,7 @@
 
 import * as React from "react";
 import type {
-  Binding, BlockSpec, Format, GroupSpec, Layout, Placed, Presence, Read, SurfaceSpec,
+  Binding, BlockSpec, Format, GroupSpec, Layout, Placed, Presence, Read, SurfaceSpec, Viewed,
 } from "@engine/kernel";
 import { BLOCKS, isGroup } from "@engine/kernel";
 import { Arranged, spanning } from "../parts/arrange.js";
@@ -53,8 +53,16 @@ import { PARTS } from "./parts.js";
 export interface Has {
   /** The record this screen is about, where it is about one. */
   readonly record?: Readonly<Record<string, unknown>> | undefined;
-  /** Every view the app declared, by id, as an outcome. */
-  readonly views: Readonly<Record<string, Loaded<readonly Readonly<Record<string, unknown>>[]>>>;
+  /**
+   * Every view the app declared, by id, as an outcome.
+   *
+   * ⚠️ THE WHOLE `Viewed`, NOT THE ROWS. A view carries a `limit`, so
+   * `items.length` is the ceiling rather than the total — and `count` is a
+   * binding a block can be pointed at. Handing over rows alone made every
+   * `count` in every product a number that stops rising at the cap, silently,
+   * with the true figure already fetched and thrown away one function earlier.
+   */
+  readonly views: Readonly<Record<string, Loaded<Viewed>>>;
   /** Where a `goes` leads. */
   readonly onGo?: ((screen: string) => void) | undefined;
   /** What a `does` runs. */
@@ -92,7 +100,14 @@ const DRAWN: Record<Format, (v: unknown, has: Has) => React.ReactNode> = {
 
 const rowsOf = (has: Has, view: string) => {
   const held = has.views[view];
-  return held?.status === "ready" ? held.data : undefined;
+  return held?.status === "ready" ? held.data.items : undefined;
+};
+
+/* ⚠️ THE VIEW'S OWN COUNT, NOT THE LENGTH OF WHAT CAME BACK — see `Has.views`.
+   A view is bounded, so counting the rows in hand answers the limit. */
+const countOf = (has: Has, view: string) => {
+  const held = has.views[view];
+  return held?.status === "ready" ? held.data.count : undefined;
 };
 
 /**
@@ -109,7 +124,7 @@ const valueOf = (read: Read, has: Has): unknown => {
     case "field": return has.record?.[read.field];
     case "subject": return has.record;
     case "view": return rowsOf(has, read.view);
-    case "count": return rowsOf(has, read.view)?.length;
+    case "count": return countOf(has, read.view);
   }
 };
 
@@ -199,7 +214,15 @@ function Placed({ block, has }: { readonly block: BlockSpec; readonly has: Has }
     const spec = entry.takes[slot];
     if (spec?.whole && binding.from.of === "view") {
       owns = true;
-      props[slot] = has.views[binding.from.view] ?? ready([]);
+      /* ⚠️ THE ROWS, NOT THE `Viewed`. A list block pages over what it holds, so
+         a total beside them is not a prop it has — the total reaches a screen as
+         a `count` binding on a block that draws a figure. Handing the wrapper
+         through would put `{items, count}` where an array belongs and draw a
+         table of one row that is an object. */
+      const got = has.views[binding.from.view];
+      props[slot] = got === undefined
+        ? ready([])
+        : got.status === "ready" ? ready(got.data.items) : got;
       /* ⚠️ AND THE EMPTY SENTENCE GOES WITH IT, because the block that owns its
          waiting owns its emptiness too — `Region` is not the one drawing it. */
       if (block.nothing) {

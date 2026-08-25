@@ -95,6 +95,38 @@ export interface Sort {
 }
 
 /**
+ * WHAT RUNNING A VIEW ANSWERS — the rows, and how many there are.
+ *
+ * ⚠️ THE COUNT IS NOT `items.length`, AND IT IS IN THE CONTRACT SO IT CANNOT BE
+ * DROPPED ON THE WAY TO THE SCREEN. A view carries a `limit`; a block drawing
+ * "50" over a strip capped at fifty is a screen reporting its own ceiling as a
+ * fact about the workspace. The runner goes to the trouble of counting, and the
+ * only thing that makes that worth doing is the browser carrying it.
+ *
+ * ⚠️ AND IT IS THE KERNEL'S RATHER THAN THE RUNTIME'S, because the renderer
+ * reads it. The arrow points `apps → design → runtime → kernel`, so a shape both
+ * ends of that need has exactly one home — and restating it in the design
+ * package is how the two come to disagree about a field neither one throws on.
+ */
+export interface Viewed {
+  readonly items: readonly Readonly<Record<string, unknown>>[];
+  readonly count: number;
+}
+
+/**
+ * WHERE A DECLARED SCREEN IS ANSWERED — `/api/screen/<id>`.
+ *
+ * ⚠️ THE PATH SEGMENT, NAMED ONCE, AND IN THE KERNEL BECAUSE BOTH ENDS SPEAK IT.
+ * The worker routes on it and the browser asks for it; spelled at each door they
+ * are two strings that have to agree, and they disagree by one character exactly
+ * once, silently, as a 404 that reads like an unfinished screen.
+ *
+ * ⚠️ AN OPERATION ID MAY NOT CONTAIN A SLASH, which is what makes this safe to
+ * put in the same space: `screen/<id>` cannot collide with one.
+ */
+export const SCREEN_PATH = "screen";
+
+/**
  * ⚠️ EQUALITY AND PRESENCE, AND NOTHING ELSE — see the header. There is no `gt`,
  * no `lt`, no `in`, no `like`, and none of them is coming: the first comparison
  * operator is the one that makes a manifest a language, and the second is free.

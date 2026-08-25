@@ -41,9 +41,17 @@ const DIST = join(dirname(fileURLToPath(import.meta.url)), "..", "dist");
    ships. Twenty-six bytes is not a cost worth arguing about; being made to write
    it down is. The renderer itself is NOT in here: it sits behind
    `@engine/design/body` so the entry chunk carries the contract and not the
-   thirty components that draw from it. */
+   thirty components that draw from it.
+
+   ⚠️ AND BY 3,534 MORE ON 2026-08-25 FOR THE LAZY BOUNDARY THAT KEEPS IT THAT
+   WAY. `AppSurface` draws a declared body through `Declared`, and importing it
+   statically put 10 KiB of renderer into the module the first paint blocks on —
+   this guard is what caught it, on the commit that did it, which is the only
+   reason it was noticed. What is left in here is the `React.lazy` call, the
+   Suspense boundary and Vite's manifest entry for the chunk. The trade is
+   explicit: 3.5 KiB of plumbing to keep 10 KiB of components out. */
 const CEILING = {
-  js: { raw: 1_100_026, gzip: 330_000 },
+  js: { raw: 1_103_560, gzip: 330_000 },
   css: { raw: 470_000, gzip: 50_000 },
 };
 
