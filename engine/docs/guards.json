@@ -3945,6 +3945,15 @@
       "impl": "scripts/scene.test.mjs",
       "proves": "dock:",
       "fails": "a dock painted from a card tier — a white slab in the light theme — or one that states a fill and no ink, which is a near-black glyph on a near-black plate that every contrast check here passes because they all measure ink against the PAGE"
+    },
+    {
+      "id": "every-block-is-real-and-everything-that-could-be-one-is-placed",
+      "protects": "D92",
+      "stage": "91",
+      "status": "live",
+      "impl": "scripts/vocabulary.test.mjs",
+      "proves": "block(s), every one a real export",
+      "fails": "a renamed component leaving its registry entry pointing at nothing - a manifest refused for naming a block that plainly exists, or a blank region where a card was; and the silent half, a component that could be a block and is in no registry, which exists and works and passes every guard while no screen can ever ask for it, so the next app hand-rolls the thing that was already built"
     }
   ]
 }

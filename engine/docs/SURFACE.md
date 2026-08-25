@@ -206,12 +206,39 @@ That is `ViewSpec` describing itself, a stage early. **The largest single win in
 this arc is not the screens — it is the container that disappears when a block
 names a declared query.** S8 is where that lands.
 
-### S3 — The block registry
-Every `@engine/design` export that can be a block gets an entry: its name, the
-props it takes as a schema, the states it must implement. Generated from the
-source, refusing rather than skipping, like `inventory.mjs` and `guards.json`
-already do. This is what makes *"if an app needs a complex component we add it to
-the engine and then use it"* a two-line operation rather than a negotiation.
+### S3 — The block registry · **stage 91, shipped**
+
+**Forty blocks in `kernel/src/blocks.ts`**, and the set was chosen by counting
+rather than by surveying: every entry is a component the twelve reading screens
+actually draw. Rows, lists, figures, thirteen charts, four marks.
+
+**The membership is derived; the meaning is declared.** That is not what the plan
+said, and it is the honest shape. `scripts/vocabulary.test.mjs` reads the design
+package's source and refuses in both directions — an entry naming a component
+that is not exported, and a component that could be a block and is classified as
+nothing. A candidate is any exported component that takes no `children`, because
+`children` means "the caller composes" and a declaration cannot. Every one of the
+192 is a block or is named in one of seven categories with a reason, and the
+lists can only shrink. What a generator could NOT derive is what a slot means —
+"the rows" against "how many", and that this one takes a view and nothing else. A
+`React.ReactNode` says none of that.
+
+Three things the building settled, each a change to what S1 shipped:
+
+- **A body nests exactly one level.** `Section` and `Group` are the two
+  most-drawn components in the product by a wide margin, and the flat contract
+  could not say so — every screen would have been one undivided column. A group
+  holds blocks and never another group: one level is a layout, two is a tree, and
+  the type is what refuses it.
+- **The four outcomes are the frame's, not forty components'.** S1 had every
+  block declaring which states it implemented, and the honest answer was almost
+  none. Building them in would be thirty-nine copies of one decision — the shape
+  this arc exists to remove. A block declares its SKELETON (`bones`); the frame
+  draws waiting, nothing, trouble and denied around it. That makes S5 tractable:
+  one implementation instead of forty.
+- **`goes` — a row leads to a screen, named by id.** Half the rows in a product
+  navigate, and `does` could only name operations. A route typed in a body would
+  be a second spelling of an address the manifest already holds.
 
 ### S4 — Blocks reflow by their own size
 ⚠️ **Container queries, not slot coordinates.** A block that knows it is "in a
@@ -220,11 +247,14 @@ responds to its own measured box works in every container forever, including one
 nobody has designed yet. Guarded by measurement: render at two widths, assert the
 geometry actually differs in the intended way — `geometryOf` already does this.
 
-### S5 — Every block ships its whole state set
+### S5 — The four outcomes, drawn once
 waiting · nothing · trouble · denied. Partly exists — `Loaded`, `Await`,
 `Nothing`, `Trouble`, `useGate` — and is currently the CALLER's job to wire,
-which is exactly the class of thing a caller forgets. Made total, moved inside
-the block, guarded by the registry from S3 refusing a block that lacks one.
+which is exactly the class of thing a caller forgets.
+
+⚠️ **S3 changed this stage's shape.** They do not move inside forty blocks; they
+move into the FRAME, which draws them around whichever block it places, using
+the skeleton that block declares. One implementation, not forty.
 
 ### S6 — The layouts
 The declared arrangements: the stack, the grid, the split, the board. Container

@@ -17,9 +17,10 @@ import { describe, expect, it } from "vitest";
 import { collection } from "../src/collection.js";
 import { field } from "../src/field.js";
 import {
-  BLOCK_STATES, COLS_MOST, colsOf, fieldsIn, refuseSurface, refuseView, unreadViews,
+  BONES, COLS_MOST, blocksIn, colsOf, fieldsIn, refuseSurface, refuseView, unreadViews,
   viewsIn, type BlockIndex, type SurfaceSpec, type ViewSpec,
 } from "../src/surface.js";
+import { BLOCKS } from "../src/blocks.js";
 
 /* ------------------------------------------------------------------ world --- */
 
@@ -58,19 +59,19 @@ const recent: ViewSpec = {
  */
 const HEADING = {
   id: "Heading",
+  bones: "text",
   takes: { says: { label: "The words", takes: ["field", "words"], required: true } },
-  states: [...BLOCK_STATES],
 } as const satisfies BlockIndex[string];
 
 const INDEX: BlockIndex = {
   Heading: HEADING,
   Listing: {
     id: "Listing",
+    bones: "table",
     takes: {
       rows: { label: "The rows", takes: ["view"], required: true },
       total: { label: "How many", takes: ["count"] },
     },
-    states: [...BLOCK_STATES],
   },
 };
 
@@ -260,6 +261,112 @@ describe("a screen is one kind of thing", () => {
       { id: "register", story: { writes: "note.publish", asks: [] } },
       INDEX, [recent], COLLECTIONS, [],
     )).toEqual([]);
+  });
+});
+
+/* ------------------------------------------------------------- the groups --- */
+
+/**
+ * ⚠️ THE COMMONEST SHAPE IN THE PRODUCT, AND THE FLAT CONTRACT COULD NOT SAY IT.
+ * Counted across the twelve OneInventory screens that only read, `Section` and
+ * `Group` are the two most-drawn components by a wide margin — a labelled region
+ * holding a card of rows is what almost every screen is made of. A flat list of
+ * blocks would have drawn every one of them as one undivided column.
+ */
+describe("blocks sit under one heading, and the nesting stops there", () => {
+  const grouped = (over: Partial<SurfaceSpec> = {}) => screen({
+    body: body({
+      blocks: [{
+        group: "Label",
+        of: [{ block: "Heading", bind: { says: { from: { of: "field", field: "title" } } } }],
+      }],
+      ...over,
+    }),
+  });
+
+  it("accepts a group of blocks", () => {
+    expect(why(grouped())).toEqual([]);
+  });
+
+  it("refuses a heading over an empty card", () => {
+    expect(why(screen({ body: body({ blocks: [{ group: "Label", of: [] }] }) })))
+      .toContain("nothing_on_it");
+  });
+
+  it("checks the blocks inside a group, not only the ones beside it", () => {
+    expect(why(screen({
+      body: body({
+        blocks: [{ group: "Label", of: [{ block: "Ghost" }] }],
+      }),
+    }))).toContain("block_unknown");
+  });
+
+  /*
+    ⚠️ ROOM IS ASKED FOR AT THE TOP LEVEL AND NOWHERE ELSE, which falls out of
+    what a group IS. The layout hands columns to what it places; a group's own
+    blocks stack inside the card it draws, so a span in there is a number the
+    layout will never read — declared, typechecked, and silently ignored.
+  */
+  it("refuses a span inside a group, whose blocks stack", () => {
+    expect(why(screen({
+      body: body({
+        layout: { as: "grid", cols: 2 },
+        blocks: [{
+          group: "Label",
+          of: [{
+            block: "Heading",
+            span: { cols: 2 },
+            bind: { says: { from: { of: "words", says: "Note" } } },
+          }],
+        }],
+      }),
+    }))).toContain("span_without_a_grid");
+  });
+
+  it("lets the group itself ask for room", () => {
+    expect(why(grouped({ layout: { as: "grid", cols: 2 } }))).toEqual([]);
+  });
+
+  it("flattens every block with the group it is under", () => {
+    const flat = blocksIn(body({
+      blocks: [
+        { block: "Heading", bind: { says: { from: { of: "words", says: "Top" } } } },
+        { group: "Label", of: [{ block: "Listing" }] },
+      ],
+    }));
+    expect(flat.map((f) => [f.block.block, f.under]))
+      .toEqual([["Heading", null], ["Listing", "Label"]]);
+  });
+});
+
+/* --------------------------------------------------------------- it leads --- */
+
+describe("a row leads to a screen this app has", () => {
+  const leading = (goes: string) => screen({
+    body: body({
+      blocks: [{
+        block: "Heading",
+        goes,
+        bind: { says: { from: { of: "words", says: "Onwards" } } },
+      }],
+    }),
+  });
+
+  it("accepts one naming a declared screen", () => {
+    expect(refuseSurface(leading("stock"), INDEX, [recent], COLLECTIONS, [], ["stock"]))
+      .toEqual([]);
+  });
+
+  /*
+    ⚠️ A ROW THAT LEADS NOWHERE IS THE ONE FAULT THAT LOOKS LIKE A SLOW APP. The
+    row is drawn, it is pressable, pressing it does nothing — so the person
+    presses it again. Naming the screen rather than a path is what makes this
+    checkable: a route typed here would be a second spelling of an address, and
+    the two drift the first time a screen moves.
+  */
+  it("refuses one leading nowhere", () => {
+    expect(refuseSurface(leading("ghost"), INDEX, [recent], COLLECTIONS, [], ["stock"])
+      .map((p) => p.why)).toContain("goes_nowhere");
   });
 });
 
@@ -476,13 +583,19 @@ describe("a block is registered, complete, and offers what exists", () => {
       .toContain("block_unknown");
   });
 
-  it("refuses a block that has not implemented all four states", () => {
-    const partial: BlockIndex = {
-      ...INDEX,
-      Heading: { ...HEADING, states: ["waiting", "nothing"] },
-    };
-    const found = refuseSurface(screen(), partial, [recent], COLLECTIONS, []).map((p) => p.why);
-    expect(found.filter((w) => w === "state_missing")).toHaveLength(2);
+  /*
+    ⚠️ THE FOUR OUTCOMES ARE THE FRAME'S, AND WHAT THE BLOCK OWES IS THE SHAPE
+    OF ITS OWN ABSENCE. Building waiting, nothing, trouble and denied into forty
+    components would be thirty-nine copies of one decision — the shape this arc
+    exists to remove. So the type insists on a skeleton and nothing else, and a
+    block cannot be registered without saying what it looks like when it is not
+    there yet.
+  */
+  it("cannot be registered without saying what its absence looks like", () => {
+    for (const entry of Object.values(BLOCKS)) {
+      expect(BONES, `${entry.id} names "${entry.bones}", which is not a skeleton`)
+        .toContain(entry.bones);
+    }
   });
 
   it("refuses a block offering an operation the app does not declare", () => {

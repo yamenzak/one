@@ -3321,3 +3321,44 @@ colour claim with HSV saturation); or an ambience layer whose effect is not
 measured, since `background-image` reads topmost first and a crush appended after
 an opaque base is present in the string, applied to nothing, and reports numbers
 identical to four decimal places.
+
+## D92 — A screen is a body or a story, and what a body binds through is closed
+
+A product's screens are the last large place a capability can be declared in one
+place and drawn in another. Eleven surfaces are already drawn from declarations
+no app writes a line of; what stayed hand-written was a product's own screens,
+and the line between the two was never a principle — it is where the work
+stopped. Every UI defect this framework has had is the same shape, and 10,130
+lines of hand-written screens is the surface that shape lives on.
+
+**A body is READ and a story is CAPTURE, and nothing is both.** A body names
+blocks and binds them to what the app declares; the engine draws it. A story is a
+flow of questions holding answers nobody has saved yet, whose controls are a
+camera, a viewfinder and a packing editor — things a manifest could only express
+by becoming a second React. Measured across OneInventory: twelve screens hold no
+state at all and eleven capture. A screen declaring both has two answers to what
+it is, and a renderer would pick one silently, by whichever it checked first.
+
+**The vocabulary a body binds through is closed, and there is no operator in it.**
+A value is read from one of five places, wears one of seven named formatters, and
+is tested for presence or for membership in a declared set. A comparison, a sum
+or a threshold is not expressible: it becomes a query on the collection, where it
+is typed, tested, and read the same way by everything else. That is an escape
+VALVE rather than a hatch — a hatch takes the logic somewhere nothing can see it,
+and the valve pushes it into the data layer where the kernel already refuses a
+field that is not there. A dispatch may only be asked of an `enum` for the same
+reason: the field has declared its values, so a branch on one it can never hold
+is refused rather than being a card nobody ever sees.
+
+**The four outcomes are the frame's, and what a block owes is the shape of its
+own absence.** Building waiting, nothing, trouble and denied into forty
+components would be thirty-nine copies of one decision — the shape this whole
+arc exists to remove. A block declares its skeleton; the frame draws the rest.
+
+**Therefore never:** a comparison operator in a manifest; a screen that is both a
+body and a story; a block index that lets an unknown name through, since the
+failure is then a blank region in production rather than a refusal at
+composition; a slot coordinate a block can read, because a block that knows it is
+"in a 2×1" breaks in the first layout that does not use that vocabulary; or a
+group inside a group, which is a tree, and a tree in a declaration is the
+template language this design exists without.

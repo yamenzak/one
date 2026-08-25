@@ -247,30 +247,92 @@ export interface BlockSpec {
   readonly when?: Presence;
   readonly bind?: Readonly<Record<string, Binding>>;
   readonly does?: readonly string[];
+  /**
+   * ⚠️ WHERE A ROW LEADS, AS A SCREEN'S ID RATHER THAN A PATH. `does` names
+   * operations and could not express "open the shelf this row is about" — which
+   * is what half the rows in a product do. A route typed here would be a second
+   * spelling of an address the manifest already holds, and the two would drift
+   * the first time a screen moved.
+   */
+  readonly goes?: string;
 }
+
+/**
+ * BLOCKS UNDER ONE HEADING, AND THE NESTING STOPS HERE.
+ *
+ * ⚠️ THIS IS THE COMMONEST SHAPE IN THE PRODUCT AND THE CONTRACT COULD NOT SAY
+ * IT. Counted across the screens that only read, `Section` and `Group` are the
+ * two most-used components by a wide margin — a labelled region holding a card
+ * of rows is what almost every screen is made of, and a flat list of blocks
+ * would have drawn every one of them as one undivided column.
+ *
+ * ⚠️ AND A GROUP HOLDS BLOCKS, NEVER ANOTHER GROUP. One level is a layout; two
+ * is a tree, and a tree in a declaration is the template language this design
+ * exists without. The type is what refuses it, so there is no rule to remember.
+ */
+export interface GroupSpec {
+  /** ⚠️ `null` is a card with no heading, which is a real and common thing. */
+  readonly group: string | null;
+  readonly of: readonly BlockSpec[];
+  readonly when?: Presence;
+  readonly span?: Span;
+}
+
+export type Placed = BlockSpec | GroupSpec;
+
+export const isGroup = (p: Placed): p is GroupSpec => "group" in p;
 
 /** A screen's body: what it is for, how it is arranged, and what is on it. */
 export interface SurfaceSpec {
   readonly shape: ScreenShape;
   readonly layout: Layout;
-  readonly blocks: readonly BlockSpec[];
+  readonly blocks: readonly Placed[];
 }
 
 /* --------------------------------------------------------- the block index --- */
 
 /**
- * THE FOUR STATES EVERY BLOCK OWES, AND THE CALLER STOPS WIRING THEM.
+ * THE FOUR OUTCOMES EVERY DECLARED BLOCK GETS, AND NOT ONE OF THEM IS ITS OWN
+ * CODE.
  *
- * ⚠️ EACH OF THESE HAS SHIPPED AS A WRONG ANSWER WEARING A LOADING STATE'S
- * EXCUSE. An empty array rendered as "nothing here" while the request was still
- * in flight; a failed load rendered as "no media yet"; a control drawn for
- * somebody who could not press it. They are the caller's job today, which is
- * exactly the class of thing a caller forgets — so they move inside the block,
- * and a block that does not implement one cannot be registered.
+ * ⚠️ EACH HAS SHIPPED AS A WRONG ANSWER WEARING A LOADING STATE'S EXCUSE. An
+ * empty array drawn as "nothing here" while the request was still in flight; a
+ * failed load drawn as "no media yet"; a control drawn for somebody who could
+ * not press it. Today they are the CALLER's job to wire, which is exactly the
+ * class of thing a caller forgets.
+ *
+ * ⚠️ AND THE FIX IS THE FRAME, NOT FORTY COMPONENTS. Building the four into
+ * every block would be forty implementations of one decision, thirty-nine of
+ * which are copies — the shape this whole arc exists to remove. The renderer
+ * draws them ONCE, around whichever block it is placing; what it needs from the
+ * block is the only thing it cannot work out, which is what the absence should
+ * LOOK like. That is `BlockEntry.waiting`.
  */
+/* DEFER(engine-93) stage:93 — NAMED HERE AND IMPLEMENTED NOWHERE YET. The four
+   outcomes are what stage 93 builds into the frame; declaring them now is what
+   stops the renderer inventing a fifth, and what a block's `bones` is FOR. */
 export type BlockState = "waiting" | "nothing" | "trouble" | "denied";
 
+/* DEFER(engine-93) stage:93 — see above: the four are named here and built into
+   the frame at stage 93. */
 export const BLOCK_STATES: readonly BlockState[] = ["waiting", "nothing", "trouble", "denied"];
+
+/**
+ * ⚠️ A SKELETON IS SHAPED LIKE WHAT IS COMING, WHICH IS WHY A SPINNER IS NOT ONE.
+ * A spinner is a layout that will jump; rows that become rows do not. Only the
+ * block knows which of these it is, so it is the one thing the frame has to be
+ * told — and naming it here rather than in the component keeps it a fact the
+ * renderer can read without mounting anything.
+ */
+export type Bones =
+  | "rows" | "hero" | "figure" | "chart" | "tiles" | "table" | "form" | "text";
+
+/* DEFER(engine-96) stage:96 — THE RENDERER IS WHAT READS THIS AT RUNTIME. Until
+   it exists the list is a type the compiler enforces and a set the registry's
+   own test walks; the map from a name to a skeleton component is stage 96's. */
+export const BONES: readonly Bones[] = [
+  "rows", "hero", "figure", "chart", "tiles", "table", "form", "text",
+];
 
 /**
  * WHAT ONE SLOT ON A BLOCK ACCEPTS.
@@ -295,7 +357,8 @@ export interface SlotSpec {
 export interface BlockEntry {
   readonly id: string;
   readonly takes: Readonly<Record<string, SlotSpec>>;
-  readonly states: readonly BlockState[];
+  /** ⚠️ What its absence looks like — see `Bones`. The frame draws the rest. */
+  readonly bones: Bones;
 }
 
 export type BlockIndex = Readonly<Record<string, BlockEntry>>;
@@ -307,8 +370,9 @@ export type SurfaceRefusal =
   | "block_unknown" | "slot_unknown" | "slot_missing" | "slot_kind_wrong"
   | "field_unknown" | "field_without_a_subject" | "format_wrong"
   | "dispatch_not_closed" | "dispatch_unreachable" | "two_kinds_of_screen"
+  | "goes_nowhere"
   | "span_overflows" | "span_without_a_grid" | "grid_too_wide"
-  | "state_missing" | "operation_unknown" | "nothing_on_it";
+  | "operation_unknown" | "nothing_on_it";
 
 export interface SurfaceProblem {
   readonly of: string;
@@ -345,12 +409,31 @@ const insidePresence = (p: Presence, take: (r: Read) => void): void => {
 export const readsIn = (body: SurfaceSpec): readonly Read[] => {
   const out: Read[] = [];
   const take = (r: Read) => out.push(r);
-  for (const b of body.blocks) {
-    if (b.when) insidePresence(b.when, take);
-    for (const bind of Object.values(b.bind ?? {})) take(bind.from);
+  for (const placed of body.blocks) {
+    /* ⚠️ A GROUP'S OWN CONDITION, THEN ITS BLOCKS' — never the same one twice.
+       Walking `placed.when` and then walking it again as one of the blocks
+       reported every top-level condition's sources in duplicate, which is the
+       kind of wrongness a check counts rather than reads. */
+    if (isGroup(placed) && placed.when) insidePresence(placed.when, take);
+    for (const b of isGroup(placed) ? placed.of : [placed]) {
+      if (b.when) insidePresence(b.when, take);
+      for (const bind of Object.values(b.bind ?? {})) take(bind.from);
+    }
   }
   return out;
 };
+
+/**
+ * ⚠️ EVERY BLOCK, FLATTENED, AND WITH ITS GROUP'S NAME ON IT. A check that
+ * walked only the top level would report a screen sound while every row inside
+ * every card went unexamined — which, on this shape, is most of the screen.
+ */
+export const blocksIn = (
+  body: SurfaceSpec,
+): readonly { readonly block: BlockSpec; readonly under: string | null }[] =>
+  body.blocks.flatMap((placed) => (isGroup(placed)
+    ? placed.of.map((block) => ({ block, under: placed.group }))
+    : [{ block: placed, under: null }]));
 
 export const viewsIn = (body: SurfaceSpec): readonly string[] =>
   readsIn(body).flatMap((r) => (r.of === "view" || r.of === "count" ? [r.view] : []));
@@ -416,6 +499,7 @@ export function refuseSurface(
   views: readonly ViewSpec[],
   collections: readonly CollectionSpec[],
   operations: readonly string[],
+  screens: readonly string[] = [],
 ): readonly SurfaceProblem[] {
   const body = screen.body;
   if (!body) return [];
@@ -490,37 +574,44 @@ export function refuseSurface(
     case somebody has not hit yet; a dispatch over a free-text column is a
     comparison against a string, which is the operator this file exists without.
   */
-  for (const b of body.blocks) {
-    if (!b.when) continue;
+  const dispatching: { readonly said: string; readonly when: Presence }[] = [];
+  for (const placed of body.blocks) {
+    const said = isGroup(placed) ? `the "${placed.group ?? "unnamed"}" group` : placed.block;
+    if (placed.when) dispatching.push({ said, when: placed.when });
+    if (isGroup(placed)) {
+      for (const b of placed.of) if (b.when) dispatching.push({ said: b.block, when: b.when });
+    }
+  }
+  for (const { said, when } of dispatching) {
     const arms: { readonly at: Read; readonly one: readonly string[] }[] = [];
     const collect = (p: Presence): void => {
       if ("not" in p) return collect(p.not);
       if ("is" in p) arms.push({ at: p.is, one: p.one });
     };
-    collect(b.when);
+    collect(when);
     for (const arm of arms) {
       if (arm.at.of !== "field") {
         at("dispatch_not_closed",
-          `${b.block} branches on a ${arm.at.of}, which has no declared set of values to branch over`);
+          `${said} branches on a ${arm.at.of}, which has no declared set of values to branch over`);
         continue;
       }
       const f = subject?.[arm.at.field];
       if (!f) continue;
       if (f.kind !== "enum" || !f.values) {
         at("dispatch_not_closed",
-          `${b.block} branches on "${arm.at.field}", which is a ${f.kind} — a dispatch is `
+          `${said} branches on "${arm.at.field}", which is a ${f.kind} — a dispatch is `
           + `membership in a declared set, so make it an enum on ${screen.of} or do not branch on it`);
         continue;
       }
       for (const value of arm.one) {
         if (!f.values.includes(value)) {
           at("dispatch_unreachable",
-            `${b.block} draws when "${arm.at.field}" is "${value}", which is not one of its `
+            `${said} draws when "${arm.at.field}" is "${value}", which is not one of its `
             + `values (${f.values.join(", ")}) — a card nobody will ever see`);
         }
       }
       if (arm.one.length === 0) {
-        at("dispatch_unreachable", `${b.block} branches on "${arm.at.field}" against no values at all`);
+        at("dispatch_unreachable", `${said} branches on "${arm.at.field}" against no values at all`);
       }
     }
   }
@@ -534,31 +625,58 @@ export function refuseSurface(
 
   /* --- the blocks ------------------------------------------------------- */
 
-  for (const b of body.blocks) {
-    const where = `${screen.id} · ${b.block}`;
+  /*
+    ⚠️ ROOM IS ASKED FOR AT THE TOP LEVEL AND NOWHERE ELSE, which falls out of
+    what a group IS. The layout hands columns to what it places; a group's own
+    blocks stack inside the card it draws, so a span in there is a number the
+    layout will never read — declared, typechecked and silently ignored.
+  */
+  for (const placed of body.blocks) {
+    const said = isGroup(placed) ? `the "${placed.group ?? "unnamed"}" group` : placed.block;
+    if (placed.span && body.layout.as === "stack") {
+      at("span_without_a_grid",
+        `${said} asks for ${placed.span.cols ?? 1} columns on a stack, which has one`);
+    }
+    if (placed.span?.cols && placed.span.cols > cols) {
+      at("span_overflows", `${said} asks for ${placed.span.cols} of ${cols} columns`);
+    }
+    if (!isGroup(placed)) continue;
+    if (placed.of.length === 0) {
+      at("nothing_on_it",
+        `${said} holds no blocks, which draws a heading over an empty card`);
+    }
+    for (const b of placed.of) {
+      if (b.span) {
+        at("span_without_a_grid",
+          `${b.block} asks for room inside ${said}, whose blocks stack — the span belongs on the group`);
+      }
+    }
+  }
+
+  for (const { block: b, under } of blocksIn(body)) {
+    const where = `${screen.id} · ${b.block}${under ? ` (in "${under}")` : ""}`;
     const entry = index[b.block];
     if (!entry) {
       at("block_unknown", `${where}: no such block — nothing in the design package registers it`);
       continue;
     }
 
-    for (const state of BLOCK_STATES) {
-      if (!entry.states.includes(state)) {
-        at("state_missing", `${where} has no "${state}" state, so a screen using it can be caught without one`);
-      }
-    }
-
-    if (b.span && body.layout.as === "stack") {
-      at("span_without_a_grid", `${where} asks for ${b.span.cols ?? 1} columns on a stack, which has one`);
-    }
-    if (b.span?.cols && b.span.cols > cols) {
-      at("span_overflows", `${where} asks for ${b.span.cols} of ${cols} columns`);
-    }
 
     for (const op of b.does ?? []) {
       if (!operations.includes(op)) {
         at("operation_unknown", `${where} offers "${op}", which is not an operation this app declares`);
       }
+    }
+
+    /*
+      ⚠️ A ROW THAT LEADS NOWHERE IS THE ONE FAULT THAT LOOKS LIKE A SLOW APP.
+      The row is drawn, it is pressable, and pressing it does nothing — so the
+      person presses it again. Naming the screen rather than a path is what
+      makes this checkable at all: a route typed here would be a second spelling
+      of an address, and the two drift the first time a screen moves.
+    */
+    if (b.goes !== undefined && !screens.includes(b.goes)) {
+      at("goes_nowhere", `${where} leads to "${b.goes}", which is not a screen this app declares`);
     }
 
     const bound = b.bind ?? {};
