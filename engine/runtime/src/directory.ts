@@ -699,6 +699,53 @@ export async function liveAppsOfTenant(db: Db, id: TenantId): Promise<readonly A
   return rows.results.map((r) => r.app_id as AppId);
 }
 
+/* ---------------------------------------------------- a page of workspaces --- */
+
+/**
+ * THE NEWEST WORKSPACES, AS A WINDOW THE OTHER STATEMENTS CAN JOIN THROUGH.
+ *
+ * ⚠️ A LIST SCREEN IS ONE STATEMENT PER TABLE, NEVER ONE PER ROW. The console
+ * asked every workspace for its products and its membership one workspace at a
+ * time, so two hundred rows were six hundred and one subrequests — over the
+ * fifty a Worker is allowed, which means the screen did not get slower as a
+ * deployment grew, it stopped answering. Nothing in the code says two hundred;
+ * the limit is a number this file chose, and the walk was written as if it were
+ * free.
+ *
+ * ⚠️ THE WINDOW IS NAMED ONCE BECAUSE THREE STATEMENTS DESCRIBE IT. Two rows
+ * stamped in the same millisecond are ordered by nothing, so a second query
+ * repeating `ORDER BY at DESC LIMIT 200` may take a different two hundred — and
+ * the console would draw a workspace with somebody else's products beside it.
+ * The id breaks the tie, here, for all of them.
+ */
+export const newestTenants = (limit: number): string =>
+  `SELECT id FROM tenant ORDER BY at DESC, id DESC LIMIT ${Math.trunc(limit)}`;
+
+/** A product a workspace holds, and whether it is switched on. */
+export interface HeldApp { readonly id: AppId; readonly on: boolean }
+
+/**
+ * ⚠️ EVERY PRODUCT EACH OF THEM HAS EVER HAD, in one read. A workspace with no
+ * row is absent from the map rather than present and empty — the caller knows
+ * which workspaces it asked about, and inventing an entry per id would be the
+ * same walk this exists to remove.
+ */
+export async function appsOfTenantsIn(
+  db: Db, within: string,
+): Promise<Map<TenantId, readonly HeldApp[]>> {
+  const rows = await db.prepare(
+    `SELECT tenant_id, app_id, disabled_at FROM tenant_app WHERE tenant_id IN (${within})`)
+    .all<{ tenant_id: string; app_id: string; disabled_at: string | null }>();
+  const held = new Map<TenantId, HeldApp[]>();
+  for (const r of rows.results) {
+    const id = r.tenant_id as TenantId;
+    const mine = held.get(id) ?? [];
+    mine.push({ id: r.app_id as AppId, on: r.disabled_at === null });
+    held.set(id, mine);
+  }
+  return held;
+}
+
 /* ------------------------------------------------------------ enablement --- */
 
 export type EnableRefusal = "shard_cannot_hold_it" | "no_such_tenant";

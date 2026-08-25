@@ -44,15 +44,15 @@ import { apply, plan, resources, wanted } from "./resources.js";
 import { beginMove } from "./move.js";
 import { actionsOf, bind, bindingsOf, running } from "./ai-actions.js";
 import { decideModel } from "./models.js";
-import { MEMBERSHIP, adjust, compPlan, subscriptionFor } from "./billing.js";
+import { MEMBERSHIP, adjust, compPlan, subscriptionFor, subscriptionsIn } from "./billing.js";
 import {
   catalogueProblems, editPlan, effectivePlans, onEachPlan, planEdits, resetPlan,
   type PlanEdit,
 } from "./catalogue.js";
 import { autoTopUpOf, movements, renewAllowance, spentByApp, topUp, walletOf } from "./wallet.js";
 import {
-  appsOfTenant, commercialAllowance, commercialAllowanceFor, commercialLeft, dedicateShard,
-  disableApp, enableApp, give, giftsFor, liveAppsOfTenant, setCommercialGrant, shards,
+  appsOfTenantsIn, commercialAllowance, commercialAllowanceFor, commercialLeft, dedicateShard,
+  disableApp, enableApp, give, giftsFor, newestTenants, setCommercialGrant, shards,
   stopGift, tenantById, tenantBySlug, tenantsOf, waitingAlone,
 } from "./directory.js";
 import { memberFor, membersOf, setAppRole } from "./membership.js";
@@ -179,6 +179,13 @@ export interface OperatorDeps {
 /** ⚠️ The same window the jobs screen reads a silence against — see `Jobs`. */
 const A_DAY = 86_400_000;
 
+/**
+ * ⚠️ HOW MANY WORKSPACES THE CONSOLE'S LIST DRAWS AT ONCE, named because three
+ * statements read it. It is a number this repository chose rather than a fact
+ * about anything, and the walk beneath it used to cost three subrequests a row.
+ */
+const PAGE = 200;
+
 export function operatorOps(input: OperatorDeps): PersonalBook {
   /* ⚠️ A deployment with no catalogue wired has NO models, which every reader
      already handles as "the lane has nothing enabled" — never a throw. */
@@ -211,24 +218,36 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
       kind: "read", needs: "session", doors: ["operator"],
       async run(ctx): Promise<unknown> {
         operator(ctx);
-        const rows = await ctx.directory.prepare(
-          `SELECT * FROM tenant ORDER BY at DESC LIMIT 200`).all();
-        const items = await Promise.all(rows.results.map(async (r) => {
-          const id = r.id as TenantId;
-          /* ⚠️ EVERY PRODUCT IT HAS EVER HAD, AND WHICH OF THEM ARE ON. A
+        /* ⚠️ THREE STATEMENTS FOR THE WHOLE PAGE, AND THE SAME WINDOW IN ALL OF
+           THEM. This walked every workspace asking for its products and its
+           membership one at a time — 3N + 1 subrequests, so two hundred rows
+           blew through the fifty a Worker may make and the screen stopped
+           answering rather than merely slowing down. `newestTenants` is the
+           window; `appsOfTenantsIn` and `subscriptionsIn` join through it. */
+        const within = newestTenants(PAGE);
+        const [rows, products, subs, plans] = await Promise.all([
+          ctx.directory.prepare(
+            `SELECT * FROM tenant ORDER BY at DESC, id DESC LIMIT ${PAGE}`).all(),
+          /* ⚠️ EVERY PRODUCT EACH HAS EVER HAD, AND WHICH OF THEM ARE ON. A
              switched-off product keeps its records and its tables, so listing
              only the live ones would make the console's switch a one-way door —
              the row would vanish the moment it was turned off, with nothing left
              to turn back on. */
-          const live = new Set(await liveAppsOfTenant(ctx.directory, id));
-          const held = (await appsOfTenant(ctx.directory, id)).map((appId) => ({
-            id: appId, on: live.has(appId),
-          }));
+          appsOfTenantsIn(ctx.directory, within),
           /* ⚠️ ONE MEMBERSHIP, REPORTED AT THE WORKSPACE RATHER THAN PER PRODUCT.
              The plan, the standing and the operator's adjustments are the
              workspace's — reading them per app was N copies of one answer, and
              the console drew whichever came first. */
-          const sub = await subscriptionFor(ctx.directory, id, MEMBERSHIP);
+          subscriptionsIn(ctx.directory, MEMBERSHIP, within),
+          /* ⚠️ IN THE SAME WAVE, because the catalogue is not derived from any
+             of the three above it — asked after them it is a second wait on a
+             screen that already had one too many. */
+          sold(ctx),
+        ]);
+        const items = rows.results.map((r) => {
+          const id = r.id as TenantId;
+          const held = products.get(id) ?? [];
+          const sub = subs.get(id) ?? null;
           return {
             id, slug: r.slug, name: r.name, country: r.country,
             planId: sub?.planId ?? null,
@@ -246,14 +265,14 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
             legalName: r.legal_name ?? null,
             shardId: r.shard_id, closedAt: r.closed_at ?? null, apps: held,
           };
-        }));
+        });
         /* ⚠️ WHAT EACH PRODUCT DECLARES, not what it sells — the membership is
            the deployment's and its plans travel separately. */
         const apps = every().map((a) => ({
           id: a.id, name: a.name, mark: a.mark,
           entitlements: a.entitlements,
         }));
-        return { items, apps, plans: await sold(ctx) };
+        return { items, apps, plans };
       },
     },
 

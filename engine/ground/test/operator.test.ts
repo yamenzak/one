@@ -188,6 +188,38 @@ describe("what the console can change", () => {
   });
 
   /*
+    ⚠️ EACH ROW CARRIES ITS OWN, WHICH IS THE THING A JOIN CAN GET WRONG. The
+    list used to ask every workspace for its products and its membership one at
+    a time — 3N + 1 subrequests, over the fifty a Worker is allowed by the
+    seventeenth workspace, so the screen stopped answering rather than slowing
+    down. It reads three statements now, and the failure that replaces it is
+    quiet in the other direction: a map keyed wrongly hands every row the first
+    row's answer, which looks like a working screen until two workspaces differ.
+  */
+  it("gives each workspace its own products and its own plan", async () => {
+    await post("setup", "/api/me.tenant.create",
+      { slug: "westgate", name: "Westgate", country: "DE", apps: ["ground"] }, owner);
+    const east = (await tenantBySlug(directory(), "eastgate"))!;
+    const west = (await tenantBySlug(directory(), "westgate"))!;
+
+    expect((await post("admin", "/api/op.tenant.plan",
+      { tenant: west.id, plan: "solo" }, ops)).status).toBe(200);
+    expect((await post("admin", "/api/op.tenant.app",
+      { tenant: east.id, app: "ground", on: false }, ops)).status).toBe(200);
+
+    const seen = await (await get("admin", "/api/op.tenants", ops)).json() as {
+      items: { slug: string; planId: string | null; apps: { id: string; on: boolean }[] }[];
+    };
+    const of_ = (slug: string) => seen.items.find((t) => t.slug === slug)!;
+    expect(of_("westgate").planId).toBe("solo");
+    expect(of_("eastgate").planId).toBe(null);
+    /* ⚠️ A SWITCHED-OFF PRODUCT IS STILL LISTED, off — see `op.tenants`. The
+       row vanishing would make the console's switch a one-way door. */
+    expect(of_("eastgate").apps).toEqual([{ id: "ground", on: false }]);
+    expect(of_("westgate").apps).toEqual([{ id: "ground", on: true }]);
+  });
+
+  /*
     ⚠️ ABSOLUTE, EITHER DIRECTION, CLEARED PER KEY. A workspace held at ten
     seats and then cleared is back on the plan's own number — not on whatever
     the last adjustment happened to be, and never with the grandfathering

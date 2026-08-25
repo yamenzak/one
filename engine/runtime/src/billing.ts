@@ -126,6 +126,25 @@ export async function subscriptionFor(
 }
 
 /**
+ * ⚠️ THE MEMBERSHIP OF A WHOLE PAGE OF WORKSPACES, IN ONE READ. `within` is a
+ * statement selecting the ids — `newestTenants` — rather than a list of them,
+ * because a bound parameter per workspace is a second ceiling to hit and this
+ * screen has already hit one. A workspace that never subscribed is absent from
+ * the map, which is what `null` meant one at a time.
+ */
+export async function subscriptionsIn(
+  db: Db, appId: AppId, within: string,
+): Promise<Map<TenantId, SubRow>> {
+  const rows = await db.prepare(
+    `SELECT * FROM subscription WHERE app_id = ? AND tenant_id IN (${within})`)
+    .bind(appId).all<Record<string, unknown>>();
+  return new Map(rows.results.map((r) => {
+    const sub = asSub(r);
+    return [sub.tenantId, sub] as const;
+  }));
+}
+
+/**
  * ⚠️ THE FOUR WRITES BELOW ARE THE LADDER, AND ONLY A VERIFIED EVENT DRIVES
  * THEM. Nothing here is reachable from a route a caller can press: a workspace
  * that could write its own subscription row is a workspace that can grant itself

@@ -458,7 +458,7 @@ env or a binding.
 |---|---|---|---|
 | `schema` | the composed schema runner — declarations become tables | 7 | — |
 | `sql` | the one typed seam onto D1 | 5 | — |
-| `directory` | accounts, workspaces, placement, enablement, allowances | 42 | — |
+| `directory` | accounts, workspaces, placement, enablement, allowances | 44 | — |
 | `handles` | which binding holds which shard | 4 | — |
 | `locate` | who is asking, where they are, and what they hold | 2 | — |
 | `flags` | what somebody switched, per deployment and per workspace | 10 | — |
@@ -468,7 +468,7 @@ env or a binding.
 | `serve` | the one path every request ends in — both doors | 6 | — |
 | `records` | the generated reads and writes behind a collection | 9 | — |
 | `settings` | reading and writing a workspace's own switches | 5 | — |
-| `billing` | plans, subscriptions, the bill, the ladder | 16 | — |
+| `billing` | plans, subscriptions, the bill, the ladder | 17 | — |
 | `wallet` | OneWallet: the allowance, what was bought, and reserve → settle → release | 22 | — |
 | `catalogue` | the price list an operator edits over the declaration, and what it holds for the people already on a tier | 8 | — |
 | `packages` | granting, revoking and expiring a bought bundle | 8 | — |
@@ -520,7 +520,7 @@ env or a binding.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 1 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 9 | — |
 
-**460 of them**, 459 reached by something today.
+**463 of them**, 462 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 
