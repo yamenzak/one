@@ -1122,6 +1122,7 @@ its own header, cited by other files, and doing nothing.
 | D85 | The interface is a warm material with one hot mark on it | 3 |
 | D86 | The dock is a plate again, and it is dark in both themes | 1 |
 | D87 | Two data marks the vocabulary was missing: a position, and a texture | 0 |
+| D88 | Magnitude carries the brand, identity never does | 0 |
 <!-- /generated -->
 
 ---
