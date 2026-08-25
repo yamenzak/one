@@ -36,7 +36,7 @@ import { chromium, type Browser } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   DESK, ENOUGH_TO_RANK, FINGER, PHONE, SCALE_CEILING,
-  contrastOf, geometryOf, isLarge, mounted, sayTwins, strayTwins, scaleOf,
+  contrastOf, geometryOf, isLarge, mixedHeads, mounted, sayHeads, sayTwins, strayTwins, scaleOf,
   stylesheet, tooSmall, unreadable,
 } from "@engine/design/measuring";
 import { INVENTORY_ROUTES, INVENTORY_SURFACES } from "../src/screens/index.js";
@@ -276,6 +276,23 @@ describe("every name a screen puts in the document", () => {
       const seen = await at(route, PHONE);
       const stray = strayTwins(seen.twins);
       expect(stray, `${route}: ${sayTwins(stray)}`).toEqual([]);
+    }, 30_000);
+  }
+});
+
+/*
+  ⚠️ AND A COLUMN OF HEADINGS AGREES WITH ITSELF. Three cards in a stack where
+  ONE has a line under its name reads as "this is the important one", for a
+  reason nobody chose — and every heading in it is individually right, which is
+  why no component can catch it and why it survived a whole redesign. See
+  `Geometry.heads` for the rule and `mixedHeads` for why three rather than two.
+*/
+describe("the headings on every screen", () => {
+  for (const route of EVERY) {
+    it(`agree about whether they carry a line: ${route}`, async () => {
+      const seen = await at(route, PHONE);
+      const mixed = mixedHeads(seen.heads);
+      expect(mixed, `${route}: ${sayHeads(mixed)}`).toEqual([]);
     }, 30_000);
   }
 });

@@ -254,7 +254,7 @@ export function Home({
         */}
         {waiting.length
           ? (
-            <Section label="What needs you">
+            <Section label="What needs you" under="Run out, half counted, or waiting to be released">
               <Group>
                 {waiting.map((one) => (
                   <NavRow
@@ -300,7 +300,7 @@ export function Home({
 
         {moving
           ? (
-            <Section label="How it is going">
+            <Section label="How it is going" under="The last four weeks of movements">
               <Await
                 of={moving}
                 /* ⚠️ SHAPED LIKE WHAT IS COMING: three figures and a plot, not

@@ -14,7 +14,7 @@
 
 import * as React from "react";
 import { Skeleton } from "@heroui/react";
-import { TYPE } from "../tokens/type.js";
+import { TYPE, headed } from "../tokens/type.js";
 import { HEAD_GAP, HERO_PAD, SPACE, TITLE_PAD } from "../tokens/metrics.js";
 import { ON_SCENE } from "../tokens/ambience.js";
 import { useBones } from "./bones.js";
@@ -54,7 +54,7 @@ export function Title(
   },
 ) {
   return (
-    <div className={`flex flex-col ${SPACE.hair}`}>
+    <div className={`flex flex-col ${SPACE.hair}`} {...headed("title", under)}>
       <h1 className={TYPE.title}>{children}</h1>
       {under ? <p className={TYPE.note}>{under}</p> : null}
     </div>
@@ -95,7 +95,7 @@ export function Section(
   return (
     <section className={`flex flex-col ${HEAD_GAP}`}>
       {label || under ? (
-        <div className={`flex flex-col ${SPACE.hair}`}>
+        <div className={`flex flex-col ${SPACE.hair}`} {...headed("section", under)}>
           {label ? <h2 className={TYPE.section}>{label}</h2> : null}
           {under ? <p className={TYPE.note}>{under}</p> : null}
         </div>

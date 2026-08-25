@@ -1305,6 +1305,7 @@ Some of this is guarded and some is judgement:
 - `surface` — every declaration reaches a screen, and every field kind has a control.
 - `tone` — one voice — label length, description length, sentence case, full stops.
 - `travel` — the route decides the direction and the world decides the gesture; nothing else moves the page.
+- `type` — every size is a rung of one ladder, and only `type.ts` writes one.
 - `weight` — a component nobody has drawn yet is not in the bundle they are waiting for.
 <!-- /generated -->
 

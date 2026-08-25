@@ -256,7 +256,7 @@ export function Import({
               </Group>
             </Section>
 
-            <Section label="What would happen">
+            <Section label="What would happen" under="Counted from the rows below">
               <StatRow>
                 <Stat label="New" value={seen.tally.new} />
                 <Stat label="Already here" value={seen.tally.update} />
@@ -272,7 +272,10 @@ export function Import({
             */}
             {seen.tally.refused
               ? (
-                <Section label="These will not be imported">
+                <Section
+                  label="These will not be imported"
+                  under="Fix them in your own file and paste again"
+                >
                   <Group>
                     {seen.rows.filter((r) => r.verdict === "refused").map((row) => (
                       <ControlRow key={row.line} label={`Line ${row.line}`} under={under(row)}>
@@ -284,7 +287,7 @@ export function Import({
               )
               : null}
 
-            <Section label="Row by row">
+            <Section label="Row by row" under="What each line will do">
               <Group>
                 {seen.rows.filter((r) => r.verdict !== "refused").map((row) => (
                   <ControlRow

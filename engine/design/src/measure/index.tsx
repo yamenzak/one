@@ -358,6 +358,29 @@ export interface Geometry {
    * one exemption below expressible as a shape rather than as a count.
    */
   readonly twins: readonly { readonly id: string; readonly each: readonly string[] }[];
+  /**
+   * EVERY GROUP OF PEER HEADINGS THAT DISAGREES ABOUT WHETHER A HEADING HAS A
+   * LINE UNDER IT.
+   *
+   * ⚠️ NO COMPONENT CAN ASK THIS QUESTION — see `headed`. A `Group` knows what
+   * it was handed and nothing about the card beside it, so "the page decides,
+   * and it decides once" is a claim only something looking at the whole rendered
+   * screen can check. It is the same reason `type` is here: the fault is in the
+   * SET, and every member of it is individually right.
+   *
+   * ⚠️ PEERS ARE SAME RANK, SAME CONTAINER — never same screen. A screen may
+   * head every section with a line and none of its cards; that is a system. What
+   * it may not do is put two cards side by side and give one of them a
+   * subheading, which is what "some of these are more important" looks like when
+   * nobody meant it.
+   *
+   * `said` is the two answers found, and `text` samples one heading of each, so
+   * a failure names the two lines somebody has to look at.
+   */
+  readonly heads: readonly {
+    readonly rank: string; readonly count: number;
+    readonly withLine: string; readonly noLine: string;
+  }[];
 }
 
 /**
@@ -418,6 +441,30 @@ const isTheLibrarys = (one: Geometry["twins"][number]): boolean =>
  */
 export const strayTwins = (twins: Geometry["twins"]): Geometry["twins"] =>
   twins.filter((one) => !isTheLibrarys(one));
+
+/**
+ * ⚠️ THREE IS WHERE A DIFFERENCE STOPS READING AS A DIFFERENCE AND STARTS
+ * READING AS AN OVERSIGHT, and the number is the whole rule rather than a
+ * tolerance. Two blocks that are set differently are two blocks a reader parses
+ * as two kinds of thing — a card of facts, then a card with a consequence
+ * spelled out under its name, which is exactly where a consequence belongs.
+ * Three or more with ONE odd is a pattern with an exception in it, and an
+ * exception nobody chose is what "some of these are more important" looks like
+ * when nobody meant it. Measured across both products: every 2-peer report was a
+ * deliberate pair, and every report of 3 or more was a screen nobody had looked
+ * at as a column.
+ *
+ * ⚠️ AND IT IS A HELPER RATHER THAN A FILTER INSIDE THE READING, for the reason
+ * `tooSmall` is: the harness reports what is there and the rule is stated once,
+ * where it can be read, instead of once per product.
+ */
+export const mixedHeads = (heads: Geometry["heads"]): Geometry["heads"] =>
+  heads.filter((one) => one.count > 2);
+
+/** ⚠️ How a mixed column reads, in words a failure can print. */
+export const sayHeads = (heads: Geometry["heads"]): string =>
+  heads.map((h) => `${h.count} ${h.rank} heading(s): "${h.withLine}" has a line under it, `
+    + `"${h.noLine}" does not`).join("; ");
 
 /** ⚠️ How a doubled control reads, in words a failure can print. */
 export const sayTwins = (twins: Geometry["twins"]): string =>
@@ -661,6 +708,35 @@ export async function geometryOf(
       const twins = Array.from(byId.entries())
         .filter(([, each]) => each.length > 1)
         .map(([id, each]) => ({ id, each }));
+      /*
+        ⚠️ PEER HEADINGS, AND THE CONTAINER IS WHAT MAKES THEM PEERS — see
+        `Geometry.heads`. A heading block sits inside its own `<section>`, so the
+        thing holding the peers is that section's PARENT: one stack, one grid,
+        one column of cards. Keying on the screen instead would refuse a page
+        that heads its sections one way and its cards another, which is a system
+        rather than a fault.
+      */
+      const seats = new Map<Element, number>();
+      const nests = new Map<string, { withLine: string[]; noLine: string[] }>();
+      for (const block of Array.prototype.slice.call(
+        document.querySelectorAll("[data-head]")) as Element[]) {
+        const own = block.closest("section, header, article") ?? block;
+        const holder = own.parentElement ?? document.body;
+        if (!seats.has(holder)) seats.set(holder, seats.size);
+        const key = `${block.getAttribute("data-head")}#${seats.get(holder)}`;
+        const found = nests.get(key) ?? { withLine: [], noLine: [] };
+        const words = (block.textContent ?? "").trim().slice(0, 30);
+        (block.getAttribute("data-said") === "yes" ? found.withLine : found.noLine).push(words);
+        nests.set(key, found);
+      }
+      const heads = Array.from(nests.entries())
+        .filter(([, found]) => found.withLine.length > 0 && found.noLine.length > 0)
+        .map(([key, found]) => ({
+          rank: key.split("#")[0] ?? "",
+          count: found.withLine.length + found.noLine.length,
+          withLine: found.withLine[0] ?? "",
+          noLine: found.noLine[0] ?? "",
+        }));
       /* ⚠️ ELLIPSIS ONLY, NOT EVERY OVERFLOW. A scroller's content is wider than
          its box on purpose, and a clipped decoration is not text somebody was
          meant to read; what this is looking for is the layout deciding, on its
@@ -783,6 +859,15 @@ export async function geometryOf(
            mean nothing. What a chart may set is `CHART_TYPE`, and `motion`
            refuses any other size in source. */
         if (el.closest("svg")) continue;
+        /* ⚠️ NOR A PRINTED LABEL'S, AND IT IS THE SAME ARGUMENT ONE MEDIUM OVER.
+           `Label` is sized in MILLIMETRES because a die-cut roll is — a product
+           name at 3 mm cap height is readable at arm's length under a store-room
+           light, and that number is a fact about paper rather than a rung of a
+           screen's ladder. Counted here it added 14, 9 and 8 to the labels
+           screen and made a preview of a physical object look like a page with
+           eight type sizes on it. What a label may set is millimetres, and the
+           `data-label` mark is the boundary. */
+        if (el.closest("[data-label]")) continue;
         const style = getComputedStyle(el);
         if (style.visibility === "hidden" || style.display === "none") continue;
         if (style.clipPath && style.clipPath !== "none") continue;
@@ -813,7 +898,7 @@ export async function geometryOf(
           ({ px: s.px, weight: s.weight, count: s.count, text: s.text }))
         .sort((a: { px: number }, b: { px: number }) => b.px - a.px);
       const ink = Array.from(inks.values());
-      return { spill, worst, targets, cut, type, ink, twins };
+      return { spill, worst, targets, cut, type, ink, twins, heads };
     }, viewport.width);
   } finally {
     await page.close();

@@ -925,6 +925,11 @@ its own header, cited by other files, and doing nothing.
 | `a-checklist-is-ticked-by-what-happened` | D12 | three unticked steps for ever, shown to a workspace that finished all three last week — and a screen ticking them instead would leave them undone for anybody who did the same thing from the API or from a second screen |
 | `a-congratulation-is-said-once` | D12 | recognition repeated on every load, which is not recognition but furniture — and then the one that matters is not read either |
 | `a-step-only-the-clock-can-complete-is-refused` | D12 | a checklist item nobody can take, passing composition because a nightly sweep does raise the event — the tally counts what people did, so the step sits unticked with nothing anywhere saying why |
+| `every-size-is-a-rung-of-one-ladder` | D89 | ten hand-picked sizes in six mechanisms, each defensible where it was written and none in a relationship with any other - a product where nothing is broken, everything is slightly out of step, and no reviewer can name the fault |
+| `a-rung-actually-reaches-the-page` | D89 | the whole product rendered at one size with every check green - a class built at runtime is emitted nowhere, and a bare `text-[var(--x)]` is emitted as an INK, so the rule that ships is `color: 1.953rem` and every browser discards it in silence |
+| `a-mark-is-on-the-type-ladder-too` | D89 | six published icon sizes reaching none of them - `glyphOf` returns its mark inside a span, so a child combinator matched nothing anywhere and every glyph in the product drew at the library's own 20px while the box around it carried a correct value from a derived ladder |
+| `peer-headings-agree-about-a-line` | D89 | three cards in a stack where one carries a subheading and two do not, which reads as `this is the important one` for a reason nobody chose - and no component can see it, because a card knows what it was handed and nothing about the card beside it |
+| `the-reference-app-heads-consistently-too` | D89 | a mixed column in the reference somebody copies from, so the fault is in the next product before anybody has looked at this one |
 | `no-screen-pushes-the-page-sideways` | D7 | a screen a phone scrolls horizontally, which no source-reading check can see — the width is a computed value produced by a stylesheet, a flex container and four components that each did something defensible |
 | `every-control-is-big-enough-for-a-finger` | D7 | `ROW.tap` calling 44px non-negotiable while every button ships 40, 36 above the breakpoint and 32 for `sm` — the rule true of the rows and false of the things people press, in a product used one-handed |
 | `the-reference-app-is-measured-too` | D7 | a layout fault in the app every new screen is tried in first, which is then copied into a product before anything measures it |
@@ -1123,6 +1128,7 @@ its own header, cited by other files, and doing nothing.
 | D86 | The dock is a plate again, and it is dark in both themes | 1 |
 | D87 | Two data marks the vocabulary was missing: a position, and a texture | 0 |
 | D88 | Magnitude carries the brand, identity never does | 0 |
+| D89 | One ladder, and a rung has to reach the page | 5 |
 <!-- /generated -->
 
 ---

@@ -523,7 +523,15 @@ export function Crown({
                 <Face of={subject} name={name} size="row" />
               ) : null}
               <span className="flex min-w-0 flex-col">
-                <strong className={`truncate ${TYPE.label}`}>{name}</strong>
+                {/* ⚠️ `group`, NOT `label`, AND IT IS THE ONLY TOP A SUB-PAGE
+                    HAS. A screen with a way back draws no heading of its own —
+                    its name is the chrome's (`screen.tsx`) — so at `label` the
+                    page's name was the same size as every row under it and the
+                    reader's eye had nowhere to land. Measured on the note
+                    screen: eleven pieces of type, all 16px, nothing outranking
+                    the body. One rung up is the whole fix, and it is the rung a
+                    card's heading already takes. */}
+                <strong className={`truncate ${TYPE.group}`}>{name}</strong>
                 {under ? (
                   <span className={`truncate ${TYPE.note}`}>{under}</span>
                 ) : null}

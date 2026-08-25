@@ -24,7 +24,7 @@ import {
 } from "@heroui/react";
 import { sentence } from "../tokens/type.js";
 import { SPACE } from "../tokens/metrics.js";
-import { Knob, Tail } from "../parts/forms.js";
+import { Tail } from "../parts/forms.js";
 import type { PickerProps } from "../parts/pickers.js";
 
 /**
@@ -120,7 +120,7 @@ export function Field({ name, spec, value, onChange, disabled, set, bare, error 
               asks for: they are not part of the thing you press, and inside the
               label a refusal becomes another target that toggles the switch. */}
           <Switch.Content>
-            <Knob />
+            <Switch.Control><Switch.Thumb /></Switch.Control>
             {label}
           </Switch.Content>
           {tail}

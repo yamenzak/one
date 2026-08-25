@@ -156,7 +156,7 @@ export function Reports({ title, of, again, today, period, onPeriod }: {
               />
             </ChartPanel>
 
-            <ChartPanel label="Share of the notebook">
+            <ChartPanel label="Share of the notebook" under="The same four, as one whole">
               {/* ⚠️ A DONUT IS FOR PARTS OF ONE WHOLE and this is the only place
                   on the sheet where the parts add up to something. Four slices
                   is its ceiling in practice — past that the legend is doing all

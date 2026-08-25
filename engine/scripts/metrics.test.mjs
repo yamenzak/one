@@ -25,6 +25,7 @@
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { sizeOf } from "./lib/ladder.mjs";
 import { appDirs } from "./lib/trees.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -415,11 +416,17 @@ if (!rows.length) {
 {
   const TYPES = readFileSync(join(ENGINE, "design/src/tokens/type.ts"), "utf8");
   const LOUD = ["display", "wordmark", "figure"];
+  /* ⚠️ THE VALUE IS A TEMPLATE LITERAL NOW — the size is interpolated from the
+     ladder — so a pattern anchored to a double quote finds nothing and reports
+     the role as missing. The question is unchanged: is this role's ink FULL
+     contrast, which is narrower than `type.test.mjs`'s "does it state one". */
+  const declOf = (role) =>
+    new RegExp(`^\\s*${role}: ([\`"][^\\n]*[\`"]),$`, "m").exec(TYPES)?.[1];
   const quiet = LOUD.filter((role) => {
-    const set = new RegExp(`^\\s*${role}: "([^"]+)"`, "m").exec(TYPES)?.[1];
+    const set = declOf(role);
     return !set || !/\btext-(foreground|ink)\b/.test(set);
   });
-  const missing = LOUD.filter((role) => !new RegExp(`^\\s*${role}: "`, "m").test(TYPES));
+  const missing = LOUD.filter((role) => !declOf(role));
 
   if (missing.length) {
     fail(`type.ts: no \`${missing.join("`, `")}\` role — this guard is blind.`);
@@ -487,27 +494,28 @@ if (!rows.length) {
 {
   const TYPES = readFileSync(join(ENGINE, "design/src/tokens/type.ts"), "utf8");
   const RANKS = ["title", "section", "group"];
-  const px = (set) => {
-    const arb = /\btext-\[([\d.]+)rem\]/.exec(set);
-    if (arb) return Number(arb[1]) * 16;
-    const NAMED = { "text-base": 16, "text-lg": 18, "text-xl": 20, "text-2xl": 24, "text-3xl": 30 };
-    return NAMED[/\btext-(?:base|lg|xl|2xl|3xl)\b/.exec(set)?.[0]] ?? null;
-  };
-  const sets = RANKS.map((r) => new RegExp(`^\\s*${r}: "([^"]+)"`, "m").exec(TYPES)?.[1] ?? null);
+  /* ⚠️ ONE READER — see `lib/ladder.mjs`. This held its own five-entry map of
+     Tailwind's sizes; `motion.test.mjs` held a nine-entry one; both parsed the
+     bracketed form by hand. Three answers to one question is three answers that
+     drift, and they did — both went blind on the same commit. */
+  const sizes = RANKS.map((r) => sizeOf(r));
+  /* ⚠️ The weight is still read from the declaration — it is not on the ladder,
+     and it is the half that survives a title wrapping to two lines. */
+  const weights = RANKS.map((r) =>
+    new RegExp(`^\\s*${r}: ([\`"][^\\n]*[\`"]),$`, "m").exec(TYPES)?.[1] ?? "");
 
-  if (sets.some((s) => s === null)) {
-    fail(`type.ts: no \`${RANKS[sets.indexOf(null)]}\` role — this guard is blind.`);
+  if (sizes.some((s) => s === undefined)) {
+    fail(`type.ts: no \`${RANKS[sizes.indexOf(undefined)]}\` role — this guard is blind.`);
   } else {
-    const sizes = sets.map(px);
     const unread = sizes.indexOf(null);
     if (unread >= 0) {
-      fail(`type.ts: \`${RANKS[unread]}\` names a size this guard cannot read — `
-         + `add it to \`NAMED\` here rather than leaving the ladder unchecked.`);
+      fail(`type.ts: \`${RANKS[unread]}\` asks for no rank, so this guard cannot `
+         + `place it on the ladder.`);
     } else if (!(sizes[0] > sizes[1] && sizes[1] > sizes[2])) {
       fail(`type.ts: the heading ladder is ${sizes.join(" / ")}px and does not descend.\n`
          + "       A heading that does not outrank what it heads is a heading doing no work,\n"
          + "       and a screen of them reads as several pages stacked (D85).");
-    } else if (!/\bfont-bold\b/.test(sets[0]) || /\bfont-bold\b/.test(sets[1])) {
+    } else if (!/\bfont-bold\b/.test(weights[0]) || /\bfont-bold\b/.test(weights[1])) {
       fail(`type.ts: \`title\` and \`section\` are the same weight.\n`
          + "       Size alone stops separating them the moment a title wraps; the top rank\n"
          + "       carries a weight the ranks under it do not (D85).");

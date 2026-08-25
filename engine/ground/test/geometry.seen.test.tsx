@@ -15,7 +15,7 @@
 import { chromium, type Browser } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
-  DESK, PHONE, geometryOf, sayTwins, strayTwins, stylesheet, tooSmall,
+  DESK, PHONE, geometryOf, mixedHeads, sayHeads, sayTwins, strayTwins, stylesheet, tooSmall,
 } from "@engine/design/measuring";
 import { GROUND_ROUTES, GroundScreen } from "../src/screens/index.js";
 
@@ -84,6 +84,22 @@ describe("every name the ground puts in the document", () => {
       const seen = await at(route, PHONE);
       const stray = strayTwins(seen.twins);
       expect(stray, `${route}: ${sayTwins(stray)}`).toEqual([]);
+    }, 30_000);
+  }
+});
+
+/*
+  ⚠️ AND A COLUMN OF HEADINGS AGREES WITH ITSELF — see `Geometry.heads`. It is
+  asked of the ground as well as of the product because the ground is where a
+  new screen is tried first: a mixed column caught here is caught before it is
+  copied, and caught only in the product it is already in the reference.
+*/
+describe("the headings on every ground screen", () => {
+  for (const route of GROUND_ROUTES) {
+    it(`agree about whether they carry a line: ${route}`, async () => {
+      const seen = await at(route, PHONE);
+      const mixed = mixedHeads(seen.heads);
+      expect(mixed, `${route}: ${sayHeads(mixed)}`).toEqual([]);
     }, 30_000);
   }
 });

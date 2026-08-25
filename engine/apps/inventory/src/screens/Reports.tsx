@@ -167,7 +167,7 @@ export function Reports({ title, of, span, onSpan, again, onOpen, onSuppliers }:
             confused with each other; netted, it is a shelf that is two out and
             looks fine.
           */}
-          <Group label="What the numbers were wrong by">
+          <Group label="What the numbers were wrong by" under="Short and over kept apart, never netted off">
             {said.losses.slice(0, TOP).map((one) => (
               <AmountRow
                 key={one.product}
@@ -189,7 +189,7 @@ export function Reports({ title, of, span, onSpan, again, onOpen, onSuppliers }:
             — and it is the operation's ordering rather than this screen's, so a
             list and a notification cannot disagree about what is urgent.
           */}
-          <Group label="What to buy">
+          <Group label="What to buy" under="Soonest to run out at the top">
             {said.buy.map((one) => (
               <AmountRow
                 key={one.product}

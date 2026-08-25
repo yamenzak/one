@@ -42,7 +42,7 @@ import * as React from "react";
 import { TYPE } from "../tokens/type.js";
 import { CARD_ROWS, PROSE, SPACE } from "../tokens/metrics.js";
 import { Switch } from "@heroui/react";
-import { Knob, LongText, NamedAlready } from "./forms.js";
+import { LongText, NamedAlready } from "./forms.js";
 
 /* ------------------------------------------------------------------ parse --- */
 
@@ -363,7 +363,7 @@ export function Written({
           <Switch isSelected={reading} onChange={setReading}>
             <Switch.Content>
               <span className={TYPE.note}>Preview</span>
-              <Knob />
+              <Switch.Control><Switch.Thumb /></Switch.Control>
             </Switch.Content>
           </Switch>
         </div>

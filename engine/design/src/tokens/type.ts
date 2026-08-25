@@ -39,6 +39,204 @@
  * on it is overriding the library, which the restyle guard refuses.
  */
 
+/* ------------------------------------------------------------------ scale --- */
+
+/**
+ * EVERY SIZE IN THE PRODUCT, FROM ONE NUMBER AND ONE RATIO.
+ *
+ * ⚠️ THE ROLES WERE RIGHT AND THEIR SIZES WERE TEN LITERALS. `text-sm`,
+ * `text-base`, `text-xl`, `text-2xl`, `text-6xl`, `text-[2rem]`, `text-[2.75rem]`,
+ * `text-[3.25rem]`, `text-[3.5rem]`, `text-[5.5rem]` — six mechanisms and ten
+ * numbers, each defensible where it was written and none of them in a
+ * relationship with any other. Naming the role moved the decision to one file;
+ * it did not make the file itself a system, and the gap showed: `section` at 20
+ * and `group` at 16 read as one rank, while `title` at 32 sat two steps above
+ * `section` with nothing between them.
+ *
+ * ⚠️ SO A SIZE IS AN INDEX ON A LADDER, AND THE LADDER IS ARITHMETIC. 1.25 is
+ * the major third — wide enough that two neighbouring rungs are visibly
+ * different at reading sizes, narrow enough that eight of them span 13px to
+ * 61px without a gap somebody has to fill with an eleventh literal. Chosen
+ * because the sizes already here cluster on it: 16, 20, 25, 31, 39, 49, 61
+ * against the 16, 20, 24, 32, 44, 52, 60 that were typed.
+ *
+ * ⚠️ AND IT IS `rem`, WITH THE ROUNDING DONE ONCE HERE. A ladder recomputed at
+ * each call site is a ladder with rounding differences in it; a ladder rounded
+ * to whole pixels is a ladder that stops being geometric. Two decimal places of
+ * a rem is a twentieth of a pixel at the default root size, which no screen can
+ * show and no two rungs can collide over.
+ */
+const BASE = 1;
+const RATIO = 1.25;
+
+/** ⚠️ The rung, as a `rem` string. `step(0)` is the base; negative goes down. */
+export const step = (n: number): string => `${(BASE * RATIO ** n).toFixed(3)}rem`;
+
+/**
+ * THE LEADING OF A RUNG, WHICH IS PART OF THE RUNG AND NOT A SECOND DECISION.
+ *
+ * ⚠️ LEADING TIGHTENS AS TYPE GROWS, AND THE RAMP IS THE WHOLE OF IT. A line of
+ * 13px prose wants half again its own height between baselines; a 61px name
+ * wants less than one, because at that size the space between two lines is
+ * measured in tens of pixels and the default reads as two separate things. Every
+ * design system does this and most of them do it by hand, once per heading.
+ *
+ * ⚠️ AND IT IS HERE BECAUSE THE LADDER DROPPING IT WAS A REAL REGRESSION. A
+ * named Tailwind size carries a line-height (`text-base` is `1rem/1.5`); an
+ * arbitrary one carries none — so the moment the roles moved onto the ladder,
+ * every one of them started INHERITING its leading from wherever it was
+ * dropped. Measured: the same `label` came out 22.86px tall inside a pressable
+ * row, whose button sets 1.4286, and 24px inside an identical row that was not
+ * pressable and took the page's 1.5. Two rows, one component, three pixels, and
+ * the placeholder that stands in for them was suddenly the wrong height. That is
+ * the argument this file makes about SIZE, one property over.
+ *
+ * ⚠️ SO NO ROLE NAMES ITS OWN, and `type.test.mjs` refuses one that does. A role
+ * with a hand-picked leading is a role outside the ladder in the property nobody
+ * checks — which is exactly how it got here.
+ */
+const LEAD_BASE = 1.5;
+const LEAD_TIGHTEN = 0.09;
+const LEAD_FLOOR = 0.95;
+
+export const lead = (n: number): string =>
+  Math.max(LEAD_FLOOR, LEAD_BASE - LEAD_TIGHTEN * n).toFixed(3);
+
+/**
+ * ⚠️ THE SAME RUNG IN PIXELS, FOR THE ONE THING THAT CANNOT TAKE A CLASS — an
+ * icon, whose size is set on its box as a number (`--icon`). A ladder that stops
+ * at the edge of the DOM is a ladder with a second, undeclared ladder beside it:
+ * `ICON` held 20, 20, 22, 24, 26 and 28, six numbers with no relationship to the
+ * type they stand next to or to each other.
+ *
+ * ⚠️ AND 16 IS THE ROOT SIZE, WHICH IS AN ASSUMPTION WORTH STATING. Everything
+ * here is `rem`, so a person who has enlarged their browser's text gets larger
+ * type — and their icons scale with it only if the icon is a `rem` too. It is
+ * not: an icon in a fixed 44px circle that grows past the circle is worse than
+ * one that holds. The number is what the rung is AT THE DEFAULT, and the box
+ * around it is measured in the same units.
+ */
+export const ROOT = 16;
+
+export const pixels = (n: number): number => Math.round(ROOT * RATIO ** n);
+
+/**
+ * ⚠️ THE RUNGS HAVE NAMES BECAUSE AN INDEX AT A CALL SITE IS A LITERAL AGAIN.
+ * `step(3)` and `text-[2rem]` are the same decision made in the same place; what
+ * a role names is the RANK, and the rank is what a reader compares.
+ */
+export const RANK = {
+  /** ⚠️ 13px. Secondary text, and the only rung below the base. */
+  aside: -1,
+  /** ⚠️ 16px. What running text and a control's own name are set in. */
+  base: 0,
+  /** ⚠️ 20px. A card's heading. */
+  block: 1,
+  /** ⚠️ 25px. A part of a screen, and a figure standing in a row. */
+  part: 2,
+  /** ⚠️ 31px. What this screen is. */
+  page: 3,
+  /** ⚠️ 39px. The one thing a screen exists to show, on a phone. */
+  hero: 4,
+  /** ⚠️ 49px. That same thing on a desk, and an arrival's own mark on a phone. */
+  loud: 5,
+  /** ⚠️ 61px. An arrival on a desk. Nothing in the product goes above it. */
+  door: 6,
+} as const;
+
+export type Rank = keyof typeof RANK;
+
+/**
+ * THE LADDER REACHES THE PAGE AS VARIABLES, AND THE CLASS NAMES ARE LITERAL.
+ *
+ * ⚠️ A COMPUTED CLASS NAME IS A CLASS NAME TAILWIND NEVER EMITS, and the failure
+ * is silent and total. The first draft returned `text-[${step(n)}]` — correct
+ * arithmetic, correct string, and invisible to the scanner, which reads SOURCE
+ * text and never runs it. So no size rule was generated for any role, every
+ * heading inherited, and the whole product rendered at one size with every check
+ * green. This is the same trap the harness's own note describes one layer down:
+ * a class used only where the scanner cannot see it does not exist.
+ *
+ * ⚠️ SO THE ARITHMETIC IS EMITTED AS CSS AND THE CLASS POINTS AT IT. `TYPE_CSS`
+ * goes out with the other runtime tokens; these eight strings are written out in
+ * full so the scanner finds them, and each one is the only place its rank is
+ * spelled. The values behind them are still `step(n)` and nothing else.
+ *
+ * ⚠️ AND `length:` IS LOAD-BEARING, WHICH IS THE SAME TRAP ONE LAYER IN.
+ * `text-[…]` sets a size or an ink depending on what is inside the brackets, and
+ * Tailwind decides by LOOKING at the value: `text-[0.58em]` is a size because it
+ * carries a unit, and `text-[var(--rank-page)]` is a COLOUR, because a bare
+ * variable could be either and ink is the default. That draft compiled to
+ * `color: var(--rank-page)` — a rem string used as a colour, which every browser
+ * discards in silence — so once again no size rule reached any role and every
+ * check was green. The hint is what makes the class unambiguous.
+ */
+export const TYPE_CSS = `:root { ${(Object.keys(RANK) as Rank[])
+  .map((rank) => `--rank-${rank}: ${step(RANK[rank])}; --lead-${rank}: ${lead(RANK[rank])};`)
+  .join(" ")} }`;
+
+/**
+ * AND THE LIBRARY'S OWN SIZES ARE POINTED AT THE SAME LADDER.
+ *
+ * ⚠️ HEROUI SETS TYPE FROM TAILWIND'S NAMED SCALE — `.button--md` is
+ * `--text-sm` and `.chip` is `--text-xs` — so a screen made of our roles and its
+ * controls was serving TWO ladders: measured on one dense screen, 31, 25, 20,
+ * 16 and 13 from here and 14 and 12 from there, none of the second four
+ * derivable from anything. That is the fault this file is about, arriving
+ * through the one door D7 says we must not shut by hand: a `className` on a
+ * library component is a restyle.
+ *
+ * ⚠️ SO THE VARIABLE IS REDEFINED RATHER THAN THE COMPONENT. Tailwind's scale is
+ * a set of custom properties; pointing each at a rung leaves every library rule
+ * exactly as the library wrote it and changes only what its numbers resolve to.
+ * Nothing is overridden, nothing is `!important`, and a component the library
+ * adds tomorrow is on the ladder the day it ships.
+ *
+ * ⚠️ `sm` LANDS ON THE BASE, WHICH IS THE ONE JUDGEMENT HERE. A control's own
+ * name is not secondary text — it is the word somebody presses — and the ladder
+ * has no 14. Rounding it DOWN to `aside` would put every button's label at
+ * 12.8px on a phone; rounding up puts it level with a row's label, which is what
+ * it is.
+ */
+const LIBRARY: readonly (readonly [string, Rank])[] = [
+  ["xs", "aside"], ["sm", "base"], ["base", "base"], ["lg", "block"],
+  ["xl", "block"], ["2xl", "part"], ["3xl", "page"], ["4xl", "hero"],
+  ["5xl", "loud"], ["6xl", "door"], ["7xl", "door"], ["8xl", "door"], ["9xl", "door"],
+];
+
+export const LIBRARY_TYPE_CSS = `:root { ${LIBRARY
+  .map(([named, rank]) =>
+    `--text-${named}: var(--rank-${rank}); --text-${named}--line-height: var(--lead-${rank});`)
+  .join(" ")} }`;
+
+/* ⚠️ LITERAL, NOT BUILT — see `TYPE_CSS`. The scanner reads these. */
+const AT: Readonly<Record<Rank, string>> = {
+  aside: "text-[length:var(--rank-aside)] leading-[var(--lead-aside)]",
+  base: "text-[length:var(--rank-base)] leading-[var(--lead-base)]",
+  block: "text-[length:var(--rank-block)] leading-[var(--lead-block)]",
+  part: "text-[length:var(--rank-part)] leading-[var(--lead-part)]",
+  page: "text-[length:var(--rank-page)] leading-[var(--lead-page)]",
+  hero: "text-[length:var(--rank-hero)] leading-[var(--lead-hero)]",
+  loud: "text-[length:var(--rank-loud)] leading-[var(--lead-loud)]",
+  door: "text-[length:var(--rank-door)] leading-[var(--lead-door)]",
+};
+
+const AT_WIDE: Readonly<Record<Rank, string>> = {
+  aside: "md:text-[length:var(--rank-aside)] md:leading-[var(--lead-aside)]",
+  base: "md:text-[length:var(--rank-base)] md:leading-[var(--lead-base)]",
+  block: "md:text-[length:var(--rank-block)] md:leading-[var(--lead-block)]",
+  part: "md:text-[length:var(--rank-part)] md:leading-[var(--lead-part)]",
+  page: "md:text-[length:var(--rank-page)] md:leading-[var(--lead-page)]",
+  hero: "md:text-[length:var(--rank-hero)] md:leading-[var(--lead-hero)]",
+  loud: "md:text-[length:var(--rank-loud)] md:leading-[var(--lead-loud)]",
+  door: "md:text-[length:var(--rank-door)] md:leading-[var(--lead-door)]",
+};
+
+/** ⚠️ A size utility from a rank — the only place one is asked for. */
+const at = (rank: Rank): string => AT[rank];
+/** ⚠️ …and the same at the breakpoint, for the roles that grow. */
+const atWide = (rank: Rank): string => AT_WIDE[rank];
+
 export const TYPE = {
   /**
    * ⚠️ THE ONE THING A SCREEN EXISTS TO SHOW. A balance, a score, a count — never
@@ -53,7 +251,7 @@ export const TYPE = {
     1.25rem the number was twice the size and still lost the screen — the first
     thing anybody's eye landed on was "What needs you". Mass, not multiple.
   */
-  display: "font-mark text-[3.25rem] md:text-6xl font-bold tabular-nums tracking-[-0.035em] leading-[1.05] text-foreground",
+  display: `font-mark ${at("hero")} ${atWide("loud")} font-bold tabular-nums tracking-[-0.035em] text-foreground`,
   /**
    * ⚠️ A NAME THAT IS ACTING AS A MARK, AND THE TRACKING IS THE WHOLE ROLE. A
    * workspace's name over its own planet is not a heading somebody reads on the
@@ -68,7 +266,7 @@ export const TYPE = {
    * "Northwind Strength" breaking to leave "Strength" alone under a nine-letter
    * line is the single thing that makes a large name look unset.
    */
-  wordmark: "font-mark text-[2.75rem] md:text-6xl font-extrabold tracking-[-0.05em] leading-[0.95] text-balance text-foreground",
+  wordmark: `font-mark ${at("hero")} ${atWide("door")} font-extrabold tracking-[-0.05em] text-balance text-foreground`,
   /**
    * THE TWO HALVES OF A LOCKUP, AND THE WEIGHT SPLIT IS THE WHOLE WORDMARK.
    *
@@ -100,7 +298,7 @@ export const TYPE = {
    * logo" meant. Half the width of a 390 leaves the ring, the word and the line
    * reading as one object with air around them.
    */
-  opening: "font-mark text-[3.5rem] md:text-[5.5rem] font-light tracking-[-0.045em] leading-none",
+  opening: `font-mark ${at("loud")} ${atWide("door")} font-light tracking-[-0.045em]`,
   /**
    * What this screen is. One per screen, at the top.
    *
@@ -116,9 +314,9 @@ export const TYPE = {
    * sidebearings are a fraction of the em, so the same em value is more space
    * on a bigger word. Every other role here scales its tracking the same way.
    */
-  title: "font-mark text-[2rem] font-bold tracking-[-0.03em] leading-[1.1] text-balance",
+  title: `font-mark ${at("page")} font-bold tracking-[-0.03em] text-balance text-foreground`,
   /** What this part of the screen is. */
-  section: "font-mark text-xl font-semibold tracking-[-0.015em] text-balance",
+  section: `font-mark ${at("part")} font-semibold tracking-[-0.015em] text-balance text-foreground`,
   /**
    * ⚠️ WHAT ONE BLOCK INSIDE A PART IS, AND IT IS THE THIRD RANK BECAUSE THERE
    * ARE THREE. A screen is named, a section of it is named, and a card inside
@@ -130,11 +328,11 @@ export const TYPE = {
    * as `label` it would be indistinguishable from the name of the control under
    * it, and a card would appear to start with one of its own rows.
    */
-  group: "font-mark text-base font-semibold tracking-[-0.01em] text-balance",
+  group: `font-mark ${at("block")} font-semibold tracking-[-0.01em] text-balance text-foreground`,
   /** Prose. `text-pretty` is what stops a two-line paragraph orphaning a word. */
-  body: "text-base leading-relaxed text-pretty",
+  body: `${at("base")} text-pretty text-foreground`,
   /** Names a control or a value. Not a heading — it labels something beside it. */
-  label: "text-base font-medium",
+  label: `${at("base")} font-medium text-foreground`,
   /**
    * ⚠️ A WORD INSIDE A SENTENCE THAT IS LOUDER THAN THE REST, and it needs a
    * token because Tailwind's preflight resets `<strong>` to inherit. Written as
@@ -143,14 +341,14 @@ export const TYPE = {
    */
   strong: "font-semibold",
   /** Secondary: a caption, a hint, a timestamp. Quieter, never smaller than 14px. */
-  note: "text-sm text-muted",
+  note: `${at("aside")} text-muted`,
   /**
    * ⚠️ A NUMBER MEANT TO BE COMPARED, WITH `tabular-nums`. Proportional digits
    * make a column of figures ripple, and the reader's eye does the arithmetic on
    * the ripple rather than on the values. This is the number in a ROW or a stat
    * block; the one a screen is built around is `display`.
    */
-  figure: "font-mark text-2xl font-bold tabular-nums tracking-[-0.025em] text-foreground",
+  figure: `font-mark ${at("part")} font-bold tabular-nums tracking-[-0.025em] text-foreground`,
   /**
    * ⚠️ THE NUMERALS WITHOUT THE SIZE — for a figure that lands INSIDE a row, a
    * heading or a sentence, and takes whatever size it lands in. `figure` is a
@@ -182,7 +380,7 @@ export const TYPE = {
    * price as a config value. Every product that handles money well sets it in
    * its own sans with tabular figures, which is what `display` and `figure` do.
    */
-  code: "font-mono text-sm tracking-tight",
+  code: `font-mono ${at("aside")} tracking-tight text-foreground`,
 } as const;
 
 /**
@@ -223,6 +421,32 @@ export const CHART_TYPE = {
    */
   centre: 20,
 } as const;
+
+/* ------------------------------------------------------------- headings --- */
+
+/**
+ * A HEADING SAYS WHETHER IT HAS A LINE UNDER IT, AND ITS PEERS HAVE TO AGREE.
+ *
+ * ⚠️ THE FAULT IS NEVER ONE HEADING, IT IS TWO NEXT TO EACH OTHER. "The shelf,
+ * as it was" carried a line and the three cards under it in the same stack did
+ * not — so one card looked like the important one, for a reason nobody chose.
+ * Photographed on a phone: the mixed column reads as a screen assembled from two
+ * templates, and every heading in it is individually correct.
+ *
+ * ⚠️ SO IT IS A RULE ABOUT A GROUP, WHICH IS WHY NO COMPONENT CAN KEEP IT. A
+ * `Group` knows what it was handed and nothing about its siblings; the page
+ * decides, and the page is not an object. What a component CAN do is state its
+ * answer where something looking at the whole rendered screen can compare them —
+ * which is the shape every other rule in this file takes, one layer out.
+ *
+ * ⚠️ AND THE RANK IS PART OF THE KEY. Sections and the cards inside them are
+ * different questions: a screen may head every section with a line and none of
+ * its cards, which is a system. What it may not do is answer one of them twice.
+ */
+export const headed = (
+  rank: "title" | "section" | "group",
+  under: unknown,
+): Record<string, string> => ({ "data-head": rank, "data-said": under ? "yes" : "no" });
 
 export type Role = keyof typeof TYPE;
 

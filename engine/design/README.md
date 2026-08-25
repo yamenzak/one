@@ -165,15 +165,15 @@ part that is not. Refresh with `node engine/scripts/docs.test.mjs --write`.
 <!-- generated: node scripts/inventory.mjs vocabulary -->
 | Home | What it is for | Ships |
 |---|---|---|
-| `tokens/` | colour, type, spacing, motion, the chrome and hem rules | 85 |
+| `tokens/` | colour, type, spacing, motion, the chrome and hem rules | 94 |
 | `scene/` | the ambience engine — families, marks, the world behind a screen | 1 |
 | `frame/` | page, shape, crown, nav, dock, overlays — what wraps a screen | 72 |
-| `parts/` | rows, cards, lists, controls, the four outcomes | 200 |
+| `parts/` | rows, cards, lists, controls, the four outcomes | 199 |
 | `rendered/` | whole surfaces drawn from a kernel declaration | 53 |
 | `chart/` | the data vocabulary — a number as a shape | 41 |
 | `measure/` | what a screen actually lays out, in a real browser — the harness every app sweeps its own screens with | 1 |
 
-**453 exports.** Every one is reachable as `import { … } from "@engine/design"`;
+**461 exports.** Every one is reachable as `import { … } from "@engine/design"`;
 there is no deep import, and a guard says so.
 
 ### `tokens/`
@@ -183,7 +183,7 @@ there is no deep import, and a guard says so.
 - `tokens/ground.ts` — `CHOSEN_TINT`, `CONTROL_TINT`, `CURTAIN`, `DOCK`, `FOCUS`, `grey`, `GROUND`, `GROUND_CSS`, `GROUND_TINT`, `MIN_DELTA`, `TINT`
 - `tokens/motion.ts` — `applyLiveliness`, `ARRIVE`, `ARRIVE_MARK`, `ARRIVE_MOTION`, `ARRIVE_RISE`, `arriveAt`, `BEAT`, `BLOCK_MOTION`, `DELAY`, `Device`, `DOOR_MOTION`, `doorAt`, `Duration`, `DURATION`, `earned`, `Ease`, `EASE`, `EASE_SPLINE`, `GLYPH_MOTION`, `Intent`, `Liveliness`, `LIVELINESS`, `LIVELINESS_KEY`, `livelinessStored`, `Motion`, `MOTION`, `motionFor`, `OPENING_MOTION`, `READER_MOTION`, `reading`, `REDUCED`, `rememberLiveliness`, `SAID`, `transition`, `TURN`, `TURN_AT`, `turns`, `useMotion`, `useStill`, `useStillness`
 - `tokens/theme.ts` — `colorFor`, `productCss`, `TONE_CSS`
-- `tokens/type.ts` — `CHART_TYPE`, `FACE_CSS`, `FACE_STACK`, `MARK_STACK`, `MONO_STACK`, `Role`, `ROLES`, `sentence`, `text`, `TYPE`
+- `tokens/type.ts` — `CHART_TYPE`, `FACE_CSS`, `FACE_STACK`, `headed`, `lead`, `LIBRARY_TYPE_CSS`, `MARK_STACK`, `MONO_STACK`, `pixels`, `Rank`, `RANK`, `Role`, `ROLES`, `ROOT`, `sentence`, `step`, `text`, `TYPE`, `TYPE_CSS`
 
 ### `scene/`
 
@@ -215,7 +215,7 @@ there is no deep import, and a guard says so.
 - `parts/credits.tsx` — `Credits`, `CreditsProps`
 - `parts/face.tsx` — `appFace`, `Face`, `FaceKind`, `FaceOf`, `FaceProps`, `FaceSize`, `faceUri`, `ONE_FACE`, `Orb`, `placeFace`, `thingFace`, `whoFace`, `worldFor`
 - `parts/feedback.tsx` — `Beep`, `say`, `wakeSound`
-- `parts/forms.tsx` — `Agree`, `Choice`, `CodeEntry`, `DateInput`, `Dates`, `Dial`, `Knob`, `LongText`, `Lookup`, `MoneyInput`, `NamedAlready`, `Naming`, `NumberInput`, `NumberInputProps`, `OneOf`, `Option`, `PeriodId`, `PeriodInput`, `PERIODS`, `Picks`, `Said`, `SearchInput`, `SecretInput`, `Segmented`, `spanOf`, `Tags`, `Tail`, `TextInput`, `TextInputProps`, `TimeInput`, `withValue`, `Words`
+- `parts/forms.tsx` — `Agree`, `Choice`, `CodeEntry`, `DateInput`, `Dates`, `Dial`, `LongText`, `Lookup`, `MoneyInput`, `NamedAlready`, `Naming`, `NumberInput`, `NumberInputProps`, `OneOf`, `Option`, `PeriodId`, `PeriodInput`, `PERIODS`, `Picks`, `Said`, `SearchInput`, `SecretInput`, `Segmented`, `spanOf`, `Tags`, `Tail`, `TextInput`, `TextInputProps`, `TimeInput`, `withValue`, `Words`
 - `parts/gated.tsx` — `Allowed`, `sayGate`, `Stopped`, `STOPPED`, `useGate`
 - `parts/heads.tsx` — `Balance`, `distinguishing`, `Figure`, `Prose`, `Section`, `SectionTitle`, `Title`
 - `parts/listing.tsx` — `Col`, `Listing`, `ListingProps`, `Paged`

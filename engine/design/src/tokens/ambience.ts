@@ -1136,15 +1136,21 @@ export function ambienceStylesheet(): string {
        plate's is: a `className` on a library component is a restyle (D7), and
        the shape of this material is a property of the material. */
     `  border-radius: 9999px;`,
-    `  background-color: color-mix(in oklab, var(--tier-dock) 58%, transparent);`,
+    /* ⚠️ 74% IS A MEASUREMENT, NOT A TASTE. At 58 the plate over a pale
+       photograph composited to rgb(125,124,121) and the caption on it measured
+       3.82:1 — under the floor, on the one surface whose backdrop is an image
+       nobody chose, which is exactly the case the tier ladder cannot answer. The
+       share has to be enough that the WORST backdrop (white) still clears 4.5,
+       and white is the worst backdrop; everything darker only helps. */
+    `  background-color: color-mix(in oklab, var(--tier-dock) 74%, transparent);`,
     `  color: var(--dock-ink);`,
     `  backdrop-filter: blur(12px) saturate(1.3);`,
     `  -webkit-backdrop-filter: blur(12px) saturate(1.3); }`,
     /* ⚠️ A PRESS IS DENSER GLASS, NOT A DIFFERENT COLOUR. The plate is the same
        material throughout; what changes under a thumb is how much of the picture
        survives it. */
-    `[data-glass="true"]:hover { background-color: color-mix(in oklab, var(--tier-dock) 72%, transparent); }`,
-    `[data-glass="true"][data-pressed="true"] { background-color: color-mix(in oklab, var(--tier-dock) 84%, transparent); }`,
+    `[data-glass="true"]:hover { background-color: color-mix(in oklab, var(--tier-dock) 84%, transparent); }`,
+    `[data-glass="true"][data-pressed="true"] { background-color: color-mix(in oklab, var(--tier-dock) 92%, transparent); }`,
     /*
       ⚠️ THE ONE PLACE A PRODUCT'S OWN COLOUR TOUCHES THE CHROME, AND IT IS A
       LIGHT RATHER THAN A SURFACE. The bar carries no fill by design — every
@@ -1266,19 +1272,13 @@ export function ambienceStylesheet(): string {
     */
     `[data-chip="true"] { background-color: color-mix(in oklab, var(--foreground) 7%, transparent); }`,
     /*
-      ⚠️ THE TICK IN A SWITCH'S KNOB — see `Knob` in `forms.tsx` for why it is
-      there. The rule is here rather than on the component because the thumb is
-      inside React Aria's own tree and hands its state to nothing: a child cannot
-      ask "am I on", so the mark is always drawn and its opacity is the answer.
-      Same shape as the nav's lit destination, one file over, for the same
-      reason.
-
-      ⚠️ AND THE MARK IS THE ONLY THING THAT MOVES — opacity, not a scale or a
-      turn. The knob is already travelling the width of the track; a glyph with
-      a second motion on it is two things happening on one control.
+      ⚠️ THE SWITCH'S THUMB CARRIES NOTHING, AND THAT IS A REVERSAL. It held a
+      tick for a while — always drawn, its opacity answering "am I on", because
+      React Aria's thumb hands its state to no child. Every part of that worked
+      and the control was worse for it: the library's own switch is a shape the
+      whole world already reads, and a glyph inside a 20px knob is a second thing
+      to notice on a control whose entire job is to be noticed once.
     */
-    `[data-knob="true"] { opacity: 0; transition: ${MOTION.unlit}; }`,
-    `.switch[data-selected="true"] [data-knob="true"] { opacity: 1; transition: ${MOTION.lit}; }`,
     /*
       ⚠️ ONE OPTICAL WEIGHT FOR EVERY GLYPH IN THE PRODUCT. An icon library takes
       its size from its own props, so one caller passing nothing draws at the
@@ -1286,7 +1286,16 @@ export function ambienceStylesheet(): string {
       is the single most visible sign of a surface nobody owns. Setting it on the
       BOX means a caller cannot get it wrong.
     */
-    `[style*="--icon"] > svg { width: var(--icon); height: var(--icon); }`,
-    `[style*="--icon"] > svg { stroke-width: 1.75; }`,
+    /*
+      ⚠️ A DESCENDANT, NOT A CHILD, AND THE `>` IS WHY THE WHOLE LADDER WAS
+      INERT. `glyphOf` returns the mark inside its own `<span>`, so the tree is
+      `span[--icon] > span > svg` and this rule matched nothing — anywhere, ever.
+      Every glyph in the product drew at HeroUI's own 20px, the six sizes `ICON`
+      publishes reached none of them, and nothing could report it: the variable
+      really is set on the box, the value really is on the ladder, and the only
+      way to see the fault is to measure a rendered mark.
+    */
+    `[style*="--icon"] svg { width: var(--icon); height: var(--icon); }`,
+    `[style*="--icon"] svg { stroke-width: 1.75; }`,
   ].join("\n");
 }

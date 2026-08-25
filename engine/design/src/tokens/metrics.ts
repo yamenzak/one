@@ -25,6 +25,8 @@
  * real product rather than asserted.
  */
 
+import { RANK, pixels } from "./type.js";
+
 /* ----------------------------------------------------------------- corner --- */
 
 /**
@@ -212,7 +214,38 @@ export const TILE = {
  * obviously missing while the icons were text characters at whatever size the
  * font gave them.
  */
-export const ICON = { row: 20, crown: 20, quick: 22, nav: 24, face: 28, tile: 26 } as const;
+/**
+ * ⚠️ EVERY ONE IS A RUNG OF THE TYPE LADDER — see `pixels` in `type.ts`. These
+ * were 20, 20, 22, 24, 26 and 28: six numbers, no relationship to each other and
+ * none to the text they stand beside, each right on the screen it was picked on.
+ * An icon is a mark at a text's weight, so its size is a rung, and there are two
+ * of them.
+ *
+ * ⚠️ ONE RUNG ABOVE THE TEXT IT STANDS BESIDE, WHICH IS THE WHOLE RULE. A glyph
+ * set at the type's own size reads lighter than the words — a letterform fills
+ * its box and a mark does not — so `row` and `crown` are the rung above `label`.
+ *
+ * ⚠️ AND A MARK THAT STANDS ALONE TAKES ONE MORE. A nav destination, a tile, a
+ * quick action and a face have no words on their line to be weighed against;
+ * they carry the row themselves.
+ */
+export const ICON = {
+  row: pixels(RANK.block),
+  crown: pixels(RANK.block),
+  quick: pixels(RANK.part),
+  nav: pixels(RANK.part),
+  face: pixels(RANK.part),
+  tile: pixels(RANK.part),
+  /**
+   * ⚠️ THE MARK ON A TILE THAT IS 192px TALL RATHER THAN 112. The same 25px
+   * glyph in both left a deep tile reading as an empty box with a word at the
+   * foot — measured beside a rich one in the same grid, where the neighbour's
+   * picture, line and chip filled the space this had none of. A tile's mark IS
+   * the tile when there is nothing else in it, and a rung is what makes that a
+   * decision rather than a nudge.
+   */
+  poster: pixels(RANK.hero),
+} as const;
 
 /**
  * THE RADIUS OF THE LIGHT UNDER THE NAV'S ACTIVE MARK.
@@ -655,6 +688,18 @@ export const QUICK_PILL = "h-11 px-4" as const;
  * above it, so the air around it is one number.
  */
 export const TILE_PAD = "p-4" as const;
+
+/**
+ * THE ROOM A HEADING KEEPS FOR THE CONTROL STANDING IN IT.
+ *
+ * ⚠️ THE CONTROL IS OUT OF THE FLOW SO IT CANNOT PUSH ANYTHING DOWN — a 44px
+ * target beside a 20px line made every heading that had one 24px taller than the
+ * identical heading that did not, and moved the card's own picture with it. What
+ * absolute positioning costs is the collision: a long heading runs straight under
+ * the switch. This is the switch's width plus the gap, reserved by the heading,
+ * which is the half people leave off.
+ */
+export const CONTROL_ROOM = "pe-14" as const;
 
 /**
  * ⚠️ THE HEIGHT OF A CARD'S LEADING PHOTOGRAPH. Tall enough that a room, a

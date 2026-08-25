@@ -3115,3 +3115,80 @@ selected pair could not do once the hue stopped being ours.
 for taste; a lone series in an identity colour; or a `--data` taken from
 `--brand` raw, which is a chart that disappears on some workspaces and on no
 deployment anybody tests.
+
+## D89 — One ladder, and a rung has to reach the page
+
+**Every size in the product is `1 × 1.25ⁿ`, named by a rank, and no file outside
+`type.ts` may write one.**
+
+The roles were right and their sizes were ten literals in six mechanisms —
+`text-sm`, `text-base`, `text-xl`, `text-2xl`, `text-6xl` and four bracketed
+rems. Naming the role moved the decision to one file; it did not make the file a
+system. Measured, `section` at 20 and `group` at 16 read as one rank while
+`title` at 32 sat two steps above `section` with nothing between them: every
+number defensible where it was written, none of them in a relationship with any
+other. A rank is an index on a ladder and the ladder is arithmetic, so a size
+that is not derivable is a literal wearing a token's clothes.
+
+**An icon is on the same ladder, because it is a mark at a text's weight.**
+`ICON` held 20, 20, 22, 24, 26 and 28 — six numbers with no relationship to the
+type they stand beside or to each other. A ladder that stops at the edge of the
+DOM has a second, undeclared ladder next to it.
+
+**And the arithmetic being right is not the same as it reaching anybody.** Two
+drafts of `at(rank)` were perfect and shipped a product rendered entirely at
+16px, with TypeScript green and every guard green. The first built the class at
+runtime — `text-[${step(n)}]` — and Tailwind reads SOURCE text and never runs
+it, so no rule was emitted at all. The second wrote the class out in full as
+`text-[var(--rank-page)]`, and Tailwind emitted it as an INK, because a bare
+variable could be either and colour is what it guesses; the rule that shipped was
+`color: 1.953rem`, which every browser discards without a word. So the ladder
+goes out as custom properties, the class names are literal, and the `length:`
+hint is what makes each one a size.
+
+**Which is why the enforcement is measured rather than read.** Both failures were
+invisible to every static check by construction, so `ladder.seen.test.tsx` renders
+each role in Chromium and asserts its computed size is the rung it asked for —
+with the two dead drafts kept beside it as negative controls, because a check
+that has only ever seen a working page is a check nobody knows is looking.
+
+**Leading is part of the rung, and the ladder dropping it was its own
+regression.** A named Tailwind size carries a line-height; an arbitrary one
+carries none — so the moment the roles moved onto the ladder, every one of them
+began inheriting its leading from whatever it was dropped into. Measured: the
+same `label` came out 22.86px tall inside a pressable row, whose button sets
+1.4286, and 24px inside an identical row that was not pressable and took the
+page's 1.5 — and the placeholder standing in for those rows was suddenly the
+wrong height. `lead(n)` tightens as the rung grows, no role names its own, and
+the guard refuses one that does.
+
+**The library's own sizes point at the same ladder, and the variable is
+redefined rather than the component.** HeroUI sets type from Tailwind's named
+scale, so a screen made of our roles and its controls served two ladders — 31,
+25, 20, 16 and 13 from here, 14 and 12 from there, none of the last four
+derivable from anything. Pointing each `--text-*` at a rung leaves every library
+rule exactly as the library wrote it and changes only what its numbers resolve
+to, which is the one door D7 leaves open: a `className` on a library component
+is a restyle, a custom property is not.
+
+**And the icon half of the ladder was inert from the day it was written.** The
+rule was `[style*="--icon"] > svg` and `glyphOf` returns its mark inside a span,
+so the child combinator matched no element in the product: six published sizes
+reached none of them, and every glyph on every screen drew at the library's own
+20px while the box around it carried a correct value from a derived ladder.
+Nothing static could see it — the variable is set, the number is a rung — and it
+is now measured, with the dead selector kept beside it as the control.
+
+**A heading also states whether it has a line under it, and its peers must
+agree.** The fault is never one heading — it is three cards in a stack where one
+carries a subheading and two do not, which reads as "this is the important one"
+for a reason nobody chose. No component can catch it: a `Group` knows what it was
+handed and nothing about the card beside it. `Geometry.heads` asks it of the
+whole rendered screen, keyed on rank and container, and at three or more, because
+two blocks set differently are two kinds of thing and a reader parses that
+correctly.
+
+**Therefore never:** a size, a weight or a leading written outside `type.ts`; an
+icon dimension that is not `pixels(RANK.…)`; a rung class assembled at runtime or
+without its `length:` hint; a second scale left pointing at its own numbers; or a
+column of peer headings where some carry a line and some do not.

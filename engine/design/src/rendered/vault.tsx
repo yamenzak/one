@@ -17,7 +17,6 @@ import type { Disclosure } from "@engine/kernel";
 import { Button, Chip, Separator, Switch } from "@heroui/react";
 import { SPACE } from "../tokens/metrics.js";
 import { Group } from "../parts/surfaces.js";
-import { Knob } from "../parts/forms.js";
 import { Nothing } from "../parts/state.js";
 import { glyphOf } from "../frame/shell.js";
 import { sayMoment, sayRefused, type Instant, type ReadRefusal } from "@engine/kernel";
@@ -49,7 +48,7 @@ export function ConsentSheet({ shown, given, onChange }: ConsentProps) {
                   {/* ⚠️ Inside the content, which is the control — see
                       `SettledSwitch`. Beside it the track is a picture. */}
                   <Switch.Content>
-                    <Knob />
+                    <Switch.Control><Switch.Thumb /></Switch.Control>
                     Allowed
                   </Switch.Content>
                 </Switch>

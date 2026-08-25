@@ -24,7 +24,6 @@
 import * as React from "react";
 import { Switch } from "@heroui/react";
 import { notice } from "../frame/overlay.js";
-import { Knob } from "./forms.js";
 
 export interface SettledProps {
   readonly value: boolean;
@@ -111,7 +110,7 @@ export function SettledSwitch({ value, onSet, isDisabled, says, bare }: SettledP
     >
       {/* ⚠️ THE CONTROL IS INSIDE THE CONTENT, NOT BESIDE IT — see `STATE`. */}
       <Switch.Content>
-        <Knob />
+        <Switch.Control><Switch.Thumb /></Switch.Control>
         {bare ? null : (says ?? STATE)(shown)}
       </Switch.Content>
     </Switch>

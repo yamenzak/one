@@ -22,6 +22,7 @@
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { sizeOf } from "./lib/ladder.mjs";
 import { appDirs, appManifests, appTrees } from "./lib/trees.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -226,18 +227,13 @@ if (!chartRoles.length) {
  * a title, which must be larger than a section, which must be larger than body
  * text, is the property that makes it a scale at all.
  */
-const TYPE_SRC = readFileSync(join(ENGINE, "design/src/tokens/type.ts"), "utf8");
-const STEP = { xs: 12, sm: 14, base: 16, lg: 18, xl: 20, "2xl": 24, "3xl": 30, "4xl": 36, "5xl": 48 };
-const sizeOf = (role) => {
-  const decl = new RegExp(`\\b${role}: "([^"]*)"`).exec(TYPE_SRC);
-  if (!decl) return null;
-  const rem = /text-\[([\d.]+)rem\]/.exec(decl[1]);
-  if (rem) return Number(rem[1]) * 16;
-  const named = /\btext-((?:[0-9]?xl)|xs|sm|base|lg)\b/.exec(decl[1]);
-  return named ? STEP[named[1]] ?? null : null;
-};
+/* ⚠️ ONE READER — see `lib/ladder.mjs`. This kept a nine-entry table of
+   Tailwind's own sizes and parsed `text-[Nrem]` by hand, which is a second
+   opinion about a scale that has one owner: the day the roles started asking for
+   a rank instead of naming a size, this went blind and said so in its own words
+   while another guard said so in different words. */
 const LADDER = ["display", "title", "section", "body", "note"];
-const steps = LADDER.map((r) => [r, sizeOf(r)]);
+const steps = LADDER.map((r) => [r, sizeOf(r) ?? null]);
 const missing = steps.filter(([, px]) => px === null).map(([r]) => r);
 if (missing.length) {
   fail(`type.ts: cannot read a size for ${missing.join(", ")} — the scale guard is blind.`);

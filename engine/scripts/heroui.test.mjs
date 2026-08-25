@@ -855,26 +855,18 @@ if (!uneven) ok(`peers: ${EQUALS.length} group(s) of equals share their width`);
  * right.
  */
 /*
-  ⚠️ AND THE TRACK IS `<Knob />` NOW, WHICH IS THE SAME CHECK ON A DIFFERENT
-  NAME. The two-element composition was written at five call sites and grew a
-  tick in it, so it is one component — and a component means the raw
-  `Switch.Control` legitimately appears once, in the file that defines it, with
-  no `Switch.Content` in sight. Exempting that file by NAME rather than by
-  pattern is the rule this whole script follows: a wildcard is an exemption a new
-  file can wander into.
-
-  ⚠️ THE INVARIANT IS UNCHANGED — the track is inside the pressable label — so
-  what the walk matches is both spellings. A `<Knob />` beside a `Switch.Content`
-  is the same broken switch it always was, and it now fails for the same reason.
+  ⚠️ THE TRACK WAS A COMPONENT OF OURS FOR A WHILE AND IS THE LIBRARY'S AGAIN.
+  `Knob` wrapped this composition so a tick could be drawn inside the thumb; the
+  tick is gone (a glyph in a 20px knob is a second thing to notice on a control
+  whose whole job is to be noticed once), and with it the wrapper and the
+  by-name exemption the wrapper needed. One spelling is one thing to match.
 */
-const KNOB_IS_DEFINED_IN = "design/src/parts/forms.tsx";
-const TRACK = /<(?:Switch\.Control|Knob)\b/g;
+const TRACK = /<Switch\.Control\b/g;
 
 {
   let switches = 0;
   let loose = 0;
   for (const file of FILES) {
-    if (rel(file) === KNOB_IS_DEFINED_IN) continue;
     const src = readFileSync(file, "utf8");
     if (!TRACK.test(src)) continue;
     TRACK.lastIndex = 0;

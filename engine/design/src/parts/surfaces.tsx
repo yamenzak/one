@@ -29,11 +29,11 @@ import { Button, Card, Chip, Label, Skeleton, Switch } from "@heroui/react";
 import { Pencil } from "lucide-react";
 import type { Tone } from "@engine/kernel";
 import { sayMoneyParts } from "@engine/kernel";
-import { TYPE } from "../tokens/type.js";
+import { TYPE, headed } from "../tokens/type.js";
 import {
   CARD_LEAD, CARD_MEDIA, CARD_OTHERS, CARD_ROWS, CONTROL_SHARE, CROWN_SIZE, HEAD_GAP, ICON, INSET,
   GLASS_PAD, LEAD, NUDGE,
-  QUICK_PILL, TILE_PAD,
+  CONTROL_ROOM, QUICK_PILL, TILE_PAD,
   QUICK_CIRCLE, ROW, SPACE,
   TILE,
 } from "../tokens/metrics.js";
@@ -45,7 +45,7 @@ import { ARRIVE, arriveAt } from "../tokens/motion.js";
 import { useScenery } from "../frame/page.js";
 import type { Sky } from "../scene/index.js";
 import { useBones } from "./bones.js";
-import { Knob, NamedAlready } from "./forms.js";
+import { NamedAlready } from "./forms.js";
 import { Face, type FaceOf } from "./face.js";
 import { Hint } from "./beside.js";
 import { Tally } from "./tally.js";
@@ -364,7 +364,7 @@ export function Group(
       <>
         {label || aside || control ? (
           <div className={`flex flex-wrap items-baseline justify-between ${ROW.gap} ${ROW.pad}`}>
-            <div className={`flex min-w-0 flex-col ${SPACE.hair}`}>
+            <div className={`flex min-w-0 flex-col ${SPACE.hair}`} {...headed("group", under)}>
               {label ? <h3 className={TYPE.group}>{label}</h3> : null}
               {under ? <p className={TYPE.note}>{under}</p> : null}
             </div>
@@ -398,24 +398,37 @@ export function Group(
 
            ⚠️ AND THE ROW WRAPS, so the aside takes the line under a heading it
            cannot fit beside rather than pushing it off the screen. */
-        /* ⚠️ THE CONTROL IS OUTSIDE THE WRAPPING ROW, NOT THE LAST THING IN IT —
-           see `GroupProps.control`. Inside, `flex-wrap` sent it to its own line
-           the moment the heading and the switch together exceeded the card:
-           measured at 390 with a two-word state beside it, which is most of
-           them. What wraps is the heading and its aside; the control stands
-           beside the pair. */
-        <div className={`flex items-center ${ROW.gap}`}>
+        /*
+          ⚠️ THE CONTROL IS TAKEN OUT OF THE FLOW, WHICH IS THE ONLY WAY IT DOES
+          NOT MOVE ANYTHING. In the row it was the tallest thing in it — a 44px
+          target beside a 20px line — so a heading with a switch on it stood 24px
+          taller than the identical heading without one, and everything under it,
+          the card's own picture included, was pushed down by a control that has
+          nothing to do with where the picture starts.
+
+          ⚠️ AND IT WRAPPED BEFORE THAT. Inside the wrapping row, `flex-wrap` sent
+          it to its own line the moment the heading and a two-word state together
+          exceeded the card — measured at 390, which is most of them.
+
+          ⚠️ SO THE HEADING RESERVES THE ROOM AND THE CONTROL SITS IN IT.
+          `pe-14` is the control's own width plus the gap; without it a long
+          heading runs under the switch, which is the fault absolute positioning
+          invites and the reason it is usually the wrong answer.
+        */
+        <div className={`relative flex items-center ${ROW.gap} ${control ? CONTROL_ROOM : ""}`}>
           <div className={`flex grow flex-wrap items-center justify-between ${ROW.gap}`}>
             <div className={`flex min-w-0 items-center ${ROW.gap}`}>
               {face && label ? <Face of={face} name={label} size="chip" /> : null}
-              <div className={`flex min-w-0 flex-col ${SPACE.hair}`}>
+              <div className={`flex min-w-0 flex-col ${SPACE.hair}`} {...headed("group", under)}>
                 {label ? <h2 className={TYPE.group}>{label}</h2> : null}
                 {under ? <p className={TYPE.note}>{under}</p> : null}
               </div>
             </div>
             {aside}
           </div>
-          {control ? <span className="shrink-0">{control}</span> : null}
+          {control
+            ? <span className="absolute end-0 top-1/2 -translate-y-1/2">{control}</span>
+            : null}
         </div>
       ) : null}
       {/* ⚠️ THE WORLD GOES ON THE CARD ITSELF, not on a wrapper — the layers are
@@ -960,7 +973,7 @@ export function ToggleRow({ icon, face, label, under, value, onChange, isDisable
           <Lead icon={icon} face={face} />
           <Body label={label} under={under} />
         </span>
-        <Knob />
+        <Switch.Control><Switch.Thumb /></Switch.Control>
       </Switch.Content>
     </Switch>
     </div>
@@ -1407,7 +1420,10 @@ export function TileGrid({ tiles }: { readonly tiles: readonly TileSpec[] }) {
               {t.face
                 ? <Face of={t.face} name={t.label} size="panel" />
                 : (
-                  <span aria-hidden="true" style={{ ["--icon" as string]: `${ICON.tile}px` }}>
+                  <span
+                    aria-hidden="true"
+                    style={{ ["--icon" as string]: `${deep ? ICON.poster : ICON.tile}px` }}
+                  >
                     {t.icon}
                   </span>
                 )}
@@ -1416,11 +1432,19 @@ export function TileGrid({ tiles }: { readonly tiles: readonly TileSpec[] }) {
                   where every second label is 20px higher is what "some of these
                   have a description" looks like when the mark is top-aligned and
                   nothing claims the slack. */}
-              <span className={`mt-auto flex min-w-0 flex-col ${SPACE.hair}`}>
-                {/* ⚠️ `label`, NOT `note`. A tile's word IS the tile — muting it
-                    makes a grid of grey words under marks nobody can name. */}
-                <span className={TYPE.label}>{t.label}</span>
-                {t.under ? <span className={TYPE.note}>{t.under}</span> : null}
+              <span className={`mt-auto flex min-w-0 flex-col ${SPACE.tight}`}>
+                {/* ⚠️ THE NAME AND ITS LINE ARE ONE THING SAID TWICE — `hair`.
+                    The chip below them is a SECOND thing, and at the same gap it
+                    read as a third line of the description rather than as a
+                    count: "Everything written here" and "14 open" stacked 4px
+                    apart, one of them in a capsule, with nothing saying which
+                    was which. See `SPACE.hair`'s own note for the pair. */}
+                <span className={`flex min-w-0 flex-col ${SPACE.hair}`}>
+                  {/* ⚠️ `label`, NOT `note`. A tile's word IS the tile — muting
+                      it makes a grid of grey words under marks nobody can name. */}
+                  <span className={TYPE.label}>{t.label}</span>
+                  {t.under ? <span className={TYPE.note}>{t.under}</span> : null}
+                </span>
                 {t.foot}
               </span>
             </Button>

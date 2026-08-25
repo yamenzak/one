@@ -2929,6 +2929,55 @@
       "fails": "a checklist item nobody can take, passing composition because a nightly sweep does raise the event — the tally counts what people did, so the step sits unticked with nothing anywhere saying why"
     },
     {
+      "id": "every-size-is-a-rung-of-one-ladder",
+      "protects": "D89",
+      "stage": "88",
+      "status": "live",
+      "impl": "scripts/type.test.mjs",
+      "proves": "ladder:",
+      "fails": "ten hand-picked sizes in six mechanisms, each defensible where it was written and none in a relationship with any other - a product where nothing is broken, everything is slightly out of step, and no reviewer can name the fault"
+    },
+    {
+      "id": "a-rung-actually-reaches-the-page",
+      "protects": "D89",
+      "stage": "88",
+      "status": "live",
+      "impl": "design/test/ladder.seen.test.tsx",
+      "lane": "seen",
+      "proves": "every role computes to the rung it asked for",
+      "fails": "the whole product rendered at one size with every check green - a class built at runtime is emitted nowhere, and a bare `text-[var(--x)]` is emitted as an INK, so the rule that ships is `color: 1.953rem` and every browser discards it in silence"
+    },
+    {
+      "id": "a-mark-is-on-the-type-ladder-too",
+      "protects": "D89",
+      "stage": "88",
+      "status": "live",
+      "impl": "design/test/ladder.seen.test.tsx",
+      "lane": "seen",
+      "proves": "a mark takes the rung its box asks for",
+      "fails": "six published icon sizes reaching none of them - `glyphOf` returns its mark inside a span, so a child combinator matched nothing anywhere and every glyph in the product drew at the library's own 20px while the box around it carried a correct value from a derived ladder"
+    },
+    {
+      "id": "peer-headings-agree-about-a-line",
+      "protects": "D89",
+      "stage": "88",
+      "status": "live",
+      "impl": "apps/inventory/test/geometry.seen.test.tsx",
+      "lane": "seen",
+      "proves": "agree about whether they carry a line",
+      "fails": "three cards in a stack where one carries a subheading and two do not, which reads as `this is the important one` for a reason nobody chose - and no component can see it, because a card knows what it was handed and nothing about the card beside it"
+    },
+    {
+      "id": "the-reference-app-heads-consistently-too",
+      "protects": "D89",
+      "stage": "88",
+      "status": "live",
+      "impl": "ground/test/geometry.seen.test.tsx",
+      "lane": "seen",
+      "proves": "agree about whether they carry a line",
+      "fails": "a mixed column in the reference somebody copies from, so the fault is in the next product before anybody has looked at this one"
+    },
+    {
       "id": "no-screen-pushes-the-page-sideways",
       "protects": "D7",
       "stage": "19",
