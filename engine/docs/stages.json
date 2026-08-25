@@ -1,6 +1,6 @@
 {
   "$comment": [
-    "THE STAGE TABLE — the one place a stage's status is recorded.",
+    "THE STAGE TABLE \u2014 the one place a stage's status is recorded.",
     "",
     "`scripts/docs.test.mjs` reads this file. Two rules make it more than a list:",
     "",
@@ -10,18 +10,18 @@
     "  2. Every guard's `stage` names a row here, so a guard cannot protect work",
     "     that is not on the map.",
     "",
-    "`ends` is the exit criterion — an observable, not a feeling. It is what makes",
+    "`ends` is the exit criterion \u2014 an observable, not a feeling. It is what makes",
     "`shipped` a claim somebody could check rather than a decision somebody made."
   ],
   "stages": [
     {
       "n": 0,
-      "title": "Ground — workspace, docs, guard registry, standards",
+      "title": "Ground \u2014 workspace, docs, guard registry, standards",
       "status": "shipped"
     },
     {
       "n": 1,
-      "title": "Kernel — entities, declarations, gate algebra, problems",
+      "title": "Kernel \u2014 entities, declarations, gate algebra, problems",
       "status": "shipped"
     },
     {
@@ -31,7 +31,7 @@
     },
     {
       "n": 3,
-      "title": "Runtime — manifest → live worker",
+      "title": "Runtime \u2014 manifest \u2192 live worker",
       "status": "shipped"
     },
     {
@@ -41,17 +41,17 @@
     },
     {
       "n": 5,
-      "title": "Surface — HeroUI shell, nav, sky, rendered settings",
+      "title": "Surface \u2014 HeroUI shell, nav, sky, rendered settings",
       "status": "shipped"
     },
     {
       "n": 6,
-      "title": "Money — plans, entitlements, credits, jobs",
+      "title": "Money \u2014 plans, entitlements, credits, jobs",
       "status": "shipped"
     },
     {
       "n": 7,
-      "title": "Services — ai and notify over RPC",
+      "title": "Services \u2014 ai and notify over RPC",
       "status": "shipped"
     },
     {
@@ -66,98 +66,98 @@
     },
     {
       "n": 10,
-      "title": "One — the deployment and the OneSpace",
+      "title": "One \u2014 the deployment and the OneSpace",
       "status": "shipped"
     },
     {
       "n": 11,
-      "title": "The agent surface — every operation an MCP tool, derived",
+      "title": "The agent surface \u2014 every operation an MCP tool, derived",
       "status": "shipped"
     },
     {
       "n": 12,
-      "title": "Multi-app access — a platform role for the workspace, a role per app inside it",
+      "title": "Multi-app access \u2014 a platform role for the workspace, a role per app inside it",
       "status": "shipped"
     },
     {
       "n": 13,
-      "title": "The package rail — a priced bundle of timed grants, one ledger, one clock",
+      "title": "The package rail \u2014 a priced bundle of timed grants, one ledger, one clock",
       "status": "shipped"
     },
     {
       "n": 14,
-      "title": "The tenant centre — the shell with the router: five areas + app screens inside",
+      "title": "The tenant centre \u2014 the shell with the router: five areas + app screens inside",
       "status": "shipped"
     },
     {
       "n": 15,
-      "title": "The operator console — the same shell on `admin.`, and the maintenance switch",
+      "title": "The operator console \u2014 the same shell on `admin.`, and the maintenance switch",
       "status": "shipped"
     },
     {
       "n": 16,
-      "title": "AI actions — a lane per action, a model the operator binds, words that narrow",
+      "title": "AI actions \u2014 a lane per action, a model the operator binds, words that narrow",
       "status": "shipped"
     },
     {
       "n": 17,
-      "title": "OneSpace — one surface over the product, reachable from every door, addressed",
+      "title": "OneSpace \u2014 one surface over the product, reachable from every door, addressed",
       "status": "shipped"
     },
     {
       "n": 19,
-      "title": "OneDesign — the design system named, packaged, documented and fenced",
+      "title": "OneDesign \u2014 the design system named, packaged, documented and fenced",
       "status": "shipped"
     },
     {
       "n": 20,
-      "title": "Workspaces — personal or commercial, one brand, one installable, a shard of their own",
+      "title": "Workspaces \u2014 personal or commercial, one brand, one installable, a shard of their own",
       "status": "shipped"
     },
     {
       "n": 21,
-      "title": "Payment — a workspace subscribes, and only a signed event stamps the plan",
+      "title": "Payment \u2014 a workspace subscribes, and only a signed event stamps the plan",
       "status": "shipped"
     },
     {
       "n": 22,
-      "title": "OneSpace — `id`, `admin` and `setup` merge into one address off the workspace root",
+      "title": "OneSpace \u2014 `id`, `admin` and `setup` merge into one address off the workspace root",
       "status": "planned"
     },
     {
       "n": 23,
-      "title": "Mail that leaves the process — a letter, its variables, and a provider",
+      "title": "Mail that leaves the process \u2014 a letter, its variables, and a provider",
       "status": "shipped"
     },
     {
       "n": 24,
       "status": "shipped",
       "title": "A workspace composes its own roles out of one app's keys",
-      "ends": "`custom_role` was applied, read by `permissionsFor` and written by nothing — a table, a resolver and a refusal rule with no way to reach any of them. `role.list`, `role.save` and `role.remove` are the three that make it real. `beyond_you` is the one to read twice: a workspace composing a role out of keys its author does not hold is the shortest path from “I can manage people” to “I can do anything” — make the role, assign it to yourself — and `saveRole` is the only writer that reaches the check. A role somebody still holds may not be deleted: the registry would stop carrying it, `permissionsFor` would resolve it to nothing, and they would keep their seat and be able to do nothing at all with no screen saying why."
+      "ends": "`custom_role` was applied, read by `permissionsFor` and written by nothing \u2014 a table, a resolver and a refusal rule with no way to reach any of them. `role.list`, `role.save` and `role.remove` are the three that make it real. `beyond_you` is the one to read twice: a workspace composing a role out of keys its author does not hold is the shortest path from \u201cI can manage people\u201d to \u201cI can do anything\u201d \u2014 make the role, assign it to yourself \u2014 and `saveRole` is the only writer that reaches the check. A role somebody still holds may not be deleted: the registry would stop carrying it, `permissionsFor` would resolve it to nothing, and they would keep their seat and be able to do nothing at all with no screen saying why."
     },
     {
       "n": 25,
-      "title": "Agreements — versioned documents, an acceptance per person per version, and the wall until there is one",
+      "title": "Agreements \u2014 versioned documents, an acceptance per person per version, and the wall until there is one",
       "status": "shipped"
     },
     {
       "n": 26,
-      "title": "The vault is opened — consent, who looked, your data, and an erasure that shreds",
+      "title": "The vault is opened \u2014 consent, who looked, your data, and an erasure that shreds",
       "status": "shipped"
     },
     {
       "n": 27,
-      "title": "The AI lane runs — a catalogue that syncs itself, one door out to every provider, a charge built on what the call really cost, and a nightly check against the bill we are sent",
+      "title": "The AI lane runs \u2014 a catalogue that syncs itself, one door out to every provider, a charge built on what the call really cost, and a nightly check against the bill we are sent",
       "status": "shipped"
     },
     {
       "n": 28,
-      "title": "Notifications are filed — an event raised becomes a note in somebody's inbox",
+      "title": "Notifications are filed \u2014 an event raised becomes a note in somebody's inbox",
       "status": "shipped"
     },
     {
       "n": 29,
-      "title": "The daily sweep — erasure happens on a clock, and every run is recorded",
+      "title": "The daily sweep \u2014 erasure happens on a clock, and every run is recorded",
       "status": "shipped"
     },
     {
@@ -167,7 +167,7 @@
     },
     {
       "n": 31,
-      "title": "Account security — sign out everywhere, and proving it is you again before something irreversible",
+      "title": "Account security \u2014 sign out everywhere, and proving it is you again before something irreversible",
       "status": "shipped"
     },
     {
@@ -177,7 +177,7 @@
     },
     {
       "n": 33,
-      "title": "A guard refuses a declared setting nothing names — the seam a handler reads one through is live; the completeness check over it is not",
+      "title": "A guard refuses a declared setting nothing names \u2014 the seam a handler reads one through is live; the completeness check over it is not",
       "status": "shipped"
     },
     {
@@ -192,52 +192,52 @@
     },
     {
       "n": 36,
-      "title": "The deployment provisions itself — a product declares what it needs underneath it, and the reconciler makes it exist in the right jurisdiction, binds it, and reaps it after a drain",
+      "title": "The deployment provisions itself \u2014 a product declares what it needs underneath it, and the reconciler makes it exist in the right jurisdiction, binds it, and reaps it after a drain",
       "status": "shipped"
     },
     {
       "n": 37,
-      "title": "A workspace's records change shard, which is the only way its jurisdiction can — read-only while it copies, verified before it flips, and the source drained rather than emptied",
+      "title": "A workspace's records change shard, which is the only way its jurisdiction can \u2014 read-only while it copies, verified before it flips, and the source drained rather than emptied",
       "status": "shipped"
     },
     {
       "n": 38,
-      "title": "A notification leaves the process — Web Push written out rather than depended on, a subscription filed under the door it was made at so it wears that workspace's own icon, and a keypair the console generates and never accepts",
+      "title": "A notification leaves the process \u2014 Web Push written out rather than depended on, a subscription filed under the door it was made at so it wears that workspace's own icon, and a keypair the console generates and never accepts",
       "status": "shipped"
     },
     {
       "n": 39,
-      "title": "The documentation is two generated pages — what exists, derived from the engine; and how to add to it, which no generator can derive",
+      "title": "The documentation is two generated pages \u2014 what exists, derived from the engine; and how to add to it, which no generator can derive",
       "status": "shipped"
     },
     {
       "n": 40,
-      "title": "An app ships a screen — a product's browser half is a chunk of its own, loaded when its workspace opens it, drawing that workspace's own records through the door it is handed",
+      "title": "An app ships a screen \u2014 a product's browser half is a chunk of its own, loaded when its workspace opens it, drawing that workspace's own records through the door it is handed",
       "status": "shipped"
     },
     {
       "n": 41,
       "status": "shipped",
-      "title": "A workspace's brand reaches the screen — the surfaces it picked, and only the ones its products have",
-      "ends": "A workspace's brand reaches the two surfaces the deployment actually has, and only where the workspace asked for them. The editor stored the picks and NOTHING read them: the tile was painted from `mayBrand` alone — so a business that turned `app-icons` off still installed as itself — and no screen wore the theme at all. Being entitled to brand and asking to brand HERE are two questions, and reading only the first is what made every switch on that screen save and change nothing. `centre.view` now answers with the theme or with nothing, and `paintFor` reads the pick; the intersection is resolved where the surface is SERVED rather than where it is drawn, because every screen deciding for itself is how one product ends up branded and the next one beside it is not. On the page it is a second style element appended after the boot's — at equal specificity source order decides, and absent means EMPTY rather than untouched, or the last workspace's colours survive a switch."
+      "title": "A workspace's brand reaches the screen \u2014 the surfaces it picked, and only the ones its products have",
+      "ends": "A workspace's brand reaches the two surfaces the deployment actually has, and only where the workspace asked for them. The editor stored the picks and NOTHING read them: the tile was painted from `mayBrand` alone \u2014 so a business that turned `app-icons` off still installed as itself \u2014 and no screen wore the theme at all. Being entitled to brand and asking to brand HERE are two questions, and reading only the first is what made every switch on that screen save and change nothing. `centre.view` now answers with the theme or with nothing, and `paintFor` reads the pick; the intersection is resolved where the surface is SERVED rather than where it is drawn, because every screen deciding for itself is how one product ends up branded and the next one beside it is not. On the page it is a second style element appended after the boot's \u2014 at equal specificity source order decides, and absent means EMPTY rather than untouched, or the last workspace's colours survive a switch."
     },
     {
       "n": 42,
       "status": "shipped",
       "title": "A screen asks the gate before it draws a control, rather than after it is pressed",
-      "ends": "`blockedBy` was declared in the kernel and called by nothing, so a control the gate would refuse was drawn, pressed, and failed — the refusal arriving as a toast over a form somebody had already filled in. The Ask is now built ONCE per request and asked twice: for this request's own gate, and for what else this caller could do. `centre.view` carries the second answer as `may`, only for what is BLOCKED (absent means allowed, which is also where a client that forgets the field lands), and every input is settled in memory by the locator so fifty operations cost fifty pure walks and no query. On the page it arrives through a CONTEXT rather than a prop — a prop is a thing every screen in every product has to remember to pass, and the one that forgets is not visibly different. An act names the OPERATION it calls rather than a verdict, so a screen never restates the gate's question in its own words; `Screen`'s primary and `Confirm`'s act both read it, and the words per gate are the design system's (`STOPPED`) rather than each screen's."
+      "ends": "`blockedBy` was declared in the kernel and called by nothing, so a control the gate would refuse was drawn, pressed, and failed \u2014 the refusal arriving as a toast over a form somebody had already filled in. The Ask is now built ONCE per request and asked twice: for this request's own gate, and for what else this caller could do. `centre.view` carries the second answer as `may`, only for what is BLOCKED (absent means allowed, which is also where a client that forgets the field lands), and every input is settled in memory by the locator so fifty operations cost fifty pure walks and no query. On the page it arrives through a CONTEXT rather than a prop \u2014 a prop is a thing every screen in every product has to remember to pass, and the one that forgets is not visibly different. An act names the OPERATION it calls rather than a verdict, so a screen never restates the gate's question in its own words; `Screen`'s primary and `Confirm`'s act both read it, and the words per gate are the design system's (`STOPPED`) rather than each screen's."
     },
     {
       "n": 43,
       "status": "superseded",
       "by": "D52",
       "title": "The proving ground's remaining screens reach a workspace's own records",
-      "ends": "nothing — D52 made the ground a fixture with no `live` entry, so there is no workspace whose records it could reach, and `scripts/fixture.test.mjs` refuses the entry back"
+      "ends": "nothing \u2014 D52 made the ground a fixture with no `live` entry, so there is no workspace whose records it could reach, and `scripts/fixture.test.mjs` refuses the entry back"
     },
     {
       "n": 44,
       "status": "shipped",
-      "title": "A one-off purchase — a credit pack, and becoming a business — through the same checkout"
+      "title": "A one-off purchase \u2014 a credit pack, and becoming a business \u2014 through the same checkout"
     },
     {
       "n": 45,
@@ -247,41 +247,41 @@
     {
       "n": 46,
       "status": "shipped",
-      "title": "The wallet tops itself up — a standing instruction, a cooldown, and a decline the customer can read"
+      "title": "The wallet tops itself up \u2014 a standing instruction, a cooldown, and a decline the customer can read"
     },
     {
       "n": 47,
       "status": "shipped",
-      "title": "Storage is metered rather than refused — the included amount is where the meter starts, and an empty wallet costs the writes and never the files"
+      "title": "Storage is metered rather than refused \u2014 the included amount is where the meter starts, and an empty wallet costs the writes and never the files"
     },
     {
       "n": 48,
       "status": "planned",
-      "title": "The deployment's legal identity is complete — the registered address it is written to, and whether selling where it sells needs a representative there",
+      "title": "The deployment's legal identity is complete \u2014 the registered address it is written to, and whether selling where it sells needs a representative there",
       "ends": "`IDENTITY.address` is the address on the licence rather than the Emirate, and either a representative is declared beside the sub-processors or a written decision says none is needed for where this deployment sells"
     },
     {
       "n": 49,
       "status": "planned",
-      "title": "A stranger joins a workspace by themselves — a door the workspace opens, a role the app names, and a ceiling the plan sells (D23)",
+      "title": "A stranger joins a workspace by themselves \u2014 a door the workspace opens, a role the app names, and a ceiling the plan sells (D23)",
       "ends": "an app declares `access.joining`, composition refuses a joining role that is not a customer or that reads a tenant-scoped collection, `me.join` resolves its workspace from the door, and the customer ceiling refuses with a sentence naming the upgrade"
     },
     {
       "n": 50,
       "status": "planned",
-      "title": "The interface speaks a second language — dictionaries, a language control, and the copy guard reading both",
+      "title": "The interface speaks a second language \u2014 dictionaries, a language control, and the copy guard reading both",
       "ends": "`Presentation.language` is offered on the Formats screen, every written string in `@engine/design` and `engine/one-space` resolves through a dictionary, and `tone.test.mjs` checks the voice in each language rather than only in English"
     },
     {
       "n": 51,
       "status": "shipped",
-      "title": "A collection says `searchable` and becomes findable — the write marks, a pass carries, erasure removes, and one filter is the boundary",
+      "title": "A collection says `searchable` and becomes findable \u2014 the write marks, a pass carries, erasure removes, and one filter is the boundary",
       "ends": "`searchable` on a `CollectionSpec` produces the ledger, the `<collection>.search` operation, the quarter-hourly index pass and the removal on delete and on erasure, with `searching.test.mjs` making each of the four silences a test failure."
     },
     {
       "n": 52,
       "status": "shipped",
-      "title": "The words arrive as they are written — one metered run, streamed, and the charge rides the last token",
+      "title": "The words arrive as they are written \u2014 one metered run, streamed, and the charge rides the last token",
       "ends": "`ctx.stream` answers with an SSE `Response` from the same reserve, model and words `ctx.generate` uses; `generateStream` holds the same four bounds; a cancelled stream settles at the reserve and is corrected by the nightly check; `metering.test.mjs` asks the streaming lane every question it asks the other."
     },
     {
@@ -293,194 +293,194 @@
     {
       "n": 54,
       "status": "shipped",
-      "title": "A collection's `offline` policy reaches the browser — a write survives no signal, and a read answers without one",
+      "title": "A collection's `offline` policy reaches the browser \u2014 a write survives no signal, and a read answers without one",
       "ends": "`offline` is read by the runtime and by the browser rather than only declared: `queue` holds a write until there is a connection and replays it once, `cache` answers a read from what was last seen and says how old it is, and `none` is honest about failing. `scripts/declared.test.mjs` fails on any field of a kernel declaration that no lane reads, which is the check that would have found this one."
     },
     {
       "n": 55,
       "status": "shipped",
-      "title": "A collection narrows to part of a workspace — a location grant, and one filter the platform composes",
-      "ends": "`reach` on an `AppSpec` names the collection whose rows are the places and the field they nest by; `reachBy` on a collection names the field that says where one record is. A membership carries the places somebody works in, per app; a grant to a site covers everything under it, resolved at the read rather than frozen into the grant; and `null` — every membership until somebody is narrowed — is the whole workspace. The five generated verbs filter and refuse by themselves, `member.places` and `member.reach` are the roster's read and write, bounded by the granter's own reach, and `scripts/reach.test.mjs` fails on any statement over a narrowed table that neither carries the filter nor states why it is wide. The AUDIENCE of a notification is deliberately not narrowed — see `audienceFor`."
+      "title": "A collection narrows to part of a workspace \u2014 a location grant, and one filter the platform composes",
+      "ends": "`reach` on an `AppSpec` names the collection whose rows are the places and the field they nest by; `reachBy` on a collection names the field that says where one record is. A membership carries the places somebody works in, per app; a grant to a site covers everything under it, resolved at the read rather than frozen into the grant; and `null` \u2014 every membership until somebody is narrowed \u2014 is the whole workspace. The five generated verbs filter and refuse by themselves, `member.places` and `member.reach` are the roster's read and write, bounded by the granter's own reach, and `scripts/reach.test.mjs` fails on any statement over a narrowed table that neither carries the filter nor states why it is wide. The AUDIENCE of a notification is deliberately not narrowed \u2014 see `audienceFor`."
     },
     {
       "n": 56,
       "status": "planned",
-      "title": "A family takes a hue — one declared per product, never written at a call site",
+      "title": "A family takes a hue \u2014 one declared per product, never written at a call site",
       "ends": "`tint` carries more than one hue, each declared once in `scene/tint.ts` as a constraint on the family, chosen by name rather than by value; `scene.test.mjs` still refuses a colour written into a screen; and two products wearing the family are visibly different and neither is nameable."
     },
     {
       "n": 57,
       "status": "planned",
-      "title": "Records move between workspaces — a garage becomes a business and its history goes with it",
+      "title": "Records move between workspaces \u2014 a garage becomes a business and its history goes with it",
       "ends": "A workspace's records can be handed to another workspace the same account can already reach, with the ledger's provenance carried rather than restamped, refused where the destination's apps do not cover the source's collections, and audited on both sides. Until it exists the only path is an export and an import, which loses who did what and when."
     },
     {
       "n": 58,
       "status": "planned",
-      "title": "An operation's ceiling is in force — calls per minute, per caller, refused rather than declared",
+      "title": "An operation's ceiling is in force \u2014 calls per minute, per caller, refused rather than declared",
       "ends": "`OperationSpec.rate` is read inside `performOperation`, so both doors obey it and neither can forget; a caller past the ceiling is refused with a catalogued problem naming when to try again; and the counter is bounded rather than a row per call."
     },
     {
       "n": 59,
       "status": "shipped",
-      "title": "A write says it worked — the sentence the operation declared, and the reads it made stale",
+      "title": "A write says it worked \u2014 the sentence the operation declared, and the reads it made stale",
       "ends": "`OperationSpec.outcome` reaches the browser and is applied by the one door: a successful write raises its declared message in its declared tone exactly once, and every operation it names in `invalidates` is re-read rather than left showing what was true before the press."
     },
     {
       "n": 60,
       "status": "shipped",
-      "title": "OneInventory exists — the model, the one chokepoint that moves a balance, and the arithmetic under both",
+      "title": "OneInventory exists \u2014 the model, the one chokepoint that moves a balance, and the arithmetic under both",
       "ends": "The manifest composes and the deployment prices every key it declares; `product`, `location`, `stock` and `ledger` are collections with the balance and the history opted out of every generated write; `stock.receive`, `stock.take` and `stock.adjust` go through one function that writes the event and the projection in one batch and refuses rather than clamping; and `ledger-chokepoint.test.mjs` fails on a second place that writes either table."
     },
     {
       "n": 61,
       "status": "shipped",
-      "title": "A product's screens reach each other — the route is the app's, the prefix is the platform's",
+      "title": "A product's screens reach each other \u2014 the route is the app's, the prefix is the platform's",
       "ends": "A mounted screen is handed `go`, which takes the app's OWN route; `routeIn` adds the workspace prefix for the nav and for a row inside a screen alike, so the two are one address rather than two copies of one expression. Until it existed an app's list could not open the record it listed, and the only way it could have was by writing the centre's address scheme into a product."
     },
     {
       "n": 62,
       "status": "shipped",
-      "title": "A list narrows and pages — the generated read answers past the first fifty, and says how many there are",
-      "ends": "The generated `list` takes a filter over declared fields, a cursor and a count. `where` is equality over what the collection declares — a comparison language would be a query language arriving over the wire, and equality answers “this shelf's lines”, which is what a screen asks. The cursor is `(at, id)` rather than an offset, because rows arrive at the TOP: an offset of fifty on a collection that gained three since the first page steps over three the reader has never seen, silently. And the total is the collection's, counted over the same `WHERE` and WITHOUT the cursor, so it does not fall as somebody reads — a page of fifty out of two hundred was indistinguishable from a collection of fifty, and the screen drawing it said “fifty products” with complete confidence. The count runs BESIDE the page rather than before it, so the latency budget's `depth` is unchanged and only its trip count moved, 11 → 12, on purpose."
+      "title": "A list narrows and pages \u2014 the generated read answers past the first fifty, and says how many there are",
+      "ends": "The generated `list` takes a filter over declared fields, a cursor and a count. `where` is equality over what the collection declares \u2014 a comparison language would be a query language arriving over the wire, and equality answers \u201cthis shelf's lines\u201d, which is what a screen asks. The cursor is `(at, id)` rather than an offset, because rows arrive at the TOP: an offset of fifty on a collection that gained three since the first page steps over three the reader has never seen, silently. And the total is the collection's, counted over the same `WHERE` and WITHOUT the cursor, so it does not fall as somebody reads \u2014 a page of fifty out of two hundred was indistinguishable from a collection of fifty, and the screen drawing it said \u201cfifty products\u201d with complete confidence. The count runs BESIDE the page rather than before it, so the latency budget's `depth` is unchanged and only its trip count moved, 11 \u2192 12, on purpose."
     },
     {
       "n": 63,
       "status": "shipped",
       "title": "The guide and the milestones are ticked by what a workspace has actually done",
-      "ends": "A workspace's own tally — `tenant_event`, one row per (workspace, app, event), upserted on the way out of every successful operation that raises one — is what `guide.view` reads, so a step is ticked by what HAPPENED rather than by a screen deciding it looks done. Recorded beside `told` rather than inside it: the notification path returns early when an event has no audience, which is right for an inbox and wrong for a checklist. A milestone is said once and `tenant_milestone` is what stops it — `guide.seen` is a separate write, because a read that recorded the congratulation would spend it on a page somebody loaded and closed. And a step or milestone on an event only a JOB raises is refused at composition: the event exists, so the old check passed, and the step then sat unticked for ever because a sweep is not something anybody did."
+      "ends": "A workspace's own tally \u2014 `tenant_event`, one row per (workspace, app, event), upserted on the way out of every successful operation that raises one \u2014 is what `guide.view` reads, so a step is ticked by what HAPPENED rather than by a screen deciding it looks done. Recorded beside `told` rather than inside it: the notification path returns early when an event has no audience, which is right for an inbox and wrong for a checklist. A milestone is said once and `tenant_milestone` is what stops it \u2014 `guide.seen` is a separate write, because a read that recorded the congratulation would spend it on a page somebody loaded and closed. And a step or milestone on an event only a JOB raises is refused at composition: the event exists, so the old check passed, and the step then sat unticked for ever because a sweep is not something anybody did."
     },
     {
       "n": 64,
       "status": "shipped",
-      "title": "Itemised things — one object for its whole life, and the kits composed of them",
+      "title": "Itemised things \u2014 one object for its whole life, and the kits composed of them",
       "ends": "`unit` and `kit` are collections nothing can write by hand; issuing, taking back and retiring an object each move the shelf through the same chokepoint a box of gloves does, and `item-life.test.mjs` fails on a standing changed without one. A kit is checked against the recipe it was ASSEMBLED under, a build is refused while anything is short and a stray is reported rather than refused, and taking anything out of a built kit un-builds it. Our own label is the only code in a workspace that names one object rather than a type, which is what lets a count say \"you have already counted that one\"."
     },
     {
       "n": 65,
       "status": "shipped",
-      "title": "A model can be shown something — the vision lane carries a picture, and the reserve counts it",
-      "ends": "`Ask.image` reaches the compat endpoint as a content part rather than being dropped, so `lane: \"vision\"` is a capability and not a name; `TOKENS_PER_IMAGE` puts the picture in the reserve, whether or not the units were counted by hand, because the settle cap makes an under-count permanently ours. And `ai-commits.test.mjs` fails on any operation that generates AND writes — a model fills anything, and a person commits."
+      "title": "A model can be shown something \u2014 the vision lane carries a picture, and the reserve counts it",
+      "ends": "`Ask.image` reaches the compat endpoint as a content part rather than being dropped, so `lane: \"vision\"` is a capability and not a name; `TOKENS_PER_IMAGE` puts the picture in the reserve, whether or not the units were counted by hand, because the settle cap makes an under-count permanently ours. And `ai-commits.test.mjs` fails on any operation that generates AND writes \u2014 a model fills anything, and a person commits."
     },
     {
       "n": 66,
       "status": "shipped",
-      "title": "The release rail — a run ends, a person releases, and a late result may contradict neither",
-      "ends": "`process`, `process-item` and `job` are collections nothing writes by hand. Ending a run and releasing what it produced are separate acts under separate grants, because a green light is not a qualification. A quarantine freezes stock the chokepoint then REFUSES a take from, and lifts to needs-work — `release-ladder.test.mjs` fails on a release with no compare-and-set and on a lift that writes `released`. A late result that contradicts what is recorded is refused and names both facts; a late failure on a released run is a recall, which freezes what it can reach and NAMES what it cannot. And a job's trace is a query rather than a stored status, so a job correct on Tuesday acquires a concern on Thursday without anything about the job changing."
+      "title": "The release rail \u2014 a run ends, a person releases, and a late result may contradict neither",
+      "ends": "`process`, `process-item` and `job` are collections nothing writes by hand. Ending a run and releasing what it produced are separate acts under separate grants, because a green light is not a qualification. A quarantine freezes stock the chokepoint then REFUSES a take from, and lifts to needs-work \u2014 `release-ladder.test.mjs` fails on a release with no compare-and-set and on a lift that writes `released`. A late result that contradicts what is recorded is refused and names both facts; a late failure on a released run is a recall, which freezes what it can reach and NAMES what it cannot. And a job's trace is a query rather than a stored status, so a job correct on Tuesday acquires a concern on Thursday without anything about the job changing."
     },
     {
       "n": 67,
       "status": "shipped",
       "title": "A screen can be gated on an entitlement, the way an operation already is",
-      "ends": "`ScreenSpec.features` names the capabilities a screen is FOR, and the boot read withholds the screen unless the plan includes one of them — so a destination the workspace did not buy has no nav row, no route and no way in by typing, which is the same three answers a flag already gave. It is asked on the SERVER rather than in the chrome: the page holds no plan, and giving it one would be a second round trip on the read every screen stands on plus a second opinion about what was bought. ANY rather than ALL, because a page carrying runs and work orders is worth opening on a tier that has only work orders. Composition refuses a screen gated on a key nothing sells, and deliberately does NOT count a screen as enforcement — hiding a nav row leaves the operations behind it callable, so a key whose only mention is a screen is still sold and withheld by nothing."
+      "ends": "`ScreenSpec.features` names the capabilities a screen is FOR, and the boot read withholds the screen unless the plan includes one of them \u2014 so a destination the workspace did not buy has no nav row, no route and no way in by typing, which is the same three answers a flag already gave. It is asked on the SERVER rather than in the chrome: the page holds no plan, and giving it one would be a second round trip on the read every screen stands on plus a second opinion about what was bought. ANY rather than ALL, because a page carrying runs and work orders is worth opening on a tier that has only work orders. Composition refuses a screen gated on a key nothing sells, and deliberately does NOT count a screen as enforcement \u2014 hiding a nav row leaves the operations behind it callable, so a key whose only mention is a screen is still sold and withheld by nothing."
     },
     {
       "n": 68,
       "status": "shipped",
-      "title": "A night’s work can tell somebody — a job raises events, and the nightly sweep uses it",
-      "ends": "`JobCtx` carries `tell` and `setting`, so a per-tenant job reaches the same inbox a request does — the same audience-by-permission, the same channel resolution, the same workspace numbers — and `eventsOf` counts a job’s `emits`, so a notification about something nobody was present for composes. The runner refuses an undeclared event and `refuseJob` refuses `emits` on a deployment-scope job, because a note is filed in a workspace. OneInventory’s expiry sweep is the first: it tells about CROSSINGS rather than states — `crossedOn` is arithmetic, so nothing is remembered, a repeat run names the same batches, and nobody is told the same thing every morning for a month. `job-tells.test.mjs` fails on a job that declares an event and never raises it."
+      "title": "A night\u2019s work can tell somebody \u2014 a job raises events, and the nightly sweep uses it",
+      "ends": "`JobCtx` carries `tell` and `setting`, so a per-tenant job reaches the same inbox a request does \u2014 the same audience-by-permission, the same channel resolution, the same workspace numbers \u2014 and `eventsOf` counts a job\u2019s `emits`, so a notification about something nobody was present for composes. The runner refuses an undeclared event and `refuseJob` refuses `emits` on a deployment-scope job, because a note is filed in a workspace. OneInventory\u2019s expiry sweep is the first: it tells about CROSSINGS rather than states \u2014 `crossedOn` is arithmetic, so nothing is remembered, a repeat run names the same batches, and nobody is told the same thing every morning for a month. `job-tells.test.mjs` fails on a job that declares an event and never raises it."
     },
     {
       "n": 69,
       "status": "shipped",
-      "title": "Labels — a QR from nothing, a printable sheet, and the decant label a hazard needs",
-      "ends": "`@engine/design` draws a QR itself (ISO/IEC 18004, byte mode, level M, versions 1–10) — hand-written, and only defensible because `qr.test.ts` DECODES what it produces with a reader that shares no code with it: unmasks, reads the format bits back, de-interleaves, checks every Reed-Solomon syndrome is zero, parses the payload. One symbology for everything we print, because two encoders are two ways for a tag to come out unscannable. `LabelSheet`/`Label`/`LabelText` are the one place in the system measured in millimetres, because a label has a physical size and a screen does not. OneInventory declares a GHS classification on a product and prints the decant label a decanted bottle legally needs — signal word, hazards, statements verbatim — says plainly that the diamond is not the regulated pictogram, and reports a classification that contradicts itself where the label is printed rather than refusing it. Printing a place or a product MINTS its code, and `label-once.test.mjs` fails on any statement that could re-issue one."
+      "title": "Labels \u2014 a QR from nothing, a printable sheet, and the decant label a hazard needs",
+      "ends": "`@engine/design` draws a QR itself (ISO/IEC 18004, byte mode, level M, versions 1\u201310) \u2014 hand-written, and only defensible because `qr.test.ts` DECODES what it produces with a reader that shares no code with it: unmasks, reads the format bits back, de-interleaves, checks every Reed-Solomon syndrome is zero, parses the payload. One symbology for everything we print, because two encoders are two ways for a tag to come out unscannable. `LabelSheet`/`Label`/`LabelText` are the one place in the system measured in millimetres, because a label has a physical size and a screen does not. OneInventory declares a GHS classification on a product and prints the decant label a decanted bottle legally needs \u2014 signal word, hazards, statements verbatim \u2014 says plainly that the diamond is not the regulated pictogram, and reports a classification that contradicts itself where the label is printed rather than refusing it. Printing a place or a product MINTS its code, and `label-once.test.mjs` fails on any statement that could re-issue one."
     },
     {
       "n": 70,
       "status": "shipped",
-      "title": "Reports — what went, what was wrong, what to buy, and how much of it anybody wrote down",
-      "ends": "Every figure is derived from the ledger and nothing is stored, because a correction made in March changes what February consumed and a stored number never learns that. One operation answers all four, so a screen cannot show a month’s usage beside a fortnight’s losses. The HERO is the recorded share — the number that makes the product look bad, and the only one that says whether the others mean anything. Short and over stay apart, because netting them off draws a shelf that is wildly wrong as a shelf that is fine. What to buy is ordered by what runs out FIRST against the workspace’s own lead time, never by what is smallest — which is how a store room runs out of the thing that takes a month to get. `inferred-consumption.test.mjs` fails if the id a count mints and the prefix the report reads ever drift apart, or if a close stops naming its session."
+      "title": "Reports \u2014 what went, what was wrong, what to buy, and how much of it anybody wrote down",
+      "ends": "Every figure is derived from the ledger and nothing is stored, because a correction made in March changes what February consumed and a stored number never learns that. One operation answers all four, so a screen cannot show a month\u2019s usage beside a fortnight\u2019s losses. The HERO is the recorded share \u2014 the number that makes the product look bad, and the only one that says whether the others mean anything. Short and over stay apart, because netting them off draws a shelf that is wildly wrong as a shelf that is fine. What to buy is ordered by what runs out FIRST against the workspace\u2019s own lead time, never by what is smallest \u2014 which is how a store room runs out of the thing that takes a month to get. `inferred-consumption.test.mjs` fails if the id a count mints and the prefix the report reads ever drift apart, or if a close stops naming its session."
     },
     {
       "n": 71,
       "status": "shipped",
-      "title": "The spreadsheet somebody already has — the import, and the supplier it names",
-      "ends": "Nobody types in eight hundred products, so a paste of a stock list is the difference between a trial and a workspace. Quotes are parsed rather than stripped, the separator is read off the heading and a European decimal is not a thousands separator — each of those is a catalogue that looks complete and is wrong. The mapping is GUESSED and then SHOWN, editable, because a guess that puts the supplier's name in the product name for eight hundred rows is only catchable before it happens; every refused row comes back with its line number and its reason rather than being dropped. `one-planner.test.mjs` fails if the preview and the commit ever stop being one function — two walks of one sheet agree until the day they do not, and on that day nothing throws. A supplier is the last step of the reorder report's own workflow: it can say what to buy and, without this, not who to ring — and its own lead time beats the workspace's, which is the slowest supplier a place has."
+      "title": "The spreadsheet somebody already has \u2014 the import, and the supplier it names",
+      "ends": "Nobody types in eight hundred products, so a paste of a stock list is the difference between a trial and a workspace. Quotes are parsed rather than stripped, the separator is read off the heading and a European decimal is not a thousands separator \u2014 each of those is a catalogue that looks complete and is wrong. The mapping is GUESSED and then SHOWN, editable, because a guess that puts the supplier's name in the product name for eight hundred rows is only catchable before it happens; every refused row comes back with its line number and its reason rather than being dropped. `one-planner.test.mjs` fails if the preview and the commit ever stop being one function \u2014 two walks of one sheet agree until the day they do not, and on that day nothing throws. A supplier is the last step of the reorder report's own workflow: it can say what to buy and, without this, not who to ring \u2014 and its own lead time beats the workspace's, which is the slowest supplier a place has."
     },
     {
       "n": 72,
       "status": "shipped",
       "title": "An operation's declared input is checked at the door, and `now` is one type",
-      "ends": "`checkAll` was reached by collection records and by settings and by nothing else, so every operation's `input` map was a declaration the tool catalogue, the OpenAPI document and every generated form were written from, with nothing standing behind it — a required field could be absent, a four-hundred-thousand-character bound was advisory, and a `day` could be any string. The symptom was never a 400: the field arrived as `undefined`, reached a statement, and D1 answered `Type 'undefined' not supported` in a 503 naming a value rather than a field. It is checked before the handler now, it names the field, and the generated verbs stay exempt because `records.ts` owns create-versus-update. `Ctx.now` is a STRING, the same as `JobCtx.now` — one word had two types in one framework and the one an app can write to a row is the string. And a job's budget is wall-clock from the start of the pass rather than from the logical instant, which had made every run handed a past instant break before the first workspace and report a clean night. `input-checked.test.mjs` holds the door; all of it was found by making real requests to a real worker, which nothing in this repository had done for an app."
+      "ends": "`checkAll` was reached by collection records and by settings and by nothing else, so every operation's `input` map was a declaration the tool catalogue, the OpenAPI document and every generated form were written from, with nothing standing behind it \u2014 a required field could be absent, a four-hundred-thousand-character bound was advisory, and a `day` could be any string. The symptom was never a 400: the field arrived as `undefined`, reached a statement, and D1 answered `Type 'undefined' not supported` in a 503 naming a value rather than a field. It is checked before the handler now, it names the field, and the generated verbs stay exempt because `records.ts` owns create-versus-update. `Ctx.now` is a STRING, the same as `JobCtx.now` \u2014 one word had two types in one framework and the one an app can write to a row is the string. And a job's budget is wall-clock from the start of the pass rather than from the logical instant, which had made every run handed a past instant break before the first workspace and report a clean night. `input-checked.test.mjs` holds the door; all of it was found by making real requests to a real worker, which nothing in this repository had done for an app."
     },
     {
       "n": 73,
       "status": "shipped",
-      "title": "The other half of OneInventory, driven — and the quarantine that was a badge on a screen",
-      "ends": "Deliveries and the two expiry clocks, itemised objects and their life, kits and their recipes, the release ladder and the nightly sweep are all executed against a real database through the real door now, in `inventory-deep.test.ts`. It found the one that matters most: loading something into a run did not HOLD it. `freeze` set `standing = 'held'` on a failed or recalled run — the states where somebody has already noticed — and nothing held what was merely waiting to be signed for. So a tray whose cycle had ended and which no qualified person had released could be taken off the shelf and used on somebody, while the screen showed \"waiting to be released\". The gap between a machine finishing and a person signing for what came out of it is what this product has instead of deciding that a green light is a qualification, and until this stage the gap was a label. `process.put` holds; `process.release` stamps `ok`; `process.lift` unfreezes one item with a reason; receiving more of a held lot stays possible, because a quarantine is about what may LEAVE."
+      "title": "The other half of OneInventory, driven \u2014 and the quarantine that was a badge on a screen",
+      "ends": "Deliveries and the two expiry clocks, itemised objects and their life, kits and their recipes, the release ladder and the nightly sweep are all executed against a real database through the real door now, in `inventory-deep.test.ts`. It found the one that matters most: loading something into a run did not HOLD it. `freeze` set `standing = 'held'` on a failed or recalled run \u2014 the states where somebody has already noticed \u2014 and nothing held what was merely waiting to be signed for. So a tray whose cycle had ended and which no qualified person had released could be taken off the shelf and used on somebody, while the screen showed \"waiting to be released\". The gap between a machine finishing and a person signing for what came out of it is what this product has instead of deciding that a green light is a qualification, and until this stage the gap was a label. `process.put` holds; `process.release` stamps `ok`; `process.lift` unfreezes one item with a reason; receiving more of a held lot stays possible, because a quarantine is about what may LEAVE."
     },
     {
       "n": 74,
       "status": "shipped",
       "title": "The foot of a phone is a vignette, and everywhere an app declares is reachable from it",
-      "ends": "`--hem-bottom` was written by nobody, so the bottom vignette fell to its default of 1 on every screen: fully opaque, with the world's marks stopping dead at its top edge, which is a bar by the definition the top hem's own paragraphs give. Both hems ask the same question now — is anything actually behind this — and the easing is armed a frame after the first answer so a screen that arrives with nothing behind its nav is drawn that way rather than fading out of a hem it never should have had. And `nav: \"secondary\"` was drawn in the desktop rail and nowhere else, so an app declaring twelve destinations offered five to a phone and seven had no gesture at all. The bar's fifth slot is the way to the rest: a destination rather than a menu, wearing the app's mark, opening to say WHICH place somebody is in when they are inside one. `phoneNav` is the split as one function so the invariant — every declared destination in exactly one of the two lists — is something a test can ask about, and `design/test/reachable.test.tsx` asks it. D46."
+      "ends": "`--hem-bottom` was written by nobody, so the bottom vignette fell to its default of 1 on every screen: fully opaque, with the world's marks stopping dead at its top edge, which is a bar by the definition the top hem's own paragraphs give. Both hems ask the same question now \u2014 is anything actually behind this \u2014 and the easing is armed a frame after the first answer so a screen that arrives with nothing behind its nav is drawn that way rather than fading out of a hem it never should have had. And `nav: \"secondary\"` was drawn in the desktop rail and nowhere else, so an app declaring twelve destinations offered five to a phone and seven had no gesture at all. The bar's fifth slot is the way to the rest: a destination rather than a menu, wearing the app's mark, opening to say WHICH place somebody is in when they are inside one. `phoneNav` is the split as one function so the invariant \u2014 every declared destination in exactly one of the two lists \u2014 is something a test can ask about, and `design/test/reachable.test.tsx` asks it. D46."
     },
     {
       "n": 75,
       "status": "shipped",
       "title": "A raw ALTER is a 503 on every door, and every standard page wears the curtain",
-      "ends": "`stampOf` is a content hash over a module's statements, so ANY edit to a module replays ALL of them — and `ALTER TABLE … ADD COLUMN` is the one statement that cannot be replayed. Three modules carried one; the first edit to any of them threw `duplicate column name` out of `boot`, which is upstream of the router, so every door on the deployment answered 503 and the identity screen said \"One could not start\". It is invisible on a fresh database, therefore green in every suite, and it took the live deployment down. `columns` already existed for exactly this — it is reconciled against the live table rather than executed — so the three moved onto it and `refuseSql` now refuses the word ALTER outright, which makes the next one a test failure at the point of writing. The other half is what somebody SEES when a deployment cannot answer: `Opening` is the only screen that draws while One is starting, and there were three more — a stopped boot, a host that is not a workspace, a route that is not a screen — each its own layout, drifting. `Opening` takes a `stopped` and draws all four, so the ring completes instead of turning and the message replaces the rotating line, on the same gradient with the same grain. `Elsewhere.tsx` is deleted; `Sheet` went with it, because a centred panel is a `Group` in a `Center` and the third way of saying so had no renderer. D47."
+      "ends": "`stampOf` is a content hash over a module's statements, so ANY edit to a module replays ALL of them \u2014 and `ALTER TABLE \u2026 ADD COLUMN` is the one statement that cannot be replayed. Three modules carried one; the first edit to any of them threw `duplicate column name` out of `boot`, which is upstream of the router, so every door on the deployment answered 503 and the identity screen said \"One could not start\". It is invisible on a fresh database, therefore green in every suite, and it took the live deployment down. `columns` already existed for exactly this \u2014 it is reconciled against the live table rather than executed \u2014 so the three moved onto it and `refuseSql` now refuses the word ALTER outright, which makes the next one a test failure at the point of writing. The other half is what somebody SEES when a deployment cannot answer: `Opening` is the only screen that draws while One is starting, and there were three more \u2014 a stopped boot, a host that is not a workspace, a route that is not a screen \u2014 each its own layout, drifting. `Opening` takes a `stopped` and draws all four, so the ring completes instead of turning and the message replaces the rotating line, on the same gradient with the same grain. `Elsewhere.tsx` is deleted; `Sheet` went with it, because a centred panel is a `Group` in a `Center` and the third way of saying so had no renderer. D47."
     },
     {
       "n": 76,
       "status": "shipped",
       "title": "A person is a subject, and an operator may give them things",
-      "ends": "The console could see every workspace and nobody in one, and every way of handing something out began by knowing a workspace — so \"give my friend a workspace at the top tier\" was five acts across two screens with a human wait in the middle, and the decision behind it was recorded nowhere. `given` is that decision as an append-only row: an address, a plan × N workspaces or a number of credits, an optional term, a required reason, and the operator who signed it. It is made to an ADDRESS because a demo, a friend and a cash customer have usually never signed in; `upsertAccount` adopts what was written for them. A plan gift confers the right to found — counted WITH the bare commercial allowance, or an operator would have to raise a second number and forgetting refuses somebody the thing they were just given. `applyGifts` is the one application path and both doors call it: founding, and an operator applying to a workspace somebody already has. The plan and the allowance land in the same instant rather than on tomorrow's sweep; the gift's term travels onto the subscription so the nightly pass can end it, because bounding only the SPENDING would give a year of cash the tier for ever. And the workspace can tell: `money.view` carries `given`, so the shelf says \"Given, and free until the first of December\" where it printed a price over a card that does not exist. Two silent faults fell out — `topUp` and `grantAllowance` wrote a ledger line and an `UPDATE` that matched nothing on a workspace whose billing account was never opened, and one draft comped under the caller's app id while `renewAllowance` reads `MEMBERSHIP`, so the plan landed and the allowance was zero. Accounts and one account are console screens; no Stripe is in any of it. D48."
+      "ends": "The console could see every workspace and nobody in one, and every way of handing something out began by knowing a workspace \u2014 so \"give my friend a workspace at the top tier\" was five acts across two screens with a human wait in the middle, and the decision behind it was recorded nowhere. `given` is that decision as an append-only row: an address, a plan \u00d7 N workspaces or a number of credits, an optional term, a required reason, and the operator who signed it. It is made to an ADDRESS because a demo, a friend and a cash customer have usually never signed in; `upsertAccount` adopts what was written for them. A plan gift confers the right to found \u2014 counted WITH the bare commercial allowance, or an operator would have to raise a second number and forgetting refuses somebody the thing they were just given. `applyGifts` is the one application path and both doors call it: founding, and an operator applying to a workspace somebody already has. The plan and the allowance land in the same instant rather than on tomorrow's sweep; the gift's term travels onto the subscription so the nightly pass can end it, because bounding only the SPENDING would give a year of cash the tier for ever. And the workspace can tell: `money.view` carries `given`, so the shelf says \"Given, and free until the first of December\" where it printed a price over a card that does not exist. Two silent faults fell out \u2014 `topUp` and `grantAllowance` wrote a ledger line and an `UPDATE` that matched nothing on a workspace whose billing account was never opened, and one draft comped under the caller's app id while `renewAllowance` reads `MEMBERSHIP`, so the plan landed and the allowance was zero. Accounts and one account are console screens; no Stripe is in any of it. D48."
     },
     {
       "n": 77,
       "status": "shipped",
       "title": "A browser test does not gate a deploy",
-      "ends": "The CI job downloaded Chromium and its system libraries, then waited on twelve suites that render the shipped stylesheet and measure pixels — 97 seconds in the design package alone, 96 of them one file, more than every guard, typecheck and runtime suite put together. None of what they ask is what a deploy is waiting on: they answer whether a screen LOOKS right, and a deploy is asking whether the thing answers at all. They are `*.seen.test.*` now, excluded from every `test` config and run by `pnpm engine:seen`, which nothing in CI calls — so the cost is paid by whoever is changing a screen. Design's fast lane went 97s to 8s and the workflow installs no browser. The whole arrangement is a filename, which is why `scripts/seen.test.mjs` exists: it fails on a browser suite without the suffix, a suffixed suite that opens none, a package holding one with no `seen` script, a `test` config whose globs still pick one up — evaluated against the real filenames rather than read for the word `seen` — and a workflow that installs a browser again. `docs/guards.json` gained a `lane` field, because four registered guards are no longer reached by CI and a registry saying otherwise is worse than none. D49."
+      "ends": "The CI job downloaded Chromium and its system libraries, then waited on twelve suites that render the shipped stylesheet and measure pixels \u2014 97 seconds in the design package alone, 96 of them one file, more than every guard, typecheck and runtime suite put together. None of what they ask is what a deploy is waiting on: they answer whether a screen LOOKS right, and a deploy is asking whether the thing answers at all. They are `*.seen.test.*` now, excluded from every `test` config and run by `pnpm engine:seen`, which nothing in CI calls \u2014 so the cost is paid by whoever is changing a screen. Design's fast lane went 97s to 8s and the workflow installs no browser. The whole arrangement is a filename, which is why `scripts/seen.test.mjs` exists: it fails on a browser suite without the suffix, a suffixed suite that opens none, a package holding one with no `seen` script, a `test` config whose globs still pick one up \u2014 evaluated against the real filenames rather than read for the word `seen` \u2014 and a workflow that installs a browser again. `docs/guards.json` gained a `lane` field, because four registered guards are no longer reached by CI and a registry saying otherwise is worse than none. D49."
     },
     {
       "n": 78,
       "status": "shipped",
       "title": "Ambient motion is earned, and a field has a budget",
-      "ends": "The world's marks beat in SMIL inside a `<pattern>`, which is the only thing that repaints in one — and a repaint inside a paint server invalidates the whole fill, so every frame re-rasterised a tile and repainted a viewport-sized rect on the main thread, for as long as a screen was open, competing with scrolling. Measured at the density a list screen asks for: the fine lattice was 2,820 placements, 394 live animations and 504 KB of markup; the line-art family 432 and 10. `motionFor` is the one decision now, from a stored choice and what the device says about itself, and it answers in two tiers — ESSENTIAL motion (arrival, travel, a press, a chart drawing: short, one-shot, composited, and carrying meaning) is assumed, AMBIENT motion (endless, full-screen, never composited) is EARNED. A fine pointer is the entry condition because a mid-range phone reports eight cores and cannot report a mouse; memory and cores only veto, and their silence is not a refusal. `useStillness` became a projection of it rather than a second answer. The other half is the cost that a motion setting cannot reach: a still field is still a string to parse and a tree to rasterise, so `MARKS` caps what a field may emit and the TILE shrinks rather than the cell — the same picture repeating sooner, against half a megabyte on every screen. Measured after: 588 placements, 133 KB, and no live animations on the default path. And the switch is reachable at last: every keyframe answered `data-reduce-motion` and nothing set it, `applyAppearance` read a value nothing wrote — `Look and motion` is both, on the device rather than the account, and it says which fact about the hardware decided. D50."
+      "ends": "The world's marks beat in SMIL inside a `<pattern>`, which is the only thing that repaints in one \u2014 and a repaint inside a paint server invalidates the whole fill, so every frame re-rasterised a tile and repainted a viewport-sized rect on the main thread, for as long as a screen was open, competing with scrolling. Measured at the density a list screen asks for: the fine lattice was 2,820 placements, 394 live animations and 504 KB of markup; the line-art family 432 and 10. `motionFor` is the one decision now, from a stored choice and what the device says about itself, and it answers in two tiers \u2014 ESSENTIAL motion (arrival, travel, a press, a chart drawing: short, one-shot, composited, and carrying meaning) is assumed, AMBIENT motion (endless, full-screen, never composited) is EARNED. A fine pointer is the entry condition because a mid-range phone reports eight cores and cannot report a mouse; memory and cores only veto, and their silence is not a refusal. `useStillness` became a projection of it rather than a second answer. The other half is the cost that a motion setting cannot reach: a still field is still a string to parse and a tree to rasterise, so `MARKS` caps what a field may emit and the TILE shrinks rather than the cell \u2014 the same picture repeating sooner, against half a megabyte on every screen. Measured after: 588 placements, 133 KB, and no live animations on the default path. And the switch is reachable at last: every keyframe answered `data-reduce-motion` and nothing set it, `applyAppearance` read a value nothing wrote \u2014 `Look and motion` is both, on the device rather than the account, and it says which fact about the hardware decided. D50."
     },
     {
       "n": 79,
       "status": "shipped",
       "title": "A workspace is founded with the products somebody chose",
-      "ends": "`me.tenant.create` founded with `apps: [deps.appId]` and `deps.appId` was the string `\"hello\"`, hardcoded in the worker — so every workspace anybody made held the reference app whatever they came for, and the only way to change it afterwards was to ask an operator to do it in the console. A deployment that serves several products and can only hand out the first is one product with the others built. Founding takes the ids now, narrowed to a `sells` catalogue that is deliberately a separate list from what is SERVED — a product mid-build stays mounted for the workspaces an operator put it in and comes out of one line — and refuses an empty choice, because a workspace with no product is a name and an address with nothing to open. `me.products` reads the manifests so the wizard cannot hold a second catalogue that goes stale, and `app.list`/`app.add`/`app.remove` let an owner change it later, with the last one un-removable: a workspace with nothing on cannot reach the screen that would switch something back on. Switching one on is a row and nothing else, because every product's schema is applied to every shard at boot. The first name for those three was `product.*`, which SILENTLY REPLACED OneInventory's own `product.list` — platform operations are merged over an app's generated CRUD on purpose — so `compose` refuses a shadowing id outright now instead of resolving it. D51. The screen is `Apps` under a workspace — `apps` rather than `products` because `packages` one row up is what the workspace SELLS, and two rows a word apart meaning opposite sides of the same trade is a menu somebody has to open to tell apart. Adding one also grants the person who did it the app's FOUNDING ROLE: enabling a product is a directory row saying the workspace HAS it, not that anybody may open one, so without that the owner presses the switch and every route in the new product answers 403 to them. Them alone — a grant nobody made is not made here — and `canAssign` is bypassed at that one point on purpose, because nobody holds a key in a product switched on a moment ago and the ordinary rule would make the first role in any new product ungrantable for ever."
+      "ends": "`me.tenant.create` founded with `apps: [deps.appId]` and `deps.appId` was the string `\"hello\"`, hardcoded in the worker \u2014 so every workspace anybody made held the reference app whatever they came for, and the only way to change it afterwards was to ask an operator to do it in the console. A deployment that serves several products and can only hand out the first is one product with the others built. Founding takes the ids now, narrowed to a `sells` catalogue that is deliberately a separate list from what is SERVED \u2014 a product mid-build stays mounted for the workspaces an operator put it in and comes out of one line \u2014 and refuses an empty choice, because a workspace with no product is a name and an address with nothing to open. `me.products` reads the manifests so the wizard cannot hold a second catalogue that goes stale, and `app.list`/`app.add`/`app.remove` let an owner change it later, with the last one un-removable: a workspace with nothing on cannot reach the screen that would switch something back on. Switching one on is a row and nothing else, because every product's schema is applied to every shard at boot. The first name for those three was `product.*`, which SILENTLY REPLACED OneInventory's own `product.list` \u2014 platform operations are merged over an app's generated CRUD on purpose \u2014 so `compose` refuses a shadowing id outright now instead of resolving it. D51. The screen is `Apps` under a workspace \u2014 `apps` rather than `products` because `packages` one row up is what the workspace SELLS, and two rows a word apart meaning opposite sides of the same trade is a menu somebody has to open to tell apart. Adding one also grants the person who did it the app's FOUNDING ROLE: enabling a product is a directory row saying the workspace HAS it, not that anybody may open one, so without that the owner presses the switch and every route in the new product answers 403 to them. Them alone \u2014 a grant nobody made is not made here \u2014 and `canAssign` is bypassed at that one point on purpose, because nobody holds a key in a product switched on a moment ago and the ordinary rule would make the first role in any new product ungrantable for ever."
     },
     {
       "n": 80,
       "status": "shipped",
       "title": "The ground is a fixture, and the deployment serves no fixture",
-      "ends": "The smallest complete app on the engine — one notebook, sample content, every cross-cutting concern declared so the framework's claims are asserted against something real — was in the deployment's `APPS`, in its `SELLS`, and in the browser's product loader. So a person who came for one product founded a workspace holding a demo they never asked for, with somebody else's notes in it, and only an operator could take it away. Nobody decided that; it was where the fixture happened to live. It is `engine/ground` now, outside `engine/apps` — which is the product catalogue — and the rule is structural rather than an exemption: `fixture.test.mjs` asks whether anything the deployment serves comes from outside the catalogue, which is a fact about a path rather than a claim about one app. Its `live` half, the entry that drew its screens over a workspace's own records, is deleted: a fixture with a live browser half is a product nobody decided to sell. The dev-only ground PAGE stays, because `import.meta.env.DEV` folds it out of the bundle and `bundle.test.mjs` holds that. What the deployment's own suite proves moved with the products: `boot`, `dossier` and `agent` drive OneInventory now, and what inventory cannot express — an app's own retention rule, two products to switch between — moved to the ground's suite, where a fixture can declare anything. The move also narrowed twenty guards at once, silently, because each enumerated `engine/apps/*` by hand and the ground had been inside it; `lib/trees.mjs` is the one walk they all read now, and widening `settings` back over the ground found `notes.density` saved and read by nothing the moment its only reader was deleted. Two defects came out of driving it: `app.add` answered 200 when the enablement never landed — a switch that snaps on over a product whose every route is 404 — and the sub-processor register disclosed `sensitive` to the company running the databases when no mounted app collects any. D52."
+      "ends": "The smallest complete app on the engine \u2014 one notebook, sample content, every cross-cutting concern declared so the framework's claims are asserted against something real \u2014 was in the deployment's `APPS`, in its `SELLS`, and in the browser's product loader. So a person who came for one product founded a workspace holding a demo they never asked for, with somebody else's notes in it, and only an operator could take it away. Nobody decided that; it was where the fixture happened to live. It is `engine/ground` now, outside `engine/apps` \u2014 which is the product catalogue \u2014 and the rule is structural rather than an exemption: `fixture.test.mjs` asks whether anything the deployment serves comes from outside the catalogue, which is a fact about a path rather than a claim about one app. Its `live` half, the entry that drew its screens over a workspace's own records, is deleted: a fixture with a live browser half is a product nobody decided to sell. The dev-only ground PAGE stays, because `import.meta.env.DEV` folds it out of the bundle and `bundle.test.mjs` holds that. What the deployment's own suite proves moved with the products: `boot`, `dossier` and `agent` drive OneInventory now, and what inventory cannot express \u2014 an app's own retention rule, two products to switch between \u2014 moved to the ground's suite, where a fixture can declare anything. The move also narrowed twenty guards at once, silently, because each enumerated `engine/apps/*` by hand and the ground had been inside it; `lib/trees.mjs` is the one walk they all read now, and widening `settings` back over the ground found `notes.density` saved and read by nothing the moment its only reader was deleted. Two defects came out of driving it: `app.add` answered 200 when the enablement never landed \u2014 a switch that snaps on over a product whose every route is 404 \u2014 and the sub-processor register disclosed `sensitive` to the company running the databases when no mounted app collects any. D52."
     },
     {
       "n": 81,
       "status": "shipped",
       "title": "The navigation is five destinations, and the chrome carries the rest",
-      "ends": "OneInventory declared five primary destinations and eight secondary ones, and the secondary tier WAS navigation: the desktop rail listed it and the phone spent the fifth of its five slots on an item that opened a sheet of the rest. Thirteen places to look, a bar that could not answer \"where am I\" from eight of them, and the same product reading differently either side of the breakpoint. The ceiling was never the problem — the overflow was, and a ceiling with an overflow behind it is not a ceiling. `nav` is `\"primary\" | \"none\"` now, the first destination is the app's own root, and the chrome has two named slots an app declares into: `chrome: \"search\"` takes the crown's middle, which used to hold the workspace name — a question nobody was asking, in the widest slot a working screen has — and `chrome: \"assistant\"` is a button beside the notifications, because asking is something somebody does FROM a screen about what is on it. A screen claiming a slot AND a bar seat is refused at composition. Where a screen's one act goes falls out of the same fact: a destination's foot is the navigation so the act rides up to the crown, and a screen somebody WENT to has no bar, so the act takes that room — never both, which was `Docked`'s own rule. Neither end is a bar: both are the page's ground with a hem, and the desktop rail was the last plate left — a column of filled buttons against ink on a phone — so it wears the bar's own `data-island` treatment and pins under the crown. Moving between screens stopped rebuilding the world: `worldCss` places up to `MARKS` marks and ran on every render, so a poll landing handed React several hundred fresh marks under a page that was often also changing, which is what made travel read as the app reloading. And the six screens that left the bar were reached from nowhere for one commit — declared, mounted, rendering perfectly, openable only by typing — so `reached.test.mjs` asks every app whether a screen off the bar has a control that leads to it, matching the router handoff rather than the route's name, because every container carries the mount table and a check on the string passes over an app whose every control has been unwired. D53."
+      "ends": "OneInventory declared five primary destinations and eight secondary ones, and the secondary tier WAS navigation: the desktop rail listed it and the phone spent the fifth of its five slots on an item that opened a sheet of the rest. Thirteen places to look, a bar that could not answer \"where am I\" from eight of them, and the same product reading differently either side of the breakpoint. The ceiling was never the problem \u2014 the overflow was, and a ceiling with an overflow behind it is not a ceiling. `nav` is `\"primary\" | \"none\"` now, the first destination is the app's own root, and the chrome has two named slots an app declares into: `chrome: \"search\"` takes the crown's middle, which used to hold the workspace name \u2014 a question nobody was asking, in the widest slot a working screen has \u2014 and `chrome: \"assistant\"` is a button beside the notifications, because asking is something somebody does FROM a screen about what is on it. A screen claiming a slot AND a bar seat is refused at composition. Where a screen's one act goes falls out of the same fact: a destination's foot is the navigation so the act rides up to the crown, and a screen somebody WENT to has no bar, so the act takes that room \u2014 never both, which was `Docked`'s own rule. Neither end is a bar: both are the page's ground with a hem, and the desktop rail was the last plate left \u2014 a column of filled buttons against ink on a phone \u2014 so it wears the bar's own `data-island` treatment and pins under the crown. Moving between screens stopped rebuilding the world: `worldCss` places up to `MARKS` marks and ran on every render, so a poll landing handed React several hundred fresh marks under a page that was often also changing, which is what made travel read as the app reloading. And the six screens that left the bar were reached from nowhere for one commit \u2014 declared, mounted, rendering perfectly, openable only by typing \u2014 so `reached.test.mjs` asks every app whether a screen off the bar has a control that leads to it, matching the router handoff rather than the route's name, because every container carries the mount table and a check on the string passes over an app whose every control has been unwired. D53."
     },
     {
       "n": 82,
       "status": "shipped",
       "title": "A home screen, and a checklist that knows whose step it is",
-      "ends": "OneInventory opened on Stock — a page of rows somebody has to read to find out whether there is anything to do — and had no screen answering \"is everything all right\". Home is the root now: what is on the shelf as one figure, the four acts the bar does not already hold (receiving, labels, the spreadsheet, the suppliers — a shortcut to something a thumb reaches from every screen is a second answer to one question), what is waiting with a count each, the checklist while it is unfinished, and the movements cut down to what a first screen holds with the way on to Reports underneath. Stock moved to `/stock` and Reports gave up its bar seat, because most of its figures are on Home already and a seat for a screen that is another screen's summary is the bar answering \"where am I\" with two places that are the same place. The four entries stage 81d put on Stock went with it; the spreadsheet stayed, because it is the only one of them that is a way of filling THAT list and on the first morning it is the only way anybody fills it at all.\n\nThe engine half is the checklist itself, and it was wrong for half of every workspace. The guide was derived entirely from `tenant_event`, the workspace-wide tally — right for setup, wrong for everything a pair of hands has to learn — so somebody invited into a workspace that had been running opened a checklist already complete: every box crossed off by their employer, nothing taught, and nothing failing anywhere, because the list simply rendered empty and read as success. `StepDef.who` is `\"workspace\" | \"person\"` now, absent meaning the workspace so a book written before the axis keeps its meaning; `Raised` carries both lists and a step is looked up on the axis it declares, never a union. The personal record is a yes rather than a tally — `person_event`, one row per person per event, written the first time and never again, narrowed at the write to the events some step actually names — so what is kept about a member is which of their own first steps they have taken and a product declaring no person step keeps no personal row at all. D54.\n\nOne thing came out of photographing it that no static check could see: the nav's closed labels are held at zero width with an ellipsis on them, so the geometry sweep read four \"cut\" words in every bar in the product. The trim belongs to the open label and to nothing else."
+      "ends": "OneInventory opened on Stock \u2014 a page of rows somebody has to read to find out whether there is anything to do \u2014 and had no screen answering \"is everything all right\". Home is the root now: what is on the shelf as one figure, the four acts the bar does not already hold (receiving, labels, the spreadsheet, the suppliers \u2014 a shortcut to something a thumb reaches from every screen is a second answer to one question), what is waiting with a count each, the checklist while it is unfinished, and the movements cut down to what a first screen holds with the way on to Reports underneath. Stock moved to `/stock` and Reports gave up its bar seat, because most of its figures are on Home already and a seat for a screen that is another screen's summary is the bar answering \"where am I\" with two places that are the same place. The four entries stage 81d put on Stock went with it; the spreadsheet stayed, because it is the only one of them that is a way of filling THAT list and on the first morning it is the only way anybody fills it at all.\n\nThe engine half is the checklist itself, and it was wrong for half of every workspace. The guide was derived entirely from `tenant_event`, the workspace-wide tally \u2014 right for setup, wrong for everything a pair of hands has to learn \u2014 so somebody invited into a workspace that had been running opened a checklist already complete: every box crossed off by their employer, nothing taught, and nothing failing anywhere, because the list simply rendered empty and read as success. `StepDef.who` is `\"workspace\" | \"person\"` now, absent meaning the workspace so a book written before the axis keeps its meaning; `Raised` carries both lists and a step is looked up on the axis it declares, never a union. The personal record is a yes rather than a tally \u2014 `person_event`, one row per person per event, written the first time and never again, narrowed at the write to the events some step actually names \u2014 so what is kept about a member is which of their own first steps they have taken and a product declaring no person step keeps no personal row at all. D54.\n\nOne thing came out of photographing it that no static check could see: the nav's closed labels are held at zero width with an ellipsis on them, so the geometry sweep read four \"cut\" words in every bar in the product. The trim belongs to the open label and to nothing else."
     },
     {
       "n": 83,
       "status": "shipped",
       "title": "A product's colour is the product's, and one family commits",
-      "ends": "Two changes and they are the same change. First: `AppSpec.hue` — a product declares one OKLCH value and `Page` sets it as `--brand` on the element the ground is painted on, which is what every family reads its `lit` slot from, so the ground, the source in it, the wash on every surface and the halo under a heading are one line. A design is a set of relationships somebody chose, and while the colour arrived from a workspace's picker no screen could be designed because no screen knew what it would be made of.\n\nSecond: `neon`, and it is the first family that commits. Every world before it was quiet — right, and why a product's rich screens land at all — and none of them could make the screen somebody opens the app onto feel like anything, because a ground is BEHIND the page and the card on top of it stays the grey it is on a screen with no world. A hard bright SOURCE on black, a ring far larger than the frame or a beam, with an almost-white core and the hue living in the falloff. Its peak is not opaque, because a band at full alpha erases whatever it passes over and on a phone that is a heading; a beam's hot point keeps out of the middle, which is the one placement rule the family does not leave to the seed, because the middle of a beam's axis is where a home screen puts its one figure.\n\n`Family.wash` is the half every other family leaves out — a second, louder colour that SURFACES are made of, published as `--scene-wash` and mixed into the tiers by one rule in the stylesheet. Seven of the eight decline; the rules select on an attribute set only where a family published one, so nothing is half-washed by a fallback. The share rises with the tier, because washing a page, a card and a control by the same amount collapses three tiers into one flat field. And the hue goes in whole: amber mixed toward black is brown, and a card washed in brown reads as dirty rather than as lit.\n\nThe motion rule turned out to be \"not under the blend\" rather than \"nothing moves\". The grain is `mix-blend-mode`, so anything animating below it re-blends a viewport-sized stack sixty times a second — which is what killed the ground's old drift, and is a property of where a layer sits. `Ground.flare` is the family's own split: the shallow bloom stays under the dither where the grain stops it banding, and the steep band goes above it, on its own layer, where a rotation of a degree and a half over ninety seconds is compositor-only and costs one promoted layer. Earned from the same budget the beats answer to, and off both ways.\n\nOneInventory takes amber and puts Home on it, and Home's hero floats: no title, no strapline, no card. Nobody navigates to home — they arrive there, the crown already says where they are, and what goes in the space a heading would have taken is the number they opened the app for. D55."
+      "ends": "Two changes and they are the same change. First: `AppSpec.hue` \u2014 a product declares one OKLCH value and `Page` sets it as `--brand` on the element the ground is painted on, which is what every family reads its `lit` slot from, so the ground, the source in it, the wash on every surface and the halo under a heading are one line. A design is a set of relationships somebody chose, and while the colour arrived from a workspace's picker no screen could be designed because no screen knew what it would be made of.\n\nSecond: `neon`, and it is the first family that commits. Every world before it was quiet \u2014 right, and why a product's rich screens land at all \u2014 and none of them could make the screen somebody opens the app onto feel like anything, because a ground is BEHIND the page and the card on top of it stays the grey it is on a screen with no world. A hard bright SOURCE on black, a ring far larger than the frame or a beam, with an almost-white core and the hue living in the falloff. Its peak is not opaque, because a band at full alpha erases whatever it passes over and on a phone that is a heading; a beam's hot point keeps out of the middle, which is the one placement rule the family does not leave to the seed, because the middle of a beam's axis is where a home screen puts its one figure.\n\n`Family.wash` is the half every other family leaves out \u2014 a second, louder colour that SURFACES are made of, published as `--scene-wash` and mixed into the tiers by one rule in the stylesheet. Seven of the eight decline; the rules select on an attribute set only where a family published one, so nothing is half-washed by a fallback. The share rises with the tier, because washing a page, a card and a control by the same amount collapses three tiers into one flat field. And the hue goes in whole: amber mixed toward black is brown, and a card washed in brown reads as dirty rather than as lit.\n\nThe motion rule turned out to be \"not under the blend\" rather than \"nothing moves\". The grain is `mix-blend-mode`, so anything animating below it re-blends a viewport-sized stack sixty times a second \u2014 which is what killed the ground's old drift, and is a property of where a layer sits. `Ground.flare` is the family's own split: the shallow bloom stays under the dither where the grain stops it banding, and the steep band goes above it, on its own layer, where a rotation of a degree and a half over ninety seconds is compositor-only and costs one promoted layer. Earned from the same budget the beats answer to, and off both ways.\n\nOneInventory takes amber and puts Home on it, and Home's hero floats: no title, no strapline, no card. Nobody navigates to home \u2014 they arrive there, the crown already says where they are, and what goes in the space a heading would have taken is the number they opened the app for. D55."
     },
     {
       "n": 84,
       "status": "shipped",
       "title": "A design rule is a guard, and the measuring is done in a browser",
-      "ends": "The interface language was a document, and a document is advice. Four rules came in from outside and became checks — `transition: all`, an ungated `:hover`, a keyword easing curve, and a chart package setting seven type sizes for three jobs — and four more were rejected in writing rather than left as silence somebody re-argues (D70). What the browser reading found is the part no source-reading check could have: ink is a measurement, not a token name. Sixty-one contrast faults across nineteen screens in both themes, the worst of them a chemical-hazard sentence at 1.94:1, all of them a status colour tuned as a FILL being used as text — and the fix was found by rendering every candidate between 30% and 90% and measuring, not by taste. Two of the harness's own readings were wrong first and reported perfect screens: `slice.call` on a Map's iterator returns an empty array, so every screen reported no type at all; and the contrast parser assumed `rgb()` while Chromium answers in the author's colour space, so white on black measured 1.00. A palette fix then measured worse than the fault — `--muted: color-mix(… var(--muted) …)` on `body` is a CSS cycle and the browser discards the property, which resolved light-mode muted to pure black: it passed the floor while destroying the token's whole purpose, and only re-measuring caught it.\n\nTwo mechanisms went with it. `Outcome` is required on every write now — fifteen of fifty operations said nothing at all when they worked — and the exemption is a sentence rather than a flag, because a `silent: true` is a box somebody ticks (D71). And `problem` stopped being bypassable: `PickFile` had written its own three refusals in the file that draws them, in a colour measured at 3.39:1, so a file rejected in the browser read in different words and a different tone from the same file rejected by the server.\n\nThe last finding is the one that says why any of this is done in a browser. Thirty-nine screens — the operator console and the account centre, the surfaces with the most controls per page in this deployment — were in no sweep at all, and the sweep written for them found `/space/data` rendering nothing: a white page in production, from six characters. `slot=\"trigger\"` is correct on a `Disclosure` and correct in a fixture, and inside a presented surface it is resolved against the enclosing `Modal`, which offers `close` and throws. The design package's own mounted test carried the same fault and passed, because nothing encloses a component mounted alone.\n\nThe reading written to catch that fault then found a second one, which is the argument for a browser in one sentence: `Peek` wrapped its `Button` in `Popover.Trigger`, and react-aria put a `div role=\"button\" tabindex=\"0\"` around it carrying the SAME `id`. Two tab stops for one control, \"button, button\" to a screen reader, and a duplicate name under the popover's own `aria-*` wiring — which resolves by `getElementById` and therefore takes whichever came first. Every existing reading passed over it: the box was the right size, the ink cleared the floor, the page did not spill. `Geometry.twins` is that probe kept, asserted on every screen in the deployment, and it carries exactly one exemption — HeroUI's `DateField.Group` and `DateField.Input` both render `role=\"group\"` with the field's id, reproduced from the library's own documented anatomy with nothing of ours in the tree. It is written as a SHAPE rather than a count, so a third element on the same name still fails, and it can only shrink.\n\nAnd one fixture was found to be racing the question it exists to answer: `world.seen` grew the page on a timer and read \"did it start short?\" as soon as the hem appeared, so on a loaded machine it failed on its own precondition. Green when fast, red when busy, which teaches a reader to re-run rather than to look. The test pulls the trigger now instead of waiting for one."
+      "ends": "The interface language was a document, and a document is advice. Four rules came in from outside and became checks \u2014 `transition: all`, an ungated `:hover`, a keyword easing curve, and a chart package setting seven type sizes for three jobs \u2014 and four more were rejected in writing rather than left as silence somebody re-argues (D70). What the browser reading found is the part no source-reading check could have: ink is a measurement, not a token name. Sixty-one contrast faults across nineteen screens in both themes, the worst of them a chemical-hazard sentence at 1.94:1, all of them a status colour tuned as a FILL being used as text \u2014 and the fix was found by rendering every candidate between 30% and 90% and measuring, not by taste. Two of the harness's own readings were wrong first and reported perfect screens: `slice.call` on a Map's iterator returns an empty array, so every screen reported no type at all; and the contrast parser assumed `rgb()` while Chromium answers in the author's colour space, so white on black measured 1.00. A palette fix then measured worse than the fault \u2014 `--muted: color-mix(\u2026 var(--muted) \u2026)` on `body` is a CSS cycle and the browser discards the property, which resolved light-mode muted to pure black: it passed the floor while destroying the token's whole purpose, and only re-measuring caught it.\n\nTwo mechanisms went with it. `Outcome` is required on every write now \u2014 fifteen of fifty operations said nothing at all when they worked \u2014 and the exemption is a sentence rather than a flag, because a `silent: true` is a box somebody ticks (D71). And `problem` stopped being bypassable: `PickFile` had written its own three refusals in the file that draws them, in a colour measured at 3.39:1, so a file rejected in the browser read in different words and a different tone from the same file rejected by the server.\n\nThe last finding is the one that says why any of this is done in a browser. Thirty-nine screens \u2014 the operator console and the account centre, the surfaces with the most controls per page in this deployment \u2014 were in no sweep at all, and the sweep written for them found `/space/data` rendering nothing: a white page in production, from six characters. `slot=\"trigger\"` is correct on a `Disclosure` and correct in a fixture, and inside a presented surface it is resolved against the enclosing `Modal`, which offers `close` and throws. The design package's own mounted test carried the same fault and passed, because nothing encloses a component mounted alone.\n\nThe reading written to catch that fault then found a second one, which is the argument for a browser in one sentence: `Peek` wrapped its `Button` in `Popover.Trigger`, and react-aria put a `div role=\"button\" tabindex=\"0\"` around it carrying the SAME `id`. Two tab stops for one control, \"button, button\" to a screen reader, and a duplicate name under the popover's own `aria-*` wiring \u2014 which resolves by `getElementById` and therefore takes whichever came first. Every existing reading passed over it: the box was the right size, the ink cleared the floor, the page did not spill. `Geometry.twins` is that probe kept, asserted on every screen in the deployment, and it carries exactly one exemption \u2014 HeroUI's `DateField.Group` and `DateField.Input` both render `role=\"group\"` with the field's id, reproduced from the library's own documented anatomy with nothing of ours in the tree. It is written as a SHAPE rather than a count, so a third element on the same name still fails, and it can only shrink.\n\nAnd one fixture was found to be racing the question it exists to answer: `world.seen` grew the page on a timer and read \"did it start short?\" as soon as the hem appeared, so on a loaded machine it failed on its own precondition. Green when fast, red when busy, which teaches a reader to re-run rather than to look. The test pulls the trigger now instead of waiting for one."
     },
     {
       "n": 85,
       "status": "shipped",
       "title": "The bar earns its material: bespoke marks, one lit destination, one movement",
-      "ends": "Four items were reported as a bug and were not one — five are declared and `Work` is withheld from that workspace because its plan does not include processes, which `centre-ops` does deliberately and for a written reason: a withheld destination is ABSENT rather than locked, since the alternative is a nav row that offers something and then apologises. What WAS wrong is everything around it.\n\nThree of the four marks meant something else. Home was a star, which means favourite; Scan was a magnifier, which means somebody looking for a thing they cannot see rather than a machine reading one in their hand; Count was a double-check, which is the mark on a delivered message — put on the screen somebody opens to START a count. `home` already existed in the registry and was not being used. `scan` and `tally` did not exist at all, so both are drawn now, in the same 24×24 hand as the library with their moving parts named: a viewfinder whose beam sweeps, and a tally whose crossing stroke is drawn. The tally is THREE uprights rather than the literal four, and that is a size decision found by rendering it — five strokes across sixteen pixels puts the gaps narrower than the ink and the mark reads as hatching.\n\nThe switch had never animated. `MOTION.reveal` names `max-height` and the bar animates `max-width`, so for as long as the compact bar has existed the label's width has SNAPPED and only its opacity moved — under a header describing a word that grows out of one item while the one before it closes. `unfold` and `fold` are two intents rather than one, because the asymmetry is the effect: the outgoing word is quicker, so the room is free before anything moves into it.\n\nAnd the bar had no material at all. It carries no fill by design — every plate and pill was removed, each for a measured reason — which left four grey glyphs and one white one on the page's own ground. The active item is now LIT rather than filled: a halo of the product's own `--brand` under the glyph, at two strengths because a warm mix adds luminance on black and subtracts it on cream, where one strength came out looking like highlighter. Under the glyph and nowhere near the word, because the contrast reading composites every translucent layer above text.\n\nTwo things about how this was found are worth keeping. The ceiling that keeps the closed items from sprawling was written, typechecked and did nothing until the SPA was rebuilt — Tailwind emits only the utilities it has SEEN, so a class added to a token file does not exist until the compiler reads it, which is invisible to every check over TypeScript. And the light disappeared entirely in the first fixture because the hue was passed as an OKLCH triple rather than a colour: `color-mix` on an invalid value drops the whole declaration, and nothing else about the bar changes. Both are assertions now."
+      "ends": "Four items were reported as a bug and were not one \u2014 five are declared and `Work` is withheld from that workspace because its plan does not include processes, which `centre-ops` does deliberately and for a written reason: a withheld destination is ABSENT rather than locked, since the alternative is a nav row that offers something and then apologises. What WAS wrong is everything around it.\n\nThree of the four marks meant something else. Home was a star, which means favourite; Scan was a magnifier, which means somebody looking for a thing they cannot see rather than a machine reading one in their hand; Count was a double-check, which is the mark on a delivered message \u2014 put on the screen somebody opens to START a count. `home` already existed in the registry and was not being used. `scan` and `tally` did not exist at all, so both are drawn now, in the same 24\u00d724 hand as the library with their moving parts named: a viewfinder whose beam sweeps, and a tally whose crossing stroke is drawn. The tally is THREE uprights rather than the literal four, and that is a size decision found by rendering it \u2014 five strokes across sixteen pixels puts the gaps narrower than the ink and the mark reads as hatching.\n\nThe switch had never animated. `MOTION.reveal` names `max-height` and the bar animates `max-width`, so for as long as the compact bar has existed the label's width has SNAPPED and only its opacity moved \u2014 under a header describing a word that grows out of one item while the one before it closes. `unfold` and `fold` are two intents rather than one, because the asymmetry is the effect: the outgoing word is quicker, so the room is free before anything moves into it.\n\nAnd the bar had no material at all. It carries no fill by design \u2014 every plate and pill was removed, each for a measured reason \u2014 which left four grey glyphs and one white one on the page's own ground. The active item is now LIT rather than filled: a halo of the product's own `--brand` under the glyph, at two strengths because a warm mix adds luminance on black and subtracts it on cream, where one strength came out looking like highlighter. Under the glyph and nowhere near the word, because the contrast reading composites every translucent layer above text.\n\nTwo things about how this was found are worth keeping. The ceiling that keeps the closed items from sprawling was written, typechecked and did nothing until the SPA was rebuilt \u2014 Tailwind emits only the utilities it has SEEN, so a class added to a token file does not exist until the compiler reads it, which is invisible to every check over TypeScript. And the light disappeared entirely in the first fixture because the hue was passed as an OKLCH triple rather than a colour: `color-mix` on an invalid value drops the whole declaration, and nothing else about the bar changes. Both are assertions now."
     },
     {
       "n": 86,
@@ -492,12 +492,72 @@
       "n": 87,
       "status": "shipped",
       "title": "A wizard narrates: one question a screen, and what you answered stays said",
-      "ends": "The register sheet was four headings over groups of fields, and the field under the third of them — the tracking rung, which decides what a person is asked at every future delivery — was four bare words with four explanations written beside them that reached nobody: it was a `Segmented`, and `Segmented` renders `o.label` and nothing else. Its own header says segments are for a choice worn on the surface and never for data entry. `Story` is the general answer: an `Ask` is a question, its controls, and the CLAUSE its answer makes — one string doing two jobs, the live echo under the control and the line in the recap, so they cannot drift. The recap doubles as navigation, which is what turns checking a model's twenty filled fields into reading eight sentences. Three things came out of building it. The pure `walk` found a real bug on its second test: the last step's own refusal was drawn as a row navigating to a DIFFERENT step, because the way-there was taken from the first owing step regardless of which branch supplied the sentence. The packing clause was rewritten by measurement rather than taste — \"A box holds 10 sheets, and a sheet holds 10 tablets — 100 tablets in a box\" is correct, readable and seventeen words, which on a phone is a recap row wrapping three times; \"A box of 10 sheets of 10 tablets\" is the same fact in the form a distributor already says it in. And the new guard found bugs in itself first, twice: `ask:` matched the proving ground's sample data, where it is a column meaning who asked and every value is an email address, and `step={` matched a number field's increment."
+      "ends": "The register sheet was four headings over groups of fields, and the field under the third of them \u2014 the tracking rung, which decides what a person is asked at every future delivery \u2014 was four bare words with four explanations written beside them that reached nobody: it was a `Segmented`, and `Segmented` renders `o.label` and nothing else. Its own header says segments are for a choice worn on the surface and never for data entry. `Story` is the general answer: an `Ask` is a question, its controls, and the CLAUSE its answer makes \u2014 one string doing two jobs, the live echo under the control and the line in the recap, so they cannot drift. The recap doubles as navigation, which is what turns checking a model's twenty filled fields into reading eight sentences. Three things came out of building it. The pure `walk` found a real bug on its second test: the last step's own refusal was drawn as a row navigating to a DIFFERENT step, because the way-there was taken from the first owing step regardless of which branch supplied the sentence. The packing clause was rewritten by measurement rather than taste \u2014 \"A box holds 10 sheets, and a sheet holds 10 tablets \u2014 100 tablets in a box\" is correct, readable and seventeen words, which on a phone is a recap row wrapping three times; \"A box of 10 sheets of 10 tablets\" is the same fact in the form a distributor already says it in. And the new guard found bugs in itself first, twice: `ask:` matched the proving ground's sample data, where it is a column meaning who asked and every value is an email address, and `step={` matched a number field's increment."
     },
     {
       "n": 88,
       "status": "planned",
       "title": "The interface stops looking like a fintech: warm material, one hot mark, generous corners",
+      "ends": ""
+    },
+    {
+      "n": 89,
+      "status": "shipped",
+      "title": "The declared surface \u2014 the contract",
+      "ends": "The line was never a principle. Eleven surfaces are already drawn from declarations no app writes a line of \u2014 settings, the money pages, the console, the policy reader, the vault sheet, the guide, the field editor \u2014 and what was left hand-written is a PRODUCT's own screens, which is simply where the work stopped. This is the contract that closes it: `ScreenSpec` grows an `of` and a `body`, `AppSpec` grows `views`, and a screen becomes something the kernel can refuse.\n\nThe design is one decision repeated: every expression is a CLOSED SET and there is no operator anywhere. A value is read from one of five places, wears one of seven named formatters, and is tested for presence and nothing else. A comparison, a sum or a threshold is not expressible on purpose \u2014 it becomes a query on the collection, where it is typed, tested, and read the same way by everything else that reads that collection. That is an escape VALVE rather than a hatch: a hatch takes the logic somewhere nothing can see it, and the valve pushes it down into the data layer where the kernel already refuses a field that is not there.\n\nFourteen refusals, and every one of them draws a page today rather than throwing: a block nothing registers, a block that has not implemented all four states, a slot given a kind of source it cannot draw, a required slot left unbound, a field bound on a screen that is about nothing, a formatter that will say `Invalid Date`, a view narrowing on a column that does not exist, a span wider than its grid. The sharpest is the field with no subject \u2014 every binding resolves to undefined, and a heading bound to undefined is a blank line, so the screen reads as unfinished rather than broken and survives review.\n\nTwo things the writing settled. `ScreenShape` had two copies, and only one of them was consulted by `SHAPES`, the preset table that decides a page's width, its skeleton and where its one action goes \u2014 so a declared shape the table had never heard of would not throw, it would fall through and draw a settings page as a form. It is the kernel's now and the design package aliases it. And `kernel/src/blocks.ts` ships EMPTY, refusing every block: a screen may not name what nothing registers, and an index that let unknown names through would be worse than no index at all, because the failure would then be a blank region in production instead of a refusal at composition."
+    },
+    {
+      "n": 90,
+      "status": "planned",
+      "title": "The spike: the three hardest screens, expressed with no way out",
+      "ends": ""
+    },
+    {
+      "n": 91,
+      "status": "planned",
+      "title": "The block registry, generated from the components themselves",
+      "ends": ""
+    },
+    {
+      "n": 92,
+      "status": "planned",
+      "title": "A block reflows by its own measured box, not by a slot it was told about",
+      "ends": ""
+    },
+    {
+      "n": 93,
+      "status": "planned",
+      "title": "Every block ships its whole state set, and the caller stops wiring them",
+      "ends": ""
+    },
+    {
+      "n": 94,
+      "status": "planned",
+      "title": "The layouts: relationships rather than breakpoints",
+      "ends": ""
+    },
+    {
+      "n": 95,
+      "status": "planned",
+      "title": "The guards, re-founded on the schema",
+      "ends": ""
+    },
+    {
+      "n": 96,
+      "status": "planned",
+      "title": "The renderer: a screen is drawn from what it declares",
+      "ends": ""
+    },
+    {
+      "n": 97,
+      "status": "planned",
+      "title": "OneInventory, ported \u2014 25 screens, no escape hatch",
+      "ends": ""
+    },
+    {
+      "n": 98,
+      "status": "planned",
+      "title": "The door closes: no private UI in an app",
       "ends": ""
     }
   ]

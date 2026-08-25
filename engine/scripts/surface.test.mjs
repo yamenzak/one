@@ -103,10 +103,15 @@ const SURFACES = {
   needs: { file: "design/src/rendered/legal.tsx", renders: "export function WhereItLives" },
 
   /*
-    ⚠️ NOTHING IS OWED TODAY, and the shape stays here on purpose: `{ owed: "N" }`
-    is how the next declaration kind is added honestly — visible, against a stage,
-    rather than quietly unrendered.
+    ⚠️ THE FIRST THING OWED, AND IT IS OWED FOR EXACTLY AS LONG AS IT SHOULD BE.
+    A view is a query a screen's body names, and the body has a contract and no
+    renderer yet — so a view reaches a person through the block that reads it,
+    and until stage 96 draws one there is nothing to point at. Written here
+    rather than left silent, because a declaration nothing renders is the failure
+    this whole guard exists to catch (D12), and it looks identical whether it is
+    scheduled or forgotten.
   */
+  views: { owed: "96" },
 
   /* Not a surface: an app's own refusal wording is rendered wherever the
      refusal is, which is every screen. */

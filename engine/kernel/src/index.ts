@@ -28,6 +28,9 @@ export * from "./infra.js";
 export * from "./signin.js";
 export * from "./tone.js";
 
+export * from "./surface.js";
+export * from "./blocks.js";
+
 export * from "./notify.js";
 export * from "./setting.js";
 export * from "./flag.js";

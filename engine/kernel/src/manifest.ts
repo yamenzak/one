@@ -57,6 +57,9 @@ import type { AreaBook, SettingBook } from "./setting.js";
 import { refuseSettings } from "./setting.js";
 import { LADDER, refuseLadder } from "./dunning.js";
 import { SURFACES, refuseSurfaces } from "./brand.js";
+import type { SurfaceSpec, ViewSpec } from "./surface.js";
+import { refuseSurface, refuseView, unreadViews } from "./surface.js";
+import { BLOCKS } from "./blocks.js";
 import type { PurposeBook, VaultBook } from "./vault.js";
 import { refuseVault, strayFacts } from "./vault.js";
 import type { AppId, Tone } from "./primitives.js";
@@ -155,6 +158,30 @@ export interface ScreenSpec {
    * ten questions and be refused by the write at the end.
    */
   readonly story?: StorySpec;
+  /**
+   * WHICH COLLECTION THIS SCREEN'S RECORD COMES FROM, WHERE IT IS ABOUT ONE.
+   *
+   * ⚠️ A `detail` SCREEN HAS A SUBJECT AND A `list` SCREEN DOES NOT, and until
+   * the body could bind a field nothing needed to say which. It does now: every
+   * `field` source resolves against this, so a screen that binds one and names
+   * no `of` is refused rather than rendering blank lines where its facts were.
+   */
+  readonly of?: string;
+  /**
+   * WHAT IS ON THE SCREEN — declared, so the engine draws it.
+   *
+   * ⚠️ THE SAME BARGAIN `story` MAKES, ONE STEP FURTHER. A story declares the
+   * questions and leaves the controls to the screen, because a camera and a
+   * barcode viewfinder are not fields. A body declares the BLOCKS, and a block
+   * is a registered component with named slots — so what cannot be declared is
+   * still a component with a name in the design package, rather than a file
+   * inside one product that no other product can reach.
+   *
+   * ⚠️ ABSENT MEANS THE SCREEN DRAWS ITSELF, and that is how every screen works
+   * today. The two coexist on purpose: an app ports a screen at a time, and a
+   * migration that required all of them at once would never start.
+   */
+  readonly body?: SurfaceSpec;
 }
 
 /** A flow of questions, declared. */
@@ -237,6 +264,13 @@ export interface AppSpec {
   readonly collections: readonly CollectionSpec[];
   readonly operations: readonly AnyOperation[];
   readonly screens: readonly ScreenSpec[];
+  /**
+   * ⚠️ THE QUERIES ITS SCREENS READ, DECLARED ONCE AND NAMED. Two screens asking
+   * "what is expiring" with two hand-written filters is two answers to one
+   * question, and they drift the first time the rule changes. A view is one
+   * answer, checked against the collection it reads at composition.
+   */
+  readonly views?: readonly ViewSpec[];
   readonly problems?: ProblemCatalog;
 
   readonly notifications?: NotificationBook;
@@ -814,6 +848,26 @@ export function refuseApp(spec: AppSpec): readonly Refusal[] {
     if (!screenKeys.has(s.permission)) {
       at(`screen ${s.id}`, `needs "${s.permission}", which is not a declared permission`);
     }
+  }
+
+  /*
+    ⚠️ THE BODIES LAST, BECAUSE EVERY REFUSAL IN THEM NAMES SOMETHING CHECKED
+    ABOVE. A block bound to a field of a collection that does not compose is one
+    fault reported twice, and the second report sends the reader to the screen
+    rather than to the collection.
+  */
+  const views = spec.views ?? [];
+  for (const v of views) {
+    for (const p of refuseView(v, spec.collections)) at(p.of, `${p.why}: ${p.detail}`);
+  }
+  const ops = spec.operations.map((o) => o.id);
+  for (const s of spec.screens) {
+    for (const p of refuseSurface(s, BLOCKS, views, spec.collections, ops)) {
+      at(p.of, `${p.why}: ${p.detail}`);
+    }
+  }
+  for (const id of unreadViews(views, spec.screens.map((s) => s.body))) {
+    at(`view ${id}`, "declared and read by no screen — a rule about this product's data that nothing honours");
   }
 
   for (const p of refuseGuide(

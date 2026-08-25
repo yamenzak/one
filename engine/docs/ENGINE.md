@@ -27,6 +27,7 @@ failing test, a capability that silently does not apply (D12).
 | [BUILDING.md](BUILDING.md) | why it is shaped this way, and how to add to it |
 | [DECISIONS.md](DECISIONS.md) | what is forbidden, and why — cited by number from code and guards |
 | [../design/README.md](../design/README.md) | what a screen draws, and where a screen starts |
+| [SURFACE.md](SURFACE.md) | the arc that moves a screen out of an app and into its manifest |
 
 ---
 
@@ -419,6 +420,8 @@ and a manifest that does not compose refuses to boot.
 | `access` | permissions, roles, and what an app may never claim | 15 | — |
 | `reach` | how far one person works inside a workspace — where, as against what (D45) | 4 | — |
 | `gate` | the eight gates, in the order that decides which sentence somebody reads first | 3 | — |
+| `surface` | a screen declared — its shape, its blocks, and the closed vocabulary they bind through | 10 | — |
+| `blocks` | which blocks a screen may name at all | 1 | — |
 | `manifest` | the whole app, and the composition that refuses a broken one | 13 | — |
 | `entitlement` | what a plan includes, and the allowance algebra over it | 17 | — |
 | `credit` | metered work: the reserve, the rate, the ceiling | 15 | — |
@@ -441,7 +444,7 @@ and a manifest that does not compose refuses to boot.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**289 of them**, 288 reached by something today.
+**300 of them**, 299 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -589,6 +592,9 @@ its own header, cited by other files, and doing nothing.
 | `unknownProblems` | `problem` | composition |
 | `refuseSetting` | `setting` | composition |
 | `refuseSettings` | `setting` | composition |
+| `refuseSurface` | `surface` | composition |
+| `refuseView` | `surface` | composition |
+| `unreadViews` | `surface` | composition |
 | `refuseCommercial` | `tenancy` | runtime |
 | `refusePlacement` | `tenancy` | runtime |
 | `refuseCopy` | `tone` | guard |
@@ -1178,8 +1184,9 @@ that names no stage, so this list cannot grow by forgetting.
 | **53** — A workspace asks to change its jurisdiction, and the ask is the only thing that is new | `runtime/src/move.ts` |
 | **58** — An operation's ceiling is in force — calls per minute, per caller, refused rather than declared | `kernel/src/operation.ts` |
 | **86** — A model is given something to hear, and the seconds are counted before they are spent | `kernel/src/ai.ts` |
+| **91** — The block registry, generated from the components themselves | `kernel/src/blocks.ts` |
 
-**8 markers**, which is the real count: the table above walks what
+**9 markers**, which is the real count: the table above walks what
 a package EXPORTS, so a deferral on a field inside a declaration is invisible to
 it. `scripts/docs.test.mjs` fails on a marker naming a stage that shipped or one
 a later decision superseded, so neither list can rot into a promise nobody owes.
@@ -1278,8 +1285,18 @@ a later decision superseded, so neither list can rot into a promise nobody owes.
 | 86 | A model is given something to hear, and the seconds are counted before they are spent | **planned** |
 | 87 | A wizard narrates: one question a screen, and what you answered stays said | shipped |
 | 88 | The interface stops looking like a fintech: warm material, one hot mark, generous corners | **planned** |
+| 89 | The declared surface — the contract | shipped |
+| 90 | The spike: the three hardest screens, expressed with no way out | **planned** |
+| 91 | The block registry, generated from the components themselves | **planned** |
+| 92 | A block reflows by its own measured box, not by a slot it was told about | **planned** |
+| 93 | Every block ships its whole state set, and the caller stops wiring them | **planned** |
+| 94 | The layouts: relationships rather than breakpoints | **planned** |
+| 95 | The guards, re-founded on the schema | **planned** |
+| 96 | The renderer: a screen is drawn from what it declares | **planned** |
+| 97 | OneInventory, ported — 25 screens, no escape hatch | **planned** |
+| 98 | The door closes: no private UI in an app | **planned** |
 
-**76 shipped, 11 planned, 1 superseded.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it, and nothing may defer to a superseded one — `scripts/docs.test.mjs` fails the build on either, which is the only reason this table can be read instead of the code.
+**77 shipped, 20 planned, 1 superseded.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it, and nothing may defer to a superseded one — `scripts/docs.test.mjs` fails the build on either, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---

@@ -41,7 +41,7 @@ import { Title } from "../parts/heads.js";
 import type { Width } from "../tokens/metrics.js";
 import { Group, NavRow } from "../parts/surfaces.js";
 import { worldFor, type FaceOf } from "../parts/face.js";
-import type { Tone } from "@engine/kernel";
+import type { ScreenShape, Tone } from "@engine/kernel";
 import type { Sky } from "../tokens/ambience.js";
 import type { Density } from "../scene/index.js";
 import { Await, Nothing, RowsWaiting, FigureWaiting, FormWaiting, TextWaiting, TilesWaiting, nothingIn, type Loaded } from "../parts/state.js";
@@ -71,9 +71,13 @@ import { ARRIVE, arriveAt } from "../tokens/motion.js";
  *   form      a sequence of fields and ONE submit. The submit is the primary.
  *   reader    prose. A policy, a document, an explanation.
  *   decision  one object, one choice. A plan, a paywall, a confirmation.
+ *
+ * ⚠️ AND THE UNION ITSELF IS THE KERNEL'S, NOT THIS FILE'S. A screen DECLARES
+ * its shape now, so a second list of shapes here would be a manifest composing
+ * with a shape this table has never heard of — which does not throw: it falls
+ * through and draws a settings page as a form.
  */
-export type Shape =
-  | "list" | "detail" | "figure" | "board" | "settings" | "form" | "reader" | "decision";
+export type Shape = ScreenShape;
 
 /**
  * ⚠️ THE TABLE IS THE PRESET SYSTEM. Everything a shape decides is a row here,

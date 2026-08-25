@@ -167,6 +167,8 @@ if (what === "guards") {
     ["access", "permissions, roles, and what an app may never claim"],
     ["reach", "how far one person works inside a workspace — where, as against what (D45)"],
     ["gate", "the eight gates, in the order that decides which sentence somebody reads first"],
+    ["surface", "a screen declared — its shape, its blocks, and the closed vocabulary they bind through"],
+    ["blocks", "which blocks a screen may name at all"],
     ["manifest", "the whole app, and the composition that refuses a broken one"],
     ["entitlement", "what a plan includes, and the allowance algebra over it"],
     ["credit", "metered work: the reserve, the rate, the ceiling"],
