@@ -171,17 +171,30 @@ export interface Binding {
 }
 
 /**
- * WHETHER A BLOCK IS DRAWN AT ALL — presence, and only presence.
+ * WHETHER A BLOCK IS DRAWN AT ALL — presence, and membership in a closed set.
  *
- * ⚠️ THIS IS THE `below.length ? … : null` EVERY HAND-WRITTEN SCREEN HAS, AND IT
- * IS THE ONLY CONDITIONAL A DECLARATION GETS. A section with nothing in it is a
- * heading over a gap, so the test has to exist; an equality or a comparison here
- * would be the same operator the view already refuses, in the place where it is
- * hardest to see.
+ * ⚠️ `has` AND `empty` ARE THE `below.length ? … : null` EVERY HAND-WRITTEN
+ * SCREEN HAS. A section with nothing in it is a heading over a gap, so the test
+ * has to exist.
+ *
+ * ⚠️ AND `is`/`one` IS THE OTHER HALF, WHICH PRESENCE ALONE COULD NOT SAY AND
+ * WHICH THREE OF THE FOUR HARDEST SCREENS TURN ON. What a scanned code turned
+ * out to be — a shelf, a known product, an unknown code — decides which card is
+ * drawn and what the one action does; "is there a code" answers none of that. It
+ * is not a comparison: no ordering, no arithmetic, no arbitrary value. It is
+ * membership in a list of names.
+ *
+ * ⚠️ AND IT MAY ONLY BE ASKED OF AN `enum`, WHICH IS WHAT KEEPS IT CLOSED. The
+ * field has to have DECLARED its possible values, so a branch naming a value
+ * that can never occur is refused at composition rather than being a card
+ * nobody ever sees. A screen wanting to dispatch on something that is not an
+ * enum makes it one on the collection — the same direction the derived field
+ * goes, and for the same reason.
  */
 export type Presence =
   | { readonly has: Read }
   | { readonly empty: Read }
+  | { readonly is: Read; readonly one: readonly string[] }
   | { readonly not: Presence };
 
 /* --------------------------------------------------------------- the body --- */
@@ -293,6 +306,7 @@ export type SurfaceRefusal =
   | "not_a_name" | "view_unknown" | "view_collection_unknown" | "view_field_unknown"
   | "block_unknown" | "slot_unknown" | "slot_missing" | "slot_kind_wrong"
   | "field_unknown" | "field_without_a_subject" | "format_wrong"
+  | "dispatch_not_closed" | "dispatch_unreachable" | "two_kinds_of_screen"
   | "span_overflows" | "span_without_a_grid" | "grid_too_wide"
   | "state_missing" | "operation_unknown" | "nothing_on_it";
 
@@ -307,42 +321,43 @@ export const colsOf = (layout: Layout): number =>
   layout.as === "grid" ? layout.cols : layout.as === "split" ? COLS_MOST : 1;
 
 /**
- * Every view a body reads, however deeply it is named.
+ * The one place a `when` is taken apart.
+ *
+ * ⚠️ ONE WALK, BECAUSE A SECOND COPY IS WHERE A BRANCH GOES MISSING. There were
+ * two — one collecting views and one collecting fields — and adding the `is`
+ * arm to `Presence` meant editing both. Whichever was missed would have gone on
+ * reporting green about a conditional it could no longer see.
+ */
+const insidePresence = (p: Presence, take: (r: Read) => void): void => {
+  if ("not" in p) return insidePresence(p.not, take);
+  if ("has" in p) return take(p.has);
+  if ("empty" in p) return take(p.empty);
+  return take(p.is);
+};
+
+/**
+ * Every source a body reads, however deeply it is named.
  *
  * ⚠️ WALKED RATHER THAN LISTED, because a view named only inside a `when` is
  * still a view — and a check reading `bind` alone would report a screen as
  * sound while its one conditional pointed at nothing.
  */
-export const viewsIn = (body: SurfaceSpec): readonly string[] => {
-  const out: string[] = [];
-  const fromSource = (s: Read) => {
-    if (s.of === "view" || s.of === "count") out.push(s.view);
-  };
-  const fromPresence = (p: Presence) => {
-    if ("not" in p) return fromPresence(p.not);
-    fromSource("has" in p ? p.has : p.empty);
-  };
+export const readsIn = (body: SurfaceSpec): readonly Read[] => {
+  const out: Read[] = [];
+  const take = (r: Read) => out.push(r);
   for (const b of body.blocks) {
-    if (b.when) fromPresence(b.when);
-    for (const bind of Object.values(b.bind ?? {})) fromSource(bind.from);
+    if (b.when) insidePresence(b.when, take);
+    for (const bind of Object.values(b.bind ?? {})) take(bind.from);
   }
   return out;
 };
 
+export const viewsIn = (body: SurfaceSpec): readonly string[] =>
+  readsIn(body).flatMap((r) => (r.of === "view" || r.of === "count" ? [r.view] : []));
+
 /** Every `field` source a body reads — all of them off the screen's subject. */
-export const fieldsIn = (body: SurfaceSpec): readonly string[] => {
-  const out: string[] = [];
-  const fromSource = (s: Read) => { if (s.of === "field") out.push(s.field); };
-  const fromPresence = (p: Presence) => {
-    if ("not" in p) return fromPresence(p.not);
-    fromSource("has" in p ? p.has : p.empty);
-  };
-  for (const b of body.blocks) {
-    if (b.when) fromPresence(b.when);
-    for (const bind of Object.values(b.bind ?? {})) fromSource(bind.from);
-  }
-  return out;
-};
+export const fieldsIn = (body: SurfaceSpec): readonly string[] =>
+  readsIn(body).flatMap((r) => (r.of === "field" ? [r.field] : []));
 
 /**
  * What one view declaration can get wrong.
@@ -393,7 +408,10 @@ export function refuseView(
  * wider than its grid, a section whose condition names a view nobody declared.
  */
 export function refuseSurface(
-  screen: { readonly id: string; readonly of?: string; readonly body?: SurfaceSpec },
+  screen: {
+    readonly id: string; readonly of?: string;
+    readonly body?: SurfaceSpec; readonly story?: unknown;
+  },
   index: BlockIndex,
   views: readonly ViewSpec[],
   collections: readonly CollectionSpec[],
@@ -405,6 +423,20 @@ export function refuseSurface(
   const out: SurfaceProblem[] = [];
   const at = (why: SurfaceRefusal, detail: string) =>
     out.push({ of: `screen ${screen.id}`, why, detail });
+
+  /*
+    ⚠️ A SCREEN IS ONE KIND OF THING, AND THE TWO KINDS ARE NOT A STYLE CHOICE.
+    A `body` is READ and drawn by the engine; a `story` is CAPTURE — a flow of
+    questions holding unsaved answers, whose controls are a camera, a viewfinder
+    and a packing editor and cannot be declared without building a second React.
+    A screen carrying both has two answers to what it is, and the renderer would
+    have to pick one — silently, by whichever it checked first.
+  */
+  if (screen.story) {
+    at("two_kinds_of_screen",
+      "declares both a story and a body — one asks questions and holds the answers, "
+      + "the other is drawn from what it reads, and nothing can be both");
+  }
 
   /* --- the layout ------------------------------------------------------- */
 
@@ -445,6 +477,51 @@ export function refuseSurface(
         `binds the field "${name}" and names no \`of\` — there is no record for it to be a field of`);
     } else if (subject && !(name in subject)) {
       at("field_unknown", `binds "${name}", which ${screen.of} does not have`);
+    }
+  }
+
+  /* --- the dispatches --------------------------------------------------- */
+
+  /*
+    ⚠️ A DISPATCH MAY ONLY BE ASKED OF AN `enum`, AND THAT IS WHAT KEEPS THE
+    VOCABULARY CLOSED. The field has DECLARED its possible values, so this can
+    check both directions at once — and both failures are silent. A branch on a
+    value the field can never hold is a card nobody ever sees, which reads as a
+    case somebody has not hit yet; a dispatch over a free-text column is a
+    comparison against a string, which is the operator this file exists without.
+  */
+  for (const b of body.blocks) {
+    if (!b.when) continue;
+    const arms: { readonly at: Read; readonly one: readonly string[] }[] = [];
+    const collect = (p: Presence): void => {
+      if ("not" in p) return collect(p.not);
+      if ("is" in p) arms.push({ at: p.is, one: p.one });
+    };
+    collect(b.when);
+    for (const arm of arms) {
+      if (arm.at.of !== "field") {
+        at("dispatch_not_closed",
+          `${b.block} branches on a ${arm.at.of}, which has no declared set of values to branch over`);
+        continue;
+      }
+      const f = subject?.[arm.at.field];
+      if (!f) continue;
+      if (f.kind !== "enum" || !f.values) {
+        at("dispatch_not_closed",
+          `${b.block} branches on "${arm.at.field}", which is a ${f.kind} — a dispatch is `
+          + `membership in a declared set, so make it an enum on ${screen.of} or do not branch on it`);
+        continue;
+      }
+      for (const value of arm.one) {
+        if (!f.values.includes(value)) {
+          at("dispatch_unreachable",
+            `${b.block} draws when "${arm.at.field}" is "${value}", which is not one of its `
+            + `values (${f.values.join(", ")}) — a card nobody will ever see`);
+        }
+      }
+      if (arm.one.length === 0) {
+        at("dispatch_unreachable", `${b.block} branches on "${arm.at.field}" against no values at all`);
+      }
     }
   }
 

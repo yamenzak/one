@@ -420,7 +420,7 @@ and a manifest that does not compose refuses to boot.
 | `access` | permissions, roles, and what an app may never claim | 15 | — |
 | `reach` | how far one person works inside a workspace — where, as against what (D45) | 4 | — |
 | `gate` | the eight gates, in the order that decides which sentence somebody reads first | 3 | — |
-| `surface` | a screen declared — its shape, its blocks, and the closed vocabulary they bind through | 10 | — |
+| `surface` | a screen declared — its shape, its blocks, and the closed vocabulary they bind through | 11 | — |
 | `blocks` | which blocks a screen may name at all | 1 | — |
 | `manifest` | the whole app, and the composition that refuses a broken one | 13 | — |
 | `entitlement` | what a plan includes, and the allowance algebra over it | 17 | — |
@@ -444,7 +444,7 @@ and a manifest that does not compose refuses to boot.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**300 of them**, 299 reached by something today.
+**301 of them**, 300 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -1286,7 +1286,7 @@ a later decision superseded, so neither list can rot into a promise nobody owes.
 | 87 | A wizard narrates: one question a screen, and what you answered stays said | shipped |
 | 88 | The interface stops looking like a fintech: warm material, one hot mark, generous corners | **planned** |
 | 89 | The declared surface — the contract | shipped |
-| 90 | The spike: the three hardest screens, expressed with no way out | **planned** |
+| 90 | The spike: the three hardest screens, and the easy one that was mistaken for the general case | shipped |
 | 91 | The block registry, generated from the components themselves | **planned** |
 | 92 | A block reflows by its own measured box, not by a slot it was told about | **planned** |
 | 93 | Every block ships its whole state set, and the caller stops wiring them | **planned** |
@@ -1296,7 +1296,7 @@ a later decision superseded, so neither list can rot into a promise nobody owes.
 | 97 | OneInventory, ported — 25 screens, no escape hatch | **planned** |
 | 98 | The door closes: no private UI in an app | **planned** |
 
-**77 shipped, 20 planned, 1 superseded.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it, and nothing may defer to a superseded one — `scripts/docs.test.mjs` fails the build on either, which is the only reason this table can be read instead of the code.
+**78 shipped, 19 planned, 1 superseded.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it, and nothing may defer to a superseded one — `scripts/docs.test.mjs` fails the build on either, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---

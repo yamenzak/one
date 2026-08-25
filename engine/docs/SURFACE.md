@@ -138,16 +138,73 @@ Three things the contract settled that the plan had left open:
   one protecting the whole design: the day `gt` is added to make one screen
   easier, the manifest has become a query language.
 
-### S2 — The spike, and it comes second on purpose
-Express the THREE HARDEST screens against the S1 contract, on paper, with no
-renderer: `Register.tsx` (1,089 lines), `Receive.tsx` (465), `Scan.tsx` (374).
-Not the easy ones — the ceiling is only where the hard ones are, and finding it
-at stage 8 is finding it too late.
+### S2 — The spike · **stage 90, shipped** — and it found something
 
-⚠️ **No escape hatch during the spike.** The moment one exists the spike stops
-teaching anything. If a screen cannot be expressed, the finding is the contract's
-and S1 is revised — which at this stage costs a day and after stage 6 costs a
-month.
+Expressed `Register.tsx` (1,089 lines), `Receive.tsx` (465) and `Scan.tsx` (374)
+against the S1 contract, on paper, with no renderer and no escape hatch.
+
+**None of the three can be expressed, and that is the correct answer.** Two
+distinct things are missing, not one, and only one of them is a gap in the
+contract.
+
+#### What the workload actually is
+
+The plan said "25 screens, 10,130 lines" as though they were one kind of thing.
+Measured, they are three:
+
+| | files | lines | |
+|---|---|---|---|
+| **Reads** | 12 | 2,829 | no state, no effects, no capture at all |
+| **Wiring** | 2 | 3,518 | `live.tsx` + `index.tsx` — not screens |
+| **Capture** | 11 | 3,783 | hold unsaved answers before a write |
+
+`Where.tsx`, the sample the plan reasoned from, is one of the twelve. **It was
+the easy case being mistaken for the general one** — which is exactly the failure
+the spike exists to catch, and why it is stage 2 rather than stage 8.
+
+#### Class A — value dispatch. A real gap, closed.
+
+`Presence` could say "is there a code". It could not say **what the code turned
+out to be**, which is what three of these screens are about: a scanned label that
+is a shelf sends the session there, a known product is a thing to open, an
+unknown one is a question. Three cards, three different acts, one `does`.
+
+`Presence` gained one arm — `{ is: <read>, one: [names] }` — and it stays closed
+because **it may only be asked of an `enum`.** The field has declared its
+possible values, so both failures are refused at composition: a branch on a value
+the column can never hold (a card nobody will ever see, which reads as a case
+somebody has not hit yet) and a dispatch over free text (a comparison against a
+string, which is the operator this design exists without). A screen wanting to
+branch on something that is not an enum makes it one on the collection — the same
+direction the derived field goes, and for the same reason.
+
+#### Class B — capture. Not a gap. A second kind of screen.
+
+`Receive` holds four answers re-seeded per scan, computes a cumulative pack
+multiplier the server also computes, and derives a validation message that
+disables the one action. `Register` holds twenty-four pieces of state and narrates
+each one as a clause. **Nothing declarative should express that, and the framework
+already says so:** `ScreenSpec.story` exists, `Register` already is one, and its
+header already draws the line in the right place — *"a camera, a barcode
+viewfinder and a packing editor are not fields, and a manifest that could express
+them would be a second React."*
+
+So the taxonomy goes in the contract now rather than being discovered at S9: **a
+screen is a `body` or a `story`, and `two_kinds_of_screen` refuses both.** A
+screen carrying both has two answers to what it is, and a renderer would pick one
+silently, by whichever it checked first.
+
+#### And the biggest finding was not in the three screens
+
+**`live.tsx` is 2,579 lines — a quarter of the app — and it is not a screen.** It
+fetches, joins and hands props. Its own header says why it exists: *"Three lists
+and a lookup is the honest shape while the platform's generated `list` answers a
+whole collection; the alternative is an operation per screen, which is a query
+language with extra steps."*
+
+That is `ViewSpec` describing itself, a stage early. **The largest single win in
+this arc is not the screens — it is the container that disappears when a block
+names a declared query.** S8 is where that lands.
 
 ### S3 — The block registry
 Every `@engine/design` export that can be a block gets an entry: its name, the
@@ -189,9 +246,10 @@ surfaces that already work, not a new idea — and it arrives after the contract
 has survived the spike, the blocks exist, and the guards can see it.
 
 ### S9 — OneInventory, ported
-All 25 screens, 10,130 lines, no escape hatch. Photographed before and after at
-both widths and both themes, because the port is only correct if the product is
-unchanged.
+Every screen is a `body` or a `story`, and nothing is a third thing. On the
+numbers S2 measured, that is **12 screens declared, 11 already the right kind,
+and `live.tsx` largely gone**. Photographed before and after at both widths and
+both themes, because the port is only correct if the product is unchanged.
 
 ### S10 — The door closes
 `engine/ground` ported, the app-side UI deleted, and a guard that refuses a
@@ -201,6 +259,11 @@ unchanged.
 genuinely needs code is a component in `@engine/design` with its own entry in
 the ledger — which is the rule already, one level up. Stated as an absolute it is
 a rule that gets quietly broken; stated this way it is one that gets obeyed.
+
+⚠️ **And S2 sharpened it further: a story's CONTROLS stay in the app.** The
+guard's question is not "is there a `.tsx`" but "is there a screen that is
+neither a declared body nor a declared story" — which is the thing that can
+drift, and the only thing worth refusing.
 
 ---
 

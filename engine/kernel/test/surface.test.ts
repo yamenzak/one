@@ -35,6 +35,8 @@ const note = collection({
     at: field.instant({ label: "Written", holds: "none" }),
     pinned: field.bool({ label: "Pinned", holds: "none" }),
     words: field.number({ label: "Words", holds: "none" }),
+    /* ⚠️ The axis a dispatch may branch on — see "what it turned out to be". */
+    state: field.enum({ label: "State", holds: "none", values: ["draft", "live", "filed"] }),
   },
 });
 
@@ -163,6 +165,101 @@ describe("the vocabulary is closed", () => {
   it("refuses a block missing a slot it cannot draw without", () => {
     expect(why(screen({ body: body({ blocks: [{ block: "Heading" }] }) })))
       .toContain("slot_missing");
+  });
+});
+
+/* ----------------------------------------------------------- the dispatch --- */
+
+/**
+ * ⚠️ WHAT A THING TURNED OUT TO BE DECIDES THE SCREEN, and presence could not
+ * say it. Three of the four hardest screens in OneInventory turn on exactly
+ * this: a scanned code that is a shelf sends the session there, a known product
+ * is a thing to open, an unknown one is a question — three different cards and
+ * three different acts, and "is there a code" answers none of them.
+ */
+describe("a block branches on what something turned out to be", () => {
+  const onState = (one: readonly string[], field = "state") => screen({
+    body: body({
+      blocks: [{
+        block: "Heading",
+        when: { is: { of: "field", field }, one },
+        bind: { says: { from: { of: "words", says: "Here" } } },
+      }],
+    }),
+  });
+
+  it("accepts a branch over values the field declares", () => {
+    expect(why(onState(["draft", "filed"]))).toEqual([]);
+  });
+
+  /*
+    ⚠️ A CARD NOBODY WILL EVER SEE, AND IT LOOKS LIKE A CASE NOT YET HIT. The
+    branch is well-formed, the field is real, the screen renders — and the value
+    is one the column can never hold, so the section is simply always absent.
+  */
+  it("refuses a branch on a value the field can never hold", () => {
+    expect(why(onState(["draft", "archived"]))).toContain("dispatch_unreachable");
+  });
+
+  it("refuses a branch against no values at all", () => {
+    expect(why(onState([]))).toContain("dispatch_unreachable");
+  });
+
+  /*
+    ⚠️ AN ENUM AND NOTHING ELSE, WHICH IS WHAT KEEPS THE VOCABULARY CLOSED. A
+    dispatch over free text is a comparison against a string — the operator this
+    file exists without — and it has no declared set for the check above to read.
+    The fix is to make the column an enum, which is the same direction a derived
+    field goes and for the same reason.
+  */
+  it("refuses a branch on anything that has not declared its values", () => {
+    expect(why(onState(["anything"], "title"))).toContain("dispatch_not_closed");
+  });
+
+  it("refuses a branch on a whole record, which has no values to branch over", () => {
+    expect(why(screen({
+      body: body({
+        blocks: [{
+          block: "Heading",
+          when: { is: { of: "subject" }, one: ["draft"] },
+          bind: { says: { from: { of: "words", says: "Here" } } },
+        }],
+      }),
+    }))).toContain("dispatch_not_closed");
+  });
+
+  /* ⚠️ ONE WALK, so a conditional's source is seen by every check. */
+  it("finds a field named only inside a negated dispatch", () => {
+    expect(fieldsIn(body({
+      blocks: [{
+        block: "Heading",
+        when: { not: { is: { of: "field", field: "state" }, one: ["draft"] } },
+        bind: { says: { from: { of: "words", says: "Here" } } },
+      }],
+    }))).toEqual(["state"]);
+  });
+});
+
+/* ------------------------------------------------------- one kind of thing --- */
+
+/**
+ * ⚠️ THE SPIKE'S FINDING, MADE A REFUSAL. A `body` is READ and drawn by the
+ * engine; a `story` is CAPTURE — a flow of questions holding unsaved answers,
+ * whose controls are a camera and a viewfinder and cannot be declared without
+ * building a second React. A screen carrying both has two answers to what it
+ * is, and the renderer would pick one silently, by whichever it checked first.
+ */
+describe("a screen is one kind of thing", () => {
+  it("refuses a screen that is both a story and a body", () => {
+    expect(why(screen({ story: { writes: "note.publish", asks: [] } })))
+      .toContain("two_kinds_of_screen");
+  });
+
+  it("says nothing about a story with no body", () => {
+    expect(refuseSurface(
+      { id: "register", story: { writes: "note.publish", asks: [] } },
+      INDEX, [recent], COLLECTIONS, [],
+    )).toEqual([]);
   });
 });
 
