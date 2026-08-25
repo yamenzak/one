@@ -420,7 +420,7 @@ and a manifest that does not compose refuses to boot.
 | `access` | permissions, roles, and what an app may never claim | 15 | — |
 | `reach` | how far one person works inside a workspace — where, as against what (D45) | 4 | — |
 | `gate` | the eight gates, in the order that decides which sentence somebody reads first | 3 | — |
-| `surface` | a screen declared — its shape, its blocks, and the closed vocabulary they bind through | 14 | 2 |
+| `surface` | a screen declared — its shape, its blocks, and the closed vocabulary they bind through | 13 | 1 |
 | `blocks` | which blocks a screen may name at all | 1 | — |
 | `manifest` | the whole app, and the composition that refuses a broken one | 13 | — |
 | `entitlement` | what a plan includes, and the allowance algebra over it | 17 | — |
@@ -444,7 +444,7 @@ and a manifest that does not compose refuses to boot.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**304 of them**, 301 reached by something today.
+**303 of them**, 301 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -1049,6 +1049,7 @@ its own header, cited by other files, and doing nothing.
 | `every-block-is-real-and-everything-that-could-be-one-is-placed` | D92 | a renamed component leaving its registry entry pointing at nothing - a manifest refused for naming a block that plainly exists, or a blank region where a card was; and the silent half, a component that could be a block and is in no registry, which exists and works and passes every guard while no screen can ever ask for it, so the next app hand-rolls the thing that was already built |
 | `a-block-may-not-name-a-breakpoint` | D92 | a component that reflows on the viewport while sitting in a box the viewport knows nothing about - four columns drawn into 300 pixels on a 1440px monitor, every one of them a word per line, and the reverse where a list given the whole of a tablet stays a phone list; plus a container rule with no container over it, which resolves against whatever ancestor happens to be one and fires on somebody else's width |
 | `a-list-decides-by-its-own-box-on-one-unchanging-screen` | D92 | a breakpoint passing for a container query - the two are indistinguishable in every reading that varies the window, since both collapse a list on a phone and open it on a desk; held at ONE viewport width and given two boxes, only a container query can answer differently |
+| `one-block-and-all-four-of-the-things-that-can-be-true-of-it` | D92 | the three outcomes a screen skips because in development the request is instant and it succeeds - an empty array drawn as a confident fact while the request is still in flight, a failed load drawn as `no media yet`, and a skeleton drawn for something the person was never going to be allowed to see, which is a promise the screen breaks a second later |
 <!-- /generated -->
 
 ### And how well each decision is defended
@@ -1147,7 +1148,7 @@ its own header, cited by other files, and doing nothing.
 | D89 | One ladder, and a rung has to reach the page | 5 |
 | D90 | A screen composes the vocabulary; it does not re-derive it | 5 |
 | D91 | A night is deep and lit, and the ladder's numbers are the ones that ship | 2 |
-| D92 | A screen is a body or a story, and what a body binds through is closed | 3 |
+| D92 | A screen is a body or a story, and what a body binds through is closed | 4 |
 <!-- /generated -->
 
 ---
@@ -1171,10 +1172,9 @@ and counted two of ten was the same gap it exists to close, one layer down.
 |---|---|---|
 | **35** — A workspace runs its own retention ladder against its own customers, and ours freezes it | `kernel/src/package.ts` | 1 |
 | **35** — A workspace runs its own retention ladder against its own customers, and ours freezes it | `runtime/src/jobs.ts` | 1 |
-| **93** — Every block ships its whole state set, and the caller stops wiring them | `kernel/src/surface.ts` | 1 |
 | **96** — The renderer: a screen is drawn from what it declares | `kernel/src/surface.ts` | 1 |
 
-**4 declarations** are built and reached by nothing, each waiting on a
+**3 declarations** are built and reached by nothing, each waiting on a
 stage it names in a `DEFER` marker. `scripts/capability.test.mjs` fails on one
 that names no stage, so this list cannot grow by forgetting.
 
@@ -1190,11 +1190,9 @@ that names no stage, so this list cannot grow by forgetting.
 | **53** — A workspace asks to change its jurisdiction, and the ask is the only thing that is new | `runtime/src/move.ts` |
 | **58** — An operation's ceiling is in force — calls per minute, per caller, refused rather than declared | `kernel/src/operation.ts` |
 | **86** — A model is given something to hear, and the seconds are counted before they are spent | `kernel/src/ai.ts` |
-| **93** — Every block ships its whole state set, and the caller stops wiring them | `kernel/src/surface.ts` |
-| **93** — Every block ships its whole state set, and the caller stops wiring them | `kernel/src/surface.ts` |
 | **96** — The renderer: a screen is drawn from what it declares | `kernel/src/surface.ts` |
 
-**11 markers**, which is the real count: the table above walks what
+**9 markers**, which is the real count: the table above walks what
 a package EXPORTS, so a deferral on a field inside a declaration is invisible to
 it. `scripts/docs.test.mjs` fails on a marker naming a stage that shipped or one
 a later decision superseded, so neither list can rot into a promise nobody owes.
@@ -1297,14 +1295,14 @@ a later decision superseded, so neither list can rot into a promise nobody owes.
 | 90 | The spike: the three hardest screens, and the easy one that was mistaken for the general case | shipped |
 | 91 | The block registry: forty blocks, counted rather than surveyed | shipped |
 | 92 | A block reflows by its own measured box, and the screen is held still to prove it | shipped |
-| 93 | Every block ships its whole state set, and the caller stops wiring them | **planned** |
+| 93 | The four outcomes are the frame's, and what a block owes is the shape of its own absence | shipped |
 | 94 | The layouts: relationships rather than breakpoints | **planned** |
 | 95 | The guards, re-founded on the schema | **planned** |
 | 96 | The renderer: a screen is drawn from what it declares | **planned** |
 | 97 | OneInventory, ported — 25 screens, no escape hatch | **planned** |
 | 98 | The door closes: no private UI in an app | **planned** |
 
-**80 shipped, 17 planned, 1 superseded.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it, and nothing may defer to a superseded one — `scripts/docs.test.mjs` fails the build on either, which is the only reason this table can be read instead of the code.
+**81 shipped, 16 planned, 1 superseded.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it, and nothing may defer to a superseded one — `scripts/docs.test.mjs` fails the build on either, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---

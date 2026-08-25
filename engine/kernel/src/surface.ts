@@ -292,31 +292,22 @@ export interface SurfaceSpec {
 /* --------------------------------------------------------- the block index --- */
 
 /**
- * THE FOUR OUTCOMES EVERY DECLARED BLOCK GETS, AND NOT ONE OF THEM IS ITS OWN
- * CODE.
+ * WHAT A BLOCK'S ABSENCE LOOKS LIKE, AND IT IS THE ONE THING THE FRAME CANNOT
+ * WORK OUT.
  *
- * ⚠️ EACH HAS SHIPPED AS A WRONG ANSWER WEARING A LOADING STATE'S EXCUSE. An
- * empty array drawn as "nothing here" while the request was still in flight; a
- * failed load drawn as "no media yet"; a control drawn for somebody who could
- * not press it. Today they are the CALLER's job to wire, which is exactly the
- * class of thing a caller forgets.
+ * ⚠️ THE FOUR OUTCOMES — waiting, nothing, trouble, denied — ARE THE FRAME'S,
+ * NOT FORTY COMPONENTS'. Each has shipped as a wrong answer wearing a loading
+ * state's excuse: an empty array drawn as "nothing here" while the request was
+ * still in flight, a failed load drawn as "no media yet", a control drawn for
+ * somebody who could not press it. Building the four into every block would be
+ * thirty-nine copies of one decision, which is the shape this arc exists to
+ * remove — so `Region` draws them ONCE, and what it needs from the block is the
+ * only thing it cannot derive.
  *
- * ⚠️ AND THE FIX IS THE FRAME, NOT FORTY COMPONENTS. Building the four into
- * every block would be forty implementations of one decision, thirty-nine of
- * which are copies — the shape this whole arc exists to remove. The renderer
- * draws them ONCE, around whichever block it is placing; what it needs from the
- * block is the only thing it cannot work out, which is what the absence should
- * LOOK like. That is `BlockEntry.waiting`.
+ * ⚠️ AND THE FOUR ARE NOT LISTED HERE. They were, and nothing imported the list:
+ * the frame's own branches are what enforce them, and a second enumeration is a
+ * thing to keep in step with no way of knowing when it has drifted.
  */
-/* DEFER(engine-93) stage:93 — NAMED HERE AND IMPLEMENTED NOWHERE YET. The four
-   outcomes are what stage 93 builds into the frame; declaring them now is what
-   stops the renderer inventing a fifth, and what a block's `bones` is FOR. */
-export type BlockState = "waiting" | "nothing" | "trouble" | "denied";
-
-/* DEFER(engine-93) stage:93 — see above: the four are named here and built into
-   the frame at stage 93. */
-export const BLOCK_STATES: readonly BlockState[] = ["waiting", "nothing", "trouble", "denied"];
-
 /**
  * ⚠️ A SKELETON IS SHAPED LIKE WHAT IS COMING, WHICH IS WHY A SPINNER IS NOT ONE.
  * A spinner is a layout that will jump; rows that become rows do not. Only the

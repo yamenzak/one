@@ -526,9 +526,9 @@
     },
     {
       "n": 93,
-      "status": "planned",
-      "title": "Every block ships its whole state set, and the caller stops wiring them",
-      "ends": ""
+      "status": "shipped",
+      "title": "The four outcomes are the frame's, and what a block owes is the shape of its own absence",
+      "ends": "The four outcomes are drawn once, around whichever block the frame is placing, using the skeleton that block declares. Stage 91 is what made this one small: building waiting, nothing, trouble and denied into forty components would have been thirty-nine copies of one decision, which is the shape the whole arc exists to remove.\n\n`nothing` is a REQUIRED field, and that is most of the component. Every surface that rendered an empty array as a confident fact did so because saying what emptiness MEANS was something a caller could leave out — a passkey card showing a \"0\" badge for the length of a round trip, a bell saying \"you're all caught up\" mid-fetch, a media library whose `catch` turned a failed load into \"no media yet\". A field nobody has to fill is a field that stays empty; a required one is how that stops being a thing to remember.\n\nDenied comes first, which is deliberately not the order `Await` uses. The other three are about a request and this one is about whether there should be a request at all — so a skeleton followed by a refusal is a promise the screen breaks a second later, and it is worse than the refusal on its own because somebody has already started waiting for it. The rest of the order is `Await`'s and is not arbitrary: trouble outranks emptiness, because a failed request has no data and `[]` is what a naive reading of it produces; waiting outranks both, because during the round trip neither is known yet.\n\nThree call sites moved over, each of which had been wiring the same three by hand. The ones that did not are the line worth writing down: a screen whose answer can never legitimately be empty — the plan catalogue, the maintenance modes — keeps `Await`, because a required \"what emptiness means\" on a list that is never empty is a sentence nobody will ever read and somebody has to invent."
     },
     {
       "n": 94,

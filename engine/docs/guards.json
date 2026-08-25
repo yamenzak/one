@@ -3973,6 +3973,15 @@
       "lane": "seen",
       "proves": "draws rows in a narrow box and columns in a wide one",
       "fails": "a breakpoint passing for a container query - the two are indistinguishable in every reading that varies the window, since both collapse a list on a phone and open it on a desk; held at ONE viewport width and given two boxes, only a container query can answer differently"
+    },
+    {
+      "id": "one-block-and-all-four-of-the-things-that-can-be-true-of-it",
+      "protects": "D92",
+      "stage": "93",
+      "status": "live",
+      "impl": "design/test/region.test.tsx",
+      "proves": "a region draws exactly one of four things",
+      "fails": "the three outcomes a screen skips because in development the request is instant and it succeeds - an empty array drawn as a confident fact while the request is still in flight, a failed load drawn as `no media yet`, and a skeleton drawn for something the person was never going to be allowed to see, which is a promise the screen breaks a second later"
     }
   ]
 }

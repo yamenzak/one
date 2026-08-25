@@ -124,8 +124,16 @@ if (!charts) {
 const WHY = {
   /* Named in `Format`. A binding picks one; it is not placed on its own. */
   formatter: ["Num", "Money", "When", "Size", "Unit", "Tally", "Dated", "Clock", "Amount", "Code"],
-  /* What the frame draws AROUND a block. Never placed by a declaration. */
+  /*
+    What the frame draws AROUND a block. Never placed by a declaration.
+
+    ⚠️ `Region` IS THE FRAME ITSELF, which is why it belongs here rather than in
+    the registry. It draws the four outcomes around whichever block it is given,
+    using the skeleton that block declares — so a screen that could place a
+    `Region` would be placing the thing that places blocks.
+  */
   state: [
+    "Region",
     "Trouble", "Nothing", "Working", "RowsWaiting", "HeroWaiting", "FigureWaiting",
     "ChartWaiting", "TilesWaiting", "TableWaiting", "FormWaiting", "TextWaiting",
     "ShapeWaiting", "Waiting",

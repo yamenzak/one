@@ -25,12 +25,13 @@ import * as React from "react";
 import { Circle } from "lucide-react";
 import { Alert, Button, EmptyState, Skeleton, Spinner } from "@heroui/react";
 import { PLATFORM_PROBLEMS, problem } from "@engine/kernel";
-import type { Problem } from "@engine/kernel";
+import type { Bones, Problem } from "@engine/kernel";
 import { TYPE } from "../tokens/type.js";
 import { EMPTY_PAD, EMPTY_READ, NUDGE, PAD, ROW, SPACE } from "../tokens/metrics.js";
 import { ARRIVE } from "../tokens/motion.js";
 import { Waiting, blanks } from "./bones.js";
 import { whoFace } from "./face.js";
+import { STOPPED, sayGate, useGate } from "./gated.js";
 import { Group, NavRow, QuickActions, TileGrid } from "./surfaces.js";
 import { Balance } from "./heads.js";
 
@@ -574,5 +575,104 @@ export function TextWaiting({ lines = 3 }: { readonly lines?: number }) {
       ))}
       {lines > 0 ? <Skeleton className="h-4 w-[55%] rounded-full" /> : null}
     </div>
+  );
+}
+
+/* ---------------------------------------------------------------- region --- */
+
+/**
+ * ⚠️ THE SKELETON A BLOCK'S ABSENCE WEARS, FROM THE NAME ITS REGISTRY ENTRY
+ * DECLARES. The frame cannot work out what is coming and the block cannot be
+ * asked to draw its own four outcomes without writing the same decision forty
+ * times — so the block says what it looks like and the frame does the rest.
+ */
+const SKELETON: Readonly<Record<Bones, () => React.ReactNode>> = {
+  rows: () => <RowsWaiting rows={4} />,
+  hero: () => <HeroWaiting />,
+  figure: () => <FigureWaiting count={2} />,
+  chart: () => <ChartWaiting />,
+  tiles: () => <TilesWaiting tiles={4} />,
+  table: () => <TableWaiting />,
+  form: () => <FormWaiting />,
+  text: () => <TextWaiting />,
+};
+
+export interface RegionProps<T> {
+  /** ⚠️ What its absence looks like — `BlockEntry.bones`. */
+  readonly bones: Bones;
+  readonly of: Loaded<T>;
+  /**
+   * ⚠️ NOT OPTIONAL, WHICH IS THE POINT OF THE WHOLE COMPONENT. Every surface
+   * that rendered `[]` as a confident fact did so because saying what emptiness
+   * MEANS was a field somebody could leave out — a passkey card with a "0" badge
+   * while the list was still in flight, a bell saying "you're all caught up"
+   * mid-fetch, a media library whose failed load read as "no media yet". A
+   * required field is how that stops being a thing to remember.
+   */
+  readonly nothing: {
+    readonly says: string;
+    readonly under?: string;
+    readonly icon?: React.ReactNode;
+    readonly offer?: { readonly label: string; readonly onDo: () => void };
+  };
+  /** ⚠️ Emptiness is the caller's to define for anything that is not a list. */
+  readonly isNothing?: (data: T) => boolean;
+  /** ⚠️ Offered only where the problem says trying again could work. */
+  readonly again?: () => void;
+  /**
+   * WHICH OPERATION THIS REGION'S CONTENTS ARE FOR. Absent means ungated.
+   *
+   * ⚠️ THE OPERATION RATHER THAN A BOOLEAN, so a region asks the same question
+   * the request will ask rather than restating the gate's rule in its own words
+   * — see `useGate`. The two spellings drift, and the one that drifts is the
+   * screen's.
+   */
+  readonly needs?: string;
+  readonly then: (data: T) => React.ReactNode;
+}
+
+/**
+ * ONE BLOCK, AND ALL FOUR OF THE THINGS THAT CAN BE TRUE OF IT.
+ *
+ * ⚠️ FORTY BLOCKS WOULD BE THIRTY-NINE COPIES OF ONE DECISION. Waiting, nothing,
+ * trouble and denied are the same four answers whatever is being drawn, and
+ * building them into each component is the shape the declared surface exists to
+ * remove. What only the block knows is what its absence should LOOK like, and
+ * that is one name in the registry (`BlockEntry.bones`).
+ *
+ * ⚠️ AND DENIED COMES FIRST, WHICH IS NOT THE ORDER `Await` USES. The other
+ * three are about a request; this one is about whether there should be a request
+ * at all. A skeleton followed by a refusal is a promise the screen breaks a
+ * second later — and it is worse than the refusal on its own, because somebody
+ * has already started waiting for it.
+ *
+ * ⚠️ THE REST OF THE ORDER IS `Await`'s AND IT IS NOT ARBITRARY. Trouble
+ * outranks emptiness, because a failed request has no data and `[]` is what a
+ * naive reading of it produces; waiting outranks both, because during the round
+ * trip neither is known yet. Getting it wrong is how a screen says "nothing
+ * here" for a second on every single load.
+ */
+export function Region<T>({
+  bones, of, nothing, isNothing, again, needs, then,
+}: RegionProps<T>) {
+  const stopped = useGate(needs);
+  if (stopped) {
+    return (
+      <Nothing
+        icon={nothing.icon}
+        says={sayGate(stopped)}
+        {...(STOPPED[stopped].out ? {} : { under: nothing.says })}
+      />
+    );
+  }
+  return (
+    <Await
+      of={of}
+      waiting={SKELETON[bones]()}
+      nothing={<Nothing {...nothing} />}
+      {...(isNothing ? { isNothing } : {})}
+      {...(again ? { again } : {})}
+      then={then}
+    />
   );
 }

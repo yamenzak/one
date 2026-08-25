@@ -273,14 +273,28 @@ the viewport spelling, so obeying D92 failed the guard protecting D7; and the
 date-shaped field name in the kernel. The token is `ROOM.narrow`/`ROOM.wide` now,
 which is better English anyway.
 
-### S5 — The four outcomes, drawn once
-waiting · nothing · trouble · denied. Partly exists — `Loaded`, `Await`,
-`Nothing`, `Trouble`, `useGate` — and is currently the CALLER's job to wire,
-which is exactly the class of thing a caller forgets.
+### S5 — The four outcomes, drawn once · **stage 93, shipped**
 
-⚠️ **S3 changed this stage's shape.** They do not move inside forty blocks; they
-move into the FRAME, which draws them around whichever block it places, using
-the skeleton that block declares. One implementation, not forty.
+`Region` in `state.tsx`: waiting · nothing · trouble · denied, around whichever
+block it is given, using the skeleton that block declares. One implementation
+rather than forty — which is what S3's finding made possible.
+
+**`nothing` is a required field, and that is the whole component.** Every surface
+that rendered `[]` as a confident fact did so because saying what emptiness MEANS
+was something a caller could leave out: a passkey card showing a "0" badge for
+the length of a round trip, a bell saying "you're all caught up" mid-fetch, a
+media library whose `catch(() => setItems([]))` turned a failed load into "no
+media yet". A required field is how that stops being a thing to remember.
+
+**Denied comes first, which is not the order `Await` uses.** The other three are
+about a request; this one is about whether there should be a request at all. A
+skeleton followed by a refusal is a promise the screen breaks a second later, and
+it is worse than the refusal on its own — somebody has already started waiting.
+
+Three call sites converted (Apps, Tried, Switches), each of which had been
+hand-wiring the same three. Screens whose answer can never legitimately be empty
+— the plan catalogue, the maintenance modes — keep `Await`, and that is the line:
+`Region` is for a block whose answer can be nothing.
 
 ### S6 — The layouts
 The declared arrangements: the stack, the grid, the split, the board. Container

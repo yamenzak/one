@@ -19,7 +19,8 @@
  */
 
 import {
-  Await, Group, NoteRow, Nothing, RowsWaiting, Screen, ToggleRow,
+  Region,
+  Group, NoteRow, Screen, ToggleRow,
   appFace, glyphOf, notice,
 } from "@engine/design";
 import { api } from "../api.js";
@@ -62,15 +63,15 @@ export function Apps({ view }: { readonly view: CentreView }) {
         ? undefined
         : { says: "Only an owner or a manager may change this" }}
     >
-      <Await
+      <Region
+        bones="rows"
         of={list.of}
-        waiting={<RowsWaiting rows={2} />}
         again={list.again}
         isNothing={(d) => d.items.length === 0}
         /* ⚠️ A DEPLOYMENT MAY OFFER NOTHING, and that is a sentence rather than a
            failure — a self-host with one product built in has nothing here to
            choose between. */
-        nothing={<Nothing icon={glyphOf("apps")} says="This deployment offers nothing to add" />}
+        nothing={{ icon: glyphOf("apps"), says: "This deployment offers nothing to add" }}
         then={(data) => (
           <Group>
             {data.items.map((p) => (

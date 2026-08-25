@@ -19,7 +19,8 @@
  */
 
 import {
-  Await, Group, NavRow, Nothing, RowsWaiting, Screen, appFace, glyphOf, useDay,
+  Region,
+  Group, NavRow, Screen, appFace, glyphOf, useDay,
 } from "@engine/design";
 import type { FlagBook, FlagDef } from "@engine/kernel";
 import { instant, overdue } from "@engine/kernel";
@@ -72,12 +73,12 @@ export function Switches({ onGo }: { readonly onGo: (to: Where) => void }) {
   return (
     /* ⚠️ `list` — every row leads somewhere and nothing is set from here. */
     <Screen shape="list" under="What is switched on, and for whom">
-      <Await
+      <Region
+        bones="rows"
         of={flags.of}
-        waiting={<RowsWaiting rows={3} />}
         again={flags.again}
         isNothing={(d) => d.apps.length === 0}
-        nothing={<Nothing icon={glyphOf("flag")} says="No product here declares a flag" />}
+        nothing={{ icon: glyphOf("flag"), says: "No product here declares a flag" }}
         then={(data) => (
           /* ⚠️ NO `Stack` — see `Keys.tsx`. The screen's own rhythm is the DOM's,
              so a column here collapses every product into one block. */

@@ -12,7 +12,8 @@
  * on or off, so the row says which relative to what everybody else here has.
  */
 
-import { Await, Group, NoteRow, Nothing, RowsWaiting, Screen, ToggleRow, glyphOf, notice, whoFace }
+import {
+  Region, Group, NoteRow, Screen, ToggleRow, glyphOf, notice, whoFace }
   from "@engine/design";
 import { api } from "../api.js";
 import { useLoad } from "./data.js";
@@ -54,12 +55,12 @@ export function Tried({ view, id }: {
 
   return (
     <Screen shape="settings">
-      <Await
+      <Region
+        bones="rows"
         of={who.of}
-        waiting={<RowsWaiting rows={3} />}
         again={who.again}
         isNothing={(d) => d.items.length === 0}
-        nothing={<Nothing icon={glyphOf("people")} says="Nobody here has an account yet" />}
+        nothing={{ icon: glyphOf("people"), says: "Nobody here has an account yet" }}
         then={(data) => (
           <Group
             label={data.label}
