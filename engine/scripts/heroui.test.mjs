@@ -839,22 +839,40 @@ if (!uneven) ok(`peers: ${EQUALS.length} group(s) of equals share their width`);
  * `Switch` by hand rather than reaching for a component that already got it
  * right.
  */
+/*
+  ⚠️ AND THE TRACK IS `<Knob />` NOW, WHICH IS THE SAME CHECK ON A DIFFERENT
+  NAME. The two-element composition was written at five call sites and grew a
+  tick in it, so it is one component — and a component means the raw
+  `Switch.Control` legitimately appears once, in the file that defines it, with
+  no `Switch.Content` in sight. Exempting that file by NAME rather than by
+  pattern is the rule this whole script follows: a wildcard is an exemption a new
+  file can wander into.
+
+  ⚠️ THE INVARIANT IS UNCHANGED — the track is inside the pressable label — so
+  what the walk matches is both spellings. A `<Knob />` beside a `Switch.Content`
+  is the same broken switch it always was, and it now fails for the same reason.
+*/
+const KNOB_IS_DEFINED_IN = "design/src/parts/forms.tsx";
+const TRACK = /<(?:Switch\.Control|Knob)\b/g;
+
 {
   let switches = 0;
   let loose = 0;
   for (const file of FILES) {
+    if (rel(file) === KNOB_IS_DEFINED_IN) continue;
     const src = readFileSync(file, "utf8");
-    if (!/<Switch\.Control\b/.test(src)) continue;
+    if (!TRACK.test(src)) continue;
+    TRACK.lastIndex = 0;
     switches++;
-    /* Every `Switch.Control` must open after a `Switch.Content` opens and before
-       that content closes. Anything else is the sibling shape. */
-    for (const at of [...src.matchAll(/<Switch\.Control\b/g)].map((m) => m.index)) {
+    /* Every track must open after a `Switch.Content` opens and before that
+       content closes. Anything else is the sibling shape. */
+    for (const at of [...src.matchAll(TRACK)].map((m) => m.index)) {
       const opened = src.lastIndexOf("<Switch.Content", at);
       const closed = src.lastIndexOf("</Switch.Content>", at);
       if (opened < 0 || closed > opened) {
         const line = src.slice(0, at).split("\n").length;
         loose++;
-        fail(`${rel(file)}:${line}: <Switch.Control> outside <Switch.Content>.\n` +
+        fail(`${rel(file)}:${line}: the switch's track is outside <Switch.Content>.\n` +
              `       The content is the pressable label; beside it the track is a picture — ` +
              `pressing the switch does nothing and only the word works.`);
       }

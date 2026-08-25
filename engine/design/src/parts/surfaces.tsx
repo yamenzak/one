@@ -43,7 +43,7 @@ import { ARRIVE, arriveAt } from "../tokens/motion.js";
 import { useScenery } from "../frame/page.js";
 import type { Sky } from "../scene/index.js";
 import { useBones } from "./bones.js";
-import { NamedAlready } from "./forms.js";
+import { Knob, NamedAlready } from "./forms.js";
 import { Face, type FaceOf } from "./face.js";
 import { Hint } from "./beside.js";
 import { Tally } from "./tally.js";
@@ -757,7 +757,7 @@ export function ToggleRow({ icon, face, label, under, value, onChange, isDisable
           <Lead icon={icon} face={face} />
           <Body label={label} under={under} />
         </span>
-        <Switch.Control><Switch.Thumb /></Switch.Control>
+        <Knob />
       </Switch.Content>
     </Switch>
     </div>

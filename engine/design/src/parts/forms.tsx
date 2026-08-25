@@ -30,10 +30,12 @@ import {
   Button,
   Checkbox, CheckboxGroup, ComboBox, Description, FieldError, Input, InputGroup,
   InputOTP, Label, ListBox, NumberField, Radio, RadioGroup, REGEXP_ONLY_DIGITS, SearchField,
-  Select, Skeleton, Slider, Tag, TagGroup, TextArea, TextField, TimeField, ToggleButton,
+  Select, Skeleton, Slider, Switch, Tag, TagGroup, TextArea, TextField, TimeField, ToggleButton,
   ToggleButtonGroup,
 } from "@heroui/react";
 import { dayOf, instant } from "@engine/kernel";
+/* ⚠️ The one glyph registry — a switch does not draw its own tick. */
+import { glyphOf } from "../frame/shell.js";
 import { CODE_SLOT, SPACE } from "../tokens/metrics.js";
 
 /**
@@ -1060,5 +1062,48 @@ export function PeriodInput({ value, onChange, today, label = "Period", ...p }: 
         </React.Suspense>
       ) : null}
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------- knob --- */
+
+/**
+ * THE TRACK AND THE THUMB, WITH A TICK IN IT — the one switch face in the
+ * product.
+ *
+ * ⚠️ IT EXISTS BECAUSE `<Switch.Control><Switch.Thumb /></Switch.Control>` WAS
+ * WRITTEN FIVE TIMES. Five copies of a two-element composition is five places to
+ * fix the day the switch grows anything — and it just did.
+ *
+ * ⚠️ THE TICK IS A SECOND CHANNEL FOR STATE, NOT AN ORNAMENT, and it is the same
+ * argument the ruled meter makes (D87). A switch says on-or-off with a POSITION
+ * and a COLOUR: position is a couple of millimetres at arm's length, and colour
+ * is the channel that fails first. A mark that is present or absent survives a
+ * printout, a forced-colours mode and a reader who cannot separate the track's
+ * two greens — and it costs nothing to anybody else, because the knob was empty.
+ *
+ * ⚠️ IT IS DRAWN ALWAYS AND FADED BY CSS, WHICH IS FORCED RATHER THAN LAZY. The
+ * thumb is inside React Aria's own render tree and does not hand its state to a
+ * child, so a component cannot ask "am I on" here. `[data-knob]` is the hook and
+ * the rule lives with the other chrome in `ambienceStylesheet` — the same shape
+ * as the nav's lit destination, for the same reason.
+ *
+ * ⚠️ AND THE MARK NEVER MOVES, ONLY ITS OPACITY. The knob is already travelling
+ * across the track; a glyph that also scaled or turned would be two motions on
+ * one control, which is the thing the motion engine exists to prevent.
+ */
+export function Knob() {
+  return (
+    <Switch.Control>
+      <Switch.Thumb>
+        {/* ⚠️ 12px, WHICH IS THE THUMB'S OWN HEIGHT LESS ITS BREATHING ROOM. The
+            library sizes its own SVGs from a class, not from `--icon`, so a mark
+            handed in here without one draws at the button scale and is clipped
+            by the knob it is meant to sit in. */}
+        <span data-knob="true" aria-hidden="true" style={{ ["--icon" as string]: "12px" }}>
+          {glyphOf("check")}
+        </span>
+      </Switch.Thumb>
+    </Switch.Control>
   );
 }

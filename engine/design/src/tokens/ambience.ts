@@ -1190,6 +1190,20 @@ export function ambienceStylesheet(): string {
     */
     `[data-chip="true"] { background-color: color-mix(in oklab, var(--foreground) 7%, transparent); }`,
     /*
+      ⚠️ THE TICK IN A SWITCH'S KNOB — see `Knob` in `forms.tsx` for why it is
+      there. The rule is here rather than on the component because the thumb is
+      inside React Aria's own tree and hands its state to nothing: a child cannot
+      ask "am I on", so the mark is always drawn and its opacity is the answer.
+      Same shape as the nav's lit destination, one file over, for the same
+      reason.
+
+      ⚠️ AND THE MARK IS THE ONLY THING THAT MOVES — opacity, not a scale or a
+      turn. The knob is already travelling the width of the track; a glyph with
+      a second motion on it is two things happening on one control.
+    */
+    `[data-knob="true"] { opacity: 0; transition: ${MOTION.unlit}; }`,
+    `.switch[data-selected="true"] [data-knob="true"] { opacity: 1; transition: ${MOTION.lit}; }`,
+    /*
       ⚠️ ONE OPTICAL WEIGHT FOR EVERY GLYPH IN THE PRODUCT. An icon library takes
       its size from its own props, so one caller passing nothing draws at the
       library default beside one that passed 20 — and a list with two icon sizes

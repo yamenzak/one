@@ -168,12 +168,12 @@ part that is not. Refresh with `node engine/scripts/docs.test.mjs --write`.
 | `tokens/` | colour, type, spacing, motion, the chrome and hem rules | 85 |
 | `scene/` | the ambience engine — families, marks, the world behind a screen | 1 |
 | `frame/` | page, shape, crown, nav, dock, overlays — what wraps a screen | 72 |
-| `parts/` | rows, cards, lists, controls, the four outcomes | 196 |
+| `parts/` | rows, cards, lists, controls, the four outcomes | 197 |
 | `rendered/` | whole surfaces drawn from a kernel declaration | 53 |
 | `chart/` | the data vocabulary — a number as a shape | 40 |
 | `measure/` | what a screen actually lays out, in a real browser — the harness every app sweeps its own screens with | 1 |
 
-**448 exports.** Every one is reachable as `import { … } from "@engine/design"`;
+**449 exports.** Every one is reachable as `import { … } from "@engine/design"`;
 there is no deep import, and a guard says so.
 
 ### `tokens/`
@@ -215,7 +215,7 @@ there is no deep import, and a guard says so.
 - `parts/credits.tsx` — `Credits`, `CreditsProps`
 - `parts/face.tsx` — `appFace`, `Face`, `FaceKind`, `FaceOf`, `FaceProps`, `FaceSize`, `faceUri`, `ONE_FACE`, `Orb`, `placeFace`, `thingFace`, `whoFace`, `worldFor`
 - `parts/feedback.tsx` — `Beep`, `say`, `wakeSound`
-- `parts/forms.tsx` — `Agree`, `Choice`, `CodeEntry`, `DateInput`, `Dates`, `Dial`, `LongText`, `Lookup`, `MoneyInput`, `NamedAlready`, `Naming`, `NumberInput`, `NumberInputProps`, `OneOf`, `Option`, `PeriodId`, `PeriodInput`, `PERIODS`, `Picks`, `Said`, `SearchInput`, `SecretInput`, `Segmented`, `spanOf`, `Tags`, `Tail`, `TextInput`, `TextInputProps`, `TimeInput`, `withValue`, `Words`
+- `parts/forms.tsx` — `Agree`, `Choice`, `CodeEntry`, `DateInput`, `Dates`, `Dial`, `Knob`, `LongText`, `Lookup`, `MoneyInput`, `NamedAlready`, `Naming`, `NumberInput`, `NumberInputProps`, `OneOf`, `Option`, `PeriodId`, `PeriodInput`, `PERIODS`, `Picks`, `Said`, `SearchInput`, `SecretInput`, `Segmented`, `spanOf`, `Tags`, `Tail`, `TextInput`, `TextInputProps`, `TimeInput`, `withValue`, `Words`
 - `parts/gated.tsx` — `Allowed`, `sayGate`, `Stopped`, `STOPPED`, `useGate`
 - `parts/heads.tsx` — `Balance`, `distinguishing`, `Figure`, `Prose`, `Section`, `SectionTitle`, `Title`
 - `parts/listing.tsx` — `Col`, `Listing`, `ListingProps`, `Paged`
