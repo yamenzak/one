@@ -5985,6 +5985,24 @@ const manifest = (): AppSpec => defineApp({
     { id: "every-run", of: "process", sort: { by: "started", dir: "down" }, limit: 100,
       tally: [{ as: "items", of: "process-item", by: "process" }] },
     { id: "every-job", of: "job", sort: { by: "opened", dir: "down" }, limit: 100 },
+    /* ⚠️ WHAT WENT THROUGH THIS RUN — the batches somebody signed against. */
+    { id: "run-items", of: "process-item", where: [{ field: "process", is: { here: "record" } }],
+      limit: 200 },
+    /* ⚠️ WHAT IS IN THIS KIT. A kit is a set somebody carries, and its contents
+       are the whole reason to open it. */
+    { id: "kit-items", of: "unit", where: [{ field: "kit", is: { here: "record" } }],
+      limit: 200 },
+    /* ⚠️ WHAT HAS HAPPENED TO THIS ONE THING — the ledger, newest first, which
+       is the default order and so is not declared. */
+    { id: "moves-here", of: "ledger", where: [{ field: "product", is: { here: "record" } }],
+      limit: 50 },
+    /* ⚠️ THE DELIVERIES OF THIS PRODUCT, and their standing. */
+    { id: "batches-here", of: "batch", where: [{ field: "product", is: { here: "record" } }],
+      limit: 100 },
+    /* ⚠️ THE ITEMISED ONES — a product tracked one by one has units rather than
+       a quantity, and this is where they are. */
+    { id: "units-here", of: "unit", where: [{ field: "product", is: { here: "record" } }],
+      limit: 200 },
   ],
 
   /*
@@ -6181,9 +6199,90 @@ const manifest = (): AppSpec => defineApp({
         ],
       } },
     { id: "run", route: "/run", label: "A run", nav: "none", icon: "check",
-      permission: "process:read", features: ["processes"] },
+      permission: "process:read", features: ["processes"], of: "process",
+      body: {
+        shape: "detail",
+        layout: { as: "stack" },
+        blocks: [
+          {
+            group: "The run",
+            of: [
+              { block: "FieldRow",
+                bind: {
+                  label: { from: { of: "words", says: "What kind" } },
+                  value: { from: { of: "field", field: "kind" } },
+                } },
+              { block: "FieldRow",
+                when: { has: { of: "field", field: "machine" } },
+                bind: {
+                  label: { from: { of: "words", says: "Machine" } },
+                  value: { from: { of: "field", field: "machine" } },
+                } },
+              { block: "FieldRow",
+                bind: {
+                  label: { from: { of: "words", says: "Started" } },
+                  value: { from: { of: "field", field: "started" }, as: "when" },
+                } },
+            ],
+          },
+          {
+            group: "What went through it",
+            of: [{
+              block: "Listing",
+              shows: [
+                { field: "batch.lot", label: "Lot" },
+                { field: "verdict", label: "Verdict" },
+                { field: "reason", label: "Why" },
+              ],
+              nothing: { says: "Nothing signed off yet", under: "Add a batch and it appears here" },
+              bind: {
+                label: { from: { of: "words", says: "What went through it" } },
+                of: { from: { of: "view", view: "run-items" } },
+              },
+            }],
+          },
+        ],
+      } },
     { id: "case", route: "/case", label: "A job", nav: "none", icon: "note",
-      permission: "process:read", features: ["jobs"] },
+      permission: "process:read", features: ["jobs"], of: "job",
+      body: {
+        shape: "detail",
+        layout: { as: "stack" },
+        blocks: [
+          { block: "FieldRow",
+            bind: {
+              label: { from: { of: "words", says: "Reference" } },
+              value: { from: { of: "field", field: "ref" } },
+            } },
+          { block: "FieldRow",
+            bind: {
+              label: { from: { of: "words", says: "What it is about" } },
+              value: { from: { of: "field", field: "label" } },
+            } },
+          { block: "FieldRow",
+            bind: {
+              label: { from: { of: "words", says: "How it is going" } },
+              value: { from: { of: "field", field: "state" } },
+            } },
+          { block: "FieldRow",
+            bind: {
+              label: { from: { of: "words", says: "Opened" } },
+              value: { from: { of: "field", field: "opened" }, as: "when" },
+            } },
+          /* ⚠️ ONLY ONCE IT IS CLOSED. A "Closed —" row on an open job is a
+             blank where a date belongs, which reads as a date that failed to
+             load rather than as a job still running. */
+          { block: "FieldRow",
+            when: { has: { of: "field", field: "closed" } },
+            bind: {
+              label: { from: { of: "words", says: "Closed" } },
+              value: { from: { of: "field", field: "closed" }, as: "when" },
+            } },
+          { block: "NoteRow",
+            when: { has: { of: "field", field: "note" } },
+            bind: { children: { from: { of: "field", field: "note" } } } },
+        ],
+      } },
     /* ⚠️ `etch` — ruled geometry, which is what a shelf is. Seeded on the
        location, so every shelf in the workspace has a ground of its own. */
     { id: "location", route: "/where", label: "A location", nav: "none", icon: "pin",
@@ -6242,7 +6341,94 @@ const manifest = (): AppSpec => defineApp({
         ],
       } },
     { id: "product", route: "/thing", label: "A product", nav: "none", icon: "box",
-      permission: "product:read" },
+      permission: "product:read", of: "product",
+      body: {
+        shape: "detail",
+        layout: { as: "stack" },
+        blocks: [
+          {
+            group: "What it is",
+            of: [
+              { block: "FieldRow",
+                when: { has: { of: "field", field: "brand" } },
+                bind: {
+                  label: { from: { of: "words", says: "Brand" } },
+                  value: { from: { of: "field", field: "brand" } },
+                } },
+              { block: "FieldRow",
+                bind: {
+                  label: { from: { of: "words", says: "Counted in" } },
+                  value: { from: { of: "field", field: "unit" }, as: "unit" },
+                } },
+              /* ⚠️ ONLY WHERE THERE IS A FLOOR. "Par —" is a blank where a
+                 number belongs, which reads as one that failed to load. */
+              { block: "FieldRow",
+                when: { has: { of: "field", field: "par" } },
+                bind: {
+                  label: { from: { of: "words", says: "Keep at least" } },
+                  value: { from: { of: "field", field: "par" }, as: "num" },
+                } },
+              { block: "NoteRow",
+                when: { has: { of: "field", field: "handling" } },
+                bind: { children: { from: { of: "field", field: "handling" } } } },
+            ],
+          },
+          /* ⚠️ ONLY FOR A PRODUCT TRACKED ONE BY ONE. A quantity-tracked product
+             has no units, and an empty "Items" section under it is a section
+             about a way of working this product does not use. */
+          {
+            group: "Items",
+            when: { is: { of: "field", field: "tracking" }, one: ["itemised", "assembled"] },
+            of: [{
+              block: "Listing",
+              shows: [
+                { field: "serial", label: "Serial" },
+                { field: "code", label: "Code" },
+                { field: "location.name", label: "Where" },
+              ],
+              nothing: { says: "No items yet", under: "Receive some and they appear here" },
+              goes: "unit",
+              bind: {
+                label: { from: { of: "words", says: "Items" } },
+                of: { from: { of: "view", view: "units-here" } },
+              },
+            }],
+          },
+          {
+            group: "Deliveries",
+            when: { is: { of: "field", field: "tracking" }, one: ["batched"] },
+            of: [{
+              block: "Listing",
+              shows: [
+                { field: "lot", label: "Lot" },
+                { field: "standing", label: "Standing" },
+                { field: "received", label: "Received" },
+              ],
+              nothing: { says: "No deliveries yet", under: "Receive some and they appear here" },
+              bind: {
+                label: { from: { of: "words", says: "Deliveries" } },
+                of: { from: { of: "view", view: "batches-here" } },
+              },
+            }],
+          },
+          {
+            group: "What has happened",
+            of: [{
+              block: "Listing",
+              shows: [
+                { field: "day", label: "When" },
+                { field: "delta", label: "Change" },
+                { field: "reason", label: "Why" },
+              ],
+              nothing: { says: "Nothing has moved yet", under: "Receive or count some and it appears here" },
+              bind: {
+                label: { from: { of: "words", says: "What has happened" } },
+                of: { from: { of: "view", view: "moves-here" } },
+              },
+            }],
+          },
+        ],
+      } },
     /* ⚠️ ONE OBJECT, AND IT IS A DESTINATION RATHER THAN A SHEET. Its history is
        the point of it — where it has been, who had it, when it was serviced —
        and a life somebody has to hold a sheet open to read is a life nobody
@@ -6250,7 +6436,41 @@ const manifest = (): AppSpec => defineApp({
     { id: "unit", route: "/item", label: "An item", nav: "none", icon: "tag",
       permission: "stock:read" },
     { id: "kit", route: "/kit", label: "A kit", nav: "none", icon: "layers",
-      permission: "stock:read" },
+      permission: "stock:read", of: "kit",
+      body: {
+        shape: "detail",
+        layout: { as: "stack" },
+        blocks: [
+          { block: "CopyRow",
+            when: { has: { of: "field", field: "code" } },
+            bind: {
+              label: { from: { of: "words", says: "Code" } },
+              value: { from: { of: "field", field: "code" } },
+            } },
+          { block: "FieldRow",
+            bind: {
+              label: { from: { of: "words", says: "How it is" } },
+              value: { from: { of: "field", field: "state" } },
+            } },
+          {
+            group: "What is in it",
+            of: [{
+              block: "Listing",
+              shows: [
+                { field: "product.name", label: "Product" },
+                { field: "serial", label: "Serial" },
+                { field: "code", label: "Code" },
+              ],
+              nothing: { says: "Nothing in it yet", under: "Put something in and it appears here" },
+              goes: "unit",
+              bind: {
+                label: { from: { of: "words", says: "What is in it" } },
+                of: { from: { of: "view", view: "kit-items" } },
+              },
+            }],
+          },
+        ],
+      } },
     /* ⚠️ `glow` — pure light, no marks, which is what an arrival wants. */
     /* ⚠️ ITS OWN DESTINATION RATHER THAN A SECOND FIELD ON `Scan`. Both screens
        are "tell me about this" and the gestures could not be less alike: one is
