@@ -519,10 +519,64 @@ bound to it. The manifest refused two earlier attempts and was right both times:
 row's own column rather than a declared field — and was redundant anyway, since
 the runner already orders `at DESC, id DESC`.
 
-**Still owed before OneInventory can be ported:** the browser side that fetches
-`/api/screen/<id>` and draws through `Body`, and the join — a read through a
-declared `ref`, which is what the twelve screens actually need. Then the ports,
-photographed at both widths and both themes.
+**`Declared` is the browser half**, in `one-space/src/centre/Declared.tsx`. It
+fetches the door, spreads one answer into one outcome per view, and draws through
+`Body`. Two things about where it sits:
+
+- **A declared body outranks a mounted component**, in `AppSurface`, and that
+  order is what makes a port a DELETION. A screen gains a `body`, the file that
+  drew it stops being reached, and the day somebody removes that file nothing
+  changes — which is the only way twenty-five screens move without a flag day.
+  The other order would let a stale mount silently win over the declaration
+  meant to replace it, and the screen would go on looking correct.
+- **Behind a lazy boundary, because the renderer is every block it can draw.**
+  Imported statically it put 10 KiB into the module the first paint blocks on,
+  for a page only ever reached after somebody opens a product — and
+  `weight.test.ts` caught it on the commit that did it, which is the only reason
+  it was noticed.
+
+### The join: one hop over a reference · **stage 97**
+
+⚠️ **Without it every declared list is a column of ids, and that is the finding
+that stopped the port.** A stock line holds `product` and `location` as
+references; what the screen wants is the product's name, its unit and the
+location's name. Twelve reading screens, every one of them joining, each through
+its own copy of a hand-written `linesOf`.
+
+`"product.name"` is a field a body may read. **One hop, and the second is not
+coming** — `product.supplier.name` is where a manifest stops being a declaration
+and starts needing a query planner, which is the same line `Match` draws at the
+first comparison operator: the third one is then free. `reachFor` is the one
+resolver, read by the refusal AND by the runner, because two implementations of
+what `product.name` means is how a path the kernel accepts becomes a column the
+runner cannot find — a blank under a correct heading, which reads as missing data
+rather than as a typo.
+
+**Resolved on the server, one query per REFERENCE.** The ids of every row are
+collected and deduplicated first, so three lines over two products and one place
+is two statements — not three, and not six. `runaway.test.mjs` caught the
+`Promise.all` and demanded the bound in writing, which is the guard working;
+`joined.test.ts` counts the statements as well as checking the values, because a
+join that returns the right names one row at a time passes every value-only
+assertion in the file. And the scope is applied again on the target: a reference
+is an id, and an id is a string somebody could have written into a row.
+
+**The browser half of the join is zero lines.** `row["product.name"]` is a plain
+key — a nested answer would have cost every block, for ever, the knowledge of
+which of its keys are records.
+
+### The ratchet · **how the rest of the port is kept honest**
+
+⚠️ **A port with no ratchet stalls at whatever is comfortable.** Stage 96 proved
+a screen can be declared and stage 98 makes a written one a failure; between them
+the count is the only thing standing between "the arc is proceeding" and "one
+screen was declared and everybody moved on". `census.test.mjs` pins it at **29**,
+and it fails in BOTH directions — over means a product mid-port grew a new
+hand-written screen, under means somebody ported one and left the ceiling above
+it to absorb the next regression in silence.
+
+**Still owed:** the twelve ports themselves, photographed before and after at
+both widths and both themes, and then S10.
 
 ### S9 — the plan as written
 Every screen is a `body` or a `story`, and nothing is a third thing. On the

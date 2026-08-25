@@ -1312,7 +1312,7 @@ a later decision superseded, so neither list can rot into a promise nobody owes.
 | 94 | The layouts: relationships rather than breakpoints | shipped |
 | 95 | The guards, re-founded on the schema | shipped |
 | 96 | The renderer: a screen is drawn from what it declares | shipped |
-| 97 | OneInventory, ported — 25 screens, no escape hatch | **planned** |
+| 97 | OneInventory, ported — the join first, then 25 screens | **planned** |
 | 98 | The door closes: no private UI in an app | **planned** |
 
 **84 shipped, 13 planned, 1 superseded.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it, and nothing may defer to a superseded one — `scripts/docs.test.mjs` fails the build on either, which is the only reason this table can be read instead of the code.
