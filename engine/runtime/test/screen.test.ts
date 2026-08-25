@@ -39,9 +39,21 @@ const supplier = made("supplier", "supplier", {
   name: field.text({ label: "Name", required: true, holds: "none", max: 80 }),
 });
 
+/* ⚠️ ONE THAT ASKS AND ONE THAT DOES NOT — see `Drawn.acts`. The browser draws a
+   form for the first and runs the second on the press, and it decides which from
+   what the door sends rather than from a catalogue it downloaded. */
+const OPS = [
+  {
+    id: "shelf.rename", summary: "Rename this shelf",
+    input: { name: field.text({ label: "Name", required: true, holds: "none", max: 80 }) },
+  },
+  { id: "shelf.tidy", summary: "Tidy it", input: {} },
+] as unknown as AppSpec["operations"];
+
 const APP = {
   id: "warehouse",
   collections: [shelf, supplier],
+  operations: OPS,
   views: [
     { id: "below", of: "shelf", where: [{ field: "inside", is: { here: "record" } }] },
     { id: "everyone", of: "supplier" },
@@ -129,6 +141,35 @@ describe("a screen is handed its record and its views together", () => {
     if ("needs" in got) throw new Error(got.needs);
     expect(got.record).toBeNull();
     expect(got.views["below"]?.items).toEqual([]);
+  });
+
+  /*
+    ⚠️ THE ACTS TRAVEL WITH THE SCREEN, AND ONLY THE ONES IT OFFERS. Sending the
+    catalogue would put every operation in the product on the wire for a screen
+    with one button on it; sending none would mean the browser cannot draw a form
+    without downloading the product's own manifest, which is the dependency
+    stage 98 exists to remove.
+  */
+  it("sends the acts the body names, with the input each one takes", async () => {
+    const acting: ScreenSpec = {
+      ...place,
+      id: "acting",
+      body: {
+        ...place.body!,
+        blocks: [{ ...place.body!.blocks[0]!, does: ["shelf.rename"] }],
+      },
+    } as unknown as ScreenSpec;
+    const got = await drawnFor(shard(), APP, acting, TENANT, all, cold);
+    if ("needs" in got) throw new Error(got.needs);
+    expect(Object.keys(got.acts)).toEqual(["shelf.rename"]);
+    expect(got.acts["shelf.rename"]?.summary).toBe("Rename this shelf");
+    expect(Object.keys(got.acts["shelf.rename"]?.input ?? {})).toEqual(["name"]);
+  });
+
+  it("sends no acts at all for a body that offers none", async () => {
+    const got = await drawnFor(shard(), APP, place, TENANT, all, cold);
+    if ("needs" in got) throw new Error(got.needs);
+    expect(got.acts).toEqual({});
   });
 
   it("runs only the views this screen's body reads", async () => {

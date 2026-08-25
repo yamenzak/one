@@ -34,11 +34,18 @@ const read = (p) => readFileSync(join(ENGINE, p), "utf8");
 /* ------------------------------------------------------------------ inline --- */
 
 /*
-  ⚠️ THE TWO EXEMPTIONS ARE THE DEFINITION AND THE SHEET, and neither is a
-  loophole: `field.tsx` IS the control, and `edit.tsx` is the one place a
-  control is allowed to be — behind a deliberate press, in a tray, with a Save.
+  ⚠️ THE THREE EXEMPTIONS ARE THE DEFINITION AND THE TWO TRAYS, and none is a
+  loophole: `field.tsx` IS the control, and `edit.tsx` and `doing.tsx` are the
+  two places a control is allowed to be — behind a deliberate press, in a tray,
+  with one button that commits.
+
+  ⚠️ AND `doing.tsx` IS THE FORM CASE THE RULE ALWAYS NAMED. `edit.tsx`'s own
+  header says a form is the obvious exception — several fields answered together
+  and submitted once — and an operation's declared input is exactly that, which
+  is why it is a tray with a Save rather than a row with a control in it. The
+  list can still only grow on purpose, in a diff, with the argument attached.
 */
-const ALLOWED = new Set(["field.tsx", "edit.tsx"]);
+const ALLOWED = new Set(["field.tsx", "edit.tsx", "doing.tsx"]);
 
 const RENDERED = "design/src/rendered";
 const strays = readdirSync(join(ENGINE, RENDERED))

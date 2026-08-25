@@ -587,6 +587,23 @@ export const viewsIn = (body: SurfaceSpec): readonly string[] =>
   readsIn(body).flatMap((r) => (r.of === "view" || r.of === "count" ? [r.view] : []));
 
 /**
+ * EVERY OPERATION A BODY OFFERS — what `does` names, across every block.
+ *
+ * ⚠️ READ ONCE HERE RATHER THAN WALKED AT EACH END. The door sends the acts a
+ * screen offers so the browser can draw their forms; the guard checks each one
+ * is declared; the agent surface lists them. Three walks of one tree is how one
+ * of them comes to miss a group's blocks, and the symptom is a button that opens
+ * nothing on exactly the screens whose acts are inside a group.
+ */
+export const actsIn = (body: SurfaceSpec): readonly string[] => {
+  const out: string[] = [];
+  for (const { block } of blocksIn(body)) {
+    for (const id of block.does ?? []) if (!out.includes(id)) out.push(id);
+  }
+  return out;
+};
+
+/**
  * WHICH COLUMNS EACH VIEW IS ASKED FOR, BY VIEW ID.
  *
  * ⚠️ THE PATHS ARE PER BLOCK AND THE FETCHING IS PER VIEW, so this is where the

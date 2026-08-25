@@ -66,9 +66,14 @@ const DIST = join(dirname(fileURLToPath(import.meta.url)), "..", "dist");
    ⚠️ AND 864 MORE FOR THE TALLY — `refuseView`'s four new refusals and
    `talliedIn`. Same reason as the hop: the browser validates the manifest it was
    handed, so every clause the contract gains is a first paint that grows. The
-   counting itself is `tallyRows`, on the worker, where a `GROUP BY` belongs. */
+   counting itself is `tallyRows`, on the worker, where a `GROUP BY` belongs.
+
+   ⚠️ AND 56 FOR `actsIn`. The form that RUNS a declared act — `Doing`, four
+   kilobytes of it — is not in this number, which is the boundary working: it is
+   reached from `Declared`, which is lazy, so a browser that never opens a
+   product never downloads a form for one. */
 const CEILING = {
-  js: { raw: 1_105_650, gzip: 330_000 },
+  js: { raw: 1_105_706, gzip: 330_000 },
   css: { raw: 470_000, gzip: 50_000 },
 };
 

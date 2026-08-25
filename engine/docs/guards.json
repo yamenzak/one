@@ -4167,6 +4167,15 @@
       "impl": "runtime/test/joined.test.ts",
       "proves": "asks once per tally, never once per row",
       "fails": "the shape OneInventory built five times by hand — a whole second collection fetched to a phone so a `Map` and a loop could count it"
+    },
+    {
+      "id": "a-screen-carries-the-acts-it-offers-and-no-others",
+      "protects": "D92",
+      "stage": "97",
+      "status": "live",
+      "impl": "runtime/test/screen.test.ts",
+      "proves": "sends the acts the body names, with the input each one takes",
+      "fails": "the whole operation catalogue on the wire for a screen with one button on it — or none of it, which leaves the browser unable to draw a form without downloading the product's own manifest"
     }
   ]
 }

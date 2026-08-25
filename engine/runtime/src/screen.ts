@@ -22,9 +22,11 @@
  * nothing — it is the same answer as a record with empty columns.
  */
 
-import type { AppSpec, ScreenSpec } from "@engine/kernel";
+import type { AppSpec, Fields, ScreenSpec } from "@engine/kernel";
 import type { Reach } from "@engine/kernel";
-import { SCREEN_PATH, columnsIn, permissionFor, reachFor, viewsIn } from "@engine/kernel";
+import {
+  SCREEN_PATH, actsIn, columnsIn, permissionFor, reachFor, viewsIn,
+} from "@engine/kernel";
 import { readOne } from "./records.js";
 import { runViews, type Viewed } from "./views.js";
 import { type Db } from "./sql.js";
@@ -36,6 +38,24 @@ export { SCREEN_PATH };
 export interface Drawn {
   readonly record: Record<string, unknown> | null;
   readonly views: Readonly<Record<string, Viewed>>;
+  /**
+   * WHAT THE BODY'S `does` NAMES, WITH THE INPUT EACH ONE TAKES.
+   *
+   * ⚠️ SENT WITH THE SCREEN RATHER THAN LOOKED UP IN THE BROWSER, and that is
+   * what lets the app's own chunk be deleted. A form drawn from an operation's
+   * declaration needs the declaration; the alternative is the product shipping
+   * its manifest to every browser, which is the weight D17 exists about and the
+   * dependency stage 98 exists to remove.
+   *
+   * ⚠️ ONLY WHAT THIS SCREEN OFFERS. Sending the whole catalogue would put every
+   * operation in the product on the wire for a screen with one button on it.
+   */
+  readonly acts: Readonly<Record<string, Act>>;
+}
+
+export interface Act {
+  readonly summary: string;
+  readonly input: Fields;
 }
 
 /** ⚠️ Refused rather than empty — see `Refused`. */
@@ -118,5 +138,14 @@ export async function drawnFor(
     runViews(db, app, reads, scope, here, reaching),
   ]);
 
-  return { record: held ?? null, views };
+  /* ⚠️ ONLY WHAT THE BODY NAMES, and an id the app does not declare is dropped
+     rather than sent as a stub — `refuseSurface` refuses one at composition, so
+     an unknown here is a manifest that never composed. */
+  const acts: Record<string, Act> = {};
+  for (const id of screen.body ? actsIn(screen.body) : []) {
+    const spec = (app.operations ?? []).find((o) => o.id === id);
+    if (spec) acts[id] = { summary: spec.summary, input: spec.input };
+  }
+
+  return { record: held ?? null, views, acts };
 }

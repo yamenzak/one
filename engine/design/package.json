@@ -9,7 +9,8 @@
     "./vite": "./vite.ts",
     "./labels": "./src/parts/labels.tsx",
     "./measuring": "./src/measure/index.tsx",
-    "./body": "./src/rendered/body.tsx"
+    "./body": "./src/rendered/body.tsx",
+    "./doing": "./src/rendered/doing.tsx"
   },
   "types": "./src/index.ts",
   "scripts": {
