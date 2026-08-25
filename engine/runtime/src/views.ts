@@ -23,7 +23,7 @@
 
 import type { AppSpec, CollectionSpec, Reach, Viewed, ViewSpec } from "@engine/kernel";
 import { eraseBy } from "@engine/kernel";
-import { joinRows } from "./joined.js";
+import { joinRows, tallyRows } from "./joined.js";
 import { narrow, type Here } from "./records.js";
 import { column, table, type Db } from "./sql.js";
 
@@ -80,8 +80,16 @@ export async function runView(
       .bind(...bound, want).all(),
   ]);
 
-  const items = await joinRows(
-    db, rows.results, reaches, app.collections ?? [], scope);
+  /* ⚠️ THE JOIN THEN THE TALLY, ON THE ROWS RATHER THAN IN SEQUENCE WITH THE
+     FETCH. Both read the same rows and neither needs the other, so they are two
+     statements each over the ids already in hand. */
+  const [held, counts] = await Promise.all([
+    joinRows(db, rows.results, reaches, app.collections ?? [], scope),
+    tallyRows(db, rows.results, view.tally ?? [], app.collections ?? [], scope),
+  ]);
+  /* ⚠️ MERGED BY POSITION, WHICH IS SAFE BECAUSE BOTH MAP THE SAME ARRAY IN
+     ORDER. Merging by id would be a second index over rows already aligned. */
+  const items = held.map((row, i) => ({ ...row, ...counts[i] }));
   return { items, count: counted?.n ?? rows.results.length };
 }
 

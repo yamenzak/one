@@ -420,7 +420,7 @@ and a manifest that does not compose refuses to boot.
 | `access` | permissions, roles, and what an app may never claim | 15 | — |
 | `reach` | how far one person works inside a workspace — where, as against what (D45) | 4 | — |
 | `gate` | the eight gates, in the order that decides which sentence somebody reads first | 3 | — |
-| `surface` | a screen declared — its shape, its blocks, and the closed vocabulary they bind through | 16 | — |
+| `surface` | a screen declared — its shape, its blocks, and the closed vocabulary they bind through | 17 | — |
 | `blocks` | which blocks a screen may name at all | 1 | — |
 | `manifest` | the whole app, and the composition that refuses a broken one | 13 | — |
 | `entitlement` | what a plan includes, and the allowance algebra over it | 17 | — |
@@ -444,7 +444,7 @@ and a manifest that does not compose refuses to boot.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**306 of them**, 305 reached by something today.
+**307 of them**, 306 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -501,7 +501,7 @@ env or a binding.
 | `screen` | what a declared screen is handed: its record, its views, and the permission every one of them needs | 2 | — |
 | `search` | what is findable: the ledger a write leaves, and the pass that carries it | 17 | — |
 | `views` | a declared view, run: narrowed, sorted, bounded, and counted whole | 3 | — |
-| `joined` | a field on what a row points at, one query per reference rather than one per row | 1 | — |
+| `joined` | a field on what a row points at, one query per reference rather than one per row | 2 | — |
 | `search-ops` | the find operation a searchable collection gets, with its boundary already in it | 1 | — |
 | `totals-ops` | how many of each thing there are, in one ask instead of one list read per number | 2 | — |
 | `operator` | the deployment looking at itself | 4 | — |
@@ -526,7 +526,7 @@ env or a binding.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 1 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 9 | — |
 
-**470 of them**, 469 reached by something today.
+**471 of them**, 470 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 
@@ -1065,6 +1065,8 @@ its own header, cited by other files, and doing nothing.
 | `a-body-may-reach-one-reference-and-no-further` | D92 | `product.supplier.name` in a manifest, which is where a declaration stops being one and starts needing a query planner — the same line `Match` draws at the first comparison operator |
 | `a-join-asks-once-per-reference-not-once-per-row` | D36 | fifty stock lines costing fifty subrequests on a warehouse phone — the right names at fifty times the price, which every value-only assertion in the file passes over |
 | `a-reference-is-resolved-inside-the-callers-own-scope` | D5 | a stale or forged id in a row becoming a way to read one workspace's records through another's screen |
+| `a-count-must-point-back-at-what-it-counts-for` | D92 | a tally whose `of` and `by` are both real and unrelated — it answers zero for every row, which reads as an empty shelf rather than as a manifest naming the wrong pair |
+| `a-tally-is-one-grouped-statement` | D36 | the shape OneInventory built five times by hand — a whole second collection fetched to a phone so a `Map` and a loop could count it |
 <!-- /generated -->
 
 ### And how well each decision is defended
@@ -1107,7 +1109,7 @@ its own header, cited by other files, and doing nothing.
 | D33 | A lane is an address, and a model we do not sell is not a fault | 0 |
 | D34 | The prices are parsed from Google's own page, and a modality is a set | 0 |
 | D35 | A model answers more than one lane, and one task column could not say so | 0 |
-| D36 | The latency budget: how many round trips a screen costs | 2 |
+| D36 | The latency budget: how many round trips a screen costs | 3 |
 | D37 | Depth is the number, and unbounded is a different question from expensive | 2 |
 | D38 | Nothing that reads no table waits for a schema | 1 |
 | D39 | `locate` answers twice from one read | 0 |
@@ -1163,7 +1165,7 @@ its own header, cited by other files, and doing nothing.
 | D89 | One ladder, and a rung has to reach the page | 5 |
 | D90 | A screen composes the vocabulary; it does not re-derive it | 5 |
 | D91 | A night is deep and lit, and the ladder's numbers are the ones that ship | 2 |
-| D92 | A screen is a body or a story, and what a body binds through is closed | 14 |
+| D92 | A screen is a body or a story, and what a body binds through is closed | 15 |
 <!-- /generated -->
 
 ---

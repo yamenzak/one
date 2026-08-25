@@ -391,7 +391,8 @@ const ALL = [
        location — not a hundred, which is the shape this guard exists to refuse
        and the reason the join is here rather than in each screen. */
     ["runtime/src/joined.ts",
-      [1, "the references one body names, deduplicated — never one per row"]],
+      [2, "the references one body names and the counts one view asks for, both "
+        + "deduplicated — never one per row"]],
     ["runtime/src/centre-ops.ts",
       [1, "the products a workspace has switched on — the deployment's own catalogue"]],
     ["runtime/src/operator.ts",

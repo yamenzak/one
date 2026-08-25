@@ -13,7 +13,7 @@ import { env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
 import { field, reachFor, type CollectionSpec } from "@engine/kernel";
 import { applySchema, type Db } from "../src/index.js";
-import { joinRows } from "../src/joined.js";
+import { joinRows, tallyRows } from "../src/joined.js";
 import { put } from "../src/records.js";
 import { schemaFor } from "../src/schema.js";
 
@@ -172,5 +172,48 @@ describe("what it does when the other end is not there", () => {
       shard(), rows, [reach(line, "product.name")], COLLECTIONS, OTHER);
     expect(out.every((r) => r["product.name"] === null),
       "a reference resolved past the caller's own scope").toBe(true);
+  });
+});
+
+describe("how many rows point back at each of these", () => {
+  const places = async () => (await shard().prepare("SELECT * FROM place ORDER BY id").all())
+    .results as Record<string, unknown>[];
+  const kinds = async () => (await shard().prepare("SELECT * FROM product ORDER BY id").all())
+    .results as Record<string, unknown>[];
+  const LINES = { as: "lines", of: "line", by: "place" } as const;
+  const OF_KIND = { as: "lines", of: "line", by: "product" } as const;
+
+  it("counts the rows pointing at each one", async () => {
+    const out = await tallyRows(shard(), await places(), [LINES], COLLECTIONS, TENANT);
+    expect(out[0]?.["lines"]).toBe(3);
+  });
+
+  it("counts per row rather than in total", async () => {
+    const out = await tallyRows(shard(), await kinds(), [OF_KIND], COLLECTIONS, TENANT);
+    expect(out.map((r) => r["lines"]).sort()).toEqual([1, 2]);
+  });
+
+  /*
+    ⚠️ ZERO, NOT NOTHING. `GROUP BY` returns no group for an empty one, so the
+    absence has to be filled in — an undefined draws as a blank where "0"
+    belongs, which reads as a number still loading rather than as an empty shelf.
+  */
+  it("answers zero for a row nothing points at", async () => {
+    await add(place, { name: "Empty bay" });
+    const out = await tallyRows(shard(), await places(), [LINES], COLLECTIONS, TENANT);
+    expect(out.find((r) => r["name"] === "Empty bay")?.["lines"]).toBe(0);
+  });
+
+  /* ⚠️ ONE GROUPED STATEMENT, which is the whole reason this is not a loop. */
+  it("asks once per tally, never once per row", async () => {
+    const { db, n } = counting();
+    await tallyRows(db, await places(), [LINES], COLLECTIONS, TENANT);
+    expect(n()).toBe(1);
+  });
+
+  it("counts only inside the caller's own workspace", async () => {
+    const out = await tallyRows(shard(), await places(), [LINES], COLLECTIONS, OTHER);
+    expect(out.every((r) => r["lines"] === 0),
+      "a count reached past the caller's own scope").toBe(true);
   });
 });

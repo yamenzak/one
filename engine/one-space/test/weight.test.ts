@@ -61,9 +61,14 @@ const DIST = join(dirname(fileURLToPath(import.meta.url)), "..", "dist");
    contract that grows is a first paint that grows. What is NOT in here is the
    join itself: `runtime/src/joined.ts` runs on the worker and never reaches a
    browser bundle at all. Twelve OneInventory screens cannot be declared without
-   it, which is the trade the number records. */
+   it, which is the trade the number records.
+
+   ⚠️ AND 864 MORE FOR THE TALLY — `refuseView`'s four new refusals and
+   `talliedIn`. Same reason as the hop: the browser validates the manifest it was
+   handed, so every clause the contract gains is a first paint that grows. The
+   counting itself is `tallyRows`, on the worker, where a `GROUP BY` belongs. */
 const CEILING = {
-  js: { raw: 1_104_786, gzip: 330_000 },
+  js: { raw: 1_105_650, gzip: 330_000 },
   css: { raw: 470_000, gzip: 50_000 },
 };
 

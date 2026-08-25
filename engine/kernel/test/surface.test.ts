@@ -135,6 +135,61 @@ describe("a body that composes", () => {
   });
 });
 
+/* ------------------------------------------------------------- counting up --- */
+
+/**
+ * ⚠️ THE COMMONEST THING A READING SCREEN SHOWS THAT A DECLARATION COULD NOT SAY,
+ * measured across OneInventory: a per-row count on the location tree, the
+ * supplier list, the run list, the product page and the kit page — five copies
+ * of one query, each assembled in a container with a `Map` and a loop over a
+ * whole second collection.
+ */
+describe("a view may count what points back at it", () => {
+  const tallied = (t: { as: string; of: string; by: string }) =>
+    refuseView({ ...recent, tally: [t] } as ViewSpec, COLLECTIONS).map((p) => p.why);
+
+  it("accepts a count over a reference that points back", () => {
+    /* ⚠️ `person` has no ref to `note`, so the pair that WORKS here is a note
+       counted by its author — read the other way round from the view. */
+    expect(refuseView(
+      { id: "people", of: "person", tally: [{ as: "notes", of: "note", by: "author" }] } as ViewSpec,
+      COLLECTIONS,
+    )).toEqual([]);
+  });
+
+  it("refuses a count whose name is already a field", () => {
+    expect(tallied({ as: "title", of: "note", by: "author" })).toEqual(["tally_name_taken"]);
+  });
+
+  it("refuses a count over a collection this app does not declare", () => {
+    expect(tallied({ as: "n", of: "nothing", by: "author" }))
+      .toEqual(["tally_collection_unknown"]);
+  });
+
+  it("refuses a count by something that is not a reference", () => {
+    expect(tallied({ as: "n", of: "note", by: "title" })).toEqual(["tally_not_a_ref"]);
+  });
+
+  /*
+    ⚠️ THE ONE THAT MATTERS, AND THE ONLY ONE THAT IS SILENT. `of` naming a real
+    collection and `by` naming a real reference on it is not enough — the
+    reference has to point back at THIS view's collection. Pointed elsewhere the
+    count is over rows that have nothing to do with the ones being drawn, and it
+    answers zero for every one of them: an empty shelf rather than a manifest
+    naming the wrong pair.
+  */
+  it("refuses a count by a reference that points somewhere else", () => {
+    expect(refuseView(
+      { id: "notes", of: "note", tally: [{ as: "n", of: "note", by: "author" }] } as ViewSpec,
+      COLLECTIONS,
+    ).map((p) => p.why)).toEqual(["tally_points_elsewhere"]);
+  });
+
+  it("refuses a count into something that is not a name", () => {
+    expect(tallied({ as: "how many!", of: "note", by: "author" })).toEqual(["not_a_name"]);
+  });
+});
+
 /* -------------------------------------------------------- one hop over --- */
 
 /**

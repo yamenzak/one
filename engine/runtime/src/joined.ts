@@ -25,7 +25,7 @@
  * way to read one workspace's rows from another's screen.
  */
 
-import type { CollectionSpec, Reach } from "@engine/kernel";
+import type { CollectionSpec, Reach, TallySpec } from "@engine/kernel";
 import { eraseBy, hopsIn } from "@engine/kernel";
 import { column, table, type Db } from "./sql.js";
 
@@ -88,6 +88,54 @@ export async function joinRows(
       const target = typeof at === "string" ? by.get(reach.through)?.get(at) : undefined;
       out[`${reach.through}.${reach.field}`] = target?.[reach.field] ?? null;
     }
+    return out;
+  });
+}
+
+/* -------------------------------------------------------------- counting up --- */
+
+/**
+ * HOW MANY ROWS POINT BACK AT EACH OF THESE — see `TallySpec`.
+ *
+ * ⚠️ THE MIRROR OF THE JOIN ABOVE, AND THE SAME DISCIPLINE. One `GROUP BY` per
+ * tally, over the ids in hand, rather than a count per row. The five places
+ * OneInventory built this by hand were each a `Map` and a loop over a whole
+ * second collection fetched in full — which is the same answer, computed in a
+ * browser, over rows a phone had to download first.
+ *
+ * ⚠️ AND A ROW WITH NOTHING POINTING AT IT ANSWERS ZERO, NOT NOTHING. `GROUP BY`
+ * returns no group for an empty one, so the absence has to be filled in — an
+ * undefined there draws as a blank where "0" belongs, which reads as a number
+ * still loading rather than as an empty shelf.
+ */
+export async function tallyRows(
+  db: Db, rows: readonly Readonly<Record<string, unknown>>[],
+  tally: readonly TallySpec[], collections: readonly CollectionSpec[], scope: string,
+): Promise<readonly Readonly<Record<string, unknown>>[]> {
+  if (!rows.length || !tally.length) return rows;
+
+  const ids = [...new Set(rows.map((r) => String(r["id"] ?? "")).filter(Boolean))].slice(0, MOST);
+  if (!ids.length) return rows;
+
+  const found = await Promise.all(tally.map(async (t) => {
+    const spec = collections.find((c) => c.id === t.of);
+    if (!spec) return { t, held: new Map<string, number>() };
+    const erase = eraseBy(spec);
+    const holes = ids.map(() => "?").join(", ");
+    const sql = `SELECT ${column(t.by)} AS at, COUNT(*) AS n FROM ${table(spec.id)} `
+      + `WHERE ${column(t.by)} IN (${holes})`
+      + (erase ? ` AND ${column(erase.column)} = ?` : "")
+      + ` GROUP BY ${column(t.by)}`;
+    const got = await db.prepare(sql).bind(...ids, ...(erase ? [scope] : [])).all();
+    const held = new Map<string, number>();
+    for (const r of got.results as { at: string; n: number }[]) held.set(String(r.at), Number(r.n));
+    return { t, held };
+  }));
+
+  return rows.map((row) => {
+    const out: Record<string, unknown> = { ...row };
+    const id = String(row["id"] ?? "");
+    for (const { t, held } of found) out[t.as] = held.get(id) ?? 0;
     return out;
   });
 }

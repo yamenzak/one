@@ -4149,6 +4149,24 @@
       "impl": "runtime/test/joined.test.ts",
       "proves": "refuses to resolve a reference from another workspace",
       "fails": "a stale or forged id in a row becoming a way to read one workspace's records through another's screen"
+    },
+    {
+      "id": "a-count-must-point-back-at-what-it-counts-for",
+      "protects": "D92",
+      "stage": "97",
+      "status": "live",
+      "impl": "kernel/test/surface.test.ts",
+      "proves": "refuses a count by a reference that points somewhere else",
+      "fails": "a tally whose `of` and `by` are both real and unrelated — it answers zero for every row, which reads as an empty shelf rather than as a manifest naming the wrong pair"
+    },
+    {
+      "id": "a-tally-is-one-grouped-statement",
+      "protects": "D36",
+      "stage": "97",
+      "status": "live",
+      "impl": "runtime/test/joined.test.ts",
+      "proves": "asks once per tally, never once per row",
+      "fails": "the shape OneInventory built five times by hand — a whole second collection fetched to a phone so a `Map` and a loop could count it"
     }
   ]
 }

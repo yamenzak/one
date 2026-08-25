@@ -87,6 +87,41 @@ export interface ViewSpec {
    * view somebody will point a phone at with forty thousand rows behind it.
    */
   readonly limit?: number;
+  /**
+   * HOW MANY ROWS POINT BACK AT EACH OF THESE — "lines on this shelf", "items in
+   * this run", "products from this supplier".
+   *
+   * ⚠️ THE COMMONEST THING A READING SCREEN SHOWS THAT A DECLARATION COULD NOT
+   * SAY. Measured across OneInventory: a per-row count appears on the location
+   * tree, the supplier list, the run list, the product page and the kit page —
+   * every one of them assembled in a container with a `Map` and a loop, which is
+   * five copies of one query the database can answer in one statement.
+   *
+   * ⚠️ IT IS ON THE VIEW RATHER THAN ON THE COLLECTION, AND THE DIFFERENCE IS
+   * WHAT IT COSTS. A field would imply a column, and a column implies a writer
+   * and a drift — a counter maintained by every operation that adds or removes a
+   * row, wrong the first time one of them forgets. This is computed on read,
+   * beside the rows it belongs to, and a view that does not ask does not pay.
+   *
+   * ⚠️ ONE GROUPED STATEMENT PER TALLY, never one per row. Same discipline as the
+   * join beside it, and for the same reason.
+   */
+  readonly tally?: readonly TallySpec[];
+}
+
+/**
+ * ⚠️ COUNTING UP A REFERENCE, WHICH IS THE MIRROR OF READING DOWN ONE. `reachFor`
+ * answers "the name of the product this line points at"; this answers "how many
+ * lines point at this location". Between them a screen can say what a row IS and
+ * what it HOLDS, which is what every list in this product turned out to need.
+ */
+export interface TallySpec {
+  /** ⚠️ What the number is called on the row — a `shows` column may name it. */
+  readonly as: string;
+  /** The collection whose rows are counted. */
+  readonly of: string;
+  /** The `ref` field on that collection which points back at this view's own. */
+  readonly by: string;
 }
 
 export interface Sort {
@@ -485,6 +520,8 @@ export type SurfaceRefusal =
   /* ⚠️ THE SIX A DOTTED PATH CAN GET WRONG — see `reachFor`. They are separate
      from `field_unknown` because the fix is different for each: a typo, a hop
      through something that is not a reference, a second hop that is not coming. */
+  | "tally_name_taken" | "tally_collection_unknown"
+  | "tally_not_a_ref" | "tally_points_elsewhere"
   | ReachRefusal
   | "split_without_an_aside" | "aside_without_a_split"
   | "operation_unknown" | "nothing_on_it";
@@ -699,8 +736,50 @@ export function refuseView(
     at("view_field_unknown", `sorts by "${spec.sort.by}", which ${held.id} does not have`);
   }
 
+  /*
+    ⚠️ THE POINTING HAS TO GO BOTH WAYS, AND THE THIRD CHECK IS THE ONE THAT
+    MATTERS. `of` naming a real collection and `by` naming a real reference on it
+    is not enough — the reference has to point back at THIS view's collection, or
+    the count is over rows that have nothing to do with the ones being drawn. It
+    answers zero for every row, which reads as an empty shelf rather than as a
+    manifest naming the wrong pair.
+  */
+  for (const t of spec.tally ?? []) {
+    if (!FIELD_NAME.test(t.as)) {
+      at("not_a_name", `counts into "${t.as}", which is not a name a column could show`);
+      continue;
+    }
+    if (known(t.as)) {
+      at("tally_name_taken",
+        `counts into "${t.as}", which is already a field on ${held.id} — the count would `
+        + "replace it, so a column showing it would draw the wrong number");
+      continue;
+    }
+    const of = collections.find((c) => c.id === t.of);
+    if (!of) {
+      at("tally_collection_unknown",
+        `counts "${t.of}", which this app does not declare`);
+      continue;
+    }
+    const by = of.fields[t.by];
+    if (!by) {
+      at("tally_not_a_ref", `counts ${t.of} by "${t.by}", which ${t.of} does not have`);
+    } else if (by.kind !== "ref") {
+      at("tally_not_a_ref",
+        `counts ${t.of} by "${t.by}", which is a ${by.kind} rather than a reference`);
+    } else if (by.to !== held.id) {
+      at("tally_points_elsewhere",
+        `counts ${t.of} by "${t.by}", which points at ${by.to} rather than at ${held.id}`);
+    }
+  }
+
   return out;
 }
+
+/** ⚠️ What a view's rows carry beyond their own columns — read by the refusal
+    checking a `shows`, and by nothing at runtime, where the key is just a key. */
+export const talliedIn = (spec: ViewSpec): readonly string[] =>
+  (spec.tally ?? []).map((t) => t.as);
 
 /**
  * What one screen's body can get wrong.
@@ -950,8 +1029,13 @@ export function refuseSurface(
           `${where} names columns and binds no view, so there are no rows for them to be columns of`);
       } else {
         const held = collections.find((c) => c.id === view.of)?.fields;
+        /* ⚠️ A TALLY IS A COLUMN TOO, AND IT IS NOT A FIELD. `talliedIn` is what
+           the view promises to put on each row beyond the collection's own — so
+           a `shows` naming one is correct, and checking against the fields alone
+           would refuse the very thing the tally was declared for. */
+        const counted = talliedIn(view);
         for (const col of b.shows) {
-          if (!held) continue;
+          if (!held || counted.includes(col.field)) continue;
           const reach = reachFor(col.field, held, collections);
           if (typeof reach === "string") {
             at(reach === "path_field_unknown" && !col.field.includes(".")
