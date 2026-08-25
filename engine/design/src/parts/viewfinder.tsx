@@ -54,7 +54,7 @@
 import * as React from "react";
 import { CameraOff } from "lucide-react";
 import { Button } from "@heroui/react";
-import { Stack } from "./arrange.js";
+import { Row, Stack } from "./arrange.js";
 import { say, wakeSound } from "./feedback.js";
 import { TextInput } from "./forms.js";
 import { Nothing } from "./state.js";
@@ -489,16 +489,39 @@ export function Viewfinder({
     onRead(said);
   }, [code, onRead]);
 
+  /*
+    ⚠️ A BUTTON BESIDE THE FIELD, BECAUSE ENTER IS NOT A KEY EVERY KEYBOARD HAS.
+    Submitting on Enter is right and it was the ONLY way in: a phone showing a
+    numeric keypad for a field full of digits offers no Return at all, so
+    somebody typed the number off a label, looked at it sitting there, and had
+    no way to add it. Reported exactly that way — "at type the number it's not
+    working".
+
+    ⚠️ AND IT IS DISABLED WHILE THERE IS NOTHING TO ADD, which is what makes it
+    readable as the way in rather than as a second, mysterious control: the
+    moment a digit is typed it lights up, which says what it is for without a
+    word of help text.
+  */
   const port = (
-    <TextInput
-      label={typed.label}
-      value={code}
-      onChange={setCode}
-      onSubmit={enter}
-      name="code"
-      {...(typed.placeholder === undefined ? {} : { placeholder: typed.placeholder })}
-      {...(typed.help === undefined ? {} : { help: typed.help })}
-    />
+    /* ⚠️ THE FIELD GROWS AND THE BUTTON DOES NOT, so on a phone the row wraps
+       and Add lands under the field at full width rather than squeezing the
+       digits into a third of the screen. */
+    <Row space="tight">
+      <div className="min-w-48 grow">
+        <TextInput
+          label={typed.label}
+          value={code}
+          onChange={setCode}
+          onSubmit={enter}
+          name="code"
+          {...(typed.placeholder === undefined ? {} : { placeholder: typed.placeholder })}
+          {...(typed.help === undefined ? {} : { help: typed.help })}
+        />
+      </div>
+      <Button variant="secondary" isDisabled={!code.trim()} onPress={enter}>
+        Add
+      </Button>
+    </Row>
   );
 
   /* ⚠️ THE AUDIO IS WOKEN INSIDE THE PRESS, which is the only place a browser

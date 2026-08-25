@@ -88,6 +88,52 @@ const DETAIL: Readonly<Record<string, string>> = {
 
 export const sayDetail = (rung: string): string | null => DETAIL[rung] ?? null;
 
+/**
+ * THE FOUR RUNGS AS A CHOICE, IN THE WORDS OF THE THING BEING REGISTERED.
+ *
+ * ⚠️ THE EXAMPLES TEACH AND THE SUBJECT LANDS IT. "Deliveries stay apart" is a
+ * rule somebody has to apply to what is in their hand; "deliveries of amoxicillin
+ * stay apart" is the same rule already applied, and the difference is whether
+ * choosing costs a moment's translation. The lists of kinds stay — they are how
+ * somebody recognises which rung THEIRS is — and the name goes in front of them.
+ *
+ * ⚠️ AND IT DEGRADES TO THE GENERAL WORDING. This step can be reached with the
+ * name still empty (nothing forces it until the flow ends), so every clause has
+ * a form that reads correctly with no subject at all — "it" — rather than a
+ * sentence with a hole in it.
+ */
+export const detailOptions = (
+  unit: string, name: string,
+): readonly { readonly id: string; readonly label: string; readonly help: string }[] => {
+  const it = name.trim() || "it";
+  /* ⚠️ THE BARE SINGULAR, NOT `one()`. "Each a box has its own number" is what
+     an article does inside a sentence that already has a determiner in front of
+     it, and it reads as a translation fault rather than a typo. */
+  const each = unit.trim() || "one";
+  return [
+    {
+      id: "listed",
+      label: "That we have it",
+      help: `${it} is on the list so you can find it and order it. Nothing is ever counted`,
+    },
+    {
+      id: "counted",
+      label: "How many we have",
+      help: `One running total, in ${some(unit || "unit")}. Screws, paper, gloves, cleaning supplies — most things`,
+    },
+    {
+      id: "batched",
+      label: "Which delivery it came from",
+      help: `Deliveries of ${it} stay apart, so you can trace a recall or an expiry. Medicine, food, chemicals, paint`,
+    },
+    {
+      id: "itemised",
+      label: "Every single one",
+      help: `Each ${each} has its own number and its own history. Machines, tools, laptops, gas cylinders`,
+    },
+  ];
+};
+
 /* -------------------------------------------------------------- counting --- */
 
 /**

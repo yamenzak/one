@@ -14,7 +14,7 @@
 
 import * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { Fills, ready } from "@engine/design";
+import { Fills, Story, ready } from "@engine/design";
 import { describe, expect, it } from "vitest";
 import { inventory } from "../src/index.js";
 
@@ -32,6 +32,7 @@ import type { Guess } from "../src/screens/Scan.js";
 import { keyOf, type Noted } from "../src/screens/Receive.js";
 import { Move } from "../src/screens/Move.js";
 import { Ladder } from "../src/screens/Ladder.js";
+import { detailOptions } from "../src/saying.js";
 import { Case, type Used } from "../src/screens/Case.js";
 import { Run, type Covered } from "../src/screens/Run.js";
 import { Work, type Jobs, type Runs } from "../src/screens/Work.js";
@@ -1829,5 +1830,145 @@ describe("the unit is asked inside its own sentence", () => {
     );
     expect(out).toContain("……");
     expect(out).toContain('data-blank="waiting"');
+  });
+});
+
+/**
+ * ⚠️ THE FOUR RUNGS ARE THE HARDEST WORDING IN THE PRODUCT, and they were
+ * written about an abstract thing. "Deliveries stay apart" is a rule somebody
+ * has to apply to what is in their hand; naming the thing applies it for them.
+ */
+describe("what level of detail to keep, in the words of the thing", () => {
+  it("names the product and counts in the unit somebody typed", () => {
+    const said = detailOptions("box", "Nitrile gloves");
+    const help = Object.fromEntries(said.map((o) => [o.id, o.help]));
+    expect(help.listed).toContain("Nitrile gloves is on the list");
+    expect(help.counted).toContain("in boxes");
+    expect(help.batched).toContain("Deliveries of Nitrile gloves");
+    expect(help.itemised).toContain("Each box has its own number");
+  });
+
+  /* ⚠️ THE EXAMPLES SURVIVE THE SUBSTITUTION. They are how somebody recognises
+     which rung is theirs, and a sentence about their own product with no
+     comparison in it is a sentence they still have to reason about. */
+  it("keeps the kinds of thing each rung suits", () => {
+    const help = detailOptions("litre", "Wall paint").map((o) => o.help).join(" ");
+    expect(help).toContain("Screws, paper, gloves");
+    expect(help).toContain("Medicine, food, chemicals, paint");
+    expect(help).toContain("Machines, tools, laptops, gas cylinders");
+  });
+
+  /* ⚠️ AND IT READS WITH NOTHING FILLED IN. This step is reachable before the
+     name is typed, and a sentence with a hole in it is worse than a general one. */
+  it("reads as a general sentence before anything is named", () => {
+    const help = Object.fromEntries(detailOptions("", "").map((o) => [o.id, o.help]));
+    expect(help.listed).toContain("it is on the list");
+    expect(help.itemised).toContain("Each one has its own number");
+    expect(help.batched).not.toContain("of  ");
+  });
+});
+
+/**
+ * ⚠️ THE CASE'S BARCODE IS SCANNED WHERE THE CASE IS DESCRIBED, which removes a
+ * multiplication the flow used to ask for. What it must not do is become a
+ * second list of codes.
+ */
+describe("a barcode on a pack", () => {
+  it("is offered on a rung that has a name, and not before", () => {
+    const named = renderToStaticMarkup(
+      <Ladder
+        unit="tablet"
+        levels={[{ name: "box", per: 10 }]}
+        onChange={() => undefined}
+        codeAt={() => null}
+        onCode={() => undefined}
+      />,
+    );
+    expect(named).toContain("Or type the number on the box");
+
+    const blank = renderToStaticMarkup(
+      <Ladder
+        unit="tablet"
+        levels={[{ name: "", per: 10 }]}
+        onChange={() => undefined}
+        codeAt={() => null}
+        onCode={() => undefined}
+      />,
+    );
+    expect(blank).not.toContain("Or type the number on");
+  });
+
+  /* ⚠️ AND IT IS NOT OFFERED AT ALL WHERE NOBODY WIRED IT — the ladder is used
+     on screens that have no codes to attach one to. */
+  it("is absent where the screen does not take one", () => {
+    const out = renderToStaticMarkup(
+      <Ladder unit="tablet" levels={[{ name: "box", per: 10 }]} onChange={() => undefined} />,
+    );
+    expect(out).not.toContain("Or type the number on");
+  });
+
+  /* ⚠️ THE READ CODE IS DRAWN AS THE FACT IT IS, with the way to undo it. */
+  it("shows the code it holds, and offers to remove it", () => {
+    const out = renderToStaticMarkup(
+      <Ladder
+        unit="tablet"
+        levels={[{ name: "case", per: 4 }]}
+        onChange={() => undefined}
+        codeAt={() => "5012345678900"}
+        onCode={() => undefined}
+        onUncode={() => undefined}
+      />,
+    );
+    expect(out).toContain("5012345678900");
+    expect(out).toContain("Remove the barcode on the case");
+  });
+});
+
+/**
+ * ⚠️ THE REVIEW IS A SENTENCE ABOUT THE THING, NOT A LIST OF FACTS ABOUT A
+ * RECORD. Eight rows of the same shape is a form with the fields removed and it
+ * gets scrolled past; one paragraph is read in a pass, and a wrong word in a
+ * sentence stands out in a way a wrong row never does.
+ */
+describe("the review reads as one sentence", () => {
+  const review = () => renderToStaticMarkup(
+    <Story
+      asks={[
+        { id: "a", ask: "What is it?", part: { lead: "This is", said: "Nitrile gloves" }, children: null },
+        { id: "b", ask: "What is one?", part: { lead: "counted in", said: "boxes" }, children: null },
+        { id: "c", ask: "Where does it live?", part: { lead: "keep it", said: null }, children: null },
+        { id: "d", ask: "Any barcodes?", says: "Two barcodes", children: null },
+      ]}
+      at="review"
+      onGo={() => undefined}
+      does={{ op: "product.register", label: "Add it", onDo: () => undefined }}
+      review={{ lead: <img src="data:," alt="The main picture" /> }}
+    />,
+  );
+
+  it("joins the answered parts into one line", () => {
+    const out = review();
+    expect(out).toContain("This is");
+    expect(out).toContain("Nitrile gloves");
+    expect(out).toContain("counted in");
+    expect(out).toContain("boxes");
+  });
+
+  /* ⚠️ AN UNANSWERED PART IS A VISIBLE GAP IN THE SENTENCE, which is the whole
+     reason a review exists: a list of what WAS answered cannot show an omission. */
+  it("leaves a blank where nothing was said", () => {
+    expect(review()).toContain('data-blank="waiting"');
+  });
+
+  /* ⚠️ AND A STEP WITH NO PART KEEPS ITS ROW. A list of barcodes is not a clause,
+     and forcing it into one would be prose for its own sake. */
+  it("keeps a row for a step that is not in the sentence", () => {
+    expect(review()).toContain("Two barcodes");
+  });
+
+  /* ⚠️ THE PICTURE IS THE FASTEST CHECK ON THE SCREEN — somebody recognises the
+     wrong box before reading a word. */
+  it("leads with the main picture", () => {
+    expect(review()).toContain("The main picture");
   });
 });

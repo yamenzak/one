@@ -54,8 +54,9 @@ import { Button } from "@heroui/react";
 import { MOST_BYTES, sayList } from "@engine/kernel";
 /* ⚠️ ONE BOX IS ONE CODE — the fold the reader has no way to know. */
 import { foldScan } from "../code.js";
+import { factors } from "../packing.js";
 import {
-  one, sayCodes, sayDates, sayDetail, sayMore, sayPacks, sayThing, sayUnit, some,
+  detailOptions, one, sayCodes, sayDates, sayDetail, sayMore, sayPacks, sayThing, sayUnit, some,
 } from "../saying.js";
 import { Ladder, type Rung } from "./Ladder.js";
 
@@ -175,45 +176,6 @@ export interface RegisterProps {
   readonly busy?: boolean;
   readonly again: () => void;
 }
-
-/*
-  ⚠️ THE FOUR LEVELS OF DETAIL, NAMED BY WHAT YOU WILL BE ABLE TO ANSWER LATER
-  RATHER THAN BY WHAT THE SYSTEM CALLS THEM. These were `Listed`, `Counted`,
-  `Batched` and `Itemised`, which is four adjectives nobody can choose between
-  without being taught — and being taught is the cost this whole flow exists to
-  remove.
-
-  ⚠️ AND EACH ONE NAMES THE KIND OF THING IT SUITS. An example does more work
-  than any definition: "medicine, food, chemicals" settles the question for
-  somebody holding a bottle of anything, in a way "deliveries are kept separate"
-  never will.
-
-  ⚠️ `assembled` IS ABSENT ON PURPOSE. A kit is made out of other things rather
-  than declared as one, so offering it here would be a level nothing behind this
-  flow can honour.
-*/
-const DETAIL: readonly Option[] = [
-  {
-    id: "listed",
-    label: "That we have it",
-    help: "It is on the list so you can find it and order it. Nothing is ever counted",
-  },
-  {
-    id: "counted",
-    label: "How many we have",
-    help: "One running total. Screws, paper, gloves, cleaning supplies — most things",
-  },
-  {
-    id: "batched",
-    label: "Which delivery it came from",
-    help: "Deliveries stay apart, so you can trace a recall or an expiry. Medicine, food, chemicals, paint",
-  },
-  {
-    id: "itemised",
-    label: "Every single one",
-    help: "Each has its own number and its own history. Machines, tools, laptops, gas cylinders",
-  },
-];
 
 /**
  * ⚠️ WHAT A CODE IS, WORKED OUT RATHER THAN ASKED. The step used to offer four
@@ -359,6 +321,38 @@ export function Register({
      number — is refused at the door, so sending it would turn an unfinished line
      into a refusal about a field the person had not got to yet. */
   const rungs = levels.filter((rung) => rung.name.trim() && rung.per > 1);
+
+  /*
+    ⚠️ A CODE SCANNED ON A PACK GOES IN THE ONE LIST OF CODES, with the number it
+    covers DERIVED. Somebody holding a case of 4 boxes of 10 has already said
+    both numbers on this screen; asking again on the barcode step is asking them
+    to multiply — and the whole reason a pack is a named multiplier is so nobody
+    has to. `factors` is the same arithmetic the worker does (`packing.ts`).
+
+    ⚠️ AND THE PACK IS RE-DERIVED WHENEVER THE LADDER MOVES, because the ladder
+    is what it means. Stored as a number typed once, editing "10 per box" to 12
+    would leave the case's code still covering forty — a stale multiplier on a
+    barcode nobody would think to re-check.
+  */
+  const perRung = React.useMemo(() => factors(levels).map((rung) => rung.per), [levels]);
+  const codeOnRung = (at: number): string | null => {
+    const per = perRung[at];
+    if (!per) return null;
+    return codes.find((row) => row.pack === per)?.value ?? null;
+  };
+  const scanRung = (at: number, code: string) => {
+    const said = code.trim();
+    const per = perRung[at];
+    if (!said || !per) return;
+    setCodes((held) => (held.some((row) => row.value === said)
+      ? held.map((row) => (row.value === said ? { ...row, pack: per } : row))
+      : [...held, { value: said, kind: namespaceOf(said), pack: per }]));
+  };
+  const unscanRung = (at: number) => {
+    const per = perRung[at];
+    if (!per) return;
+    setCodes((held) => held.filter((row) => row.pack !== per));
+  };
   /* ⚠️ NOTHING IS COUNTED, SO NOTHING BELOW DEPENDS ON A COUNT — see the header.
      This is the one answer that removes whole questions. */
   const counts = detail !== "listed";
@@ -403,6 +397,7 @@ export function Register({
       ask: "What is it?",
       under: "Photograph it and the rest fills itself in",
       says: sayThing(brand, name, photos.length, Boolean(answer)),
+      part: { lead: "This is", said: name.trim() || null },
       short: !name.trim()
         ? "Give it a name"
         /* ⚠️ NOT A REFUSAL UNTIL IT IS THE STRONG KIND, and even then it is
@@ -621,6 +616,7 @@ export function Register({
       id: "unit",
       ask: "What is one of them?",
       says: sayUnit(unit, whole),
+      part: { lead: "counted in", said: unit.trim() ? some(unit) : null },
       short: !unit.trim() ? "Say what one of them is called" : undefined,
       children: (
         <>
@@ -680,11 +676,20 @@ export function Register({
       ask: "How much do you need to know about each one?",
       under: "This decides what you are asked every time some arrives",
       says: sayDetail(detail),
+      part: { lead: "and what you will know is", said: sayDetail(detail)?.toLowerCase() ?? null },
       children: (
-        /* ⚠️ RADIOS, NOT SEGMENTS — see `DETAIL`. Four consequences that have to
+        /* ⚠️ RADIOS, NOT SEGMENTS — see `detailOptions`. Four consequences that have to
            be readable BEFORE the choice; `Segmented` draws labels only, which is
            how four carefully written explanations reached nobody for a month. */
-        <OneOf label="How much detail" value={detail} onChange={setDetail} options={DETAIL} />
+        <OneOf
+          label="How much detail"
+          value={detail}
+          onChange={setDetail}
+          /* ⚠️ IN THE WORDS OF THE THING IN FRONT OF THEM — see `detailOptions`.
+             "Deliveries stay apart" is a rule to apply; "deliveries of
+             amoxicillin stay apart" is the rule already applied. */
+          options={detailOptions(unit, name)}
+        />
       ),
     },
 
@@ -725,7 +730,19 @@ export function Register({
             by the sheet typed 10 every time and hoped.
           */}
           {packed === "packed"
-            ? <Ladder unit={unit} levels={levels} onChange={setLevels} />
+            ? (
+              <Ladder
+                unit={unit}
+                levels={levels}
+                onChange={setLevels}
+                /* ⚠️ THE CASE'S BARCODE, SCANNED WHERE THE CASE IS DESCRIBED —
+                   see `LadderProps.onCode`. It lands in the same list the
+                   barcode step writes, with the multiplier the ladder implies. */
+                codeAt={codeOnRung}
+                onCode={scanRung}
+                onUncode={unscanRung}
+              />
+            )
             : null}
         </>
       ),
@@ -837,6 +854,7 @@ export function Register({
       under: "Food, medicine, chemicals, adhesives — anything with a printed date",
       when: counts,
       says: sayDates(expires, shelfDays, openDays),
+      part: { lead: "it", said: expires ? "goes out of date" : "does not go out of date" },
       children: (
         <>
           <Segmented
@@ -898,6 +916,10 @@ export function Register({
       under: "What somebody standing at the shelf needs to know",
       when: counts,
       says: noted.length ? `Notes on ${sayList(shown, noted)}` : "Nothing special to remember",
+      /* ⚠️ THE STORING LINE, WHICH IS THE ONE SOMEBODY AT THE SHELF NEEDS. The
+         handling note is for whoever picks it up and belongs on the label, not
+         in a sentence about what this thing is. */
+      part: { lead: "keep it", said: storage.trim() || null },
       children: (
         <>
           {/* ⚠️ THE TWO FIELDS `Written` WAS BUILT FOR. A model writes headed
@@ -1037,7 +1059,23 @@ export function Register({
       at={where}
       onGo={setWhere}
       leave={back}
-      review={{ ask: "Does this look right?", under: "Press any line to change it" }}
+      review={{
+        ask: "Does this look right?",
+        under: "Press any word to change it",
+        /* ⚠️ THE PICTURE FIRST, BECAUSE IT IS THE FASTEST CHECK ON THE SCREEN.
+           Ten questions in, somebody recognises the wrong box before they have
+           read a word — and the photograph is also the thing a model's answers
+           were read OFF, so it is what the sentence under it is checked against. */
+        lead: photos[0]
+          ? (
+            <img
+              src={photos[0]}
+              alt="The main picture"
+              className="aspect-square w-32 rounded-xl object-cover"
+            />
+          )
+          : undefined,
+      }}
       does={{
         /* ⚠️ THE NOUN, BECAUSE "IT" IS ONLY OBVIOUS TO WHOEVER WROTE IT. Ten
            questions later, the last control says what it adds. */

@@ -59,9 +59,11 @@
  */
 
 import * as React from "react";
+import { Link } from "@heroui/react";
 import { Screen, type Act } from "./screen.js";
 import { travel } from "./travel.js";
 import { DURATION, EASE } from "../tokens/motion.js";
+import { TYPE } from "../tokens/type.js";
 import { glyphOf } from "./shell.js";
 import { Section } from "../parts/heads.js";
 import { ActionRow, NoteRow } from "../parts/surfaces.js";
@@ -102,6 +104,27 @@ export interface Ask {
    * find it — see how the last step reports an earlier step's debt below.
    */
   readonly short?: string;
+  /**
+   * THE SAME ANSWER AS A CLAUSE INSIDE ONE SENTENCE — `{ lead: "counted in",
+   * said: "boxes" }` reads as *…counted in **boxes**…*.
+   *
+   * ⚠️ A LIST OF SENTENCES IS A FORM WITH THE FIELDS REMOVED; A PARAGRAPH IS
+   * SOMETHING SOMEBODY READS. Eight rows each stating one fact is a review that
+   * gets scrolled past — every line the same shape, no line more important than
+   * the next. The same eight facts as one sentence about the thing being made is
+   * read in one pass, and a wrong word STANDS OUT, which is the whole job of the
+   * screen before the button that commits it.
+   *
+   * ⚠️ THE CONNECTIVES ARE THE APP'S BECAUSE THEY ARE PRODUCT WORDING. "It is
+   * measured in" belongs to a thing on a shelf; the frame has no nouns and could
+   * only supply commas. What the frame owns is the shape — a paragraph, the
+   * blanks pressable, an unanswered one visibly a gap.
+   *
+   * ⚠️ AND A STEP WITHOUT ONE STILL GETS A ROW. Prose is right for the facts that
+   * make a sentence and wrong for a list of barcodes, so the review is the
+   * paragraph followed by rows for everything that is not in it.
+   */
+  readonly part?: { readonly lead: string; readonly said: string | null };
   /** ⚠️ Skipped where false. A step that does not apply is not a step. */
   readonly when?: boolean;
   readonly children: React.ReactNode;
@@ -146,7 +169,16 @@ export interface StoryProps {
    * three screens to say one thing, and the review restates what is still on the
    * screen behind it.
    */
-  readonly review?: boolean | { readonly ask?: string; readonly under?: string };
+  readonly review?: boolean | {
+    readonly ask?: string;
+    readonly under?: string;
+    /**
+     * ⚠️ WHAT THE THING LOOKS LIKE, ABOVE WHAT IT IS. A picture is the fastest
+     * check available: somebody who has answered ten questions about a box
+     * recognises the wrong box in one glance and reads no words at all.
+     */
+    readonly lead?: React.ReactNode;
+  };
   /**
    * ONE LINE OVER THE QUESTION, SAID ONCE — not per field. See DESIGN.md §1.
    *
@@ -228,14 +260,54 @@ export const REVIEW = "review";
  * wrong with a half-filled record. An unanswered step reads as its own question
  * with "Nothing set" under it, and is pressable like every other line.
  */
-function Review({ live, onGo }: {
+function Review({ live, onGo, lead }: {
   readonly live: readonly Ask[];
   readonly onGo: (id: string) => void;
+  readonly lead?: React.ReactNode;
 }) {
+  const steps = live.filter((one) => one.id !== REVIEW);
+  const prose = steps.filter((one) => one.part);
+  const rows = steps.filter((one) => !one.part);
   return (
     <Stack space="tight">
-      {live
-        .filter((one) => one.id !== REVIEW)
+      {lead}
+
+      {/*
+        ⚠️ ONE PARAGRAPH, AND EVERY ANSWER IN IT IS A BUTTON. Pressing the wrong
+        word goes to the step that wrote it, which is what makes reading the
+        sentence the same act as correcting it — a review somebody has to
+        translate back into "which screen was that" is a review they skip.
+      */}
+      {prose.length
+        ? (
+          <p className={`${TYPE.title} text-pretty`}>
+            {prose.map((one, at) => (
+              <React.Fragment key={one.id}>
+                {at ? ", " : null}
+                {one.part?.lead}{" "}
+                {/* ⚠️ A LINK RATHER THAN A BUTTON, and the difference is not the
+                    guard — it is the reading. A word inside a sentence that
+                    takes you somewhere IS a link; a button in a paragraph is a
+                    control somebody has to step around to finish the line. */}
+                <Link
+                  onPress={() => { onGo(one.id); }}
+                  /* ⚠️ THE BLANK IS UNDERLINED WHETHER OR NOT IT IS FILLED — the
+                     same rule `Fills` draws, because it is the same blank read
+                     back. */
+                  className={"underline decoration-[var(--brand)] decoration-2 underline-offset-4 "
+                    + "data-[blank=waiting]:text-muted data-[blank=waiting]:decoration-[var(--line)]"}
+                  data-blank={one.part?.said ? "said" : "waiting"}
+                >
+                  {one.part?.said ?? "……"}
+                </Link>
+              </React.Fragment>
+            ))}
+            .
+          </p>
+        )
+        : null}
+
+      {rows
         .map((one) => (
           /* ⚠️ THE ANSWER IS THE LABEL AND THE QUESTION IS UNDER IT, which is
              the way round somebody scans a review: they are hunting for the
@@ -455,7 +527,9 @@ export function Story({
           under the control it read back to somebody looking at it.
         */}
         <Section label={here.ask}>
-          {here.id === REVIEW ? <Review live={live} onGo={jump} /> : here.children}
+          {here.id === REVIEW
+            ? <Review live={live} onGo={jump} lead={said.lead} />
+            : here.children}
         </Section>
 
         {/* ⚠️ AND WHERE THE DEBT IS SOMEBODY ELSE'S STEP, THE SENTENCE IS THE WAY

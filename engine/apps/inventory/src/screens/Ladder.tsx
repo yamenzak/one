@@ -27,7 +27,7 @@
 
 import * as React from "react";
 import {
-  NoteRow, NumberInput, Row, Spacer, TextInput,
+  Bars, NoteRow, NumberInput, Row, Spacer, TextInput, Viewfinder,
 } from "@engine/design";
 import { Button } from "@heroui/react";
 import { some } from "../saying.js";
@@ -51,6 +51,23 @@ export interface LadderProps {
   readonly unit: string;
   readonly levels: readonly Rung[];
   readonly onChange: (next: readonly Rung[]) => void;
+  /**
+   * THE BARCODE ON THIS PACK, IF ONE HAS BEEN READ.
+   *
+   * ⚠️ THE CODE IS SCANNED WHERE THE PACK IS DESCRIBED, and that removes the one
+   * multiplication the flow used to ask for. Scanned on the barcode step instead,
+   * the question is "how many units does this cover" and somebody holding a case
+   * of 4 boxes of 10 has to answer 40 — a sum they can get wrong, about a fact
+   * the ladder beside it already states. Here the answer is the rung.
+   *
+   * ⚠️ AND IT IS STILL ONE LIST OF CODES. This hands the value up; the screen
+   * puts it in the same place a scan on the barcode step goes, with the
+   * multiplier derived rather than typed. Two ways in, one store, no second
+   * answer to "what does this code mean".
+   */
+  readonly codeAt?: (at: number) => string | null;
+  readonly onCode?: (at: number, code: string) => void;
+  readonly onUncode?: (at: number) => void;
 }
 
 /**
@@ -76,7 +93,7 @@ export const inside = (
  */
 const LIKELY = ["box", "case", "pallet", "container", "load", "shipment"] as const;
 
-export function Ladder({ unit, levels, onChange }: LadderProps) {
+export function Ladder({ unit, levels, onChange, codeAt, onCode, onUncode }: LadderProps) {
   const set = (at: number, of: Partial<Rung>) => {
     onChange(levels.map((rung, i) => (i === at ? { ...rung, ...of } : rung)));
   };
@@ -114,6 +131,40 @@ export function Ladder({ unit, levels, onChange }: LadderProps) {
               onChange={(per) => { set(at, { per }); }}
               min={2}
             />
+            {/*
+              ⚠️ OFFERED ONLY ONCE THE PACK HAS A NAME. "Scan the barcode on it"
+              over two empty fields is a control for a thing that does not exist
+              yet, and what it would attach the code to is undecided.
+            */}
+            {onCode && named
+              ? (codeAt?.(at)
+                ? (
+                  <Row space="tight">
+                    <Bars of={codeAt(at) ?? ""} onScreen />
+                    <span className="tabular-nums truncate">{codeAt(at)}</span>
+                    <Spacer />
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      aria-label={`Remove the barcode on the ${named}`}
+                      onPress={() => { onUncode?.(at); }}
+                    >
+                      Remove
+                    </Button>
+                  </Row>
+                )
+                : (
+                  <Viewfinder
+                    says={`Hold up the barcode on the ${named}`}
+                    typed={{
+                      label: `Or type the number on the ${named}`,
+                      placeholder: "The digits printed under the bars",
+                    }}
+                    onRead={(code) => { onCode(at, code); }}
+                  />
+                ))
+              : null}
+
             <Row space="tight">
               <Spacer />
               <Button
