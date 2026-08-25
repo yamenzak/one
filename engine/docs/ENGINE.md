@@ -647,8 +647,8 @@ its own header, cited by other files, and doing nothing.
 | `a-library-decides-it-does-not-rule` | D9 | one of our own rules living inside somebody else's package, re-learned from their release notes |
 | `every-field-a-declaration-offers-is-one-something-reads` | D12 | a manifest sets a field, the type accepts it, and the capability it names does not exist — no route to mount and no schema to apply, so nothing anywhere goes red |
 | `a-held-write-is-one-a-replay-can-recognise` | D12 | a shelf counted once in a basement is counted twice when the signal comes back, with nothing anywhere failing |
-| `a-queue-refuses-rather-than-dropping-what-it-holds` | D12 | somebody's morning of counting is discarded to make room for the next scan, at the moment nobody can see it happen |
-| `an-answer-from-this-device-says-how-old-it-is` | D12 | last week's stock is drawn as today's, with nothing on the screen able to date it |
+| `a-queue-refuses-rather-than-dropping-what-it-holds` | D67 | somebody's morning of counting is discarded to make room for the next scan, at the moment nobody can see it happen |
+| `an-answer-from-this-device-says-how-old-it-is` | D67 | last week's stock is drawn as today's, with nothing on the screen able to date it |
 | `nothing-is-held-or-kept-that-a-collection-did-not-declare` | D12 | a copy of a workspace's records on every device that ever opened it, for a promise the manifest never made |
 | `what-a-declaration-says-about-an-operation-reaches-the-browser` | D17 | the page holds no manifest, so a payload that stops carrying these leaves every write silent and every phone unable to hold one, with the browser's own suite still green |
 | `a-write-says-the-sentence-its-operation-declared` | D12 | a successful write is silent, or two screens calling one operation say two different things about what just happened |
@@ -785,6 +785,7 @@ its own header, cited by other files, and doing nothing.
 | `an-app-names-a-lane-never-a-model` | D19 | a deployment decision shipped through a product release — wrong the day the provider retires the row, and different in every app, with nothing failing |
 | `an-edited-prompt-is-bounded-at-both-levels` | D19 | a variable nothing offers is sent to a model as a literal brace, and the answer comes back subtly wrong with nobody the wiser |
 | `the-run-and-the-screens-read-one-resolution` | D19 | the bill stops matching what anybody was shown, because the run used a different model or different words than the console reported |
+| `the-base-instructions-never-leave-the-worker` | D26 | every prompt the deployment has, shipped to the browser of anybody who can open the wording screen, because a substitution has to be seeded to be editable at all |
 | `a-screen-names-a-shape-and-the-shape-places-the-action` | D7 | the one thing a screen is for lands somewhere different on every screen — buried at the foot of a long list on one, pinned on the next — so somebody has to hunt for it and the product reads as assembled by different people; and a block comment written between two tags ships four lines of design rationale to production as body text |
 | `one-subject-wears-one-face-everywhere` | D7 | the same person is a picture in the crown, a letter in the roster and a different letter in a table — because each surface seeded a face from whatever field it happened to hold, and every one of them looks correct on its own |
 | `a-face-is-seeded-on-an-identity-not-a-label` | D7 | somebody gets a new face the day they correct the spelling of their name, and a workspace gets a new one the day it is renamed — so a picture people had learned to recognise means nothing; and a face fetched from api.dicebear.com puts a third party in the request path of every roster, unnamed on the trust screen |
@@ -941,10 +942,10 @@ its own header, cited by other files, and doing nothing.
 | `the-last-product-cannot-be-switched-off` | D51 | a workspace its own owner cannot reach, with the bill still running — nothing is on, so the screen that would switch something back on is not drawn |
 | `a-field-never-exceeds-its-mark-budget` | D50 | half a megabyte of markup parsed before the first paint of every screen, on the device least able to afford it — a cost a motion setting cannot reach, because it is there whether anything moves or not |
 | `the-world-moves-only-where-it-was-earned` | D50 | a viewport-sized repaint on the main thread for as long as a screen is open, competing with the scroll, on a phone that never asked for it |
-| `the-ground-is-outside-the-product-catalogue` | D51 | a fixture living in engine/apps, where being a product is decided by position rather than by anybody |
+| `the-ground-is-outside-the-product-catalogue` | D52 | a fixture living in engine/apps, where being a product is decided by position rather than by anybody |
 | `the-deployment-serves-no-fixture` | D51 | the test ground back in APPS, where an operator can put a demo notebook with sample content into somebody's workspace |
 | `the-deployment-sells-no-fixture` | D51 | the test ground back in SELLS, where anybody founding a workspace can switch it on |
-| `the-worker-does-not-import-the-ground` | D51 | a list that does not name the fixture over a worker that still composes it |
+| `the-worker-does-not-import-the-ground` | D52 | a list that does not name the fixture over a worker that still composes it |
 | `the-product-loader-does-not-name-the-ground` | D17 | a customer opening the fixture's screens over their own records |
 | `the-ground-has-no-live-entry-point` | D17 | the half that turns sample screens into a product's real ones coming back, which is what makes the loader entry easy to add again |
 | `a-ground-is-composed-once-per-scene` | D53 | moving between screens reads as the app reloading rather than as a page sliding over a world, because several hundred marks are rebuilt and handed to React under a page that is also changing |
@@ -979,6 +980,45 @@ its own header, cited by other files, and doing nothing.
 | `the-docks-pair-belongs-to-the-flow` | D80 | a Back button over none of the wiring it implies — no recap, no per-step refusal, and no answer to the phone's own back gesture, which is the one that loses five screens of typing |
 | `a-declared-flow-is-the-flow-its-screen-draws` | D81 | a manifest describing a product that does not exist — the declared questions are what the docs print and what an agent is handed before it starts a flow, and drifted from the screen they promise a page nobody built; it also catches a flow whose `writes` names an operation the app never declared, which is ten questions ending in a 404 |
 | `a-step-names-its-id-above-its-question` | D81 | a step the guard cannot name, so the manifest comparison silently reads the wrong id — a step whose controls declare their own options puts three of them between one question and the next, which is how the barcode step came to be called `loose` |
+| `a-destructive-statement-never-reaches-a-live-database` | D38 | a schema step that drops or rewrites a column on a database that is already serving — and the fault it was written after answered 503 on every door for an hour behind a green gate, because `boot` threw and static assets kept loading |
+| `no-unbounded-loop-waits-on-anything` | D37 | a loop that is wrong until somebody notices, which is the one class of bug that does not degrade — a wrong answer is wrong once, and what a runaway costs is a function of how long it goes unseen |
+| `one-function-holds-the-reserve-and-the-charge` | D27 | a model call that reaches a provider and not the meter — settlement charges `min(held, actual)`, so every unit an estimate fails to anticipate is a unit the platform pays for and the customer does not, silently, on every call |
+| `a-price-is-discovered-and-a-decision-is-not` | D24 | a model an operator switched off answering again the next morning, because the nightly sync's UPDATE named a column somebody had decided |
+| `an-empty-catalogue-retires-nothing` | D24 | every model this deployment sells retired in one pass at 03:00, because a changed path or a wrong token answered `200 []` and the sweep believed it |
+| `a-row-is-never-sold-at-or-below-cost` | D25 | a workspace free to pick the row that breaks even at best, as often as it likes — the reserve caps the charge, so a margin of nothing can only ever lose |
+| `something-outside-our-arithmetic-checks-the-charge` | D27 | an estimate, a rate table, a multiplier and a settle all derived from each other, agreeing perfectly through a mistake they share, with nothing independent ever asked |
+| `a-spend-row-holds-the-cost-and-not-the-words` | D28 | a permanent record of everything every workspace has ever typed, read by nothing and deleted by nobody, waiting for the first person who copies the database |
+| `a-failed-run-is-still-a-row` | D28 | a button that did nothing and left no trace, and credits held against a call that never happened, released by nobody |
+| `a-stream-is-the-same-metered-run` | D30 | perfect output arriving beautifully and billed to nobody — the settle caps the charge, so a streaming lane that never settles is an error nowhere |
+| `a-stream-asks-for-its-own-usage` | D30 | a streamed run settling on its reserve for ever, because the provider was never asked to report what it used and the tag that would have caught it was missing |
+| `a-special-category-is-never-searchable` | D29 | a search index holding data the vault exists to keep out of one — and every failure in this area looks like an empty result, which is indistinguishable from the working state |
+| `a-screens-rhythm-is-the-doms` | D70 | two spacings inside one container, which reads as a page assembled by hand — and measured over React children rather than the DOM it is a check a wrapper component defeats without anybody editing a screen |
+| `the-route-decides-the-direction` | D42 | a page that changes with no transition, or one that animates for somebody who asked for less motion — and the direction read from anywhere but the route is a back gesture that plays as a push |
+| `only-one-file-builds-a-card` | D7 | a card whose inset is a component's opinion rather than one number, so two cards on one screen disagree about their own geometry and every list looks hand-assembled |
+| `every-mark-animates-or-is-deliberately-still` | D50 | a mark left holding its last frame, which reads as a screen that froze — and a glyph drawn straight from the library is a still icon in a product where every other one moves as its purpose |
+| `every-stamped-attribute-is-read` | D70 | a `data-` attribute the markup sets and no selector, variant or query reads — a decision written into the DOM that reaches no screen, and the only kind of dead code CSS cannot report |
+| `every-refusal-reaches-a-person` | D75 | a mutation that fails into silence, so a person presses a control, nothing happens, and the app has told them nothing — the fault is invisible in review because the correct code and the silent code differ by one line |
+| `one-formatter-and-the-reader-is-the-person` | D9 | a date, time or number formatted in the machine's conventions rather than the reader's — and an instant sliced into a day by hand is off by a whole day for anybody east or west of the server |
+| `a-closed-set-value-is-never-drawn-as-words` | D70 | a screen printing the code instead of the name — a shard called "eu", a store called "d1", a payment parked because "no_tenant": every one passes typecheck, renders, and shows somebody the inside of the program |
+| `an-account-door-screen-knows-its-door` | D20 | a screen on the account door calling an operation that needs a tenancy, which 404s there — and it looks identical to a screen that works, because the door it is on is not visible in the file that draws it |
+| `a-declared-job-is-run-by-the-composed-book` | D12 | a job declared in a manifest, validated for its cron and its floor, drawn on a screen an operator opens — and run by nothing; it held for three stages and every suite was green throughout |
+| `a-quantity-is-multiplied-once` | D76 | a quantity multiplied twice or not at all — the fault that put nine hundred tablets on a shelf, where both halves of the arithmetic were individually correct and the number the person expected showed the whole time |
+| `a-settled-field-is-refused-by-the-write` | D78 | a generated update changing the unit every other number is counted in — twenty boxes on a shelf become twenty sheets, every balance reinterpreted, with no write anywhere near a quantity |
+| `one-answer-per-question-through-one-door` | D36 | the same question asked several times for one screen, which is round trips a person waits through — and a read outside the door is one nothing can dedupe, cache or count against a budget |
+| `a-total-is-asked-for-and-never-counted-by-hand` | D57 | three round trips to put three numbers over a screen, each carrying identity, workspace, membership and standing in order to run one SELECT COUNT(*) |
+| `a-deploy-reaches-a-browser-that-is-open` | D56 | a tab left running a build that no longer exists, calling a surface that has moved under it — and a version stamped from anywhere but the entry bundle's own name is one that says a deploy happened when it did not |
+| `an-expensive-component-is-reached-lazily` | D40 | the first screen paying for a library nobody has drawn yet, which is weight in the bundle a person waits on before anything appears |
+| `an-expensive-component-is-reached-only-by-import` | D58 | a calendar and a colour picker downloaded, parsed and compiled before the opening curtain can be painted, on every visit to every app, including screens with no form on them |
+| `a-hashed-asset-is-kept-and-the-document-is-not` | D59 | a cached document naming a build that has been replaced, so a returning browser fetches an entry bundle that no longer exists and the app fails to start with nothing on screen to say why |
+| `a-databases-place-is-declared-once` | D64 | records made in a jurisdiction nobody chose, because the place was a default in a script rather than a declaration — and it cannot be corrected afterwards without moving data that is already there |
+| `a-copy-is-verified-by-counting` | D65 | a copy bound as though it were the same database when a table is short, so the switch happens and the missing rows are discovered by whoever notices their records are gone |
+| `asking-a-live-database-never-fails-quietly` | D64 | a provisioning or reconciliation step that asks a live database something impossible and reads the failure as an answer — the class where the automation reports success and the resource is not there |
+| `the-workflow-builds-what-the-worker-serves` | D2 | a deploy that ships a worker built from something other than what the tests ran against, so the green run described a bundle that was never uploaded |
+| `nothing-joins-the-first-wait-unbudgeted` | D63 | a question added to the preflight with no budget on it, so the first thing a person waits for grows a round trip nobody measured — and D62 puts that wait before the bundle, which is time spent looking at nothing |
+| `a-tab-switch-is-not-a-journey` | D68 | a tab switch animated as a page transition, and an abandoned journey landing on top of the one that replaced it — the more somebody presses, the worse it gets, which is exactly how it was reported |
+| `a-decode-is-paced-and-off-the-answering-thread` | D69 | a camera loop spending the one thread that answers a tap, so the screen stops responding while it is reading — and an unpaced decode is a phone that runs hot and a battery a person notices |
+| `the-first-paint-blocks-on-two-things` | D66 | a third blocking request joining the first wait unnoticed, because nothing said what the opening cost or what it may cost again |
+| `the-weight-ceilings-stay-within-reach` | D66 | a budget raised so far above the build that it stops being a budget, and half a megabyte arrives in the entry chunk with nobody noticing |
 <!-- /generated -->
 
 ### And how well each decision is defended
@@ -987,17 +1027,17 @@ its own header, cited by other files, and doing nothing.
 | # | Decision | Guarded by |
 |---|---|---|
 | D1 | The tenant is primary; an app is a capability switched on for it | 15 |
-| D2 | The framework is OneEngine; the deployment is One; packages are `@engine/*` | 3 |
+| D2 | The framework is OneEngine; the deployment is One; packages are `@engine/*` | 4 |
 | D3 | One worker on the request path; heavy work splits over RPC service bindings | 7 |
 | D4 | Composition is lazy: a request composes the app it is for, and no other | 3 |
 | D5 | Storage is placed, not owned. The directory carries every cross-tenant fact | 15 |
 | D6 | Jurisdiction is a workspace fact, derived from the business's country | 5 |
-| D7 | HeroUI v3 is the component layer, and its components are not restyled | 71 |
+| D7 | HeroUI v3 is the component layer, and its components are not restyled | 72 |
 | D8 | Declarations are typed object literals; not decorators, not a custom format | 3 |
-| D9 | Libraries encode decisions; we write invariants | 3 |
+| D9 | Libraries encode decisions; we write invariants | 4 |
 | D10 | Five primary destinations, maximum | 7 |
 | D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 19 |
-| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 137 |
+| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 136 |
 | D13 | The agent surface is derived: every operation is an MCP tool unless it says why not | 4 |
 | D14 | Provider AI calls go through the unified AI binding and its gateway, never direct fetch | 1 |
 | D15 | One membership, two authorities: a platform role for the workspace, a role per app inside it | 7 |
@@ -1005,29 +1045,29 @@ its own header, cited by other files, and doing nothing.
 | D17 | The tenant centre is one bundle for every product, and declarations reach the page as data | 8 |
 | D18 | The operator stands outside every workspace, and the console is a door rather than a role | 8 |
 | D19 | An AI action declares a lane and a letterhead; the operator binds the model, and words narrow downward | 4 |
-| D20 | OneSpace is one surface presented over the product, reachable from every door, and it is a route | 3 |
+| D20 | OneSpace is one surface presented over the product, reachable from every door, and it is a route | 4 |
 | D21 | A workspace is personal or commercial, and that is what it IS rather than what it bought | 9 |
 | D22 | Branding and the installable app belong to the workspace, never to one app inside it | 6 |
 | D23 | A stranger joins a workspace as a `customer`, and only ever as a `customer` | 0 |
-| D24 | A model's PRICE is discovered nightly; whether it is sold, and at what margin, never is | 0 |
-| D25 | A workspace picks its own model, because it pays for it — and that is only safe above cost | 0 |
-| D26 | A workspace ADDS to our instructions; it never replaces them, and it is never sent the base | 0 |
-| D27 | The charge is built on what the call cost, and something outside our arithmetic checks it | 0 |
-| D28 | A charge is milli-credits; the balance is whole ones, and the remainder carries | 0 |
-| D29 | A collection says which fields are findable, and everything else follows | 0 |
-| D30 | A stream is the same metered run, and the charge rides the last token | 0 |
+| D24 | A model's PRICE is discovered nightly; whether it is sold, and at what margin, never is | 2 |
+| D25 | A workspace picks its own model, because it pays for it — and that is only safe above cost | 1 |
+| D26 | A workspace ADDS to our instructions; it never replaces them, and it is never sent the base | 1 |
+| D27 | The charge is built on what the call cost, and something outside our arithmetic checks it | 2 |
+| D28 | A charge is milli-credits; the balance is whole ones, and the remainder carries | 2 |
+| D29 | A collection says which fields are findable, and everything else follows | 1 |
+| D30 | A stream is the same metered run, and the charge rides the last token | 2 |
 | D31 | Two capabilities assessed and not adopted, with the trigger that reopens each | 0 |
 | D32 | The catalogue has two sources, and one is priced from a table we hold | 0 |
 | D33 | A lane is an address, and a model we do not sell is not a fault | 0 |
 | D34 | The prices are parsed from Google's own page, and a modality is a set | 0 |
 | D35 | A model answers more than one lane, and one task column could not say so | 0 |
-| D36 | The latency budget: how many round trips a screen costs | 0 |
-| D37 | Depth is the number, and unbounded is a different question from expensive | 0 |
-| D38 | Nothing that reads no table waits for a schema | 0 |
+| D36 | The latency budget: how many round trips a screen costs | 1 |
+| D37 | Depth is the number, and unbounded is a different question from expensive | 1 |
+| D38 | Nothing that reads no table waits for a schema | 1 |
 | D39 | `locate` answers twice from one read | 0 |
-| D40 | The weight of the first screen is a number somebody has to raise | 0 |
+| D40 | The weight of the first screen is a number somebody has to raise | 1 |
 | D41 | The page asks before the bundle arrives | 0 |
-| D42 | The route decides the direction, the world decides the gesture | 0 |
+| D42 | The route decides the direction, the world decides the gesture | 1 |
 | D43 | The skeleton is the screen somebody saw last time | 0 |
 | D44 | The sender is the deployment's, the reply and the words are the workspace's | 0 |
 | D45 | A membership is narrowed to part of a workspace, and one filter applies everywhere | 1 |
@@ -1035,35 +1075,35 @@ its own header, cited by other files, and doing nothing.
 | D47 | One screen draws every moment One cannot show you a screen | 0 |
 | D48 | A gift is a row about a person, not a state on a workspace | 0 |
 | D49 | A browser test does not gate a deploy | 4 |
-| D50 | Ambient motion is earned; essential motion is assumed | 2 |
-| D51 | A workspace is founded with the products somebody chose | 7 |
-| D52 | The proving ground is a fixture, and the deployment serves no fixture | 0 |
+| D50 | Ambient motion is earned; essential motion is assumed | 3 |
+| D51 | A workspace is founded with the products somebody chose | 5 |
+| D52 | The proving ground is a fixture, and the deployment serves no fixture | 2 |
 | D53 | The navigation is five destinations, and the chrome carries the rest | 8 |
 | D54 | Half a getting-started list is the workspace's and half is the person's | 0 |
 | D55 | A product's colour is the product's, and one family commits | 0 |
-| D56 | A tab is told its build was replaced, and reloads when its reader says so | 0 |
-| D57 | A total is one ask, and a collection nobody may read is absent from it | 0 |
-| D58 | An expensive component has one home, and it is reached lazily | 0 |
-| D59 | A content-hashed asset is kept; the document that names it is not | 0 |
+| D56 | A tab is told its build was replaced, and reloads when its reader says so | 1 |
+| D57 | A total is one ask, and a collection nobody may read is absent from it | 1 |
+| D58 | An expensive component has one home, and it is reached lazily | 1 |
+| D59 | A content-hashed asset is kept; the document that names it is not | 1 |
 | D60 | A worker's one thread is a shared resource, and drawing is what spends it | 0 |
 | D61 | A cold isolate is the ordinary case, so its boot is a latency budget | 0 |
 | D62 | The centre is asked for before the bundle, not after the session | 0 |
-| D63 | What a request waits for is measured, per operation, and budgeted | 0 |
-| D64 | Where a database goes is declared once, and both paths that make one read it | 0 |
-| D65 | A copy is verified by counting rows, and the window it needs is read, not asserted | 0 |
-| D66 | The first paint has a weight, and nothing joins the first wait unbudgeted | 0 |
-| D67 | The tab's store is bounded, and stops being trusted when it stops being datable | 0 |
-| D68 | A tab switch is not a journey, and only the journey still running may land | 0 |
-| D69 | Nothing reads the camera with the thread a person is waiting on | 0 |
-| D70 | A design rule is a guard or it is not a rule | 6 |
+| D63 | What a request waits for is measured, per operation, and budgeted | 1 |
+| D64 | Where a database goes is declared once, and both paths that make one read it | 2 |
+| D65 | A copy is verified by counting rows, and the window it needs is read, not asserted | 1 |
+| D66 | The first paint has a weight, and nothing joins the first wait unbudgeted | 2 |
+| D67 | The tab's store is bounded, and stops being trusted when it stops being datable | 2 |
+| D68 | A tab switch is not a journey, and only the journey still running may land | 1 |
+| D69 | Nothing reads the camera with the thread a person is waiting on | 1 |
+| D70 | A design rule is a guard or it is not a rule | 9 |
 | D71 | Every write says what happened, or says why it does not | 1 |
 | D72 | A duplicate is refused on a fact and asked about on a resemblance | 0 |
 | D73 | A form that scrolls is a page, and a prop does not fix it | 0 |
 | D74 | "On" is not "the action", and one token was doing both | 0 |
-| D75 | A refusal that reaches nobody is a control that does nothing | 0 |
-| D76 | A packaging level is a named multiplier, never a product | 0 |
+| D75 | A refusal that reaches nobody is a control that does nothing | 1 |
+| D76 | A packaging level is a named multiplier, never a product | 1 |
 | D77 | Moving stock is a verb of its own | 0 |
-| D78 | Some fields are set once, and the write is what says so | 0 |
+| D78 | Some fields are set once, and the write is what says so | 1 |
 | D79 | A design guard that spares the apps is a guard about the wrong tree | 0 |
 | D80 | A multi-step flow asks questions and says the answers back | 4 |
 | D81 | A flow is declared in the manifest and drawn in a screen | 2 |

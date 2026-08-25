@@ -147,6 +147,69 @@ for (const g of live) {
 ok(`invoked: every live guard is reached by a command — ${live.length - slow} by CI, `
   + `${slow} by \`pnpm engine:seen\``);
 
+/* --------------------------------------------------------------- listed --- */
+
+/**
+ * AND THE OTHER DIRECTION, WHICH WAS NEVER ASKED.
+ *
+ * ⚠️ EVERY CHECK ABOVE WALKS REGISTRY → IMPLEMENTATION. An entry whose script
+ * vanished fails; an entry naming an assertion that was renamed fails; an entry
+ * tagged for the wrong lane fails. A guard that RUNS and was never registered is
+ * invisible to all of them, and twenty-seven of eighty-three were in exactly
+ * that state — including two added the week this check was written, so it was
+ * growing rather than settling.
+ *
+ * ⚠️ AND WHAT IT COSTS IS THE INDEX'S CREDIBILITY, WHICH IS THE TREE'S CENTRAL
+ * PROPERTY. `ENGINE.md`'s section headed "Every guard, and what breaks without
+ * it" is GENERATED from this registry — so what the registry omits, that
+ * document denies. Worse, the decision-defence table reported zero guards for
+ * the money decisions while `metering.test.mjs` sat in the gate restating those
+ * invariants verbatim in its own header. A reader consulting the table to find
+ * out whether an area is defended got "no" for an area that is.
+ *
+ * ⚠️ SO THE GATE'S OWN LIST IS THE SOURCE. `gate.mjs` names its guards in one
+ * array; reading it here is the same trick the invocation check above already
+ * plays, and it means a guard becomes registrable the moment it becomes runnable
+ * rather than the day somebody remembers.
+ */
+{
+  const gate = readFileSync(join(ENGINE, "scripts/gate.mjs"), "utf8");
+  const array = /const GUARDS\s*=\s*\[([\s\S]*?)\n\];/.exec(gate);
+  if (!array) {
+    fail("scripts/gate.mjs no longer declares a `GUARDS` array this can read, so\n"
+      + "       nothing checks that a running guard was ever registered.");
+  } else {
+    /* ⚠️ AND THE ARRAY IS NOT THE WHOLE LIST. The runner spreads it and appends
+       the guards that need their own node flags (`[...GUARDS, "tone"]`), so
+       reading the array alone would let a guard be added there — runnable,
+       running, and unregistered — with this check still green. */
+    const extra = /for \(const name of \[\.\.\.GUARDS([^\]]*)\]/.exec(gate)?.[1] ?? "";
+    const runs = [...array[1].matchAll(/"([^"]+)"/g)].map((m) => m[1])
+      .concat([...extra.matchAll(/"([^"]+)"/g)].map((m) => m[1]));
+    /* ⚠️ A FLOOR, because an empty match list and a clean tree are the same
+       green line without a number. */
+    if (runs.length < 40) {
+      fail(`scripts/gate.mjs: read ${runs.length} guard name(s) from \`GUARDS\`, which is\n`
+        + "       fewer than the gate reports running — the matcher is broken rather than\n"
+        + "       the list being short.");
+    }
+    const named = new Set(guards.map((g) =>
+      String(g.impl ?? "").replace(/^scripts\//, "").replace(/\.test\.mjs$/, "")));
+    const strays = runs.filter((stem) => !named.has(stem));
+    for (const stem of strays) {
+      fail(`scripts/${stem}.test.mjs runs in the gate and no registry entry names it.\n`
+        + "       ENGINE.md's guard table and its decision-defence counts are generated from\n"
+        + "       docs/guards.json — so an unregistered guard is one the documentation\n"
+        + "       actively denies exists, and the decision it defends reads as undefended.\n"
+        + "       Add an entry: `protects`, `stage`, `impl`, `proves` and a `fails` written\n"
+        + "       as a consequence in the world.");
+    }
+    if (!strays.length) {
+      ok(`listed: every guard the gate runs has a registry entry — ${runs.length}`);
+    }
+  }
+}
+
 /* ----------------------------------------------------------------- owed --- */
 
 const owed = guards.filter((g) => g.status === "owed");

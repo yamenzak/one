@@ -2,6 +2,298 @@
 
 Guidance for Claude Code working in this repository.
 
+## What ships, and what does not
+
+⚠️ **`engine/` IS THE ONLY THING THIS REPOSITORY DEPLOYS.** `ci.yml`,
+`deploy.yml` and `provision.yml` are deleted; `.github/workflows/` holds
+`engine.yml` and `relocate.yml` and nothing else. The root `pnpm test` is
+`pnpm gate && pnpm engine:test`, and `pnpm gate` is the workflow parser plus
+`pnpm engine:gate`. Everything below the divider describes a tree that no
+workflow reads.
+
+⚠️ **`apps/` AND `packages/` ARE FROZEN, NOT GONE.** They are still in
+`pnpm-workspace.yaml`, so they install and resolve and typecheck in an editor —
+and they are built, tested and deployed by nothing. They are on disk because
+Kova has to be readable while it is ported.
+
+⚠️ **AND KOVA IS LIVE, WITH A PAYING TENANT, SERVING ITS LAST DEPLOY.** Nothing
+watches it any more. That is why `engine/scripts/inert.test.mjs` matters more now rather
+than less: it fails if One's worker name collides with a live one, if a D1 name
+does, or if `ROOT` overlaps a hostname a customer already answers on — One serves
+`*.${ROOT}`, so a `ROOT` of `4dl.app` would put One's wildcard over
+`<slug>.kova.4dl.app` and route precedence rather than intent would decide who
+answers. `.github/workflows/engine.yml`'s header is the long form.
+
+**To change any of that, bring a workflow back deliberately. Do not push and
+hope.**
+
+## OneEngine — the framework, and One — the deployment
+
+⚠️ **`engine/` IS THE SUCCESSOR TO EVERYTHING BELOW THE DIVIDER, AND IT IS WHERE
+ALL WORK GOES. THERE ARE TWO DOCUMENTS AND YOU START AT THE FIRST.** [engine/docs/ENGINE.md](engine/docs/ENGINE.md) is **what exists** — every
+operation an app gets without declaring it, the doors, the gates, the refusals,
+every table and what erasure does to it, and the list of what is built and
+reached by nothing. It is generated end to end, from the real composer and the
+real registries, so it cannot go stale.
+[engine/docs/BUILDING.md](engine/docs/BUILDING.md) is **why it is shaped that way
+and how to add to it**, and [engine/docs/DECISIONS.md](engine/docs/DECISIONS.md)
+is the append-only ledger both cite by number. Nothing else is
+required to resume the work; **start there rather than from recall.**
+
+⚠️ **AND THE DOCUMENTS ARE NOT WHERE THE WORK IS RECORDED.** A new module needs a
+line in `engine/scripts/inventory.mjs`; a new table needs a row in `HOLDINGS`; a
+new operation, door, gate or problem appears by itself from
+`EMIT=1 pnpm --filter @engine/ground test`. Each generator REFUSES rather than
+skipping, so a capability cannot be added and quietly left out of the index —
+which is the mechanism that makes reinvention hard. BUILDING.md §7 is the list.
+
+⚠️ **BUILDING A SCREEN IS A DIFFERENT STARTING POINT, AND IT IS
+[engine/design/README.md](engine/design/README.md).** The design language and the
+ambience engine live beside the package that draws them — `DESIGN.md` and
+`AMBIENCE.md` are in `engine/design/`, not in `engine/docs/` — so everything
+needed to build a surface is one `ls` away. The README's export list is
+generated, so "does this already exist" is a question with a current answer.
+
+**The two names mean different things and neither is the other.** **OneEngine** is the
+FRAMEWORK — `@engine/kernel` (pure contracts), `@engine/runtime` (the only code that
+touches a binding), **`@engine/design`** — the browser half and the design system
+every app draws with, named **OneDesign**, router-free — and **`engine/ground`**,
+the PROVING GROUND. **One** is the DEPLOYMENT built on it: `engine/one` is the
+worker that answers every door for every product, `engine/one-space` is the page a
+person opens at the root, `id.` and `setup.`. A product is a manifest inside it,
+and **OneInventory is the only one** — the coaching app that proved stage 9 left
+the tree on 2026-08-16 to be rewritten under a new name. So "One" is what a
+customer types and "OneEngine" is what a contributor imports, and the day there is
+a second deployment the split is what makes that cheap.
+
+⚠️ **`engine/ground` IS NOT A PRODUCT, AND THAT IS ENFORCED BY WHERE IT LIVES.**
+It is the smallest complete app — one notebook over a SAMPLE world, declaring
+every cross-cutting concern — and every claim the framework makes is asserted
+against it: 241 of the engine's tests are its, and most of the design system is
+drawn in its screens. It was `engine/apps/hello` until 2026-08-22, which put it in
+the deployment's `APPS`, its `SELLS` and the browser's product loader — so a
+person who came for OneInventory founded a workspace holding a demo they never
+asked for. `engine/apps/*` is the product catalogue; the ground is outside it, has
+no `live` entry a browser could load, and `scripts/fixture.test.mjs` refuses all
+three back. Its dev-only page is still at `?screen=ground` (D52).
+
+**`engine/` is INERT to the legacy tree by construction**: nothing in it is in
+`apps.json`, so `deploy.yml` can never select it. Its tests and guards DO run —
+`pnpm engine:test`, `engine:typecheck`, and `engine:gate`, which is inside the root
+`pnpm gate`.
+
+⚠️ **THERE IS A SECOND TEST LANE AND CI DOES NOT RUN IT.** A suite that launches
+Chromium to measure real pixels is `*.seen.test.*`, is excluded from every `test`
+config, and runs in **`pnpm engine:seen`** — because a browser answers whether a
+screen LOOKS right, which is not what a deploy is waiting to know, and because it
+cost more than every other check in the repository put together (the design
+package alone: 97s → 8s). **Run `engine:seen` after touching a screen.** The
+split is a filename, so `engine/scripts/seen.test.mjs` (in `engine:gate`) fails
+on a browser suite without the suffix, a suffixed suite that opens none, a
+package holding one with no `seen` script, a `test` config whose globs still pick
+one up, and a workflow that installs a browser again. DECISIONS.md D49.
+
+**That whole class is a guard now.** `scripts/capability-reachable.test.mjs` (in
+`pnpm gate`) fails on any app — the template included — that applies a package's
+`SchemaModule` and never mounts its route tree. The shape it catches is the one
+this document is a catalogue of: tables applied, a Durable Object bound, dispatch
+sites writing rows, and no route to reach any of it, with every suite green. It
+reads `apps.json`, so app #5 is asked the same question the day it is registered.
+
+Three things are still Kova's on purpose, and each README says why: `Shell.tsx`
+(role-adaptive nav is a product decision, extraction plan §3.2), the presentation
+halves of `StudioPausedBanner`/`NotificationBell`/`StudioSwitcher`/`FeatureLock`
+(a registry read wrapped around a few `@4dl/ui` primitives — injecting the
+registry leaves a `Card` with a parameter), and the Stripe **route trees**, whose
+handlers are woven through Kova's notification registry, entitlement gates and
+`requireClientAccess`. Only the reconciliation logic moved.
+
+⚠️ **The MAINTENANCE screen was on that list and should not have been.** It is
+`@4dl/app-kit`'s `MaintenanceScreen` as of 2026-08-08. Its own header comment is
+the argument — *"This is about US. Nobody reading it did anything, nobody can pay
+to end it"* — so the only variable is the name over the door, and it sat in one
+app while `platform.maintenance` closed all of them. The line above still holds
+for the standing banners, which name a product's own arrears and say different
+things per app; it did not hold for this one, and "presentation stays in the app"
+is a rule that has to be re-argued per case rather than applied.
+
+**Tests** — recount with `pnpm test` before quoting a figure anywhere; the suite
+moves. **Measured 2026-08-09** from one `pnpm turbo run test --concurrency=1`,
+per package:
+**632 kova/api (+31 skipped) + 282 scena/api + 237 kova/domain + 163 tessa/api +
+145 ui + 107 tenancy + 104 kova/app + 87 tessa/domain + 87 billing + 80 ai +
+63 commerce + 61 scena/widgets + 45 billing-rail + 44 core + 40 scena/timeline +
+35 auth + 35 scena/app + 24 notify + 23 scena/manifest + 23 tessa/app +
+20 template + 19 template/app + 18 scena/protocol + 18 storage + 18 app-kit +
+17 kova/protocol +
+14 purge + 9 email + 7 i18n + 6 scena/brand + 5 admin** — **2,468 passing,
+31 skipped**, 60 turbo tasks, all green.
+
+⚠️ **`--concurrency=1`, and the reason is worth knowing before reading a red
+run.** A parallel root `pnpm test` still loses one Workers-pool suite to
+Miniflare storage contention now and then — `Isolated storage failed`, or
+`Network connection lost` out of an after-hook, never an assertion. `retry: 1`
+absorbs most of it; a serial run absorbs the rest. Re-run the failing suite on
+its own filter before believing a failure that has no assertion in it.
+
+The +81 since the earlier figure on the same day is all new coverage over
+behaviour that was previously in one app or in none: `@4dl/billing` 45 → 87 (the
+refund/dispute reversal, the plan-catalog routes and the Stripe console routes,
+all three moved out of an app), `@4dl/scena` 234 → 261 (the webhook guards, the
+OTP gate, the per-actor budget and the config-write refusal) and `@4dl/tessa`
+152 → 163 (the OTP gate and the AI-column regression). A split moves tests; it
+does not add any — so where a count went up, something is being checked that
+was not.
+
+Scena's 449 (234 api + 30 app + 185 across its five pure packages) were never in
+the older figure at all; nor were Tessa's. `@scena/timeline`'s 40 are the ones
+that matter most per line — they prove
+`position(t) = (t − T0) mod cycleLength`, which is the whole product.
+The template's 20 are 11 conformance (declarations only — no database, no
+fixtures) + 9 integration (the real worker through Miniflare, on the real
+`*.localhost` host topology). Three of the nine are the ones to copy into a new
+app: they probe every shared surface for a 404, and assert the OTP guard is
+registered BEFORE Better Auth's catch-all — mounting it after is a bypass that
+typechecks, passes every other test, and looks identical in a route list.
+`@4dl/template-app`'s 19 are the SPA half: the UI-language lints, Tailwind's
+`@source` list, the shared admin panels, the accent tokens, and `pickScreen`'s
+door/gate decision — which is a pure function precisely so it can be one.
+Package counts shift as the extraction proceeds — Stage 1 moved 68 tests from
+`@4dl/platform` to `@4dl/tenancy`; the split moves tests, it does not add any.
+The pricing and normalizer suites live
+in `apps/api/test` and are already *inside* the API count — the older
+"protocol/pricing/normalizer" phrasing double-counted them. **E2E is separate**
+(`pnpm e2e`, not part of `pnpm test`): 3 Playwright specs for Kova, ~40 s all in,
+all green — plus **Tessa's 6 and Scena's 3**, each in its own package on its own port
+(**8787 Kova, 8788 Tessa, 8789 Scena + 8790 its player**). Sharing a port makes
+whichever suite runs second drive another product's worker, which fails as
+"element not found" rather than as a conflict; the same is true of wrangler's
+DEFAULT devtools inspector on 9229, so each suite past the first pins its own
+(`--inspector-port`, Tessa 9230, Scena 9231/9232).
+Scena has **two more configs outside the gate**, both because they need the
+development platform-admin lane and the gate must never have it: `wall` (the
+two-screens-same-slide spec, 1 spec, ~1 min) and `shots` (4 projects × 21
+images, ~20 min). All measured green 2026-08-07.
+
+**Built and tested:** foundation, auth (OTP + passkeys, incl. autofill /
+conditional UI), tenancy + row-level scope, the AI suite (credits reserve →
+run → settle), commerce (Kova's platform rail + the tenant's own payment rail), content, reports, media,
+tenant custom domains (Cloudflare for SaaS, per-domain WebAuthn RP — SPEC §14.1),
+the vision suite (Snap-a-Meal + Label Reader) on a real Gemini path, InboxDO
+real-time notification push (WebSocket DO; the bell keeps a slow poll as a
+backstop), plan-editor affordances (copy-week with progression, superset/circuit
+round-logging), the workout UI parity pass, the rebuilt Train tab, and the
+offline-first PWA (app-shell precache + Background-Sync replay of failed
+log-write POSTs).
+
+**E2E (Playwright) — three golden paths, `apps/e2e`, run with `pnpm e2e`.** What
+they cover, precisely:
+1. owner sign-up → studio create → invite a client by email → the client signs in
+   with their own OTP, auto-links, and completes the 5-step intake wizard → the
+   coach sees the entered profile. (The path that 403'd on the client persona's
+   first write; the integration suite structurally cannot see that class of bug —
+   AGENTS.md §4.)
+2. coach builds + publishes a workout plan → the client sees it as their active
+   plan, opens the player and logs a set → the coach sees the set on the client's
+   day.
+3. client creates a food by hand and logs a portion as a snack → their diary and
+   day totals move and survive a reload → the coach sees the meal.
+
+Each spec provisions its own studio and users (unique emails), so the suite is
+re-runnable with no reset. The sign-in OTP is read out of the local Miniflare D1
+`verification` table, never from a log. **NOT covered by E2E:** commerce/Stripe,
+the AI suite, the camera paths (Snap-a-Meal, barcode, label, body scan), external
+food/exercise search, notifications/inbox, staff invitations, custom domains, the
+offline lane (the config blocks the service worker on purpose), and anything
+desktop-width — the projects list is Chromium at a phone viewport only.
+
+⚠️ **Both suites run on the real host topology, via `*.localhost`.** `wrangler dev`
+and Miniflare preserve the Host, and browsers resolve `.localhost` to loopback, so
+the integration suite signs in on `setup.localhost:8787` and asserts tenant
+behaviour on `<slug>.localhost:8787`, and the E2E suite drives the same doors.
+`apps/e2e/src/resolve-localhost.ts` supplies `.localhost` resolution for Node,
+because some container images do not implement RFC 6761.
+
+Two honest dev-only differences from production, both documented where they bite:
+- **The session cookie is host-only locally.** `Domain=localhost` is rejected by
+  browsers, so `cookieDomainFor` returns null for loopback and each `*.localhost`
+  has its own jar. Production issues one cookie for the whole root, so one sign-in
+  covers every studio. The E2E fixtures carry the real cookie across hosts rather
+  than signing in twice (which the OTP cooldown would correctly refuse).
+- **The operator-door restriction stands down in dev** (`isDevRoot`), because dev has
+  a single root and therefore no separate door.
+
+⚠️ Still :8787 (the worker serving the built SPA), never vite's :5173: with the vite
+proxy the browser Origin is `localhost:5173` while the worker's is `localhost:8787`,
+and Better Auth 1.6.23 ignores the `trustedOrigins` array `auth.ts` passes it — so
+every *cookie-bearing* Better Auth POST 403s `INVALID_ORIGIN`. Production is
+same-origin and unaffected.
+
+**NOT built** (do not describe any of these as shipped):
+- **Wearable import** (Health Connect).
+- **Trainer ↔ client chat** — `chat` is `reserved: true` in
+  `@kova/domain/entitlements.ts`. No plan in the current catalog (Solo/Light/Pro/
+  Max) enables it; the retired `studio`/`team` rows still carry `chat: true` in
+  their stored D1 JSON, left untouched so a grandfathered tenant keeps exactly what
+  it was sold. Inert either way — reserved features are unenforced by construction.
+- **Tenant API / webhooks / data exports** — the `integrations` entitlement is
+  also `reserved: true`: no export route, no CSV serializer, no download UI, no
+  tenant API-key issuance, no webhook dispatcher. SPEC §11 promises data export;
+  it does not exist. (The www pricing page no longer advertises it.)
+- **Tenant marketplace storefront** and the **public blog renderer**.
+- **Analytics Engine `USAGE`** — binding referenced, not wired.
+- **Six catalogued AI features**: voice logging, meal swap, menu scout,
+  periodization assistant, the retention-radar per-client LLM line, and the
+  business-digest narrative. The retention *report endpoint* exists but has no
+  UI caller; the coach dashboard only shows a simpler "At risk" count.
+
+**Shipped but thinner than it sounds:**
+- The Train tab's "browsable library grid" is EMPTY until a studio fills it.
+  **Kova ships no exercises at all** — the 40-row starter library and its
+  operator button were removed: content a studio did not choose is something to
+  delete, not a head start. The consequence to know about is `ai/draft-plan`,
+  which whitelists library ids and so refuses with `empty_library` (409) until
+  the studio has added some. That is the correct refusal, not a regression.
+- "Training Load vs target" doesn't reach the client in production.
+
+**Ops:** the first deploy of any app is **Actions → "Provision an app on
+Cloudflare" → its id** (see the app-registry section above). DEPLOY.md is the
+long form and still worth reading before touching anything deploy-shaped.
+
+A fresh deploy **cannot send email** until `email.provider`/`email.from` exist in
+D1 — the mock provider fails closed outside dev. There IS an operator screen for
+it (Platform admin → **Email delivery**, `@4dl/admin`'s panel over
+`@4dl/email/admin-routes`), but it cannot break the BOOTSTRAP deadlock and no UI
+could: reaching it needs a platform-admin session, which needs an OTP, which
+needs email. **Provisioning now seeds those rows** (`ON CONFLICT DO NOTHING`,
+sender `noreply@4dl.app`), which is what breaks it — a workflow with database
+access can do what a screen behind a login cannot.
+
+**`noreply@4dl.app` is verified and DELIVERING — this is done, do not raise it
+again.** The owner of `4dl.app` confirmed it on 2026-08-02 by receiving a Tessa
+sign-in OTP at the address, which exercises the whole path end to end: the seeded
+`app_config` rows, the Cloudflare Email Sending sender, and DNS on the zone.
+Verification is per-zone and was done once for the whole platform, so every app
+here inherits a working sender — that is the entire reason the address is shared
+rather than per-app. The steps in DEPLOY.md §6 remain correct for a NEW zone;
+they are not outstanding work on this one.
+
+The vision suite is still dead until `google.gemini_key` is set
+(Platform admin → AI).
+
+See SPEC §13 for the phase map.
+
+---
+
+# The frozen tree
+
+⚠️ **EVERYTHING BELOW THIS LINE DESCRIBES CODE NO WORKFLOW BUILDS, TESTS OR
+DEPLOYS.** It is accurate about what is on disk and it is kept because Kova is
+live and has to be readable while it is ported — but every claim it makes about
+CI, `apps.json`, deploys or provisioning is about workflows that were deleted.
+Read it as history with a running instance attached, never as the state of this
+repository.
+
 ## Project
 
 **Kova** — a multi-tenant, multi-trainer platform for personal-training
@@ -869,263 +1161,6 @@ the INVARIANT, never the incident** — "the reserve is a ceiling on revenue" st
 true forever, while "Scena's copy under-counted four ways" describes a codebase
 that will not exist and reads as a live warning about an impossible problem. If a
 past defect is worth preventing, that is a test, not a paragraph.
-
-## OneEngine — the framework, and One — the deployment
-
-⚠️ **`engine/` IS THE SUCCESSOR TO EVERYTHING ABOVE, AND IT IS
-WHERE NEW STRUCTURAL WORK GOES. THERE ARE TWO DOCUMENTS AND YOU START AT THE
-FIRST.** [engine/docs/ENGINE.md](engine/docs/ENGINE.md) is **what exists** — every
-operation an app gets without declaring it, the doors, the gates, the refusals,
-every table and what erasure does to it, and the list of what is built and
-reached by nothing. It is generated end to end, from the real composer and the
-real registries, so it cannot go stale.
-[engine/docs/BUILDING.md](engine/docs/BUILDING.md) is **why it is shaped that way
-and how to add to it**, and [engine/docs/DECISIONS.md](engine/docs/DECISIONS.md)
-is the append-only ledger both cite by number. Nothing else is
-required to resume the work; **start there rather than from recall.**
-
-⚠️ **AND THE DOCUMENTS ARE NOT WHERE THE WORK IS RECORDED.** A new module needs a
-line in `engine/scripts/inventory.mjs`; a new table needs a row in `HOLDINGS`; a
-new operation, door, gate or problem appears by itself from
-`EMIT=1 pnpm --filter @engine/ground test`. Each generator REFUSES rather than
-skipping, so a capability cannot be added and quietly left out of the index —
-which is the mechanism that makes reinvention hard. BUILDING.md §7 is the list.
-
-⚠️ **BUILDING A SCREEN IS A DIFFERENT STARTING POINT, AND IT IS
-[engine/design/README.md](engine/design/README.md).** The design language and the
-ambience engine live beside the package that draws them — `DESIGN.md` and
-`AMBIENCE.md` are in `engine/design/`, not in `engine/docs/` — so everything
-needed to build a surface is one `ls` away. The README's export list is
-generated, so "does this already exist" is a question with a current answer.
-
-**The two names mean different things and neither is the other.** **OneEngine** is the
-FRAMEWORK — `@engine/kernel` (pure contracts), `@engine/runtime` (the only code that
-touches a binding), **`@engine/design`** — the browser half and the design system
-every app draws with, named **OneDesign**, router-free — and **`engine/ground`**,
-the PROVING GROUND. **One** is the DEPLOYMENT built on it: `engine/one` is the
-worker that answers every door for every product, `engine/one-space` is the page a
-person opens at the root, `id.` and `setup.`. A product is a manifest inside it,
-and **OneInventory is the only one** — the coaching app that proved stage 9 left
-the tree on 2026-08-16 to be rewritten under a new name. So "One" is what a
-customer types and "OneEngine" is what a contributor imports, and the day there is
-a second deployment the split is what makes that cheap.
-
-⚠️ **`engine/ground` IS NOT A PRODUCT, AND THAT IS ENFORCED BY WHERE IT LIVES.**
-It is the smallest complete app — one notebook over a SAMPLE world, declaring
-every cross-cutting concern — and every claim the framework makes is asserted
-against it: 241 of the engine's tests are its, and most of the design system is
-drawn in its screens. It was `engine/apps/hello` until 2026-08-22, which put it in
-the deployment's `APPS`, its `SELLS` and the browser's product loader — so a
-person who came for OneInventory founded a workspace holding a demo they never
-asked for. `engine/apps/*` is the product catalogue; the ground is outside it, has
-no `live` entry a browser could load, and `scripts/fixture.test.mjs` refuses all
-three back. Its dev-only page is still at `?screen=ground` (D52).
-
-**`engine/` is INERT to the legacy tree by construction**: nothing in it is in
-`apps.json`, so `deploy.yml` can never select it. Its tests and guards DO run —
-`pnpm engine:test`, `engine:typecheck`, and `engine:gate`, which is inside the root
-`pnpm gate`.
-
-⚠️ **THERE IS A SECOND TEST LANE AND CI DOES NOT RUN IT.** A suite that launches
-Chromium to measure real pixels is `*.seen.test.*`, is excluded from every `test`
-config, and runs in **`pnpm engine:seen`** — because a browser answers whether a
-screen LOOKS right, which is not what a deploy is waiting to know, and because it
-cost more than every other check in the repository put together (the design
-package alone: 97s → 8s). **Run `engine:seen` after touching a screen.** The
-split is a filename, so `engine/scripts/seen.test.mjs` (in `engine:gate`) fails
-on a browser suite without the suffix, a suffixed suite that opens none, a
-package holding one with no `seen` script, a `test` config whose globs still pick
-one up, and a workflow that installs a browser again. DECISIONS.md D49.
-
-**That whole class is a guard now.** `scripts/capability-reachable.test.mjs` (in
-`pnpm gate`) fails on any app — the template included — that applies a package's
-`SchemaModule` and never mounts its route tree. The shape it catches is the one
-this document is a catalogue of: tables applied, a Durable Object bound, dispatch
-sites writing rows, and no route to reach any of it, with every suite green. It
-reads `apps.json`, so app #5 is asked the same question the day it is registered.
-
-Three things are still Kova's on purpose, and each README says why: `Shell.tsx`
-(role-adaptive nav is a product decision, extraction plan §3.2), the presentation
-halves of `StudioPausedBanner`/`NotificationBell`/`StudioSwitcher`/`FeatureLock`
-(a registry read wrapped around a few `@4dl/ui` primitives — injecting the
-registry leaves a `Card` with a parameter), and the Stripe **route trees**, whose
-handlers are woven through Kova's notification registry, entitlement gates and
-`requireClientAccess`. Only the reconciliation logic moved.
-
-⚠️ **The MAINTENANCE screen was on that list and should not have been.** It is
-`@4dl/app-kit`'s `MaintenanceScreen` as of 2026-08-08. Its own header comment is
-the argument — *"This is about US. Nobody reading it did anything, nobody can pay
-to end it"* — so the only variable is the name over the door, and it sat in one
-app while `platform.maintenance` closed all of them. The line above still holds
-for the standing banners, which name a product's own arrears and say different
-things per app; it did not hold for this one, and "presentation stays in the app"
-is a rule that has to be re-argued per case rather than applied.
-
-**Tests** — recount with `pnpm test` before quoting a figure anywhere; the suite
-moves. **Measured 2026-08-09** from one `pnpm turbo run test --concurrency=1`,
-per package:
-**632 kova/api (+31 skipped) + 282 scena/api + 237 kova/domain + 163 tessa/api +
-145 ui + 107 tenancy + 104 kova/app + 87 tessa/domain + 87 billing + 80 ai +
-63 commerce + 61 scena/widgets + 45 billing-rail + 44 core + 40 scena/timeline +
-35 auth + 35 scena/app + 24 notify + 23 scena/manifest + 23 tessa/app +
-20 template + 19 template/app + 18 scena/protocol + 18 storage + 18 app-kit +
-17 kova/protocol +
-14 purge + 9 email + 7 i18n + 6 scena/brand + 5 admin** — **2,468 passing,
-31 skipped**, 60 turbo tasks, all green.
-
-⚠️ **`--concurrency=1`, and the reason is worth knowing before reading a red
-run.** A parallel root `pnpm test` still loses one Workers-pool suite to
-Miniflare storage contention now and then — `Isolated storage failed`, or
-`Network connection lost` out of an after-hook, never an assertion. `retry: 1`
-absorbs most of it; a serial run absorbs the rest. Re-run the failing suite on
-its own filter before believing a failure that has no assertion in it.
-
-The +81 since the earlier figure on the same day is all new coverage over
-behaviour that was previously in one app or in none: `@4dl/billing` 45 → 87 (the
-refund/dispute reversal, the plan-catalog routes and the Stripe console routes,
-all three moved out of an app), `@4dl/scena` 234 → 261 (the webhook guards, the
-OTP gate, the per-actor budget and the config-write refusal) and `@4dl/tessa`
-152 → 163 (the OTP gate and the AI-column regression). A split moves tests; it
-does not add any — so where a count went up, something is being checked that
-was not.
-
-Scena's 449 (234 api + 30 app + 185 across its five pure packages) were never in
-the older figure at all; nor were Tessa's. `@scena/timeline`'s 40 are the ones
-that matter most per line — they prove
-`position(t) = (t − T0) mod cycleLength`, which is the whole product.
-The template's 20 are 11 conformance (declarations only — no database, no
-fixtures) + 9 integration (the real worker through Miniflare, on the real
-`*.localhost` host topology). Three of the nine are the ones to copy into a new
-app: they probe every shared surface for a 404, and assert the OTP guard is
-registered BEFORE Better Auth's catch-all — mounting it after is a bypass that
-typechecks, passes every other test, and looks identical in a route list.
-`@4dl/template-app`'s 19 are the SPA half: the UI-language lints, Tailwind's
-`@source` list, the shared admin panels, the accent tokens, and `pickScreen`'s
-door/gate decision — which is a pure function precisely so it can be one.
-Package counts shift as the extraction proceeds — Stage 1 moved 68 tests from
-`@4dl/platform` to `@4dl/tenancy`; the split moves tests, it does not add any.
-The pricing and normalizer suites live
-in `apps/api/test` and are already *inside* the API count — the older
-"protocol/pricing/normalizer" phrasing double-counted them. **E2E is separate**
-(`pnpm e2e`, not part of `pnpm test`): 3 Playwright specs for Kova, ~40 s all in,
-all green — plus **Tessa's 6 and Scena's 3**, each in its own package on its own port
-(**8787 Kova, 8788 Tessa, 8789 Scena + 8790 its player**). Sharing a port makes
-whichever suite runs second drive another product's worker, which fails as
-"element not found" rather than as a conflict; the same is true of wrangler's
-DEFAULT devtools inspector on 9229, so each suite past the first pins its own
-(`--inspector-port`, Tessa 9230, Scena 9231/9232).
-Scena has **two more configs outside the gate**, both because they need the
-development platform-admin lane and the gate must never have it: `wall` (the
-two-screens-same-slide spec, 1 spec, ~1 min) and `shots` (4 projects × 21
-images, ~20 min). All measured green 2026-08-07.
-
-**Built and tested:** foundation, auth (OTP + passkeys, incl. autofill /
-conditional UI), tenancy + row-level scope, the AI suite (credits reserve →
-run → settle), commerce (Kova's platform rail + the tenant's own payment rail), content, reports, media,
-tenant custom domains (Cloudflare for SaaS, per-domain WebAuthn RP — SPEC §14.1),
-the vision suite (Snap-a-Meal + Label Reader) on a real Gemini path, InboxDO
-real-time notification push (WebSocket DO; the bell keeps a slow poll as a
-backstop), plan-editor affordances (copy-week with progression, superset/circuit
-round-logging), the workout UI parity pass, the rebuilt Train tab, and the
-offline-first PWA (app-shell precache + Background-Sync replay of failed
-log-write POSTs).
-
-**E2E (Playwright) — three golden paths, `apps/e2e`, run with `pnpm e2e`.** What
-they cover, precisely:
-1. owner sign-up → studio create → invite a client by email → the client signs in
-   with their own OTP, auto-links, and completes the 5-step intake wizard → the
-   coach sees the entered profile. (The path that 403'd on the client persona's
-   first write; the integration suite structurally cannot see that class of bug —
-   AGENTS.md §4.)
-2. coach builds + publishes a workout plan → the client sees it as their active
-   plan, opens the player and logs a set → the coach sees the set on the client's
-   day.
-3. client creates a food by hand and logs a portion as a snack → their diary and
-   day totals move and survive a reload → the coach sees the meal.
-
-Each spec provisions its own studio and users (unique emails), so the suite is
-re-runnable with no reset. The sign-in OTP is read out of the local Miniflare D1
-`verification` table, never from a log. **NOT covered by E2E:** commerce/Stripe,
-the AI suite, the camera paths (Snap-a-Meal, barcode, label, body scan), external
-food/exercise search, notifications/inbox, staff invitations, custom domains, the
-offline lane (the config blocks the service worker on purpose), and anything
-desktop-width — the projects list is Chromium at a phone viewport only.
-
-⚠️ **Both suites run on the real host topology, via `*.localhost`.** `wrangler dev`
-and Miniflare preserve the Host, and browsers resolve `.localhost` to loopback, so
-the integration suite signs in on `setup.localhost:8787` and asserts tenant
-behaviour on `<slug>.localhost:8787`, and the E2E suite drives the same doors.
-`apps/e2e/src/resolve-localhost.ts` supplies `.localhost` resolution for Node,
-because some container images do not implement RFC 6761.
-
-Two honest dev-only differences from production, both documented where they bite:
-- **The session cookie is host-only locally.** `Domain=localhost` is rejected by
-  browsers, so `cookieDomainFor` returns null for loopback and each `*.localhost`
-  has its own jar. Production issues one cookie for the whole root, so one sign-in
-  covers every studio. The E2E fixtures carry the real cookie across hosts rather
-  than signing in twice (which the OTP cooldown would correctly refuse).
-- **The operator-door restriction stands down in dev** (`isDevRoot`), because dev has
-  a single root and therefore no separate door.
-
-⚠️ Still :8787 (the worker serving the built SPA), never vite's :5173: with the vite
-proxy the browser Origin is `localhost:5173` while the worker's is `localhost:8787`,
-and Better Auth 1.6.23 ignores the `trustedOrigins` array `auth.ts` passes it — so
-every *cookie-bearing* Better Auth POST 403s `INVALID_ORIGIN`. Production is
-same-origin and unaffected.
-
-**NOT built** (do not describe any of these as shipped):
-- **Wearable import** (Health Connect).
-- **Trainer ↔ client chat** — `chat` is `reserved: true` in
-  `@kova/domain/entitlements.ts`. No plan in the current catalog (Solo/Light/Pro/
-  Max) enables it; the retired `studio`/`team` rows still carry `chat: true` in
-  their stored D1 JSON, left untouched so a grandfathered tenant keeps exactly what
-  it was sold. Inert either way — reserved features are unenforced by construction.
-- **Tenant API / webhooks / data exports** — the `integrations` entitlement is
-  also `reserved: true`: no export route, no CSV serializer, no download UI, no
-  tenant API-key issuance, no webhook dispatcher. SPEC §11 promises data export;
-  it does not exist. (The www pricing page no longer advertises it.)
-- **Tenant marketplace storefront** and the **public blog renderer**.
-- **Analytics Engine `USAGE`** — binding referenced, not wired.
-- **Six catalogued AI features**: voice logging, meal swap, menu scout,
-  periodization assistant, the retention-radar per-client LLM line, and the
-  business-digest narrative. The retention *report endpoint* exists but has no
-  UI caller; the coach dashboard only shows a simpler "At risk" count.
-
-**Shipped but thinner than it sounds:**
-- The Train tab's "browsable library grid" is EMPTY until a studio fills it.
-  **Kova ships no exercises at all** — the 40-row starter library and its
-  operator button were removed: content a studio did not choose is something to
-  delete, not a head start. The consequence to know about is `ai/draft-plan`,
-  which whitelists library ids and so refuses with `empty_library` (409) until
-  the studio has added some. That is the correct refusal, not a regression.
-- "Training Load vs target" doesn't reach the client in production.
-
-**Ops:** the first deploy of any app is **Actions → "Provision an app on
-Cloudflare" → its id** (see the app-registry section above). DEPLOY.md is the
-long form and still worth reading before touching anything deploy-shaped.
-
-A fresh deploy **cannot send email** until `email.provider`/`email.from` exist in
-D1 — the mock provider fails closed outside dev. There IS an operator screen for
-it (Platform admin → **Email delivery**, `@4dl/admin`'s panel over
-`@4dl/email/admin-routes`), but it cannot break the BOOTSTRAP deadlock and no UI
-could: reaching it needs a platform-admin session, which needs an OTP, which
-needs email. **Provisioning now seeds those rows** (`ON CONFLICT DO NOTHING`,
-sender `noreply@4dl.app`), which is what breaks it — a workflow with database
-access can do what a screen behind a login cannot.
-
-**`noreply@4dl.app` is verified and DELIVERING — this is done, do not raise it
-again.** The owner of `4dl.app` confirmed it on 2026-08-02 by receiving a Tessa
-sign-in OTP at the address, which exercises the whole path end to end: the seeded
-`app_config` rows, the Cloudflare Email Sending sender, and DNS on the zone.
-Verification is per-zone and was done once for the whole platform, so every app
-here inherits a working sender — that is the entire reason the address is shared
-rather than per-app. The steps in DEPLOY.md §6 remain correct for a NEW zone;
-they are not outstanding work on this one.
-
-The vision suite is still dead until `google.gemini_key` is set
-(Platform admin → AI).
-
-See SPEC §13 for the phase map.
 
 ## Scena — the third app
 
