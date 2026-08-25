@@ -221,6 +221,19 @@ export interface Span {
 }
 
 /**
+ * ONE COLUMN OF A LIST — the field, and the word over it.
+ *
+ * ⚠️ THE WORD IS REQUIRED AND IS NOT THE FIELD'S OWN LABEL. A column heading is
+ * read at the top of a narrow column beside five others, where the field's full
+ * label ("How many are on this shelf right now") is a paragraph; the field's
+ * label is right in a form and wrong here, and one of the two has to give.
+ */
+export interface Column {
+  readonly field: string;
+  readonly label: string;
+}
+
+/**
  * ⚠️ THREE CELLS IS THE CEILING, AND IT IS A DESIGN DECISION RATHER THAN A
  * LIMITATION. A block spanning most of a grid is a block that wanted to be
  * outside the grid — put it above or below, where it is one thing on its own,
@@ -280,6 +293,33 @@ export interface BlockSpec {
    * the first time a screen moved.
    */
   readonly goes?: string;
+  /**
+   * WHICH FIELDS OF A LIST BECOME ITS COLUMNS.
+   *
+   * ⚠️ A LIST'S COLUMNS ARE NOT RECOVERABLE FROM ITS ROWS, and `Listing`'s own
+   * header has said so since it was written: which fields matter, in what order,
+   * under what words, and which of them a person may sort by are four decisions,
+   * and a component that guessed would guess differently per screen. The
+   * renderer needs them and no binding can carry them — a `Read` resolves to one
+   * value, and this is a projection.
+   *
+   * ⚠️ SO IT IS A PROPERTY OF THE PLACEMENT RATHER THAN A SLOT, like `span` and
+   * `when`. Every field named here is checked against the collection the view
+   * reads, so a renamed column is a refusal at composition rather than a blank
+   * column on a page.
+   */
+  readonly shows?: readonly Column[];
+  /**
+   * WHAT ITS EMPTINESS MEANS, IN THE APP'S OWN WORDS.
+   *
+   * ⚠️ REQUIRED OF ANY BLOCK THAT READS A LIST, for the reason `Region.nothing`
+   * is required one level down: a surface that renders an empty result as a
+   * confident fact does it because saying what emptiness MEANS was something the
+   * caller could leave out. A renderer inventing "Nothing here yet" is that same
+   * omission with the app taken out of the loop — every empty list in every
+   * product saying the same nothing.
+   */
+  readonly nothing?: { readonly says: string; readonly under?: string };
   /**
    * ⚠️ THIS IS THE ASIDE OF A SPLIT, AND EXACTLY ONE THING MAY SAY SO. The
    * alternative is positional — "the last block is the sidebar" — which reads as
@@ -367,9 +407,21 @@ export const BONES: readonly Bones[] = [
  * turns "bound a single record to a list" from a blank screen into a refusal.
  */
 export interface SlotSpec {
-  readonly label: string;
-  readonly takes: readonly Read["of"][];
-  readonly required?: boolean;
+  label: string;
+  takes: readonly Read["of"][];
+  required?: boolean;
+  /**
+   * ⚠️ THIS SLOT TAKES THE OUTCOME, NOT THE ROWS — and the block draws its own
+   * waiting. One block needs it: `Listing` pages and searches, so it sizes its
+   * own skeleton by its column count and knows when a search found nothing in a
+   * list that is not empty. Wrapping it in the frame's four outcomes as well
+   * would draw a generic table skeleton and then a specific one.
+   *
+   * ⚠️ IT IS ON THE ENTRY RATHER THAN IN THE RENDERER, because "which block owns
+   * its own loading" is knowledge about a component, and a renderer holding a
+   * list of component names is the join this whole registry exists to remove.
+   */
+  whole?: boolean;
 }
 
 /**
@@ -397,6 +449,7 @@ export type SurfaceRefusal =
   | "dispatch_not_closed" | "dispatch_unreachable" | "two_kinds_of_screen"
   | "goes_nowhere"
   | "span_too_wide" | "span_without_a_grid"
+  | "shows_without_a_list" | "shows_field_unknown" | "nothing_unsaid"
   | "split_without_an_aside" | "aside_without_a_split"
   | "operation_unknown" | "nothing_on_it";
 
@@ -710,6 +763,43 @@ export function refuseSurface(
     */
     if (b.goes !== undefined && !screens.includes(b.goes)) {
       at("goes_nowhere", `${where} leads to "${b.goes}", which is not a screen this app declares`);
+    }
+
+    /*
+      ⚠️ A BLOCK THAT READS A LIST CAN BE EMPTY, AND EMPTINESS IS THE APP'S
+      SENTENCE. A renderer inventing "Nothing here yet" is the same omission
+      `Region.nothing` was made required to stop, with the app taken out of the
+      loop — every empty list in every product saying the same nothing, and
+      nobody able to say what a person should do about it.
+    */
+    const lists = Object.values(b.bind ?? {}).some((x) => x.from.of === "view");
+    if (lists && !b.nothing) {
+      at("nothing_unsaid",
+        `${where} reads a list and does not say what it means when the list is empty`);
+    }
+
+    /*
+      ⚠️ A LIST'S COLUMNS ARE A DECLARATION, NOT A DERIVATION — `Listing`'s own
+      header has said so since it was written. What is checked here is that the
+      fields named are on the collection the view reads, because the alternative
+      is a column of blanks under a correct heading, which reads as missing data
+      rather than as a typo.
+    */
+    if (b.shows?.length) {
+      const reads = Object.values(b.bind ?? {}).map((x) => x.from).find((r) => r.of === "view");
+      const view = reads?.of === "view" ? views.find((v) => v.id === reads.view) : undefined;
+      if (!view) {
+        at("shows_without_a_list",
+          `${where} names columns and binds no view, so there are no rows for them to be columns of`);
+      } else {
+        const held = collections.find((c) => c.id === view.of)?.fields;
+        for (const col of b.shows) {
+          if (held && !(col.field in held)) {
+            at("shows_field_unknown",
+              `${where} shows "${col.field}", which "${view.of}" does not have`);
+          }
+        }
+      }
     }
 
     const bound = b.bind ?? {};

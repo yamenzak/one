@@ -8,7 +8,8 @@
     ".": "./src/index.ts",
     "./vite": "./vite.ts",
     "./labels": "./src/parts/labels.tsx",
-    "./measuring": "./src/measure/index.tsx"
+    "./measuring": "./src/measure/index.tsx",
+    "./body": "./src/rendered/body.tsx"
   },
   "types": "./src/index.ts",
   "scripts": {

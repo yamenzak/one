@@ -28,8 +28,11 @@ import type { BlockEntry, BlockIndex, Bones, SlotSpec } from "./surface.js";
 
 /* ------------------------------------------------------------------ sugar --- */
 
-const slot = (label: string, takes: SlotSpec["takes"], required = false): SlotSpec =>
-  ({ label, takes, ...(required ? { required: true } : {}) });
+const slot = (
+  label: string, takes: SlotSpec["takes"], required = false, whole = false,
+): SlotSpec => ({
+  label, takes, ...(required ? { required: true } : {}), ...(whole ? { whole: true } : {}),
+});
 
 /** A value off the record the screen is about, or a fixed word. */
 const SAID = ["field", "words"] as const;
@@ -79,8 +82,7 @@ const ROWS: BlockIndex = {
 
   /** A row about a person or a place, wearing its face. */
   PersonRow: block("PersonRow", "rows", {
-    who: slot("Whose row this is", ["subject", "field"], true),
-    label: slot("Their name", SAID, true),
+    name: slot("Their name", SAID, true),
     under: slot("The second line", SAID),
     aside: slot("At the end", TOLD),
   }),
@@ -91,7 +93,7 @@ const ROWS: BlockIndex = {
    * nobody's field — "Scanning a shelf puts everything after it there".
    */
   NoteRow: block("NoteRow", "rows", {
-    says: slot("The sentence", SAID, true),
+    children: slot("The sentence", SAID, true),
   }),
 
   /** An identifier somebody will read out or retype. */
@@ -123,7 +125,10 @@ const ROWS: BlockIndex = {
 const LISTS: BlockIndex = {
   /** Rows that become columns where there is room. */
   Listing: block("Listing", "table", {
-    rows: slot("The rows", ["view"], true),
+    /* ⚠️ THE OUTCOME, NOT THE ROWS — see `SlotSpec.whole`. This block pages and
+       searches, so it sizes its own skeleton and can tell an empty list from a
+       search that matched nothing in a list that is not empty. */
+    of: slot("The rows", ["view"], true, true),
     label: slot("What this list is", ["words"], true),
   }),
 
@@ -168,7 +173,7 @@ const FIGURES: BlockIndex = {
   /** One number is the point of the screen. */
   Hero: block("Hero", "hero", {
     value: slot("The figure", ["field", "count"], true),
-    label: slot("What it counts", SAID),
+    eyebrow: slot("What it counts", SAID),
     under: slot("What that means", SAID),
   }),
 
@@ -176,27 +181,33 @@ const FIGURES: BlockIndex = {
   Stat: block("Stat", "figure", {
     value: slot("The figure", ["field", "count"], true),
     label: slot("What it counts", SAID, true),
-    under: slot("What that means", SAID),
   }),
 
   /** How far along something is. */
   Meter: block("Meter", "figure", {
     value: slot("How much", ["field", "count"], true),
-    of: slot("Out of how much", ["field", "count"], true),
-    label: slot("What it measures", SAID),
+    limit: slot("Out of how much", ["field", "count"], true),
+    label: slot("What it measures", SAID, true),
   }),
 
-  /** How much it moved. */
+  /**
+   * How much it moved.
+   *
+   * ⚠️ IT TAKES THE MOVEMENT, NOT THE TWO FIGURES. This entry described a block
+   * that subtracts `was` from `value`; the component does no arithmetic at all
+   * and never did. `of` is the words a delta is meaningless without — "vs last
+   * month" — because a signed number on its own is not a fact.
+   */
   Delta: block("Delta", "figure", {
-    value: slot("Now", ["field", "count"], true),
-    was: slot("Before", ["field", "count"], true),
-    label: slot("What moved", SAID),
+    value: slot("How far it moved", ["field", "count"], true),
+    of: slot("Against what", ["words"], true),
   }),
 
   /** A number out of a possible best. */
   Score: block("Score", "figure", {
-    value: slot("The score", ["field", "count"], true),
-    label: slot("What it scores", SAID),
+    of: slot("The score", ["field", "count"], true),
+    out: slot("Out of", ["field", "count"], true),
+    label: slot("What it scores", SAID, true),
   }),
 
   /** A dial. */
@@ -210,28 +221,49 @@ const FIGURES: BlockIndex = {
 /* ----------------------------------------------------------------- charts --- */
 
 /**
- * ⚠️ EVERY CHART TAKES A VIEW AND A LABEL AND NOTHING ELSE, WHICH IS THE POINT.
- * Which shape suits a series is a design decision made once per screen, not a
- * set of axis, tick, grid and legend options an app spends an afternoon on —
- * that is the whole reason the chart package exists (`CHART_TYPE`).
+ * ⚠️ TWO, AND THE THIRTEEN THAT WERE HERE WERE NOT COUNTED — THEY WERE LISTED.
+ * The header of this file says every entry was chosen by tallying the components
+ * the twelve reading screens actually draw. That was true of the rows and the
+ * figures and false of the charts: `LineChart` and `BarChart` are the two a
+ * product draws, and the other eleven appear only in the proving ground's
+ * gallery, which is where a design system shows what it has rather than where a
+ * product says what it needs.
+ *
+ * ⚠️ AND THE ENTRY CLAIMED THEY SHARE ONE API, WHICH NONE OF THEM DO. It said
+ * every chart takes a view and a label; the components take `series`, or `data`
+ * and `subject`, or `rows`/`columns`/`values`, or `points` and `tone`. A
+ * declaration naming `HeatmapChart` and binding `series` would have passed every
+ * check in the repository and drawn an empty box, because the prop it filled is
+ * not one that component has.
+ *
+ * ⚠️ THE ELEVEN ARE NOT DELETED, THEY ARE NOT IN THE VOCABULARY. They remain
+ * exported components a hand-written screen may draw. A heatmap needs two
+ * categorical axes and a measure, a dumbbell needs pairs, a table needs columns
+ * — three data shapes `ViewSpec` cannot yet describe, and inventing a binding
+ * that silently drops two of the three would be this same fault again. When a
+ * product needs one, the contract grows a way to say what it takes and the entry
+ * comes back with it.
  */
-const chart = (id: string): BlockEntry => block(id, "chart", {
-  series: slot("What is plotted", ["view"], true),
-  label: slot("What the chart is", ["words"], true),
-});
+const CHARTS: BlockIndex = {
+  /** A series over time. */
+  LineChart: block("LineChart", "chart", {
+    describes: slot("What the chart is", ["words"], true),
+    series: slot("What is plotted", ["view"], true),
+  }),
 
-const CHARTS: BlockIndex = Object.fromEntries([
-  "LineChart", "AreaChart", "ColumnChart", "BarChart", "StackedChart",
-  "DivergingChart", "DumbbellChart", "HeatmapChart", "ScatterChart",
-  "DonutChart", "CompositionBar", "Sparkline", "ChartTable",
-].map((id) => [id, chart(id)]));
+  /** Named things compared, laid out along the reading direction. */
+  BarChart: block("BarChart", "chart", {
+    describes: slot("What the chart is", ["words"], true),
+    data: slot("What is compared", ["view"], true),
+  }),
+};
 
 /* ------------------------------------------------------------------ marks --- */
 
 const MARKS: BlockIndex = {
   /** A barcode, drawn from a code the record carries. */
   Bars: block("Bars", "figure", {
-    code: slot("The code", ["field"], true),
+    of: slot("The code", ["field"], true),
   }),
 
   /** Whose or what's — never a picture. */
@@ -241,7 +273,7 @@ const MARKS: BlockIndex = {
 
   /** Prose a workspace wrote, wearing the design system. */
   Markdown: block("Markdown", "text", {
-    text: slot("The prose", SAID, true),
+    of: slot("The prose", SAID, true),
   }),
 
   /** A legal document or a policy, read rather than scanned. */

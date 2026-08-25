@@ -141,11 +141,6 @@ const ELSEWHERE = {
   /* --- arguments, not gaps --- */
   SecretInput: "nothing an APP stores is a credential — the kernel has no `secret` " +
     "field kind, and the keys an operator pastes are the console's, which is OneSpace's",
-  Arranged: "a layout that arrived as DATA, which is the renderer's case and nobody " +
-    "else's — a hand-written screen already knows whether it wants a stack, a grid " +
-    "or a split and says so; `design/test/arranged.seen.test.tsx` measures that its " +
-    "three branches produce three geometries. Delete this line at stage 96, when the " +
-    "renderer draws every screen through it",
 
 };
 

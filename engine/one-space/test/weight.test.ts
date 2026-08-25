@@ -33,9 +33,17 @@ import { describe, expect, it } from "vitest";
 const DIST = join(dirname(fileURLToPath(import.meta.url)), "..", "dist");
 
 /* Measured 2026-08-23, with headroom for ordinary growth and none for a new
-   dependency nobody discussed. Raw is the parse cost; gzip is the wait. */
+   dependency nobody discussed. Raw is the parse cost; gzip is the wait.
+
+   ⚠️ RAISED BY 26 BYTES ON 2026-08-25, AND THE NUMBER IS THE POINT. The declared
+   surface grew three clauses — a list's columns, what its emptiness means, and
+   which slot takes the whole outcome — and `refuseSurface` is real code that
+   ships. Twenty-six bytes is not a cost worth arguing about; being made to write
+   it down is. The renderer itself is NOT in here: it sits behind
+   `@engine/design/body` so the entry chunk carries the contract and not the
+   thirty components that draw from it. */
 const CEILING = {
-  js: { raw: 1_100_000, gzip: 330_000 },
+  js: { raw: 1_100_026, gzip: 330_000 },
   css: { raw: 470_000, gzip: 50_000 },
 };
 

@@ -69,17 +69,36 @@ const balanced = (text, from) => {
 /** ⚠️ A component, never a constant: PascalCase has a lower-case letter in it. */
 const isComponent = (name) => /^[A-Z]/.test(name) && /[a-z]/.test(name) && !name.includes("_");
 
-/** Every exported component, and whether it takes `children`. */
+/**
+ * ⚠️ THE DESTRUCTURED NAMES, WHICH IS WHAT A SLOT HAS TO MATCH. Reading the
+ * TYPE would be reading what the component says it accepts; reading the
+ * destructuring is reading what it actually pulls out and uses, and those differ
+ * exactly where a prop was renamed and one of the two was missed.
+ */
+const propsIn = (args) => {
+  const brace = args.indexOf("{");
+  if (brace < 0) return [];
+  let depth = 0, end = brace;
+  for (let i = brace; i < args.length; i++) {
+    if (args[i] === "{") depth++;
+    else if (args[i] === "}") { depth--; if (!depth) { end = i; break; } }
+  }
+  return args.slice(brace + 1, end).split(",")
+    .map((x) => x.trim().split(/[:=]/)[0].trim())
+    .filter((x) => /^[a-z]\w*$/.test(x));
+};
+
+/** Every exported component, whether it takes `children`, and what it destructures. */
 const exported = new Map();
 for (const { at, text } of files) {
   for (const m of text.matchAll(/^export function ([A-Z]\w*)\s*(?:<[^>]*>)?\s*\(/gm)) {
     if (!isComponent(m[1])) continue;
     const args = balanced(text, m.index + m[0].length - 1);
-    exported.set(m[1], { at, composes: /\bchildren\b/.test(args) });
+    exported.set(m[1], { at, composes: /\bchildren\b/.test(args), props: propsIn(args) });
   }
   for (const m of text.matchAll(/^export const ([A-Z]\w*)\s*[:=]/gm)) {
     if (!isComponent(m[1]) || exported.has(m[1])) continue;
-    exported.set(m[1], { at, composes: false });
+    exported.set(m[1], { at, composes: false, props: [] });
   }
 }
 
@@ -88,12 +107,31 @@ for (const { at, text } of files) {
 const registry = readFileSync(join(ENGINE, "kernel/src/blocks.ts"), "utf8");
 const declared = new Set();
 for (const m of registry.matchAll(/block\("(\w+)"/g)) declared.add(m[1]);
-/* ⚠️ The charts are made by one helper over a list, so the list is where they are. */
-const charts = registry.match(/\[\s*\n?\s*"LineChart"[\s\S]*?\]\.map/);
-if (!charts) {
-  fail("kernel/src/blocks.ts: the chart list is gone, so this guard is checking a smaller set than it thinks");
-} else {
-  for (const m of charts[0].matchAll(/"(\w+)"/g)) declared.add(m[1]);
+
+/*
+  ⚠️ A FLOOR, BECAUSE A PARSER THAT STOPS MATCHING REPORTS A SMALLER VOCABULARY
+  RATHER THAN A BROKEN READ. The charts used to be built by one helper over a
+  list of thirteen names, and this guard had a special case for it; when that
+  list went, the special case was the thing that noticed. What replaces it has
+  to notice the same class of change without knowing how the file is written.
+*/
+const FEWEST = 20;
+if (declared.size < FEWEST) {
+  fail(`kernel/src/blocks.ts: only ${declared.size} block(s) parsed, under the ${FEWEST} floor.\n`
+    + `       Either the vocabulary has been gutted or this guard has stopped reading it,\n`
+    + `       and from a smaller number alone the two are the same.`);
+}
+
+/** ⚠️ Each entry's slot names, which are the props the renderer will fill. */
+const slotsOf = new Map();
+for (const m of registry.matchAll(/block\("(\w+)",\s*"\w+",\s*\{/g)) {
+  const from = registry.indexOf("{", m.index + m[0].length - 1);
+  let depth = 0, end = from;
+  for (let i = from; i < registry.length; i++) {
+    if (registry[i] === "{") depth++;
+    else if (registry[i] === "}") { depth--; if (!depth) { end = i; break; } }
+  }
+  slotsOf.set(m[1], [...registry.slice(from, end).matchAll(/^\s{4}(\w+):\s*slot\(/gm)].map((x) => x[1]));
 }
 
 /* ---------------------------------------------------- every entry is real --- */
@@ -181,6 +219,24 @@ const WHY = {
     there is nothing for a declaration to place or bind.
   */
   plumbing: ["Spacer", "Await", "ReadingProvider", "Whichever"],
+  /*
+    ⚠️ A CHART WHOSE DATA A `view` CANNOT DESCRIBE, WHICH IS ELEVEN OF THE
+    THIRTEEN. `LineChart` and `BarChart` take a series and a name and are in the
+    vocabulary. These take two categorical axes and a measure, or pairs, or
+    groups, or columns — shapes `ViewSpec` has no way to say, and a slot that
+    accepted a view and quietly filled one of the three would be the fault this
+    guard was widened to catch, one level along.
+
+    ⚠️ THEY ARE STILL EXPORTED AND A WRITTEN SCREEN MAY DRAW ANY OF THEM. What
+    they are not is bindable, and the honest way to record that is here rather
+    than as a registry entry naming props the component does not have. This list
+    shrinks when the contract learns to describe one of them.
+  */
+  unbindable: [
+    "AreaChart", "ColumnChart", "StackedChart", "DivergingChart", "DumbbellChart",
+    "HeatmapChart", "ScatterChart", "DonutChart", "CompositionBar", "Sparkline",
+    "ChartTable",
+  ],
 };
 
 const placed = new Map();
@@ -206,7 +262,7 @@ for (const [why, names] of Object.entries(WHY)) {
     loose++;
     fail(`${at}: ${name} takes no children and is neither a block nor classified.\n`
       + `       Add it to kernel/src/blocks.ts, or say why it is not one `
-      + `(formatter | state | chrome | control | inside | mark | plumbing).`);
+      + `(formatter | state | chrome | control | inside | mark | plumbing | unbindable).`);
   }
   if (!loose && !stale) {
     ok(`candidates: ${exported.size} export(s), every childless one placed or classified`);
@@ -234,6 +290,48 @@ for (const [why, names] of Object.entries(WHY)) {
     }
   }
   if (!wrong) ok("slots: every declared kind is one a binding can actually be");
+}
+
+/* --------------------------------------- and the slot is a prop it accepts --- */
+
+/**
+ * ⚠️ A SLOT NAME IS A PROP NAME, AND NOTHING CHECKED THAT UNTIL THE RENDERER
+ * NEEDED IT. The registry was written as a description of what each block ought
+ * to take, and twenty-three of the forty entries named something the component
+ * does not accept: `PersonRow.who` against a component whose prop is `name`,
+ * `Listing.rows` against `of`, `Markdown.text` against `of`, `Hero.label`
+ * against `eyebrow`, and every chart's `label` against `describes`.
+ *
+ * ⚠️ AND THE FAILURE IS SILENT IN THE WORST POSSIBLE WAY. React ignores a prop a
+ * component does not read, so the renderer would fill `rows` on a `Listing` that
+ * reads `of`, get no error, no warning and no type complaint — the manifest
+ * composes, the screen mounts, and the list is empty. Every other check in this
+ * repository passes on that.
+ *
+ * ⚠️ `children` IS A SLOT LIKE ANY OTHER, because for some blocks the content IS
+ * the children — `NoteRow` is a sentence, and eighty-nine call sites write it
+ * between the tags. The renderer passes a slot of that name as children rather
+ * than as an attribute.
+ */
+{
+  let wrong = 0;
+  for (const [id, slots] of slotsOf) {
+    const part = exported.get(id);
+    if (!part) continue; /* already reported above as not exported at all */
+    for (const name of slots) {
+      const takes = name === "children" ? part.composes : part.props.includes(name);
+      if (takes) continue;
+      wrong++;
+      fail(`kernel/src/blocks.ts: \`${id}\` declares a slot "${name}" and ${part.at}\n`
+        + `       does not take it (${part.props.join(", ") || "no destructured props"}).\n`
+        + `       React drops a prop a component does not read, so a screen binding this\n`
+        + `       composes, mounts, and draws nothing there.`);
+    }
+  }
+  if (!wrong) {
+    ok(`bound: every slot is a prop its component takes — `
+      + `${[...slotsOf.values()].reduce((n, x) => n + x.length, 0)} across ${slotsOf.size} block(s)`);
+  }
 }
 
 console.log(bad

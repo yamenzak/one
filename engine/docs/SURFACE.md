@@ -387,11 +387,74 @@ renamed code because `includes` is a substring test.
 ⚠️ **The seventeen `unrepresentable` claims are the list stage 96 must not
 violate.** Each is a promise about what the renderer will *not* let a body say.
 
-### S8 — The renderer
-The screen renderer joins `design/src/rendered/`: it takes a `ScreenSpec.body`
-and the app's declared sources, and draws the screen. This is the generalisation of the eleven
-surfaces that already work, not a new idea — and it arrives after the contract
-has survived the spike, the blocks exist, and the guards can see it.
+### S8 — The renderer · **built; stage 96 ships with S9**
+
+⚠️ **The renderer is written, tested and reached by nothing, so the stage is not
+shipped — and the check that said so is S7's.** Marking 96 shipped turned three
+guards red at once: the census's arming pin (four guards have stood down in
+favour of a kernel refusal and no screen is drawn from a declaration), the
+capability guard (`AppSpec.views` owes a surface at 96), and the deferral ledger.
+All three are the same true thing. Built is not reached, which is the rule this
+whole repository is built on, and the machinery caught me claiming otherwise
+inside an hour of writing the pin. It flips when OneInventory declares its first
+body.
+
+`design/src/rendered/body.tsx`, reached at `@engine/design/body` — deliberately
+not through the index barrel, so the entry chunk carries the contract and not the
+thirty components that draw from it.
+
+**The registry was documentation of an imagined API, and building the renderer is
+what found out.** Twenty-three of the forty entries named a slot the component
+does not take: `PersonRow.who` against a component whose prop is `name`,
+`Listing.rows` against `of`, `Markdown.text` against `of`, `Hero.label` against
+`eyebrow`, every chart's `label` against `describes`. **React drops an unknown
+prop with no error, no warning and no type complaint** — so the manifest would
+compose, the screen would mount, and the region would be blank. Every other check
+in the repository passes on that.
+
+`vocabulary.test.mjs` now refuses it, and `body.test.tsx` watches values come out
+the far end.
+
+**The thirteen charts were not counted, they were listed.** The registry's header
+says every entry was chosen by tallying what the twelve reading screens draw;
+that is true of the rows and the figures and false of the charts. `LineChart` and
+`BarChart` are the two a product draws — the other eleven appear only in the
+proving ground's gallery. And the entry claimed they share one API, which none of
+them do: the components take `series`, or `data` and `subject`, or
+`rows`/`columns`/`values`, or `points` and `tone`. They are classified
+`unbindable` now with the reason: a heatmap needs two categorical axes and a
+measure, a dumbbell needs pairs, a table needs columns — three data shapes
+`ViewSpec` cannot describe, and a slot that accepted a view and silently filled
+one of the three would be the same fault one level along.
+
+**Three clauses the contract turned out to need**, each found by the renderer
+failing rather than by reasoning:
+
+- **`shows`** — a list's columns. `Listing`'s own header has argued since it was
+  written that which fields matter, in what order, under what words, and which
+  sort are four decisions a component cannot derive. It is a projection, not a
+  binding, so it sits beside `span` and `when`; every field is checked against
+  the collection the view reads. The first three columns also become the narrow
+  half's name, second line and end — without which a phone drew the row's id,
+  which is `keys.test.mjs`'s fault with the declaration supplying the key.
+- **`nothing`** — what emptiness means, required of any block that reads a list.
+  A renderer inventing "Nothing here yet" is the omission `Region.nothing` was
+  made required to stop, with the app taken out of the loop.
+- **`SlotSpec.whole`** — this slot takes the outcome, not the rows, and the block
+  draws its own waiting. One block needs it: `Listing` pages and searches, so it
+  sizes its own skeleton and can tell an empty list from a search that matched
+  nothing. It is on the entry rather than in the renderer, because a renderer
+  holding a list of component names is the join the registry exists to remove.
+
+**And no currency, no price.** `money` says the number is minor units; which
+currency's is a workspace fact, and a default would draw one workspace's prices
+in another's symbol — right to the penny and wrong by a factor. Absent, the
+renderer draws nothing there.
+
+The entry chunk grew by **26 bytes** — the contract's three new clauses are real
+code that ships — and `weight.test.ts`'s ceiling moved by exactly that, with the
+reason written next to it. Twenty-six bytes is not worth arguing about; being
+made to write it down is the whole mechanism.
 
 ### S9 — OneInventory, ported
 Every screen is a `body` or a `story`, and nothing is a third thing. On the

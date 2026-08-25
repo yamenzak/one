@@ -4012,6 +4012,25 @@
       "fails": "a renamed component leaving its registry entry pointing at nothing - a manifest refused for naming a block that plainly exists, or a blank region where a card was; and the silent half, a component that could be a block and is in no registry, which exists and works and passes every guard while no screen can ever ask for it, so the next app hand-rolls the thing that was already built"
     },
     {
+      "id": "a-slot-is-a-prop-the-component-actually-takes",
+      "protects": "D92",
+      "stage": "96",
+      "status": "live",
+      "impl": "scripts/vocabulary.test.mjs",
+      "becomes": "elsewhere: the registry and the design package, which is where this join lives however a screen is expressed",
+      "proves": "every slot is a prop its component takes",
+      "fails": "a registry entry naming a slot its component does not accept - React drops an unknown prop with no error, no warning and no type complaint, so the renderer fills `rows` on a component that reads `of`, the manifest composes, the screen mounts, and the region is blank; twenty-three of the forty entries were wrong that way when the renderer first needed the join"
+    },
+    {
+      "id": "a-declaration-in-a-screen-out",
+      "protects": "D92",
+      "stage": "96",
+      "status": "live",
+      "impl": "design/test/body.test.tsx",
+      "proves": "a binding reaches the prop it names",
+      "fails": "a binding that resolves and never arrives - a value read correctly out of the record and handed to a prop nothing reads, a format that never reaches a formatter so every price ships as a bare integer of minor units, a condition that draws a block it should have left out, and a split whose aside was left in the main column"
+    },
+    {
       "id": "a-block-may-not-name-a-breakpoint",
       "protects": "D92",
       "stage": "92",
