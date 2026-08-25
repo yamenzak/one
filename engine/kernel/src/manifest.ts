@@ -860,7 +860,18 @@ export function refuseApp(spec: AppSpec): readonly Refusal[] {
   for (const v of views) {
     for (const p of refuseView(v, spec.collections)) at(p.of, `${p.why}: ${p.detail}`);
   }
-  const ops = spec.operations.map((o) => o.id);
+  /*
+    ⚠️ THE GENERATED ONES COUNT, AND LEAVING THEM OUT REFUSED THE ORDINARY CASE.
+    `supplier.create` is not written in any manifest — the runtime composes it
+    from the collection — so a body offering it was refused as naming an
+    operation the app does not declare, which is the one act every list screen
+    has. `operationsFor` is the same derivation the runtime mounts from, so the
+    two cannot disagree about which verbs a collection got.
+  */
+  const ops = [
+    ...spec.operations.map((o) => o.id),
+    ...spec.collections.flatMap(operationsFor),
+  ];
   const screenIds = spec.screens.map((s) => s.id);
   for (const s of spec.screens) {
     for (const p of refuseSurface(s, BLOCKS, views, spec.collections, ops, screenIds)) {

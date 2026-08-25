@@ -71,9 +71,11 @@ const DIST = join(dirname(fileURLToPath(import.meta.url)), "..", "dist");
    ⚠️ AND 56 FOR `actsIn`. The form that RUNS a declared act — `Doing`, four
    kilobytes of it — is not in this number, which is the boundary working: it is
    reached from `Declared`, which is lazy, so a browser that never opens a
-   product never downloads a form for one. */
+   product never downloads a form for one. And 34 for counting the GENERATED
+   operations into the set a body may name — without it `supplier.create` was
+   refused as undeclared, which is the one act every list screen has. */
 const CEILING = {
-  js: { raw: 1_105_706, gzip: 330_000 },
+  js: { raw: 1_105_740, gzip: 330_000 },
   css: { raw: 470_000, gzip: 50_000 },
 };
 

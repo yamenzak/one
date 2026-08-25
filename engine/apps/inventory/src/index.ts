@@ -5956,6 +5956,21 @@ const manifest = (): AppSpec => defineApp({
   ],
 
   /*
+    THE QUERIES THE DECLARED SCREENS READ — named once, on the app, so two
+    screens asking the same question get one answer (see `ViewSpec`).
+  */
+  views: [
+    /*
+      ⚠️ THE COUNT IS THE ONE FACT THAT MAKES THE LIST WORTH READING. A supplier
+      nothing comes from is a row to delete, and there is no other way to tell —
+      which is why the hand-written screen fetched every product to count them in
+      the browser. `tally` is the same answer in one grouped statement.
+    */
+    { id: "every-supplier", of: "supplier", sort: { by: "name", dir: "up" }, limit: 200,
+      tally: [{ as: "products", of: "product", by: "supplier" }] },
+  ],
+
+  /*
     ⚠️ THE SCREENS THIS STAGE ACTUALLY HAS. A declared screen with nothing
     mounted renders an honest notice, which is the right state for a screen whose
     container is not written — and the wrong state for five nav destinations at
@@ -6217,7 +6232,37 @@ const manifest = (): AppSpec => defineApp({
     { id: "supplier", route: "/suppliers", label: "Suppliers", nav: "none",
       /* ⚠️ NOT `box` — that is Stock's, and both are in the nav. A supplier is
          somebody you ring rather than something on a shelf. */
-      icon: "people", permission: "product:write" },
+      icon: "people", permission: "product:write",
+      /*
+        ⚠️ THE FIRST OF THIS PRODUCT'S SCREENS DRAWN FROM WHAT IT DECLARES —
+        no file in `screens/` renders any of this. What it replaced fetched
+        every supplier AND every product so a `Map` in the browser could count
+        one against the other; `tally` is that count, in one grouped statement,
+        beside the rows it belongs to.
+      */
+      body: {
+        shape: "list",
+        layout: { as: "stack" },
+        blocks: [{
+          block: "Listing",
+          shows: [
+            { field: "name", label: "Supplier" },
+            { field: "contact", label: "Who to ask for" },
+            { field: "products", label: "Products" },
+          ],
+          nothing: {
+            says: "No suppliers yet",
+            under: "Add one, or import a spreadsheet with a supplier column and they appear here",
+          },
+          /* ⚠️ THE ROW OPENS THE SUPPLIER; the act CREATES one. Both are the
+             declaration's, so neither is a handler somebody wrote. */
+          does: ["supplier.create"],
+          bind: {
+            label: { from: { of: "words", says: "Suppliers" } },
+            of: { from: { of: "view", view: "every-supplier" } },
+          },
+        }],
+      } },
     /* ⚠️ THE GUIDE IS ABOUT THE WORKSPACE, NOT ABOUT A SHELF — and it stops
        being wanted the week it is finished. It is reached from what is not done
        yet; a permanent slot for it is a slot every experienced person carries
