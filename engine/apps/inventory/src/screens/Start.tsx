@@ -17,7 +17,10 @@ import {
   Faq, Grid, Guide, Help, Milestones, Screen, Section, Stack, StepRow, glyphOf,
 } from "@engine/design";
 import { reached, type Raised } from "@engine/kernel";
-import { INVENTORY } from "../index.js";
+import { inventory } from "../index.js";
+
+/** ⚠️ The manifest is a thunk and memoises itself — see `inventory`. */
+const INVENTORY = inventory();
 import { LADDER, type Tracking } from "../ledger.js";
 
 /**

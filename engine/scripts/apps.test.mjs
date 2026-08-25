@@ -134,6 +134,44 @@ for (const dir of ["runtime/src", "design/src", ...appDirs.map((a) => `apps/${a}
 }
 if (!eager) ok(`lazy: nothing composes an app at startup`);
 
+/* ------------------------------------------------------------- unbuilt --- */
+
+/**
+ * ⚠️ AND `defineApp` AT COLUMN ZERO IS THE SAME COST ONE STEP EARLIER. It builds
+ * the literal and runs the whole refusal suite — the collections walk,
+ * reachability, the roles walk, the ladder — so a manifest declared as a
+ * top-level `const` is re-validated on every cold isolate over declarations that
+ * cannot have changed since the deploy. Composition was already lazy; the
+ * CONSTRUCTION above it was not, and the check that caught the one did not see
+ * the other.
+ *
+ * ⚠️ THE THUNK IS THE WHOLE FIX, so what is checked is that the call is inside
+ * one. A product nobody opens is then never built, and the four modules that ask
+ * for one product's manifest build one between them.
+ */
+{
+  const DECLARED = /^(?:export\s+)?(?:const|let|var)\s+\w+\s*(?::[^=\n]*)?=\s*defineApp\s*\(/gm;
+  const built = [];
+  for (const app of appDirs) {
+    const at = join(ENGINE, `apps/${app}/src/index.ts`);
+    if (!existsSync(at)) continue;
+    const code = stripComments(readFileSync(at, "utf8"));
+    for (const m of code.matchAll(DECLARED)) built.push(`apps/${app}/src/index.ts: ${m[0].trim()}`);
+  }
+  /* ⚠️ A floor, because no app and a clean tree read the same in green. */
+  if (!appDirs.length) {
+    fail("apps: no product directories were found at all, so this is passing over nothing.");
+  } else if (built.length) {
+    fail(`${built.join("\n       ")}\n` +
+         "       builds a manifest at module scope. `defineApp` runs every refusal, so\n" +
+         "       this is the whole check suite on every cold isolate over declarations\n" +
+         "       that have not changed since the deploy. Put the literal inside the\n" +
+         "       thunk the deployment already calls.");
+  } else {
+    ok(`unbuilt: ${appDirs.length} product(s), none builds its manifest at startup`);
+  }
+}
+
 /* ------------------------------------------------------------------ suites --- */
 
 /**

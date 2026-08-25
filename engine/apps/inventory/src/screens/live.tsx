@@ -23,7 +23,10 @@ import {
   Nothing, Screen, glyphOf, ready, trouble, useTelling, waiting, type Loaded,
 } from "@engine/design";
 import { dayPlus, type Day, type Problem } from "@engine/kernel";
-import { INVENTORY } from "../index.js";
+import { inventory } from "../index.js";
+
+/** ⚠️ The manifest is a thunk and memoises itself — see `inventory`. */
+const INVENTORY = inventory();
 import { hazardsIn, signalIn } from "../hazard.js";
 import { coverage, stuttering } from "../count.js";
 import { Count, type Change, type Counted, type Uncovered } from "./Count.js";

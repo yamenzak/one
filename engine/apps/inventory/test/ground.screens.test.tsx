@@ -16,7 +16,10 @@ import * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ready } from "@engine/design";
 import { describe, expect, it } from "vitest";
-import { INVENTORY } from "../src/index.js";
+import { inventory } from "../src/index.js";
+
+/** ⚠️ Built once here — the manifest is a thunk so that a cold isolate is not. */
+const INVENTORY = inventory();
 import {
   Count, INVENTORY_ROUTES, InventoryScreen, Receive, Scan,
   type Seen, type Uncovered,

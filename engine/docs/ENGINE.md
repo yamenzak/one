@@ -662,6 +662,7 @@ its own header, cited by other files, and doing nothing.
 | `a-schema-runner-never-migrates-destructively` | D12 | a DROP running itself on every shard at 3am because somebody edited a declaration |
 | `an-identifier-that-is-not-a-name-never-reaches-a-statement` | D8 | a generated schema built from something a request supplied, which is the injection this whole design forecloses |
 | `an-app-imports-the-kernel-and-nothing-else-of-ours` | D12 | a manifest that can call the machinery, which is a manifest that can leave a gate out of the next handler |
+| `a-manifest-is-not-built-at-module-scope` | D82 | every product's manifest constructed and put through the whole refusal suite on every cold isolate, over declarations that have not changed since the deploy — a cost that grows with the catalogue and is charged to whichever request happens to be first |
 | `a-workspace-never-holds-an-infrastructure-label` | D2 | a customer answering on the hostname a certificate authority validates against, or on the operator's own door |
 | `every-gate-is-applied-by-the-runtime-not-the-app` | D12 | a handler that runs for somebody who was never allowed to call it, because one call site forgot the check |
 | `a-replay-spends-nothing` | D12 | a phone that retried in a basement getting a second charge, a second notification and two of what it made once |
@@ -1108,6 +1109,7 @@ its own header, cited by other files, and doing nothing.
 | D79 | A design guard that spares the apps is a guard about the wrong tree | 0 |
 | D80 | A multi-step flow asks questions and says the answers back | 4 |
 | D81 | A flow is declared in the manifest and drawn in a screen | 2 |
+| D82 | A manifest is built when something asks for it, not when the module loads | 1 |
 <!-- /generated -->
 
 ---

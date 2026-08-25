@@ -29,7 +29,10 @@ import { fileURLToPath } from "node:url";
 import { chromium, type Browser } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PHONE, DESK, mounted, stylesheet, worldOf } from "@engine/design/measuring";
-import { INVENTORY } from "@engine/inventory";
+import { inventory } from "@engine/inventory";
+
+/** ⚠️ Built once here — the manifest is a thunk, so that a cold isolate does not. */
+const INVENTORY = inventory();
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 

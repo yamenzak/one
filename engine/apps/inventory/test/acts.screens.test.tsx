@@ -23,7 +23,10 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { operationsFor } from "@engine/kernel";
-import { INVENTORY } from "../src/index.js";
+import { inventory } from "../src/index.js";
+
+/** ⚠️ Built once here — the manifest is a thunk so that a cold isolate is not. */
+const INVENTORY = inventory();
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SCREENS = join(HERE, "..", "src", "screens");

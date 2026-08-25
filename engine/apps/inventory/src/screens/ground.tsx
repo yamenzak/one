@@ -19,7 +19,7 @@
 
 import * as React from "react";
 import { Shell, whoFace } from "@engine/design";
-import { INVENTORY } from "../index.js";
+import { inventory } from "../index.js";
 import { InventoryScreen, InventorySurface } from "./index.js";
 
 /** ⚠️ Every permission a screen names, so none of them is undrawable here. */
@@ -42,6 +42,9 @@ export function InventoryGround({ route, onGo }: {
   readonly onGo?: (route: string) => void;
 }) {
   const go = onGo ?? (() => undefined);
+  /* ⚠️ Asked for rather than imported as a value — the manifest is a thunk so a
+     cold isolate does not build and re-check it before anything wants it. */
+  const INVENTORY = inventory();
   const screens = (INVENTORY.screens ?? []).filter(
     (s) => !s.features?.length || s.features.some((f) => SOLD.includes(f)));
 

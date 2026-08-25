@@ -21,7 +21,10 @@
 import * as React from "react";
 import { createRoot } from "react-dom/client";
 import { Shell } from "@engine/design";
-import { INVENTORY } from "@engine/inventory";
+import { inventory } from "@engine/inventory";
+
+/** ⚠️ Built once here — the manifest is a thunk, so that a cold isolate does not. */
+const INVENTORY = inventory();
 import { shellAt } from "../src/centre/route.js";
 
 declare global {

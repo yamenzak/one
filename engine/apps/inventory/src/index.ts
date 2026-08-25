@@ -5719,7 +5719,21 @@ const expirySweep = declareJob({
 
 /* --------------------------------------------------------------- the rest --- */
 
-export const INVENTORY: AppSpec = defineApp({
+/**
+ * ⚠️ THE LITERAL IS INSIDE THE THUNK, AND THAT IS THE WHOLE POINT OF THE THUNK.
+ * Built at module scope it was constructed and put through `refuseApp` — the
+ * collections walk, the reachability check, the roles walk, the ladder — on
+ * every cold isolate, over declarations that cannot have changed since the
+ * deploy. Composition was already lazy (D4); construction and validation sat
+ * above it and were not covered by it.
+ *
+ * ⚠️ SO A BROKEN MANIFEST NOW FAILS ON THE FIRST REQUEST THAT COMPOSES THIS APP
+ * RATHER THAN AT BOOT, which is a real change in when a mistake surfaces. It is
+ * the better side of the trade because nothing waits for a person to notice:
+ * `refuseApp` runs over this manifest in the composition tests, and every deploy
+ * probes `/health` before it is called done.
+ */
+const manifest = (): AppSpec => defineApp({
   id: "inventory",
   name: "OneInventory",
   /*
@@ -6733,6 +6747,14 @@ export const INVENTORY: AppSpec = defineApp({
   lanes: ["text", "vision"],
 });
 
+/**
+ * ⚠️ LAZY AND ONCE, AND BOTH HALVES ARE THE POINT. Lazy is what keeps the
+ * construction and the refusal walk out of a cold isolate that never opens this
+ * product; once is what stops the four browser modules that ask for the manifest
+ * building four of them.
+ */
+let built: AppSpec | null = null;
+
 /* ⚠️ A THUNK, BECAUSE COMPOSITION IS LAZY (D4). Exporting the composed surface
    would put every app's route table in the startup budget of every request. */
-export const inventory = (): AppSpec => INVENTORY;
+export const inventory = (): AppSpec => (built ??= manifest());

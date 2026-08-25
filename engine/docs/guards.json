@@ -564,6 +564,14 @@
       "fails": "a manifest that can call the machinery, which is a manifest that can leave a gate out of the next handler"
     },
     {
+      "id": "a-manifest-is-not-built-at-module-scope",
+      "protects": "D82",
+      "status": "live",
+      "impl": "scripts/apps.test.mjs",
+      "proves": "unbuilt: ${appDirs.length} product(s), none builds its manifest at startup",
+      "fails": "every product's manifest constructed and put through the whole refusal suite on every cold isolate, over declarations that have not changed since the deploy — a cost that grows with the catalogue and is charged to whichever request happens to be first"
+    },
+    {
       "id": "a-workspace-never-holds-an-infrastructure-label",
       "protects": "D2",
       "stage": "3",

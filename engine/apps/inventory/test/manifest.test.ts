@@ -10,7 +10,10 @@
 
 import { describe, expect, it } from "vitest";
 import { refuseApp } from "@engine/kernel";
-import { INVENTORY } from "../src/index.js";
+import { inventory } from "../src/index.js";
+
+/** ⚠️ Built once here — the manifest is a thunk so that a cold isolate is not. */
+const INVENTORY = inventory();
 import { PROFILES, WORDS, wordsFor } from "../src/words.js";
 
 describe("the manifest", () => {

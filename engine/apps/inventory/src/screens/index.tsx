@@ -21,7 +21,10 @@
 
 import * as React from "react";
 import { ready, type Loaded } from "@engine/design";
-import { INVENTORY } from "../index.js";
+import { inventory } from "../index.js";
+
+/** ⚠️ The manifest is a thunk and memoises itself — see `inventory`. */
+const INVENTORY = inventory();
 import { LINES, PLACES, EMPTY_PLACE, type Line, type Place } from "./sample.js";
 import { Ask, type Answer } from "./Ask.js";
 import { Case, type Used } from "./Case.js";

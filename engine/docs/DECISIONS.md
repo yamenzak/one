@@ -2866,3 +2866,30 @@ fields nobody would ever be asked for.
 **What this forbids:** a story declared and not drawn, drawn and not declared,
 pointing at an operation the app does not have, or a step whose id is written
 somewhere the guard cannot read it.
+
+
+## D82 — A manifest is built when something asks for it, not when the module loads
+
+**Composition was lazy and construction was not, and the check that caught the
+one could not see the other.** D4 put `compose` behind a request, so a deployment
+serving several products pays for the one it is answering. But the manifest
+itself was a top-level `const`, so `defineApp` built the literal and ran the
+whole refusal suite — the collections walk, reachability, the roles walk, the
+ladder — on every cold isolate, over declarations that cannot have changed since
+the deploy. Measured at 0.43 ms for one product; the shape is what matters,
+because it is per app and cold is the ordinary case (D61).
+
+**The literal moved inside the thunk the deployment already calls**, and the
+thunk memoises: lazy so a product nobody opens is never built, once so the four
+browser modules that ask for one product's manifest build one between them.
+
+**The trade is when a mistake surfaces, and it is a real one.** A broken manifest
+used to fail at boot; it now fails on the first request that composes that app.
+That is the better side because nothing here waits for a person to notice —
+`refuseApp` runs over every app's real manifest in its own suite, and every
+deploy probes `/health` before it is called done — but it is a change, not a free
+win, and it is the reason this decision has a number.
+
+**What this forbids:** a manifest declared as a top-level `const`, in any app.
+`scripts/apps.test.mjs` fails on a `defineApp` at column zero, beside the check
+that already fails on a `compose` there.

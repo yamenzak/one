@@ -19,7 +19,10 @@ import {
   subscribe,
   upsertAccount, type Db,
 } from "@engine/runtime";
-import { INVENTORY } from "@engine/inventory";
+import { inventory } from "@engine/inventory";
+
+/** ⚠️ Built once here — the manifest is a thunk, so that a cold isolate does not. */
+const INVENTORY = inventory();
 import worker, { LEGAL } from "../src/index.js";
 import { booted } from "./warm.js";
 

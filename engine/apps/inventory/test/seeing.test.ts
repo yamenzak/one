@@ -15,7 +15,10 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { INVENTORY } from "../src/index.js";
+import { inventory } from "../src/index.js";
+
+/** ⚠️ Built once here — the manifest is a thunk so that a cold isolate is not. */
+const INVENTORY = inventory();
 
 const see = INVENTORY.operations.find((o) => o.id === "product.see")!;
 

@@ -39,7 +39,10 @@ import {
   useFigures, useGate, type Loaded,
 } from "@engine/design";
 import type { Raised } from "@engine/kernel";
-import { INVENTORY } from "../index.js";
+import { inventory } from "../index.js";
+
+/** ⚠️ The manifest is a thunk and memoises itself — see `inventory`. */
+const INVENTORY = inventory();
 
 /**
  * What the workspace is holding, right now.
