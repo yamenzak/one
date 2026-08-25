@@ -2921,3 +2921,31 @@ guard already give at compile time and for free.
 **Therefore never:** a service split argued from anything but a measured
 startup-CPU number; a service-to-service call made with `fetch` where a binding
 exists; and D3 read as a description of what this deployment runs.
+
+
+## D84 — A clause reads back to somebody who has left the step, not to somebody standing on it
+
+D80 gave `says` two jobs: the line in the review, and a live echo under the
+step's own controls. The second one was wrong and shipped.
+
+**A restatement an inch below the control still showing it is a screen talking
+about itself.** On a step with one field the sentence is longer than the answer
+it repeats; beside it a tick reads as a verdict on something nobody has finished
+doing; and it appears on every step of every flow, so the pattern is not one
+screen's mistake but the frame's.
+
+**The clause is unchanged and so is the reason for writing it once.** It is the
+review's line, built from the step that owns it, which is what stops a summary
+disagreeing with the screen it summarises. What is removed is the second drawing
+of it — and the test of whether an answer should be visible while it is being
+given is now direction rather than repetition.
+
+**Where a step does want the answer in front of somebody, it ASKS with it.**
+`Fills` is a sentence with one blank — *we have twelve **boxes** of nitrile
+gloves* — and the blank is the live answer. Same words, opposite direction: one
+confirms a decision already made, the other is the question, and the question is
+what makes the right answer obvious before anybody has to be taught the field.
+
+**Therefore never:** a step that states its own answer above or below the control
+that sets it; a tick against a question in progress; a review line written
+anywhere but on the step it belongs to.

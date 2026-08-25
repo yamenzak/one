@@ -168,12 +168,12 @@ part that is not. Refresh with `node engine/scripts/docs.test.mjs --write`.
 | `tokens/` | colour, type, spacing, motion, the chrome and hem rules | 83 |
 | `scene/` | the ambience engine — families, marks, the world behind a screen | 1 |
 | `frame/` | page, shape, crown, nav, dock, overlays — what wraps a screen | 72 |
-| `parts/` | rows, cards, lists, controls, the four outcomes | 194 |
+| `parts/` | rows, cards, lists, controls, the four outcomes | 195 |
 | `rendered/` | whole surfaces drawn from a kernel declaration | 53 |
 | `chart/` | the data vocabulary — a number as a shape | 39 |
 | `measure/` | what a screen actually lays out, in a real browser — the harness every app sweeps its own screens with | 1 |
 
-**443 exports.** Every one is reachable as `import { … } from "@engine/design"`;
+**444 exports.** Every one is reachable as `import { … } from "@engine/design"`;
 there is no deep import, and a guard says so.
 
 ### `tokens/`
@@ -210,7 +210,7 @@ there is no deep import, and a guard says so.
 - `parts/arrange.tsx` — `Center`, `Cluster`, `Columns`, `Grid`, `Rail`, `Row`, `Spacer`, `Stack`, `Wide`
 - `parts/bars.tsx` — `Bars`, `Bars`, `barsFor`, `BarsProps`, `checksIn`, `CodeKind`, `kindOf`, `SAYS_KIND`
 - `parts/beside.tsx` — `Hint`, `Pip`
-- `parts/blocks.tsx` — `Branch`, `Crumbs`, `Document`, `Faq`, `Gauge`, `Hotkey`, `Moment`, `PageTabs`, `Reveal`, `Step`, `Steps`, `TabSpec`, `Timeline`, `Tree`, `TreeProps`
+- `parts/blocks.tsx` — `Branch`, `Crumbs`, `Document`, `Faq`, `Fills`, `Gauge`, `Hotkey`, `Moment`, `PageTabs`, `Reveal`, `Step`, `Steps`, `TabSpec`, `Timeline`, `Tree`, `TreeProps`
 - `parts/bones.tsx` — `blanks`, `useBones`, `Waiting`
 - `parts/credits.tsx` — `Credits`, `CreditsProps`
 - `parts/face.tsx` — `appFace`, `Face`, `FaceKind`, `FaceOf`, `FaceProps`, `FaceSize`, `faceUri`, `ONE_FACE`, `Orb`, `placeFace`, `whoFace`, `worldFor`

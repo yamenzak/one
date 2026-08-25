@@ -14,7 +14,7 @@
 
 import * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { ready } from "@engine/design";
+import { Fills, ready } from "@engine/design";
 import { describe, expect, it } from "vitest";
 import { inventory } from "../src/index.js";
 
@@ -1763,5 +1763,71 @@ describe("saying how many, in the words somebody is holding", () => {
     /* ⚠️ AND SAYS NOTHING ABOUT TOTALS EITHER — a reassurance about a change
        nobody has made yet is a sentence that plants the worry it answers. */
     expect(out).not.toContain("Your totals stay");
+  });
+});
+
+/* ------------------------------------------------------- registering a thing --- */
+
+/**
+ * ⚠️ THREE THINGS ABOUT THE FLOW ITSELF, ALL OF THEM REPORTED BY SOMEBODY USING
+ * IT. What the wizard ASKS is the product; how many screens it takes to ask it
+ * is the difference between a tool and an induction.
+ */
+describe("the register flow", () => {
+  const register = () => html("/register");
+
+  /*
+    ⚠️ THE CAMERA AND THE NAME ARE ONE SCREEN. Asked separately, "start with a
+    photo?" is a question about a feature to somebody who has not seen the form
+    it fills in — and a step whose whole content is optional teaches people that
+    this flow is a row of Next buttons.
+  */
+  it("opens with the camera and the name together", () => {
+    const out = register();
+    expect(out).toContain("What is it?");
+    expect(out).toContain("Take a photo");
+    expect(out).toContain("Name");
+    expect(out).not.toContain("Start with a photo?");
+  });
+
+  /*
+    ⚠️ AND NOTHING ANNOUNCES THE MODEL OVER THE WHOLE FLOW. A banner saying the
+    photos were read sat above every question for the rest of the wizard, where
+    the thing it is about is nine screens behind. What a model wrote is checkable
+    at the review, which is where it is checked.
+  */
+  it("says nothing about a model over the question", () => {
+    expect(register()).not.toContain("Read from the photos");
+  });
+});
+
+/**
+ * ⚠️ THE UNIT WAS THE FIELD PEOPLE FILLED IN WRONG, and the label was why. Asked
+ * as "One is called", it takes the product's name, or the pack, or the plural —
+ * all reasonable answers to those three words. Set inside the sentence it ends
+ * up in, the shape of the right answer is visible before anybody types.
+ */
+describe("the unit is asked inside its own sentence", () => {
+  const unit = () => renderToStaticMarkup(
+    <Fills before="We have twelve" blank="boxes" after="of Nitrile gloves">
+      <span />
+    </Fills>,
+  );
+
+  it("puts the answer in the sentence it will be read in", () => {
+    const out = unit();
+    expect(out).toContain("We have twelve");
+    expect(out).toContain("boxes");
+    expect(out).toContain("of Nitrile gloves");
+  });
+
+  /* ⚠️ THE BLANK IS DRAWN WHETHER OR NOT IT IS FILLED — a rule that appears on
+     the first keystroke takes the shape of the sentence with it. */
+  it("draws the blank before there is an answer", () => {
+    const out = renderToStaticMarkup(
+      <Fills before="We have twelve" blank="" after="of it" waiting="……" />,
+    );
+    expect(out).toContain("……");
+    expect(out).toContain('data-blank="waiting"');
   });
 });

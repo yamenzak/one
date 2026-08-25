@@ -45,7 +45,7 @@
 
 import * as React from "react";
 import {
-  ActionRow, Await, Bars, Group, NoteRow, NumberInput, OneOf, PickFile, Row,
+  ActionRow, Await, Bars, Fills, Group, NoteRow, NumberInput, OneOf, PickFile, Row,
   RowsWaiting, SAYS_KIND, Segmented, Spacer, Story, Words,
   Lookup, Rail, TextInput, ToggleRow, Viewfinder, Written, kindOf,
   glyphOf, shrunk, useShown, useTelling, type Ask, type Loaded, type Option,
@@ -55,7 +55,7 @@ import { MOST_BYTES, sayList } from "@engine/kernel";
 /* ⚠️ ONE BOX IS ONE CODE — the fold the reader has no way to know. */
 import { foldScan } from "../code.js";
 import {
-  one, sayCodes, sayDates, sayDetail, sayMore, sayNamed, sayPacks, sayPhotos, sayUnit, some,
+  one, sayCodes, sayDates, sayDetail, sayMore, sayPacks, sayThing, sayUnit, some,
 } from "../saying.js";
 import { Ladder, type Rung } from "./Ladder.js";
 
@@ -386,11 +386,31 @@ export function Register({
     .filter(Boolean);
 
   const ASKS: readonly Ask[] = [
+    /*
+      ⚠️ THE CAMERA AND THE NAME ARE ONE QUESTION, AND SPLITTING THEM COST THE
+      CAMERA ITS POINT. Asked on a screen of its own, "start with a photo?" is a
+      question about a feature — and the honest answer from somebody who has not
+      seen the form yet is "I don't know, what will it do". Put the shutter above
+      the name it fills in and the offer explains itself: press it, and the
+      fields under it are already written.
+
+      ⚠️ AND IT REMOVES THE ONE STEP SOMEBODY COULD ONLY SAY NO TO. A step whose
+      whole content is optional is a screen most people press Next on, which
+      teaches them that pressing Next is what this flow is.
+    */
     {
-      id: "photos",
-      ask: "Start with a photo?",
-      under: "The camera can fill in most of the rest",
-      says: sayPhotos(photos.length, Boolean(answer)),
+      id: "what",
+      ask: "What is it?",
+      under: "Photograph it and the rest fills itself in",
+      says: sayThing(brand, name, photos.length, Boolean(answer)),
+      short: !name.trim()
+        ? "Give it a name"
+        /* ⚠️ NOT A REFUSAL UNTIL IT IS THE STRONG KIND, and even then it is
+           answerable in place. A form somebody fills in completely and is then
+           told to throw away is how people learn to press past a warning. */
+        : strong && !anyway
+          ? "Say it is a different thing, or open the one you have"
+          : undefined,
       children: (
         <>
           <PickFile
@@ -506,25 +526,7 @@ export function Register({
             : null}
 
           <Await of={guessed} again={again} waiting={<RowsWaiting rows={2} lead={false} />} then={() => null} />
-        </>
-      ),
-    },
 
-    {
-      id: "what",
-      ask: "What is it?",
-      under: "The name somebody would use looking for it on a shelf",
-      says: sayNamed(brand, name),
-      short: !name.trim()
-        ? "Give it a name"
-        /* ⚠️ NOT A REFUSAL UNTIL IT IS THE STRONG KIND, and even then it is
-           answerable in place. A form somebody fills in completely and is then
-           told to throw away is how people learn to press past a warning. */
-        : strong && !anyway
-          ? "Say it is a different thing, or open the one you have"
-          : undefined,
-      children: (
-        <>
           <TextInput
             label="Name"
             value={name}
@@ -618,37 +620,54 @@ export function Register({
     {
       id: "unit",
       ask: "What is one of them?",
-      under: "The word that finishes “we have twelve…”",
       says: sayUnit(unit, whole),
       short: !unit.trim() ? "Say what one of them is called" : undefined,
       children: (
         <>
           {/*
-            ⚠️ WHAT THIS WORKSPACE ALREADY COUNTS IN, OFFERED RATHER THAN
-            REMEMBERED. Typed free, one catalogue ends up with `box`, `Box`,
-            `boxes` and `BX` — four units that are one unit, on four things that
-            can never be compared or totalled. `Lookup` still takes anything
-            typed, so a new unit costs nothing; it just stops the fifth spelling
-            of an old one being the path of least resistance.
+            ⚠️ THE QUESTION IS THE SENTENCE THE ANSWER ENDS UP IN — see `Fills`.
+            Asked as a field called "One is called", this got `Nitrile gloves`
+            typed into it, or `Box of 100`, or the product name again: all
+            reasonable answers to a label, none of them a unit. Set in the line
+            it will be read in, the shape of the right answer is visible before
+            anybody types — and the wrong ones are audibly wrong.
           */}
-          <Lookup
-            label="One is called"
-            value={unit}
-            onChange={setUnit}
-            options={knownUnits}
-            placeholder="piece, box, kg, litre, roll, metre"
-            help="One of these, or type your own"
-            name="unit"
-          />
+          <Fills
+            before="We have twelve"
+            blank={unit.trim() ? some(unit) : ""}
+            after={name.trim() ? `of ${name.trim()}` : "of it"}
+            waiting="……"
+          >
+            {/*
+              ⚠️ WHAT THIS WORKSPACE ALREADY COUNTS IN, OFFERED RATHER THAN
+              REMEMBERED. Typed free, one catalogue ends up with `box`, `Box`,
+              `boxes` and `BX` — four units that are one unit, on four things
+              that can never be compared or totalled. `own` is what lets a word
+              nobody has used before be given at all; the list is what stops the
+              fifth spelling of an old one being the path of least resistance.
+            */}
+            <Lookup
+              label="One is called"
+              value={unit}
+              onChange={setUnit}
+              options={knownUnits}
+              own
+              placeholder="piece, box, kg, litre, roll, metre"
+              help="One of these, or type your own"
+              name="unit"
+            />
+          </Fills>
           {/*
-            ⚠️ THE QUESTION USES THE WORD THEY JUST TYPED, and that is the point
-            of asking it here rather than as a switch called "Whole units only".
-            "Can you have half a litre?" answers itself; "Whole units only: off"
-            is a setting somebody has to reason about.
+            ⚠️ THE HALF IS ASKED AS THE SENTENCE IT WOULD PRODUCE, for the same
+            reason. "Whole units only: off" is a setting somebody has to reason
+            about; a stock line reading *three and a half boxes of nitrile
+            gloves* answers itself, and it answers itself differently for paint
+            and for gloves, which is the whole distinction being drawn.
           */}
           <ToggleRow
             label={`Can you have half ${one(unit)}?`}
-            under="Yes for weights, lengths and liquids"
+            under={`Could you say “three and a half ${some(unit)}${
+              name.trim() ? ` of ${name.trim()}` : ""}”?`}
             value={!whole}
             onChange={(half) => { setWhole(!half); }}
           />
@@ -1019,18 +1038,6 @@ export function Register({
       onGo={setWhere}
       leave={back}
       review={{ ask: "Does this look right?", under: "Press any line to change it" }}
-      /* ⚠️ SAID ONCE, OVER THE QUESTION — not a badge on every field a model
-         touched. The review at the end is what makes it checkable; this is what
-         makes it worth checking. */
-      note={answer
-        ? (
-          <NoteRow icon={glyphOf("model")}>
-            {answer.why
-              ? `Read from the photos — ${answer.why.toLowerCase()}. Check each line before you add it`
-              : "Read from the photos. Check each line before you add it"}
-          </NoteRow>
-        )
-        : undefined}
       does={{
         /* ⚠️ THE NOUN, BECAUSE "IT" IS ONLY OBVIOUS TO WHOEVER WROTE IT. Ten
            questions later, the last control says what it adds. */

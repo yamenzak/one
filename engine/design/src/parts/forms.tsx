@@ -462,22 +462,53 @@ export const withValue = (
  * with everything else under it. The comment at the unit call site already
  * promised this ("anything typed, so a new unit costs nothing"); the control had
  * never been able to do it.
+ *
+ * ⚠️ AND `own` IS WHAT MAKES TYPING ONE POSSIBLE, WHICH FOLDING THE VALUE IN DID
+ * NOT. A selection-only combo box has one source of truth and it is the SELECTED
+ * KEY, so text matching no option selects nothing — and React Aria then restores
+ * the input to the selection on blur. Typing a word nobody had used before
+ * therefore vanished the moment the field lost focus, under help that said "or
+ * type your own": the fix above made an existing value visible, and this is what
+ * lets a new one be given at all.
+ *
+ * ⚠️ IT IS OPT-IN BECAUSE HALF OF THESE MUST REFUSE. A unit is a word a person
+ * may coin; a supplier, a location and a plan are rows that exist or do not, and
+ * a control that quietly accepted a name for one of those would send an id
+ * nothing can resolve. So the caller says which kind it is.
  */
-export function Lookup({ value, onChange, options, placeholder, name, autoFocus, ...p }: Said & {
+export function Lookup({
+  value, onChange, options, placeholder, name, autoFocus, own = false, ...p
+}: Said & {
   readonly value: string | undefined | null;
   readonly onChange: (id: string) => void;
   readonly options: readonly Option[];
   readonly placeholder?: string;
   readonly name?: string;
   readonly autoFocus?: boolean;
+  /** ⚠️ A word the list does not offer is an answer, not a mistake. */
+  readonly own?: boolean;
 }) {
   const pending = value === undefined;
   const shown = withValue(options, value);
   return (
     <ComboBox
       name={name}
-      selectedKey={value ?? null}
-      onSelectionChange={(key) => { if (key !== null) onChange(String(key)); }}
+      allowsCustomValue={own}
+      /* ⚠️ THE INPUT IS THE ANSWER WHERE A NEW WORD IS ALLOWED, and the selection
+         is the answer where it is not — two different sources of truth for two
+         different questions. Wiring both in `own` mode is what keeps a picked row
+         and a typed word landing in the same place. */
+      {...(own
+        ? { inputValue: value ?? "", onInputChange: onChange }
+        : { selectedKey: value ?? null })}
+      onSelectionChange={(key) => {
+        if (key === null) return;
+        /* ⚠️ THE LABEL, NOT THE KEY, WHERE THE INPUT IS THE ANSWER. The box shows
+           the label; storing the id would leave the two disagreeing about what
+           was chosen, and the disagreement only shows up on the next render. */
+        const picked = shown.find((o) => o.id === String(key));
+        onChange(own ? picked?.label ?? String(key) : String(key));
+      }}
       {...said(p)}
       isDisabled={p.disabled === true || pending}
     >

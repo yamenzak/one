@@ -570,8 +570,10 @@ app writes the questions and the sentences, and nothing else.
   heading names the area of the record being written and leaves the person to
   work out what is wanted; a question has an answer.
 - **A step carries `says`** — the clause its answer makes, in the person's own
-  words. One string does two jobs: the live echo under the control and the line
-  in the review. Written twice they drift.
+  words, and the review at the end is built out of them. It is NOT drawn under
+  the control: a step restating the answer beside the control that sets it is a
+  screen talking about itself. A step that wants its answer visible as it is
+  given asks with it — `Fills`, the sentence with the blank in it.
 - **An answer removes the questions it contradicts.** `when: false` takes a step
   out of the flow entirely — out of the count, the progress and the review — and
   the payload drops what it collected. Never greyed out.

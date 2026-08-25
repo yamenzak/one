@@ -222,6 +222,18 @@ export const sayPhotos = (many: number, read: boolean): string | null => {
   return read ? `${shots}, read by the camera` : shots;
 };
 
+/**
+ * ⚠️ THE NAME AND THE PHOTOGRAPHS ARE ONE ANSWER NOW, so the review says both in
+ * one line — see the first step of `Register`. Two lines for one screen would
+ * make the recap longer than the flow.
+ */
+export const sayThing = (brand: string, name: string, photos: number, read: boolean): string | null => {
+  const called = sayNamed(brand, name);
+  if (!called) return null;
+  const shots = photos > 0 ? sayPhotos(photos, read) : null;
+  return shots ? `${called} — ${shots.toLowerCase()}` : called;
+};
+
 /* ------------------------------------------------------------------ more --- */
 
 /**

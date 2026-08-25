@@ -6038,7 +6038,6 @@ const manifest = (): AppSpec => defineApp({
       story: {
         writes: "product.register",
         asks: [
-          { id: "photos", ask: "Start with a photo?" },
           { id: "what", ask: "What is it?" },
           { id: "finding", ask: "How would you look for it later?" },
           { id: "unit", ask: "What is one of them?" },

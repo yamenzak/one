@@ -1114,6 +1114,7 @@ its own header, cited by other files, and doing nothing.
 | D81 | A flow is declared in the manifest and drawn in a screen | 2 |
 | D82 | A manifest is built when something asks for it, not when the module loads | 1 |
 | D83 | The split D3 describes has not been taken, and the trigger is startup CPU | 0 |
+| D84 | A clause reads back to somebody who has left the step, not to somebody standing on it | 0 |
 <!-- /generated -->
 
 ---

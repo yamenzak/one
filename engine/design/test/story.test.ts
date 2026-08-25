@@ -81,9 +81,9 @@ describe("the story so far is what came before, and only that", () => {
 
   /*
     ⚠️ THE CURRENT STEP IS ABSENT, AND THIS IS THE ONE THAT WOULD HAVE SHIPPED.
-    Its clause is already drawn under the control, live; in the recap as well it
-    is the same sentence twice on one screen — which is exactly the duplication a
-    recap exists to remove.
+    The story so far is what somebody has already left behind; the step they are
+    standing on is the question, and stating its answer back to them is a screen
+    talking about the control they are looking at.
   */
   it("leaves out the step somebody is standing on", () => {
     const flow = walk([

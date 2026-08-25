@@ -23,6 +23,67 @@ import {
 import { TYPE } from "../tokens/type.js";
 import { Group, NavRow } from "./surfaces.js";
 
+/* ------------------------------------------------------------------ fills --- */
+
+/**
+ * A SENTENCE WITH ONE BLANK IN IT, AND THE CONTROL THAT FILLS THE BLANK.
+ *
+ * ⚠️ A LABEL SAYS WHAT A FIELD IS CALLED; A SENTENCE SAYS WHAT THE ANSWER WILL
+ * MEAN. "One is called: [ ]" is a database column with a person in front of it —
+ * they have to work out what the word will be used for, and the answer they give
+ * is the one that reads best beside the label rather than the one that reads best
+ * in the product. Put the field inside the sentence it ends up in — *we have
+ * twelve **boxes** of nitrile gloves* — and the right answer is the obvious one,
+ * before anybody explains anything.
+ *
+ * ⚠️ AND THE BLANK IS THE LIVE ANSWER, WHICH IS WHY THIS IS NOT AN ECHO. A
+ * recap under a control repeats what the control already shows; this is the same
+ * words doing the ASKING, above a control that has not been touched yet. The
+ * difference is the direction: one confirms, the other is the question.
+ *
+ * ⚠️ THE EXAMPLE NUMBER IS THE POINT AND IT IS NEVER REAL. "Twelve" is not a
+ * quantity anybody is entering — it is there so the blank has a plural beside it
+ * and the reader hears the sentence rather than reading a form. A real figure
+ * here would be a fact on a screen that is asking a question.
+ */
+export function Fills({ before, blank, after, waiting = "…", children }: {
+  readonly before: string;
+  /** The answer so far. Empty draws the blank itself. */
+  readonly blank: string;
+  readonly after?: string;
+  /** What stands in for the answer until there is one. */
+  readonly waiting?: string;
+  readonly children?: React.ReactNode;
+}) {
+  const said = blank.trim();
+  return (
+    <div className={`flex flex-col ${SPACE.snug}`}>
+      {/* ⚠️ ONE PARAGRAPH, NOT THREE SPANS IN A ROW. Set as a flex row the three
+          parts break independently and the sentence comes apart on a phone —
+          `text-pretty` on one block keeps it a sentence at every width. */}
+      <p className={`${TYPE.title} text-pretty`}>
+        {before}{" "}
+        <span
+          /* ⚠️ THE BLANK IS UNDERLINED WHETHER OR NOT IT IS FILLED, because the
+             rule is what says "this is the part you are giving me". Drawn only
+             when empty it would be a line that vanishes on the first keystroke,
+             taking the shape of the sentence with it. */
+          /* ⚠️ THE STATE IS AN ATTRIBUTE WITH A RULE ON IT, not a ternary in the
+             class list. What "waiting" looks like is one place, readable in the
+             markup, and a screen inspecting the sentence can find the blank. */
+          className={"underline decoration-[var(--brand)] decoration-2 underline-offset-4 "
+            + "data-[blank=waiting]:text-muted data-[blank=waiting]:decoration-[var(--line)]"}
+          data-blank={said ? "said" : "waiting"}
+        >
+          {said || waiting}
+        </span>
+        {after ? ` ${after}` : null}
+      </p>
+      {children}
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ steps --- */
 
 export interface Step {

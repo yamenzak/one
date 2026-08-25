@@ -15,11 +15,18 @@
  * this is the app repeating the decision in the language the decision was made
  * in, which is the only form of explanation nobody has to be told to read.
  *
- * ⚠️ AND THE SENTENCE IS ONE STRING DOING TWO JOBS, WHICH IS THE WHOLE
- * MECHANISM. `says` is the live echo under the control AND the line in the
- * review at the end. Written twice they would drift the first time somebody
- * edited one — and a summary that disagrees with the screen it summarises is
- * worse than none, because it is the half people trust.
+ * ⚠️ AND THE SENTENCE IS WRITTEN ONCE, ON THE STEP, WHICH IS THE WHOLE
+ * MECHANISM. `says` is the step's own account of its answer, and the review at
+ * the end is built out of them. Written a second time in the summary they would
+ * drift the first time somebody edited one — and a summary that disagrees with
+ * the screen it summarises is worse than none, because it is the half people
+ * trust.
+ *
+ * ⚠️ IT IS NOT DRAWN UNDER THE CONTROL, AND IT WAS. A ticked line restating the
+ * answer an inch below the control still showing it is a screen talking about
+ * itself: on a step with one field the restatement is longer than the answer,
+ * and the tick beside it reads as a verdict on something nobody has finished.
+ * A clause reads back to somebody who has LEFT the step, which is the review.
  *
  * ⚠️ THE SUMMARY IS A STEP, NOT A BAND ON EVERY SCREEN. A recap riding along
  * above each question was tried and was wrong both ways round: closed it showed
@@ -81,9 +88,9 @@ export interface Ask {
    * WHAT THIS STEP ADDS TO THE STORY — a clause in the person's own words,
    * recomputed live as they answer.
    *
-   * ⚠️ NULL WHILE UNANSWERED, AND NOT AN EMPTY STRING. An unanswered step draws
-   * no echo and takes no line in the recap; a blank line in a recap reads as a
-   * step that went wrong.
+   * ⚠️ NULL WHILE UNANSWERED, AND NOT AN EMPTY STRING. An unanswered step takes
+   * no line in the recap; a blank line in a recap reads as a step that went
+   * wrong.
    */
   readonly says?: string | null;
   /**
@@ -297,9 +304,10 @@ export function walk(asks: readonly Ask[], on: string): Walk {
   const mine = here?.short;
   const short = mine ?? (last ? owing?.short : undefined);
 
-  /* ⚠️ EVERY ANSWERED STEP BEFORE THIS ONE. The current step is absent because
-     its clause is already under the control, live — twice on one screen is the
-     duplication a recap is supposed to remove. */
+  /* ⚠️ EVERY ANSWERED STEP BEFORE THIS ONE, for a caller that wants the story so
+     far. The current step is absent because it is the question being asked: a
+     screen that stated its own answer above the control setting it would be
+     reading back to somebody who is looking at it. */
   const told = live
     .slice(0, at)
     .flatMap((one) => (one.says ? [{ id: one.id, ask: one.ask, says: one.says }] : []));
@@ -434,16 +442,20 @@ export function Story({
         <Along at={i + 1} of={live.length} />
         {note}
 
+        {/*
+          ⚠️ NO ECHO UNDER THE CONTROLS, AND `says` IS STILL DECLARED. It was
+          drawn here as a ticked line under every step — the answer, restated, an
+          inch below the control still showing it. Two things made that worse
+          than redundant: on a screen with one field the sentence is longer than
+          the answer it repeats, and a tick beside it reads as a verdict on
+          something nobody has finished doing.
+
+          ⚠️ THE CLAUSE'S JOB IS THE REVIEW, WHICH IS THE ONE PLACE THE ANSWER IS
+          NOT ALREADY ON SCREEN. A step reads back to somebody who has left it;
+          under the control it read back to somebody looking at it.
+        */}
         <Section label={here.ask}>
           {here.id === REVIEW ? <Review live={live} onGo={jump} /> : here.children}
-
-          {/* ⚠️ THE ANSWER, SAID BACK, IN THE WORDS THE ANSWER WAS GIVEN IN.
-              Under the controls rather than over them: over them it is a
-              sentence stating an answer beside the empty control that sets it,
-              which reads as a screen that has got ahead of itself. */}
-          {here.says
-            ? <NoteRow icon={glyphOf("check")}>{here.says}</NoteRow>
-            : null}
         </Section>
 
         {/* ⚠️ AND WHERE THE DEBT IS SOMEBODY ELSE'S STEP, THE SENTENCE IS THE WAY

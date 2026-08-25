@@ -882,10 +882,20 @@ text. Help text sits under a field explaining a word; this is the app restating
 the decision in the language the decision was made in, which is the only
 explanation nobody has to be told to read.
 
-**One string does both jobs, and that is the mechanism.** `says` is the live echo
-under the control AND the line in the review at the end. Written twice they drift
-the first time somebody edits one, and a summary that disagrees with the screen
-it summarises is worse than none — it is the half people trust.
+**The clause is written once, on the step, and the review is built out of them.**
+Written a second time in the summary they drift the first time somebody edits
+one, and a summary that disagrees with the screen it summarises is worse than
+none — it is the half people trust.
+
+**It is not drawn under the control, and it was.** A ticked line restating the
+answer an inch below the control still showing it is a screen talking about
+itself: on a step with one field the restatement is longer than the answer it
+repeats, and the tick beside it reads as a verdict on something nobody has
+finished doing. A clause reads back to somebody who has LEFT the step — which is
+the review, and is the one place the answer is not already on screen. Where a
+step wants its answer visible while it is being given, that is `Fills`: the
+sentence doing the ASKING with the answer in the blank, which is the same words
+pointing the other way.
 
 **The summary is a step, not a band on every screen.** A recap riding along above
 each question was tried and was wrong both ways round: closed it showed one
