@@ -40,6 +40,13 @@ export interface Line {
   readonly tracking: Tracking;
   /** ⚠️ When this line last moved — see `stock.seen`. */
   readonly seen: string;
+  /**
+   * ⚠️ AN ADDRESS, NOT A MEDIA ID. What the product was photographed as, already
+   * resolved to something an `<img>` can take — `linesOf` does that once with the
+   * door's `file`, so a screen never learns the shape of a route and the sample
+   * world can be written without one.
+   */
+  readonly photo?: string;
 }
 
 export const PLACES: readonly Place[] = [

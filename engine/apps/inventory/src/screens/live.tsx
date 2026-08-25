@@ -88,6 +88,14 @@ export interface Door {
    * is what "every navigation takes time" actually is.
    */
   known<T>(op: string, input?: Record<string, string>): T | undefined;
+  /**
+   * ⚠️ WHERE A STORED FILE CAN BE POINTED AT — the one thing the door hands back
+   * that is not an answer. A photograph belongs in an `<img>`, and an `<img>`
+   * takes an address rather than bytes; going through `get` would mean this app
+   * holding every product picture in memory as a blob URL it then has to revoke.
+   * The address is still an operation, so the roster is asked per request.
+   */
+  file(id: string): string;
 }
 
 /** What a mounted screen is handed — see `AppScreen` in OneSpace. */
@@ -355,8 +363,15 @@ function placesOf(rows: readonly Row[], stock: readonly Row[]): readonly Place[]
   }));
 }
 
+/**
+ * ⚠️ `file` IS THE FOURTH ARGUMENT BECAUSE A ROUTE IS THE DOOR'S TO KNOW. The
+ * product row holds a media ID, and a list holds an address — resolving it once
+ * here means `Line` is a shape a screen can draw and the sample world can be
+ * written out by hand, neither of which is true of an id that needs a lookup.
+ */
 function linesOf(
   rows: readonly Row[], places: readonly Place[], kinds: readonly Row[],
+  file: (id: string) => string,
 ): readonly Line[] {
   const named = new Map(places.map((p) => [p.id, p.name]));
   const kind = new Map(kinds.map((k) => [text(k.id), k]));
@@ -378,6 +393,10 @@ function linesOf(
       ...(of && of.par !== null && of.par !== undefined ? { par: num(of.par) } : {}),
       tracking: trackingOf(of?.tracking),
       seen: text(row.seen) || text(row.at),
+      /* ⚠️ THE PICTURE OF RECORD, WHICH IS THE FIRST ONE — see `product.register`.
+         A product photographed from six angles has one the shelf is scanned by,
+         and the other five are for the page that is about it. */
+      ...(of && text(of.photo) ? { photo: file(text(of.photo)) } : {}),
     };
   });
 }
@@ -461,7 +480,7 @@ const STOCK = (api: Door) => function StockHere({ app, go }: Mounted) {
 
   const reach = under(places, here);
   const rows = both(world.stock, world.kinds, (stock, kinds) => {
-    const all = linesOf(stock.items, places, kinds.items);
+    const all = linesOf(stock.items, places, kinds.items, api.file);
     return here ? all.filter((l) => reach.has(l.where)) : all;
   });
 
@@ -518,7 +537,7 @@ const THING = (api: Door) => function ThingHere({ go, at }: Mounted) {
     : [];
 
   const line = both(world.stock, world.kinds, (stock, kinds) =>
-    pick(linesOf(stock.items, places, kinds.items), id));
+    pick(linesOf(stock.items, places, kinds.items, api.file), id));
 
   /* ⚠️ THE MOVEMENTS OF THIS PRODUCT, WHEREVER THEY HAPPENED — not of this
      LINE. A line is a product on one shelf; a correction made after somebody
@@ -663,7 +682,7 @@ const WHERE = (api: Door) => function WhereHere({ go, at }: Mounted) {
   const place = places.find((p) => p.id === id || p.code === id);
 
   const rows = both(world.stock, world.kinds, (stock, kinds) =>
-    linesOf(stock.items, places, kinds.items).filter((l) => l.where === id));
+    linesOf(stock.items, places, kinds.items, api.file).filter((l) => l.where === id));
 
   return (
     <Where
@@ -844,7 +863,7 @@ const MOVE = (api: Door) => function MoveHere({ go, at }: Mounted) {
     ? placesOf(world.places.data.items, world.stock.data.items)
     : [];
   const line = both(world.stock, world.kinds, (stock, kinds) =>
-    pick(linesOf(stock.items, places, kinds.items), id));
+    pick(linesOf(stock.items, places, kinds.items, api.file), id));
 
   const held = line.status === "ready" ? line.data : undefined;
   /* ⚠️ THE PRODUCT'S OWN ROW, because the ladder is the product's. */

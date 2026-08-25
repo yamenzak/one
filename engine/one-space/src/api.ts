@@ -542,6 +542,23 @@ export const api = {
     call<T>(id, "POST", input, as?.contentType, as?.with),
 
   /**
+   * WHERE A STORED FILE CAN BE POINTED AT — for an `<img>`, and for nothing else.
+   *
+   * ⚠️ IT IS THE OPERATION'S OWN ADDRESS, NOT A SIGNED LINK. `media.read` is a
+   * GET, so the browser can put it in a `src` and the roster is still asked on
+   * every single request — see `media-ops.ts`, which argues at length against
+   * the signed public URL this is the alternative to. A signature keeps working
+   * after somebody is removed from the workspace and nothing here could revoke
+   * it; a cookie stops working the moment they are.
+   *
+   * ⚠️ AND IT IS HERE RATHER THAN IN THE APP THAT WANTS IT, because a product may
+   * not know the shape of a route. Every other call goes through `call`; this one
+   * is handed to the browser to make instead of made here, which is the only
+   * reason it is a string and not a `Promise`.
+   */
+  file: (id: string): string => `/api/media.read?id=${encodeURIComponent(id)}`,
+
+  /**
    * ⚠️ THE ONE REQUEST THAT IS NOT AN OPERATION. `/health` is outside `/api/`
    * because it is what a deploy probes before anything is signed in — and it is
    * here rather than in a screen so that this file remains the only place in the

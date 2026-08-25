@@ -19,8 +19,8 @@
  */
 
 import {
-  ActionRow, AmountRow, Group, NavRow, Num, SPACE, Screen, Tree, Unit, glyphOf, useFigures,
-  useGate,
+  ActionRow, AmountRow, Group, NavRow, Num, SPACE, Screen, Tree, Unit, glyphOf, thingFace,
+  useFigures, useGate,
   type Branch, type Loaded,
 } from "@engine/design";
 import { Button } from "@heroui/react";
@@ -175,6 +175,13 @@ export function Stock({
             {lines.map((line) => (
               <AmountRow
                 key={line.id}
+                /* ⚠️ THE THING ITSELF WHERE THERE IS A PICTURE OF IT, AND NOTHING
+                   WHERE THERE IS NOT. A glyph per row would be a column of
+                   identical box marks — a picture of the KIND, which distinguishes
+                   no row from any other and pushes every label the same 40px
+                   right for nothing. A photograph is what makes a list scanned
+                   rather than read; its absence is honest. */
+                {...(line.photo ? { face: thingFace(line.photo) } : {})}
                 label={line.name}
                 /* ⚠️ WHERE IT IS, ONLY WHEN THAT IS NOT ALREADY THE HEADING. On
                    a shelf's own screen every row would repeat the shelf's name,
