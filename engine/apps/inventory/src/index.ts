@@ -6386,7 +6386,7 @@ const manifest = (): AppSpec => defineApp({
                 { field: "code", label: "Code" },
                 { field: "location.name", label: "Where" },
               ],
-              nothing: { says: "No items yet", under: "Receive some and they appear here" },
+              nothing: { says: "None of these on the shelf", under: "Receive some and they appear here" },
               goes: "unit",
               bind: {
                 label: { from: { of: "words", says: "Items" } },
