@@ -736,4 +736,13 @@ export const GROUND_CSS = [
   */
   `.progress-circle__track-circle { stroke: color-mix(in oklab, var(--foreground) 10%, transparent); }`,
   `.progress-circle__fill-circle { stroke: var(--data); stroke-linecap: round; }`,
+  /*
+    ⚠️ AND THE BAR IS THE SAME MARK LYING DOWN, SO IT TAKES THE SAME TOKEN. The
+    ring above was corrected and the bar was not, which left one screen measuring
+    progress in the data colour and the next measuring it in the accent —
+    monochrome, so the bar read as ink rather than as a quantity, and the two
+    marks disagreed about what "how far along" looks like.
+  */
+  `.progress-bar__track { background-color: color-mix(in oklab, var(--foreground) 10%, transparent); }`,
+  `.progress-bar__fill { background-color: var(--data); }`,
 ].join("\n");
