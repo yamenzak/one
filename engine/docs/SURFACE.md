@@ -333,13 +333,59 @@ split's aside is beside its main column rather than under it — found by
 `querySelector("aside")` and `previousElementSibling`, because a reading that
 counts DOM levels breaks on the correct fix and passes on the incorrect one.
 
-### S7 — The guards, re-founded
-The 69 source-scanning guards become schema-scanning guards. Each one keeps its
-QUESTION and changes what it reads. Where a question no longer applies — a rule
-about `className` on a component nobody hand-writes any more — it is deleted with
-its reason recorded, not left passing over an empty set.
+### S7 — The guards, re-founded · **stage 95, shipped**
 
-⚠️ **Before any app is ported.** See decision 2 above.
+**The number in the sentence above was wrong, and so was the verb.** It is **56**
+guards that sweep a product, not 69 — measured — and almost none of them
+"becomes a schema-scanning guard". A guard keyed on `className`, on `<Card`, on a
+bare `fetch`, on `catch(() => [])` cannot be pointed at a `body:` and re-ask its
+question there, because the declaration has no such clause. The question does not
+convert. It **dissolves** — and that is a different thing to check.
+
+**A ported screen does not fail a guard. It stops being asked.** Nothing turns
+red; the corpus just gets smaller, one screen at a time, and a guard printing
+`ok` over forty files is indistinguishable from one printing `ok` over sixty.
+That is the same fault `lib/trees.mjs` exists for — one directory move quietly
+took the proving ground out of twenty sweeps at once — except this time it is
+scheduled, deliberate, and spread over three stages.
+
+**So the answer is written down per guard, before the port, and there are five of
+them.** `docs/guards.json` carries a `becomes` on every guard that sweeps a
+product:
+
+| answer | what it claims | what `census.test.mjs` checks |
+|---|---|---|
+| `refused: <code>` | a declaration CAN express the fault and the kernel says no | the code is in the refusal union **and** a kernel test asserts it |
+| `unrepresentable: …` | the grammar has no clause for the fault | the reason is written out |
+| `reads` | the guard reads declarations itself | it imports `lib/declared.mjs` |
+| `elsewhere: …` | the question never depended on a screen being a **file** | the reason is written out |
+| `story` | about a story's controls, which stay in the app | — |
+
+The tally: **17 unrepresentable, 35 elsewhere, 4 refused, 1 story, 0 reads.**
+
+**Zero `reads` is the finding.** Going in, the expectation was a pile of guards
+needing to be re-pointed at the manifest. There are none: every question either
+dissolves in the grammar or already lives somewhere a body lands inside. The
+declared surface does not open a coverage hole — it closes one, and the ledger is
+what proves that rather than assumes it.
+
+The sharpest single answer is **`keys`**, which asks "does a screen print a
+machine key where a name belongs" — the header calls it the most-repeated fault
+in this product. Declared, it stops being a screen's fault at all and becomes the
+field's: `labels` on the enum, named once for every screen that draws it. Asking
+it there found five live ones in OneInventory — a picker offering **"Gtin"**,
+**"Gs1"**, **"Ai-assisted"** and **"Ok"**, because sentence case has only the key
+to go on. Those are fixed in this stage.
+
+**And the reader is asked whether it can still see.** All of it rests on a text
+read of `screens: [`, which is the one kind of check that answers *none* rather
+than throwing when the shape moves under it — so an app contributing no screens
+is a failure, not a number. Both halves of that were caught by mutation: the
+first draft under-counted 31 screens as 6, and the refusal check passed a
+renamed code because `includes` is a substring test.
+
+⚠️ **The seventeen `unrepresentable` claims are the list stage 96 must not
+violate.** Each is a promise about what the renderer will *not* let a body say.
 
 ### S8 — The renderer
 The screen renderer joins `design/src/rendered/`: it takes a `ScreenSpec.body`

@@ -1048,6 +1048,8 @@ its own header, cited by other files, and doing nothing.
 | `the-dock-is-a-plate-and-its-ink-travels-with-it` | D86 | a dock painted from a card tier — a white slab in the light theme — or one that states a fill and no ink, which is a near-black glyph on a near-black plate that every contrast check here passes because they all measure ink against the PAGE |
 | `every-block-is-real-and-everything-that-could-be-one-is-placed` | D92 | a renamed component leaving its registry entry pointing at nothing - a manifest refused for naming a block that plainly exists, or a blank region where a card was; and the silent half, a component that could be a block and is in no registry, which exists and works and passes every guard while no screen can ever ask for it, so the next app hand-rolls the thing that was already built |
 | `a-block-may-not-name-a-breakpoint` | D92 | a component that reflows on the viewport while sitting in a box the viewport knows nothing about - four columns drawn into 300 pixels on a 1440px monitor, every one of them a word per line, and the reverse where a list given the whole of a tablet stays a phone list; plus a container rule with no container over it, which resolves against whatever ancestor happens to be one and fires on somebody else's width; and an element carrying both the container declaration and the rule that queries it, which cannot query itself and so is inert at every width while typechecking and shipping its class |
+| `every-guard-that-sweeps-a-product-says-what-its-question-becomes` | D92 | a guard that narrows in silence as screens are ported - a `.tsx` question asked of a `body:` that cannot contain a className, a bare fetch or a catch that answers a failure with a fact, so the check goes unanswered rather than red and the corpus shrinks one screen at a time behind an unchanged `ok`; plus a refusal claimed as the replacement that the kernel does not emit or that no test asserts, and a bare `unrepresentable` with no clause saying what the grammar has no room for |
+| `the-reader-can-still-see-the-screens-it-counts` | D92 | a text reader that has gone blind rather than a repository that has gone empty - `lib/declared.mjs` matches `screens: [` in source, which is the one kind of check that answers `none` instead of throwing when the shape moves under it, and a census reporting zero declared screens is indistinguishable from a census reporting the truth |
 | `a-list-decides-by-its-own-box-on-one-unchanging-screen` | D92 | a breakpoint passing for a container query - the two are indistinguishable in every reading that varies the window, since both collapse a list on a phone and open it on a desk; held at ONE viewport width and given two boxes, only a container query can answer differently |
 | `three-arrangements-that-are-three-arrangements` | D92 | a layout whose branches all draw one column - a grid whose template resolved to a single track, a split whose aside wrapped underneath, and a stack are three declarations that produce identical geometry and pass every static check; and a narrowest cell that never reaches the template, which makes tile, panel and card three names for the same width |
 | `one-block-and-all-four-of-the-things-that-can-be-true-of-it` | D92 | the three outcomes a screen skips because in development the request is instant and it succeeds - an empty array drawn as a confident fact while the request is still in flight, a failed load drawn as `no media yet`, and a skeleton drawn for something the person was never going to be allowed to see, which is a promise the screen breaks a second later |
@@ -1149,7 +1151,7 @@ its own header, cited by other files, and doing nothing.
 | D89 | One ladder, and a rung has to reach the page | 5 |
 | D90 | A screen composes the vocabulary; it does not re-derive it | 5 |
 | D91 | A night is deep and lit, and the ladder's numbers are the ones that ship | 2 |
-| D92 | A screen is a body or a story, and what a body binds through is closed | 5 |
+| D92 | A screen is a body or a story, and what a body binds through is closed | 7 |
 <!-- /generated -->
 
 ---
@@ -1298,12 +1300,12 @@ a later decision superseded, so neither list can rot into a promise nobody owes.
 | 92 | A block reflows by its own measured box, and the screen is held still to prove it | shipped |
 | 93 | The four outcomes are the frame's, and what a block owes is the shape of its own absence | shipped |
 | 94 | The layouts: relationships rather than breakpoints | shipped |
-| 95 | The guards, re-founded on the schema | **planned** |
+| 95 | The guards, re-founded on the schema | shipped |
 | 96 | The renderer: a screen is drawn from what it declares | **planned** |
 | 97 | OneInventory, ported — 25 screens, no escape hatch | **planned** |
 | 98 | The door closes: no private UI in an app | **planned** |
 
-**82 shipped, 15 planned, 1 superseded.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it, and nothing may defer to a superseded one — `scripts/docs.test.mjs` fails the build on either, which is the only reason this table can be read instead of the code.
+**83 shipped, 14 planned, 1 superseded.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it, and nothing may defer to a superseded one — `scripts/docs.test.mjs` fails the build on either, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---

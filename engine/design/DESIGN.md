@@ -1272,6 +1272,7 @@ Some of this is guarded and some is judgement:
 - `awaited` — what a person waits for is measured per operation, and nothing joins that wait unbudgeted.
 - `blocks` — a screen composes the vocabulary; it does not re-derive it.
 - `cards` — only `surfaces.tsx` builds a `<Card`, and every one names `CARD_ROWS`, so a card's inset is one number rather than a component's opinion.
+- `census` — every guard that sweeps a product says what happens to its question once the screen is declared, and only one of the five answers is "nothing".
 - `chrome` — one crown, one foot, and nothing else pinned to an edge — the head carries slots, the foot carries the navigation or the one act.
 - `copied` — a copy is the same database only when every table says so.
 - `descend` — a settings page is a declared destination, a level lists its pages rather than stacking them, and an authority is a screen rather than a tab.

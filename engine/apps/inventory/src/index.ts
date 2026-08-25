@@ -393,6 +393,12 @@ const code = collection({
     kind: field.enum({
       label: "Kind", required: true, holds: "none",
       values: [...CODE_KINDS],
+      /* ⚠️ TWO OF THESE ARE ACRONYMS AND SENTENCE CASE CANNOT KNOW IT. Absent
+         labels the picker offers "Gtin" and "Gs1", which are not things anybody
+         has ever called them — and the surface is right to sentence-case, since
+         it has only the key to go on. */
+      labels: { gtin: "GTIN", gs1: "GS1", national: "National", part: "Part number",
+        ours: "Ours", other: "Other" },
     }),
     /* ⚠️ HOW MANY BASE UNITS THE THING THIS CODE IS PRINTED ON HOLDS. `1` is the
        ordinary case and the carton is the reason the column exists.
@@ -421,6 +427,8 @@ const code = collection({
        when two of them disagree. */
     source: field.enum({
       label: "Learned from", holds: "none",
+      labels: { scanned: "Scanned", typed: "Typed", imported: "Imported",
+        "ai-assisted": "AI-assisted", minted: "Minted" },
       /* ⚠️ `minted` IS OURS AND IS THE MOST TRUSTWORTHY OF THE FIVE. It is the
          only value here that names a code this workspace PRINTED rather than
          read off a box, so when two codes disagree it is the one that wins. */
@@ -516,6 +524,7 @@ const tag = collection({
        of trust the day the list needs tidying. */
     source: field.enum({
       label: "Added by", holds: "none",
+      labels: { typed: "Typed", imported: "Imported", "ai-assisted": "AI-assisted" },
       values: ["typed", "imported", "ai-assisted"],
     }),
   },
@@ -643,6 +652,7 @@ const batch = collection({
     */
     standing: field.enum({
       label: "Standing", holds: "none", values: ["ok", "held"],
+      labels: { ok: "OK", held: "Held" },
     }),
     note: field.long({ label: "Note", holds: "none", max: 2_000 }),
   },
@@ -1052,6 +1062,8 @@ const ledger = collection({
     reason: field.text({ label: "Why", holds: "none", max: 200 }),
     capture: field.enum({
       label: "Recorded by", required: true, holds: "none",
+      labels: { scanned: "Scanned", typed: "Typed", voice: "Voice",
+        "ai-assisted": "AI-assisted", imported: "Imported" },
       values: ["scanned", "typed", "voice", "ai-assisted", "imported"],
     }),
     /* ⚠️ WHAT IT WAS AGAINST — a count session, a job, a process, a correction's
