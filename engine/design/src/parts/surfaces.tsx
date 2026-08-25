@@ -31,7 +31,8 @@ import type { Tone } from "@engine/kernel";
 import { sayMoneyParts } from "@engine/kernel";
 import { TYPE } from "../tokens/type.js";
 import {
-  CARD_OTHERS, CARD_ROWS, CONTROL_SHARE, CROWN_SIZE, HEAD_GAP, ICON, INSET, LEAD, NUDGE,
+  CARD_LEAD, CARD_MEDIA, CARD_OTHERS, CARD_ROWS, CONTROL_SHARE, CROWN_SIZE, HEAD_GAP, ICON, INSET,
+  GLASS_PAD, LEAD, NUDGE,
   QUICK_CIRCLE, ROW, SPACE,
   TILE,
 } from "../tokens/metrics.js";
@@ -85,6 +86,32 @@ export interface GroupProps {
    * slot, so the row wraps and a wide aside takes the line under the heading.
    */
   readonly aside?: React.ReactNode;
+  /**
+   * ONE CONTROL IN THE HEADING, ACTING ON THE WHOLE CARD.
+   *
+   * ⚠️ IT IS NOT `aside`, AND THE DIFFERENCE IS WHAT THE THING DOES RATHER THAN
+   * WHERE IT SITS. An aside ANNOTATES — a delta, a count, a period picker — so
+   * it wraps under the heading when it will not fit, which is right for a fact
+   * and wrong for a switch: a control that moves to its own line reads as
+   * belonging to the first row rather than to the card. This one is `shrink-0`
+   * and stays on the heading line.
+   *
+   * ⚠️ AND THE SHAPE IT EXISTS FOR IS THE SWITCHED CARD — a heading, a switch
+   * beside it, and rows under it that the switch turns on and off. Every
+   * reference has one; the vocabulary had `ToggleRow`, which puts the switch on
+   * a row INSIDE the card and so says it governs that row alone.
+   */
+  readonly control?: React.ReactNode;
+  /**
+   * ⚠️ A PHOTOGRAPH THE CARD LEADS WITH — see `CardMedia`. It is the object the
+   * card is about, at the card's own full width, with the rows under it.
+   *
+   * ⚠️ A PICTURE OF THE THING BEATS A PICTURE OF THE CATEGORY, and that is the
+   * whole reason this is a slot rather than a caller's `<img>`: the bleed, the
+   * aspect, the two overlay corners and the glass on them are four decisions
+   * that come out differently every time somebody makes them at a call site.
+   */
+  readonly media?: CardMedia;
   /**
    * ONE ACTION AT THE FOOT OF THE CARD, AS A REAL BUTTON.
    *
@@ -153,7 +180,153 @@ export interface GroupProps {
  */
 const InCard = React.createContext(false);
 
-export function Group({ label, under, face, aside, at, sky, seedling, does, children }: GroupProps) {
+/* ----------------------------------------------------------------- glass --- */
+
+/**
+ * A CONTROL OR A LABEL THAT STANDS ON A PHOTOGRAPH.
+ *
+ * ⚠️ IT IS THE THIRD CASE, AND THE OTHER TWO ARE BOTH STILL RIGHT. Chrome is
+ * glass because content passes under it; an in-flow control is OPAQUE from the
+ * tier ladder, because nothing moves behind it and a translucent grey over a
+ * coloured ground reads as grime (`QuickActions` has the measurement). What
+ * neither covers is a control standing on an IMAGE: opaque, it is a grey blob
+ * hiding the picture it is about, and from the ladder its legibility depends on
+ * what somebody happened to upload.
+ *
+ * ⚠️ SO IT IS THE DOCK'S OWN MATERIAL, SEEN THROUGH — dark plate, light ink,
+ * both themes, because what is behind it is not the theme. The rule is in
+ * `ambienceStylesheet` beside the plate's, for the D7 reason every fill in this
+ * package is: a component that names a colour is a component a workspace's
+ * branding never reaches.
+ *
+ * ⚠️ AND THE SHAPE IS DECIDED BY WHAT IS IN IT, NOT BY A PROP. A glyph alone is
+ * a circle — the round buttons over every viewfinder in the references — and
+ * anything with a word in it is a pill. A `shape` prop here would let a caller
+ * put "Cooling Mood" in a circle, which is the one arrangement neither of those
+ * two shapes survives.
+ */
+export function Glass({ icon, label, only, onDo }: {
+  readonly icon?: React.ReactNode;
+  /**
+   * ⚠️ ALWAYS PRESENT, EVEN WHERE IT IS NOT DRAWN. On a circle it is the
+   * accessible name and the tooltip; a glyph on a photograph with no name is
+   * the least guessable control in any product, because the picture behind it
+   * supplies no context a mark can lean on.
+   */
+  readonly label: string;
+  /**
+   * ⚠️ DRAW THE MARK ALONE — the round form. It is a request rather than an
+   * inference from a missing label, because `label` is never missing.
+   */
+  readonly only?: true;
+  readonly onDo?: () => void;
+}) {
+  const round = Boolean(icon) && only === true;
+  const mark = icon
+    ? (
+      <span
+        aria-hidden="true"
+        className="flex shrink-0 items-center"
+        style={{ ["--icon" as string]: `${ICON.row}px` }}
+      >{icon}</span>
+    )
+    : null;
+
+  /* ⚠️ NOT A BUTTON WHEN IT DOES NOTHING. A caption rendered as a `Button` is a
+     control in the accessibility tree that refuses every press, and on a phone
+     it takes a tap that was meant for the card under it. */
+  if (!onDo) {
+    return (
+      <span
+        data-glass="true"
+        className={`inline-flex items-center ${SPACE.tight} ${GLASS_PAD} ${TYPE.note}`}
+      >
+        {mark}
+        {label}
+      </span>
+    );
+  }
+
+  /* ⚠️ THE NAME IS THE TOOLTIP AS WELL AS THE LABEL, AND IT IS THE ROUND FORM
+     THAT NEEDS ONE. A mark on a photograph has no context to lean on: the
+     surrounding pixels are somebody's shelf, so nothing near it hints at what it
+     does the way a word in a row above it would. */
+  if (round) {
+    return (
+      <Hint says={label}>
+        <Button
+          data-glass="true"
+          /* ⚠️ `ghost`, BECAUSE THE FILL IS THE GLASS'S. Any other variant paints
+             its own surface over the material and the blur then sits behind an
+             opaque plate, which is the cost with none of the effect. */
+          variant="ghost"
+          isIconOnly
+          aria-label={label}
+          className={`${QUICK_CIRCLE} shrink-0`}
+          onPress={onDo}
+        >{mark}</Button>
+      </Hint>
+    );
+  }
+
+  return (
+    <Button
+      data-glass="true"
+      /* ⚠️ `ghost` — see the round form above. */
+      variant="ghost"
+      className={`shrink-0 ${GLASS_PAD} ${ROW.free}`}
+      onPress={onDo}
+    >
+      {mark}
+      {label}
+    </Button>
+  );
+}
+
+/**
+ * ⚠️ A PHOTOGRAPH THE CARD LEADS WITH, AND THE TWO SLOTS ON IT ARE WHERE THE
+ * REFERENCES PUT THEM. `over` is the bottom-left — what the picture IS, in
+ * words, where a caption goes on every photograph anybody has ever printed —
+ * and `act` is the top-right, which is the one corner a thumb reaches on a phone
+ * without covering the subject.
+ */
+export interface CardMedia {
+  readonly src: string;
+  /**
+   * ⚠️ REQUIRED, AND NOT DEFAULTED TO THE CARD'S LABEL. A picture of a shelf
+   * under a heading that says "Rack A" is described twice to a screen reader and
+   * once to everybody else; what it needs is what is IN it, which only the caller
+   * knows. Empty string is the correct answer for a picture that is decoration.
+   */
+  readonly alt: string;
+  /** ⚠️ Chips, bottom-left — see `CardMedia`. */
+  readonly over?: React.ReactNode;
+  /** ⚠️ One control, top-right — see `CardMedia`. */
+  readonly act?: React.ReactNode;
+}
+
+const Media = ({ of }: { readonly of: CardMedia }) => (
+  /* ⚠️ THE PICTURE IS THE CARD'S FULL WIDTH — see `CARD_LEAD`. A photograph
+     inset by the card's gutter is a picture in a frame, which is a different
+     object from a card that IS the thing it is about. */
+  <div className={`relative ${CARD_LEAD} ${CARD_MEDIA} overflow-hidden`}>
+    <img src={of.src} alt={of.alt} className="size-full object-cover" />
+    {of.act
+      ? <div className="absolute right-3 top-3 flex">{of.act}</div>
+      : null}
+    {of.over
+      ? (
+        <div className={`absolute inset-x-3 bottom-3 flex flex-wrap items-center ${SPACE.tight}`}>
+          {of.over}
+        </div>
+      )
+      : null}
+  </div>
+);
+
+export function Group(
+  { label, under, face, aside, control, media, at, sky, seedling, does, children }: GroupProps,
+) {
   /* ⚠️ CALLED BEFORE THE BRANCH, because it is a hook — and its answer is
      discarded when nested, which is correct: a world belongs to the card, and
      the card here is somebody else's. */
@@ -175,13 +348,14 @@ export function Group({ label, under, face, aside, at, sky, seedling, does, chil
   if (nested) {
     return (
       <>
-        {label || aside ? (
+        {label || aside || control ? (
           <div className={`flex flex-wrap items-baseline justify-between ${ROW.gap} ${ROW.pad}`}>
             <div className={`flex min-w-0 flex-col ${SPACE.hair}`}>
               {label ? <h3 className={TYPE.group}>{label}</h3> : null}
               {under ? <p className={TYPE.note}>{under}</p> : null}
             </div>
             {aside}
+            {control ? <span className="shrink-0 self-center">{control}</span> : null}
           </div>
         ) : null}
         {children}
@@ -202,7 +376,7 @@ export function Group({ label, under, face, aside, at, sky, seedling, does, chil
       className={`flex flex-col ${HEAD_GAP}`}
       style={{ ...(at === undefined ? undefined : arriveAt(at)), ...own.css }}
     >
-      {label || aside ? (
+      {label || aside || control ? (
         /* ⚠️ THE MARK IS BESIDE THE HEADING BLOCK, NOT ABOVE IT, so the label
            and its line under stay one thing and the mark reads as belonging to
            both. `chip` because a heading is not a row — a 40px plate here would
@@ -210,15 +384,24 @@ export function Group({ label, under, face, aside, at, sky, seedling, does, chil
 
            ⚠️ AND THE ROW WRAPS, so the aside takes the line under a heading it
            cannot fit beside rather than pushing it off the screen. */
-        <div className={`flex flex-wrap items-center justify-between ${ROW.gap}`}>
-          <div className={`flex min-w-0 items-center ${ROW.gap}`}>
-            {face && label ? <Face of={face} name={label} size="chip" /> : null}
-            <div className={`flex min-w-0 flex-col ${SPACE.hair}`}>
-              {label ? <h2 className={TYPE.group}>{label}</h2> : null}
-              {under ? <p className={TYPE.note}>{under}</p> : null}
+        /* ⚠️ THE CONTROL IS OUTSIDE THE WRAPPING ROW, NOT THE LAST THING IN IT —
+           see `GroupProps.control`. Inside, `flex-wrap` sent it to its own line
+           the moment the heading and the switch together exceeded the card:
+           measured at 390 with a two-word state beside it, which is most of
+           them. What wraps is the heading and its aside; the control stands
+           beside the pair. */
+        <div className={`flex items-center ${ROW.gap}`}>
+          <div className={`flex grow flex-wrap items-center justify-between ${ROW.gap}`}>
+            <div className={`flex min-w-0 items-center ${ROW.gap}`}>
+              {face && label ? <Face of={face} name={label} size="chip" /> : null}
+              <div className={`flex min-w-0 flex-col ${SPACE.hair}`}>
+                {label ? <h2 className={TYPE.group}>{label}</h2> : null}
+                {under ? <p className={TYPE.note}>{under}</p> : null}
+              </div>
             </div>
+            {aside}
           </div>
-          {aside}
+          {control ? <span className="shrink-0">{control}</span> : null}
         </div>
       ) : null}
       {/* ⚠️ THE WORLD GOES ON THE CARD ITSELF, not on a wrapper — the layers are
@@ -230,6 +413,12 @@ export function Group({ label, under, face, aside, at, sky, seedling, does, chil
             between every row ON TOP of the separator that already says where
             one ends. A rule with air either side of it is a rule you notice. */}
         <Card.Content className="gap-0">
+          {/* ⚠️ THE PICTURE IS OUTSIDE `CARD_OTHERS`, so it does not take a
+              row's vertical inset — it supplies its own, by having none. A
+              photograph with 12px of card above it is the framed-picture shape
+              `CARD_LEAD` exists to prevent, arriving through the spacing rule
+              rather than through the gutter. */}
+          {media ? <Media of={media} /> : null}
           {/* ⚠️ `CARD_OTHERS` — a child that is not a row is given a row's
               inset, so two pickers in a card are spaced like two rows rather
               than jammed together. See the token. */}
@@ -1074,53 +1263,157 @@ export function QuickActions({ actions }: {
  */
 const TILES = "repeat(auto-fit, minmax(min(6rem, 45%), 1fr))";
 
-export function TileGrid({ tiles }: {
-  readonly tiles: readonly {
-    readonly id: string; readonly label: string;
-    readonly icon: React.ReactNode; readonly onOpen: () => void;
-  }[];
-}) {
+/**
+ * ⚠️ AND A DEEP TILE NEEDS A WIDER COLUMN, WHICH IS THE HALF THAT IS EASY TO
+ * FORGET. A name, a line under it and a state chip in a 110px column is three
+ * words on three lines each — so the shallow grid puts three across and this one
+ * puts two, which is what every reference does with a device or a routine.
+ *
+ * ⚠️ AND THE FLOOR IS MEASURED AGAINST THE CARD, NOT THE SCREEN. The reading
+ * column is 326px at a 390px phone, so a 10rem floor asks for 332 with the gap
+ * and `auto-fit` answers with ONE column — a two-across grid that is one-across
+ * on every phone, which looks like a deliberate list rather than a bug.
+ */
+const DEEP_TILES = "repeat(auto-fit, minmax(min(8.5rem, 100%), 1fr))";
+
+/**
+ * ONE CELL OF A `TileGrid` — and the four optional halves are what make it a
+ * block rather than a labelled glyph.
+ *
+ * ⚠️ THE GRID USED TO BE A MARK AND A WORD, WHICH IS ONE THING A TILE CAN BE
+ * AND NOT THE COMMON ONE. Every grid worth copying is a mark or a PHOTOGRAPH,
+ * a control in the corner, a name, a line saying what it is, and a foot saying
+ * what state it is in — a device, a routine, a saved report. Built out of the
+ * old tile, each of those needed a `<div>` at the call site, and five call sites
+ * produce five spacings.
+ */
+export interface TileSpec {
+  readonly id: string;
+  readonly label: string;
+  /** ⚠️ One line under the name — what it is, never what it does. */
+  readonly under?: string;
+  readonly icon?: React.ReactNode;
+  /**
+   * ⚠️ A PICTURE OF THE THING, WHICH BEATS A PICTURE OF THE KIND. Wins over
+   * `icon` where both are given: a grid of photographs is scanned, a grid of
+   * identical category marks is read.
+   */
+  readonly face?: FaceOf;
+  /**
+   * ⚠️ THE CORNER CONTROL, AND IT IS WHY THE TILE IS NOT A BUTTON ANY MORE. A
+   * switch inside a `<button>` is a control inside a control: the press lands on
+   * whichever the browser decided, invalid markup either way, and on a phone the
+   * toggle and the destination are the same 44px. The tile's body is the
+   * destination and this stands beside it.
+   */
+  readonly control?: React.ReactNode;
+  /** ⚠️ The state, at the foot — a chip, a count, an amount. */
+  readonly foot?: React.ReactNode;
+  readonly onOpen: () => void;
+}
+
+/**
+ * ⚠️ THE DEPTH IS DECIDED BY THE TILES, NOT BY A PROP, so a grid and the bones
+ * it waits behind cannot disagree — which is the fault `TILE.tall` was made a
+ * token to prevent. A caller that could pass `deep` could pass the wrong one.
+ */
+const deepIn = (tiles: readonly TileSpec[]): boolean =>
+  tiles.some((t) => t.under || t.foot || t.face || t.control);
+
+export function TileGrid({ tiles }: { readonly tiles: readonly TileSpec[] }) {
   /* ⚠️ THE SAME CONTAINER, SO THE COLUMNS CANNOT DISAGREE. What a placeholder
      has to get right is where the content will BE, and for a grid that is the
      column count — which is a property of this element and nothing else. */
   const bones = useBones();
+  const deep = deepIn(tiles);
   return (
     <div
       className={`grid ${SPACE.snug}`}
-      style={{ gridTemplateColumns: TILES }}
+      style={{ gridTemplateColumns: deep ? DEEP_TILES : TILES }}
     >
       {bones
         ? tiles.map((t) => (
-          <Skeleton key={t.id} className={`${TILE.tall} w-full rounded-2xl`} />
+          /* ⚠️ TWO ELEMENTS RATHER THAN A TERNARY IN THE CLASS, so the height
+             is a token a reader — and `heroui.test.mjs` — can resolve. A
+             placeholder whose geometry is computed is a placeholder nothing can
+             check against the thing it stands in for. */
+          deep
+            ? <Skeleton key={t.id} className={`${TILE.deep} w-full rounded-2xl`} />
+            : <Skeleton key={t.id} className={`${TILE.tall} w-full rounded-2xl`} />
         ))
         : tiles.map((t) => (
-        <Button
-          key={t.id}
-          /* ⚠️ `tertiary` — the glyph is never brand-coloured. See QuickActions. */
-          variant="tertiary"
-          /* ⚠️ AND THE FILL IS THE SURFACE TIER, NOT THE CONTROL TIER — a tile
-             is a card you press. The rule lives in `ambience.ts` beside the
-             chip and the pill, for the same D7 reason. */
-          data-tile="true"
-          /* ⚠️ `w-full` OR THE CELL IS EQUAL AND THE TILE IS NOT. `.button` is
-             `w-fit`, so a grid of equal 1fr columns held tiles sized to their
-             own labels — "Beds", "Staff" and "Rounds" came out 162, 156 and 198
-             wide, in a grid that had already made room for three identical
-             ones. A row of tiles at three widths is the same fault as a crown of
-             lozenges: the container was right and nothing filled it. */
-          className={`w-full flex-col ${TILE.tall} ${SPACE.tight}`}
-          onPress={t.onOpen}
-        >
-          {/* ⚠️ THE MARK CARRIES THE TILE. A 16px glyph in a 96px square is a
-              tile that is mostly empty, and a grid of them reads as placeholder
-              art. `.button` sizes its own svgs, so the size is set on the box. */}
-          <span aria-hidden="true" style={{ ["--icon" as string]: `${ICON.tile}px` }}>
-            {t.icon}
-          </span>
-          {/* ⚠️ `label`, NOT `note`. A tile's word IS the tile — muting it makes
-              a grid of grey words under marks nobody can name. */}
-          <span className={TYPE.label}>{t.label}</span>
-        </Button>
+          /*
+            ⚠️ A WRAPPER, BECAUSE THE CONTROL MUST NOT BE INSIDE THE BUTTON — see
+            `TileSpec.control`. The fill and the corner belong to the wrapper so
+            the tile is ONE surface with two pressable regions on it, rather than
+            a control floating over a second one.
+          */
+          <div
+            key={t.id}
+            /* ⚠️ `min-w-0` OR THE LONGEST WORD DECIDES THE COLUMN COUNT. A grid
+               item's `min-width` is `auto`, which is its MIN-CONTENT — so one
+               tile whose line under reads "Everything written here" set a
+               248px floor and `auto-fit` answered with one column, on a grid
+               told to fit at 160. The symptom is a two-across grid that is
+               one-across on exactly the screens that have descriptions. */
+            className={`relative flex ${deep ? TILE.deep : TILE.tall} w-full min-w-0 flex-col`}
+          >
+            <Button
+              /* ⚠️ `tertiary` — the glyph is never brand-coloured. See QuickActions. */
+              variant="tertiary"
+              /* ⚠️ THE FILL IS THE SURFACE TIER, NOT THE CONTROL TIER — a tile
+                 is a card you press. The rule lives in `ambience.ts` beside the
+                 chip and the pill, for the same D7 reason.
+
+                 ⚠️ AND IT IS ON THE BUTTON RATHER THAN ON THE WRAPPER, because
+                 the rule sets `--button-bg`: moved out to the div it matched an
+                 element that reads no such variable, and the whole grid came
+                 out as unfilled text. */
+              data-tile="true"
+              /* ⚠️ `w-full` OR THE CELL IS EQUAL AND THE TILE IS NOT. `.button`
+                 is `w-fit`, so a grid of equal 1fr columns held tiles sized to
+                 their own labels — "Beds", "Staff" and "Rounds" came out 162,
+                 156 and 198 wide, in a grid that had already made room for three
+                 identical ones. */
+              className={`size-full flex-col items-start justify-start ${SPACE.tight}`
+                + ` ${ROW.free} ${ROW.wrap} p-3 text-left`}
+              onPress={t.onOpen}
+            >
+              {/* ⚠️ THE MARK CARRIES THE TILE. A 16px glyph in a 96px square is
+                  a tile that is mostly empty, and a grid of them reads as
+                  placeholder art. `.button` sizes its own svgs, so the size is
+                  set on the box. */}
+              {t.face
+                ? <Face of={t.face} name={t.label} size="panel" />
+                : (
+                  <span aria-hidden="true" style={{ ["--icon" as string]: `${ICON.tile}px` }}>
+                    {t.icon}
+                  </span>
+                )}
+              {/* ⚠️ THE NAME SITS AT THE FOOT OF WHAT IS LEFT, so a tile with a
+                  line under it and one without still align their names — a grid
+                  where every second label is 20px higher is what "some of these
+                  have a description" looks like when the mark is top-aligned and
+                  nothing claims the slack. */}
+              <span className={`mt-auto flex min-w-0 flex-col ${SPACE.hair}`}>
+                {/* ⚠️ `label`, NOT `note`. A tile's word IS the tile — muting it
+                    makes a grid of grey words under marks nobody can name. */}
+                <span className={TYPE.label}>{t.label}</span>
+                {t.under ? <span className={TYPE.note}>{t.under}</span> : null}
+                {t.foot}
+              </span>
+            </Button>
+            {/*
+              ⚠️ A SIBLING OF THE BUTTON, NEVER A CHILD — see `TileSpec.control`.
+              A switch inside a `<button>` is a control inside a control: the
+              press lands on whichever the browser decided, it is invalid markup
+              either way, and on a phone the toggle and the destination are the
+              same 44px.
+            */}
+            {t.control
+              ? <div className="absolute right-2 top-2 z-10 flex">{t.control}</div>
+              : null}
+          </div>
         ))}
     </div>
   );

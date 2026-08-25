@@ -255,3 +255,31 @@ export const ASKED: readonly {
   { id: "q3", q: "Can I get a note back after deleting it?",
     a: "No. Deleting is immediate and there is no bin — say so before you press it, which is what the confirmation is for." },
 ];
+
+/* ---------------------------------------------------------------- pictures --- */
+
+/**
+ * A PICTURE, SO THE COMPONENTS THAT STAND ON ONE CAN BE LOOKED AT.
+ *
+ * ⚠️ IT IS A DATA URI AND IT IS NOT PRETENDING TO BE A PHOTOGRAPH. `Glass` and a
+ * card's `media` lead both exist to survive content NOBODY CHOSE — a shelf
+ * somebody photographed in a dark room, a label with a white background — and
+ * the one thing a real stock photo would prove is that they work over the one
+ * image they were tuned against. A gradient with a shape in it puts a light
+ * region and a dark region under the same chip, which is the case that fails.
+ *
+ * ⚠️ AND IT IS INLINE BECAUSE THE GROUND HAS NO NETWORK. Every screen here
+ * renders with no session, no worker and no database; a file fetched from
+ * anywhere would make the one suite that photographs this package depend on
+ * something being up.
+ */
+const PICTURE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 240">
+<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0" stop-color="#f3ede4"/><stop offset="0.55" stop-color="#c98a4b"/>
+<stop offset="1" stop-color="#2a2019"/></linearGradient></defs>
+<rect width="480" height="240" fill="url(#g)"/>
+<circle cx="150" cy="96" r="66" fill="#fdfaf5" opacity="0.55"/>
+<rect x="256" y="128" width="150" height="86" rx="14" fill="#1b1410" opacity="0.62"/>
+</svg>`;
+
+export const PICTURE = `data:image/svg+xml;utf8,${encodeURIComponent(PICTURE_SVG)}`;

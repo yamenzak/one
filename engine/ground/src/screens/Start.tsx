@@ -20,13 +20,14 @@
  */
 
 import * as React from "react";
+import { Button, Chip } from "@heroui/react";
 import {
-  Faq, Grid, Guide, Help, Milestones, OfferRow, QuickActions,
-  Screen, Section, SeeAll, Stack, StepRow, TileGrid, glyphOf,
+  FieldRow, Faq, Glass, Grid, Group, Guide, Help, Milestones, OfferRow, QuickActions,
+  Screen, Section, SeeAll, SettledSwitch, Stack, StepRow, TileGrid, glyphOf,
 } from "@engine/design";
 import type { Raised } from "@engine/kernel";
 import { GROUND } from "../index.js";
-import { ASKED } from "./sample.js";
+import { ASKED, PICTURE } from "./sample.js";
 
 export function Start({ title, raised, counts, held, onGo }: {
   readonly title?: string;
@@ -41,6 +42,12 @@ export function Start({ title, raised, counts, held, onGo }: {
   readonly held: ReadonlySet<string>;
   readonly onGo: (route: string) => void;
 }) {
+  /* ⚠️ HELD HERE BECAUSE THE GROUND HAS NO SERVER — every screen in this package
+     renders with no session and no worker, so a settled control's `onSet`
+     answers `true` and the state lives in the screen. */
+  const [watching, setWatching] = React.useState(true);
+  const [sharing, setSharing] = React.useState(false);
+
   return (
     <Screen shape="board" title={title}>
       <Stack space="roomy">
@@ -69,12 +76,73 @@ export function Start({ title, raised, counts, held, onGo }: {
           <Milestones book={GROUND.milestones ?? {}} counts={counts} already={[]} />
         </Section>
 
+        {/*
+          ⚠️ THE CARD THAT LEADS WITH THE THING IT IS ABOUT. The picture reaches
+          the card's own corners, the words on it are `Glass` and so is the one
+          control — and the switch in the heading governs the whole card rather
+          than the row it would otherwise sit on.
+
+          ⚠️ AND THE PICTURE IS A STAND-IN THAT PUTS A LIGHT REGION AND A DARK
+          ONE UNDER THE SAME CHIP — see `PICTURE`. Glass over a photograph
+          somebody chose is the easy case; this is the one that fails.
+        */}
+        <Section label="What is attached">
+          <Group
+            label="The shelf, as it was"
+            under="Photographed when the count closed"
+            control={
+              <SettledSwitch
+                value={watching}
+                onSet={async (next) => { setWatching(next); return true; }}
+                says={(on) => (on ? "Watching" : "Not watching")}
+              />
+            }
+            media={{
+              src: PICTURE,
+              alt: "A rack of boxes, half of it in shadow",
+              over: (
+                <>
+                  <Glass label="Rack A" />
+                  <Glass icon={glyphOf("clock")} label="11 Aug" />
+                </>
+              ),
+              act: <Glass icon={glyphOf("search")} label="Open it full size" only onDo={() => onGo("/")} />,
+            }}
+            does={<Button variant="tertiary" onPress={() => onGo("/")}>Replace the picture</Button>}
+          >
+            <FieldRow label="Taken by" value="Priya" />
+            <FieldRow label="Counted" value="112 of 118" />
+          </Group>
+        </Section>
+
         <Section label="Where things are">
           <Stack space="roomy">
+            {/*
+              ⚠️ A TILE IS A BLOCK NOW, NOT A LABELLED GLYPH — see `TileSpec`.
+              Half of these carry a line and a state and half do not, which is
+              the arrangement that used to leave every second name 20px higher
+              than its neighbour.
+            */}
             <TileGrid
               tiles={[
-                { id: "notes", label: "Notes", icon: glyphOf("note"), onOpen: () => onGo("/") },
-                { id: "people", label: "People", icon: glyphOf("people"), onOpen: () => onGo("/people") },
+                {
+                  id: "notes", label: "Notes", under: "Everything written here",
+                  icon: glyphOf("note"),
+                  foot: <Chip size="sm" variant="tertiary"><Chip.Label>14 open</Chip.Label></Chip>,
+                  onOpen: () => onGo("/"),
+                },
+                {
+                  id: "people", label: "People", under: "Who is in the workspace",
+                  icon: glyphOf("people"),
+                  control: (
+                    <SettledSwitch
+                      value={sharing}
+                      onSet={async (next) => { setSharing(next); return true; }}
+                      says={(on) => (on ? "Shared" : "Private")}
+                    />
+                  ),
+                  onOpen: () => onGo("/people"),
+                },
                 { id: "reports", label: "Reports", icon: glyphOf("chart"), onOpen: () => onGo("/reports") },
                 { id: "search", label: "Search", icon: glyphOf("search"), onOpen: () => onGo("/search") },
               ]}

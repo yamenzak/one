@@ -194,6 +194,16 @@ export const TILE = {
    * placeholder drifting from its content looks like at the start.
    */
   tall: "h-28",
+  /**
+   * ⚠️ AND THE HEIGHT OF ONE THAT CARRIES MORE THAN A WORD. A tile leading with
+   * a photograph, a control in its corner and a line under its name is a
+   * different object from a glyph and a label, and squeezing it into 112px is
+   * what turns a device grid into a row of crowded squares. `TileGrid` picks
+   * between the two from the tiles it was handed, so a grid and the bones it
+   * waits behind cannot disagree — which is the fault `tall` is a token to
+   * prevent, one shape over.
+   */
+  deep: "h-48",
 } as const;
 
 /**
@@ -595,6 +605,41 @@ export const CARD_ROWS = "px-4 py-3" as const;
  * number whatever they are.
  */
 export const CARD_OTHERS = "[&>*:not([data-row])]:py-3" as const;
+
+/**
+ * WHAT UNDOES `CARD_ROWS` FOR THE ONE CHILD THAT IS THE CARD ITSELF.
+ *
+ * ⚠️ A PHOTOGRAPH INSET BY A GUTTER IS A PICTURE IN A FRAME, WHICH IS THE WRONG
+ * OBJECT. A card that leads with the thing it is about wants the thing to reach
+ * its own corners — the card IS the photograph with rows under it, not a card
+ * containing one. Every reference that does this does it flush; every first
+ * draft of it does not, because the gutter is already there and looks tidy.
+ *
+ * ⚠️ AND IT IS DERIVED FROM `CARD_ROWS` BY HAND, WHICH IS THE ONE THING TO WATCH.
+ * They are two literals that have to agree; `metrics.test.mjs` asserts it, so
+ * changing the card's inset without changing this fails rather than leaving a
+ * four-pixel margin down one side of a picture nobody can explain.
+ */
+export const CARD_LEAD = "-mx-4 -mt-3" as const;
+
+/**
+ * THE INSET OF A CAPSULE STANDING ON A PHOTOGRAPH — see `Glass`.
+ *
+ * ⚠️ TIGHTER THAN `CROWN_CHIP`, AND THE PICTURE IS THE REASON. A chip on the
+ * page can afford a 44px height because the ground behind it is a colour; on a
+ * photograph every pixel of plate is a pixel of the subject covered, and a
+ * caption that covers the thing it names is worse than no caption. Small enough
+ * to read as printed ON the image, tall enough to still take a thumb.
+ */
+export const GLASS_PAD = "px-3 py-1.5" as const;
+
+/**
+ * ⚠️ THE HEIGHT OF A CARD'S LEADING PHOTOGRAPH. Tall enough that a room, a
+ * shelf or a product reads as a place rather than as a banner, short enough that
+ * the rows under it are on the same screen — measured at 390 wide, where 176
+ * leaves two rows above the fold and 224 leaves none.
+ */
+export const CARD_MEDIA = "h-44" as const;
 
 /** Between a section's heading and the card under it. */
 export const HEAD_GAP = "gap-2" as const;

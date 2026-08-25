@@ -1098,6 +1098,42 @@ export function ambienceStylesheet(): string {
     */
     `[data-island="true"] [data-here="true"] { color: var(--dock-ink); }`,
     /*
+      GLASS — AND IT IS THE THIRD CASE, NOT AN EXCEPTION BEING RE-ARGUED.
+
+      ⚠️ THE RULE IT SITS BESIDE IS "GLASS IS FOR CHROME, AN IN-FLOW CONTROL IS
+      OPAQUE" (`QuickActions`), and both halves of that are still right. A chip
+      that scrolls with the page has nothing moving behind it, so the blur buys
+      nothing and the translucent grey reads as grime on a coloured ground. What
+      neither half covers is a control standing ON A PHOTOGRAPH: opaque, it is a
+      grey blob hiding the picture it is about; painted from the tier ladder, its
+      legibility depends on what somebody happened to upload.
+
+      ⚠️ SO IT IS THE DOCK'S MATERIAL AT LOWER OPACITY, WHICH IS WHY IT LIVES
+      HERE. Dark plate, light ink, both themes — because what is behind it is not
+      the theme, it is an image nobody chose. Reusing `--tier-dock` is the point
+      rather than a coincidence: the product has ONE plate, and glass is that
+      plate seen through.
+
+      ⚠️ AND THE BLUR IS EARNED HERE AND NOWHERE ELSE. It is the one surface with
+      genuinely unknown content under it, and the reason the chrome's blur was
+      removed — a repaint on every scroll beat, over the whole bar — does not
+      apply to a control the size of a thumb that does not move.
+    */
+    `[data-glass="true"] {`,
+    /* ⚠️ THE RADIUS IS HERE RATHER THAN ON THE CONTROL, for the same reason the
+       plate's is: a `className` on a library component is a restyle (D7), and
+       the shape of this material is a property of the material. */
+    `  border-radius: 9999px;`,
+    `  background-color: color-mix(in oklab, var(--tier-dock) 58%, transparent);`,
+    `  color: var(--dock-ink);`,
+    `  backdrop-filter: blur(12px) saturate(1.3);`,
+    `  -webkit-backdrop-filter: blur(12px) saturate(1.3); }`,
+    /* ⚠️ A PRESS IS DENSER GLASS, NOT A DIFFERENT COLOUR. The plate is the same
+       material throughout; what changes under a thumb is how much of the picture
+       survives it. */
+    `[data-glass="true"]:hover { background-color: color-mix(in oklab, var(--tier-dock) 72%, transparent); }`,
+    `[data-glass="true"][data-pressed="true"] { background-color: color-mix(in oklab, var(--tier-dock) 84%, transparent); }`,
+    /*
       ⚠️ THE ONE PLACE A PRODUCT'S OWN COLOUR TOUCHES THE CHROME, AND IT IS A
       LIGHT RATHER THAN A SURFACE. The bar carries no fill by design — every
       plate and pill it used to have was removed, and each was removed for a

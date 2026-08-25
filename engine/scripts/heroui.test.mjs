@@ -580,8 +580,23 @@ if (!mute) {
   the design rather than the defect, and the width that matters is the bar's,
   which is its content's by choice. What replaced this check is `travel` below.
 */
+/*
+  ⚠️ IT IS `size-full` THE TILE HAS TO CARRY, AND NAMING ONLY THAT IS THE POINT.
+  A tile is a wrapper holding a full-bleed `Button` and, where there is one, a
+  control pinned to its corner — a switch inside a `<button>` is a control inside
+  a control, so the two are siblings. The button therefore fills BOTH axes of the
+  cell rather than only the inline one.
+
+  ⚠️ AND ACCEPTING `w-full` HERE TOO WOULD DISARM THE CHECK, which is what the
+  first draft of this line did. The WRAPPER is `w-full min-w-0 flex-col` and is
+  a plain div that was always going to be full width; a pattern that took either
+  matched the wrapper, passed, and stopped asking about the button at all —
+  removing `size-full` from the button left the guard green. A guard satisfied by
+  a line other than the one it is about is the failure this file's own header
+  describes, one element over.
+*/
 const EQUALS = [
-  ["design/src/parts/surfaces.tsx", "TileGrid", /w-full flex-col/],
+  ["design/src/parts/surfaces.tsx", "TileGrid", /size-full[^\n]*flex-col/],
 ];
 let uneven = 0;
 for (const [file, group, needs] of EQUALS) {
