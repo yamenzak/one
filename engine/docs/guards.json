@@ -2966,6 +2966,26 @@
       "fails": "a rule pointing at a component a rename retired, which is a rule nobody can obey and which reports nothing forever"
     },
     {
+      "id": "the-crush-is-on-top-of-the-world",
+      "protects": "D91",
+      "stage": "88",
+      "status": "live",
+      "impl": "design/test/depth.seen.test.tsx",
+      "lane": "seen",
+      "proves": "draws its depth first",
+      "fails": "a layer present in the string and applied to nothing - `background-image` reads topmost first and every family's last layer is opaque, so a crush appended after them reported numbers identical to four decimal places across all nine families"
+    },
+    {
+      "id": "a-night-is-deep-and-lit",
+      "protects": "D91",
+      "stage": "88",
+      "status": "live",
+      "impl": "design/test/depth.seen.test.tsx",
+      "lane": "seen",
+      "proves": "reaches a real floor and a real range",
+      "fails": "a dark theme that is an even field with a slight bias - measured p01 to p99 at 0.064-0.151 with the median halfway between, which is the histogram of a wash and is what `the dark theme looks grey` is, with no check anywhere able to be pointed at it"
+    },
+    {
       "id": "a-menu-is-all-marks-or-none",
       "protects": "D90",
       "stage": "88",

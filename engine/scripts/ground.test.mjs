@@ -203,8 +203,17 @@ const CLAIMED = {
 */
 const aliasOf = (name) =>
   new RegExp(`\`${name}: var\\(--tier-(\\w+)\\);\``).exec(GROUND_SRC)?.[1] ?? null;
+/*
+  ⚠️ WHICH TIER, NOT WHICH HELPER PAINTS IT. This named `tinted` and nothing
+  else, so the day the surface ladder moved onto `hued` — which states the
+  ladder's lightness and takes only the brand's HUE, rather than mixing all
+  three channels — three tokens the guard had always seen became invisible and
+  it reported them as painted from no tier at all. The question it asks is
+  correct and the spelling it asked it in was not: `chosen` still uses `tinted`
+  on purpose, so both are live and either is a real answer.
+*/
 const tierOf = (alias) =>
-  new RegExp(`\`--tier-${alias}: \\$\\{tinted\\(g\\.(\\w+)`).exec(GROUND_SRC)?.[1] ?? null;
+  new RegExp(`\`--tier-${alias}: \\$\\{(?:tinted|hued)\\(g\\.(\\w+)`).exec(GROUND_SRC)?.[1] ?? null;
 
 let wrong = 0;
 for (const [name, tier] of Object.entries(CLAIMED)) {

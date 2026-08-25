@@ -337,6 +337,44 @@ const tinted = (l: number, pct: number) =>
   `color-mix(in oklab, ${grey(l)} ${100 - pct}%, var(--brand))`;
 
 /**
+ * THE SAME TINT WITH THE LIGHTNESS KEPT — and this is the one that ships.
+ *
+ * ⚠️ `color-mix` MOVES ALL THREE CHANNELS, WHICH MEANS THE LADDER ABOVE WAS
+ * NEVER THE LADDER. A mix toward the brand takes its LIGHTNESS with its hue, so
+ * a page declared at `0.055` and mixed 4% toward an amber at `0.79` ships at
+ * `0.084` — measured, across every family, in OKLab L over a whole screen. The
+ * dark theme's floor was fifty percent higher than the number written down for
+ * it, and the tiers above it were lifted too.
+ *
+ * ⚠️ AND THE LIFT VARIED PER WORKSPACE, WHICH IS THE HALF THAT MAKES IT A BUG
+ * RATHER THAN A CHOICE. The amount is `pct × the brand's own lightness` — so a
+ * workspace with a pale brand got a visibly lighter dark theme than one with a
+ * deep brand, from the same declaration. A palette is a set of RELATIONSHIPS
+ * (`control`'s own note), and a relationship that moves with somebody's logo
+ * colour is not one.
+ *
+ * ⚠️ SO EACH CHANNEL IS STATED BY WHOEVER OWNS IT. The LIGHTNESS is the
+ * ladder's, exactly as written; the HUE is the workspace's; the CHROMA is the
+ * ladder's own warmth plus the declared share of the brand's. That is what D85
+ * says the material is — "every neutral carries one hue at 0.010 chroma" — and
+ * it is what a mix cannot express, because a mix has no way to hold one channel
+ * still.
+ *
+ * ⚠️ RELATIVE COLOUR SYNTAX IS INSIDE THIS PRODUCT'S BASELINE, and that is worth
+ * stating rather than assuming. Tailwind v4 — which this package is built on —
+ * already requires `@property` and `color-mix`, whose support landed alongside
+ * `oklch(from …)`; every engine that can render the stylesheet at all can read
+ * this.
+ *
+ * ⚠️ `chosen` DOES NOT USE IT, AND THAT IS DELIBERATE. That tier is 78–88% brand
+ * — it is nearly all colour, its own note says the number is an anchor rather
+ * than the value of the fill, and it WANTS the brand's lightness. Every other
+ * tier is a material with a cast in it.
+ */
+const hued = (l: number, pct: number) =>
+  `oklch(from var(--brand) ${l} calc(${warmth(l).toFixed(4)} + c * ${(pct / 100).toFixed(3)}) h)`;
+
+/**
  * ⚠️ THE TOKENS ARE REDEFINED, AND THE COMPONENTS ARE NOT TOUCHED. This is the
  * sanctioned way to change how the library looks (D7) — one place, every
  * component, and a workspace's own accent still reaches all of it because every
@@ -393,12 +431,12 @@ function tier(mode: "light" | "dark"): string {
       a literal in the wash block would be two answers to what a card is made of,
       and they would agree until somebody edited one.
     */
-    `--tier-page: ${tinted(g.background, GROUND_TINT[mode])};`,
-    `--tier-base: ${tinted(g.surface, t)};`,
-    `--tier-card: ${tinted((g.surface + g.raised) / 2, t)};`,
-    `--tier-raised: ${tinted(g.raised, t)};`,
-    `--tier-field: ${tinted(g.control, t)};`,
-    `--tier-control: ${tinted(g.control, CONTROL_TINT[mode])};`,
+    `--tier-page: ${hued(g.background, GROUND_TINT[mode])};`,
+    `--tier-base: ${hued(g.surface, t)};`,
+    `--tier-card: ${hued((g.surface + g.raised) / 2, t)};`,
+    `--tier-raised: ${hued(g.raised, t)};`,
+    `--tier-field: ${hued(g.control, t)};`,
+    `--tier-control: ${hued(g.control, CONTROL_TINT[mode])};`,
     /* ⚠️ A REAL SHARE OF THE BRAND — see `CHOSEN_TINT`. This is the one control
        fill in the product that is a colour rather than a value, and the mono rule
        is the argument for it rather than against it. */
@@ -414,7 +452,7 @@ function tier(mode: "light" | "dark"): string {
       0.215 that is invisible. Nothing about the plate's darkness is knowable
       from inside a component, so the pair travels together.
     */
-    `--tier-dock: ${tinted(DOCK[mode], GROUND_TINT[mode])};`,
+    `--tier-dock: ${hued(DOCK[mode], GROUND_TINT[mode])};`,
     `--dock-ink: ${grey(DOCK.ink)};`,
 
     `--background: var(--tier-page);`,

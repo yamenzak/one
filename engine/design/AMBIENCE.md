@@ -401,6 +401,42 @@ HOW MANY, so `quiet` is fewer marks. A lattice has no count — it fills what it
 given — so presence is HOW BIG. Dividing by the density produced a coarse bold
 weave under the setting that asks for calm.
 
+## How deep a night is — the engine's, not the family's
+
+A family declares what a world is MADE of. **How dark its night goes is the
+engine's**, added as one stage under `render` and over whatever the family drew.
+
+⚠️ **The dark grounds were flat, and there is a number for it.** Measured across
+all nine families with `litness`, in OKLab L over a whole 900×700 screen: the
+night grounds spanned **0.064–0.151** from p01 to p99, with the median almost
+exactly halfway between the two. That is the histogram of a wash. `tint` was the
+one exception at 0.370, and `tint` was the one anybody described as looking
+expensive.
+
+⚠️ **A lit scene is bottom-weighted with a tail.** Most of the frame near the
+floor, a small region much brighter, a smooth ramp between. The families already
+drew the tail — three poles and a crush is a source. None of them drew enough
+FLOOR for the source to be brighter than.
+
+⚠️ **So it is one stage rather than nine edits.** Nine families each tuning their
+own floor is nine answers that agree until somebody edits one. It is seeded, so
+it varies per world inside a range approved once — a fixed vignette on every
+screen is the "one afternoon, applied forever" this directory replaced. It is
+`rgb(0 0 0 / …)` rather than a mix with the palette, because the absence of light
+is the same in every world and a tinted crush is a coloured shadow. And **day is
+untouched**: on paper the light is the absence of tint, and a crush over white is
+a grey ring.
+
+⚠️ **It goes on TOP, and that is the whole of the bug it had.** `background-image`
+reads topmost first and every family's last layer is opaque, so the crush
+appended after them was painted underneath something with no transparency —
+present in the string, applied to nothing, reporting numbers identical to four
+decimal places across all nine families. `depth.seen.test.tsx` asserts the first
+layer, because a measurement alone reads that as "no change" rather than as "no
+effect".
+
+**Measured after: floor 0.072–0.094, spread 0.085–0.334.** DECISIONS.md D91.
+
 ## Decisions worth knowing before adding a family
 
 - **Density is a rate, and a screen names an intent.** `quiet` for a page of

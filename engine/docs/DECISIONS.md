@@ -3269,3 +3269,55 @@ declared per shape; a selection a list remembers for itself; or a rail with
 paging controls a mouse cannot use. If the shape is genuinely new, it is a
 component in `@engine/design` with its own entry here — not a private copy in
 the one screen that needed it first.
+
+
+## D91 — A night is deep and lit, and the ladder's numbers are the ones that ship
+
+The dark theme read as grey, and two mechanisms were responsible. Neither was a
+taste question; both were a declared value the code did not deliver, and neither
+was visible to any check in the repository — the ambience had guards over its
+motion and its declarations and none over its LIGHT.
+
+**A mix moves all three channels, so the surface ladder was never the ladder.**
+Every tier was `color-mix(in oklab, grey(l) (100−pct)%, var(--brand))`, which
+takes the brand's LIGHTNESS along with its hue. A page declared at `0.055` and
+mixed four percent toward an amber at `0.79` ships at `0.084`: the dark floor was
+half again as high as the number written down for it, and every tier above it was
+lifted too. Worse, the lift is `pct × the brand's own lightness` — so a workspace
+with a pale brand got a visibly lighter dark theme than one with a deep brand,
+from the same declaration. A palette is a set of relationships, and one that
+moves with somebody's logo colour is not one.
+
+**So each channel is stated by whoever owns it.** `hued()` gives the LIGHTNESS to
+the ladder, exactly as written; the HUE to the workspace; the CHROMA to the
+ladder's own warmth plus the declared share of the brand's. That is what D85
+already claimed the material was — "every neutral carries one hue at 0.010
+chroma" — and it is a sentence `color-mix` cannot express, because a mix has no
+way to hold one channel still. `chosen` keeps the mix: it is 78–88% brand, its
+own note says the number is an anchor rather than a value, and it wants the
+brand's lightness.
+
+**And the grounds were flat, which "dark" alone does not fix.** Measured across
+all nine families in OKLab L over a whole screen, the night grounds spanned
+0.064–0.151 from their first percentile to their ninety-ninth, with the median
+almost exactly halfway between — the histogram of a wash. A lit scene is
+bottom-weighted with a tail into the highlights: most of the frame near the
+floor, a small region much brighter, a smooth ramp between. The families already
+drew the tail; none of them drew enough floor for the source to be brighter than.
+
+**The depth is one stage in the composer, not nine family edits.** How dark the
+dark goes is a property of the system rather than of a world, and nine families
+each tuning their own floor is nine answers that agree until somebody edits one.
+It is seeded, so it is a placement rather than a filter; it is `rgb(0 0 0 / …)`
+rather than a mix, because the absence of light is the same in every world and a
+tinted crush is a coloured shadow — the most reliable tell of a synthetic render;
+and DAY is untouched, because on paper the light is the absence of tint and a
+crush over white is a grey ring.
+
+**Therefore never:** a tier whose lightness is decided by a mix; a claim about a
+ground checked in relative luminance, which is nearly linear near black and
+compresses exactly the range a dark theme lives in (the same error as checking a
+colour claim with HSV saturation); or an ambience layer whose effect is not
+measured, since `background-image` reads topmost first and a crush appended after
+an opaque base is present in the string, applied to nothing, and reports numbers
+identical to four decimal places.

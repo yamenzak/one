@@ -929,6 +929,8 @@ its own header, cited by other files, and doing nothing.
 | `a-chosen-row-is-counted-before-anything-is-offered` | D90 | `Delete` beside a selection somebody scrolled away from, which is the one control in a list that loses data - and a choosing box named `Choose this one` twelve times over, where the row already knows what it is called |
 | `a-screen-does-not-rebuild-a-block-the-library-ships` | D90 | three filter rows at three heights with `All` meaning no-filter on one screen and a real value on the next, two byte formatters that each say `0KB` for a small file, and a facepile whose overlap is a number somebody typed - every one of which passes the restyle check, the contrast floor and the token rules, because the copy is made of the same primitives |
 | `the-vocabulary-rule-names-components-that-exist` | D90 | a rule pointing at a component a rename retired, which is a rule nobody can obey and which reports nothing forever |
+| `the-crush-is-on-top-of-the-world` | D91 | a layer present in the string and applied to nothing - `background-image` reads topmost first and every family's last layer is opaque, so a crush appended after them reported numbers identical to four decimal places across all nine families |
+| `a-night-is-deep-and-lit` | D91 | a dark theme that is an even field with a slight bias - measured p01 to p99 at 0.064-0.151 with the median halfway between, which is the histogram of a wash and is what `the dark theme looks grey` is, with no check anywhere able to be pointed at it |
 | `a-menu-is-all-marks-or-none` | D90 | a menu with a step in its left edge, where the unmarked rows start at the marked ones' LABELS and read as rows that failed to load - every line of it correct on its own, which is why it survives a review |
 | `every-size-is-a-rung-of-one-ladder` | D89 | ten hand-picked sizes in six mechanisms, each defensible where it was written and none in a relationship with any other - a product where nothing is broken, everything is slightly out of step, and no reviewer can name the fault |
 | `a-rung-actually-reaches-the-page` | D89 | the whole product rendered at one size with every check green - a class built at runtime is emitted nowhere, and a bare `text-[var(--x)]` is emitted as an INK, so the rule that ships is `color: 1.953rem` and every browser discards it in silence |
@@ -1135,6 +1137,7 @@ its own header, cited by other files, and doing nothing.
 | D88 | Magnitude carries the brand, identity never does | 0 |
 | D89 | One ladder, and a rung has to reach the page | 5 |
 | D90 | A screen composes the vocabulary; it does not re-derive it | 5 |
+| D91 | A night is deep and lit, and the ladder's numbers are the ones that ship | 2 |
 <!-- /generated -->
 
 ---

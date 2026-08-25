@@ -1042,6 +1042,129 @@ export async function shoot(
   }
 }
 
+/* ---------------------------------------------------------------- how lit --- */
+
+/**
+ * WHAT A SCREEN'S LIGHT ACTUALLY MEASURES — the luminance of every pixel in it,
+ * as a handful of percentiles.
+ *
+ * ⚠️ THE AMBIENCE IS THE ONE THING IN THIS PRODUCT NO EXISTING CHECK CAN SEE.
+ * `worldOf` compares two PNG buffers BYTE BY BYTE, which answers "did anything
+ * change" and nothing else — a ground can be flat, crushed, blown out or
+ * beautifully lit and every one of those is the same answer. Contrast is
+ * measured between two named colours, and a ground has no named colours in it:
+ * it is four stacked gradients resolving to a million different values.
+ *
+ * ⚠️ SO THE PICTURE GOES BACK INTO THE PAGE. Chromium can decode its own
+ * screenshot, so the image is handed back as a data URI, drawn to a canvas and
+ * read as `ImageData` — no decoder here, no dependency, and the pixels are
+ * exactly the ones a person would be looking at. Decoding PNG on this side
+ * would be forty lines of `zlib` and un-filtering whose only job is to
+ * reproduce what the browser already does.
+ *
+ * ⚠️ AND WHAT COMES BACK IS PERCENTILES RATHER THAN MIN AND MAX. A single hot
+ * pixel is not a highlight and a single black one is not a floor — both are
+ * antialiasing on an edge somewhere — so the shape of the light is in p01, the
+ * median and p99, and the SPREAD between the ends is what "this ground has a
+ * range" means as a number.
+ *
+ * ⚠️ IN PERCEPTUAL LIGHTNESS, NOT IN RELATIVE LUMINANCE, AND THE FIRST DRAFT OF
+ * THIS GOT IT WRONG IN THE INSTRUCTIVE DIRECTION. WCAG luminance is very nearly
+ * LINEAR near black, so it compresses exactly the range a dark theme lives in:
+ * measured that way every dark ground here reported a spread of 0.003–0.012
+ * against 0.165–0.318 in light, which reads as "the dark grounds are a hundred
+ * times flatter" and is an artefact of the scale. The identical mistake as
+ * checking a colour claim with HSV saturation, one axis over — and `ground.ts`
+ * states every tier it has in OKLab L, so a reading in anything else is
+ * answering a different question from the one the palette asks.
+ */
+export interface Lit {
+  /** ⚠️ The darkest real value — a floor, not the darkest single pixel. */
+  readonly floor: number;
+  readonly median: number;
+  /** ⚠️ The brightest real value: how hot the source gets. */
+  readonly peak: number;
+  /** ⚠️ `peak − floor`. A flat ground is a small number however dark it is. */
+  readonly spread: number;
+  /** ⚠️ What share of the picture sits in the darkest tenth of the range. */
+  readonly deep: number;
+}
+
+const PERCENTILES = { floor: 0.01, median: 0.5, peak: 0.99 } as const;
+
+export async function litness(
+  browser: Browser, markup: string, css: string,
+  viewport: { width: number; height: number }, theme: "dark" | "light" = "dark",
+): Promise<Lit> {
+  const page = await browser.newPage({ viewport });
+  try {
+    await page.setContent(pageFor(markup, css, theme));
+    await page.evaluate(() => new Promise((go) => { requestAnimationFrame(() => go(null)); }));
+    const shot = await page.screenshot({ animations: "disabled" });
+    const uri = `data:image/png;base64,${shot.toString("base64")}`;
+    /*
+      ⚠️ EVERY SIXTEENTH PIXEL, WHICH IS PLENTY AND IS NOT AN OPTIMISATION FOR
+      ITS OWN SAKE. A ground is smooth by construction — the whole point of it —
+      so a sample on a lattice describes it as well as every pixel does, and the
+      full read of a 900×700 shot is 630,000 round trips through one
+      `getImageData` array that has to be serialised back over the protocol.
+    */
+    const bins = await page.evaluate(async (src: string) => {
+      const img = new Image();
+      await new Promise((go, no) => { img.onload = go; img.onerror = no; img.src = src; });
+      const c = document.createElement("canvas");
+      c.width = img.width; c.height = img.height;
+      const ctx = c.getContext("2d")!;
+      ctx.drawImage(img, 0, 0);
+      const { data } = ctx.getImageData(0, 0, c.width, c.height);
+      /* ⚠️ OKLab's L — the same space `ground.ts` states every tier in, and the
+         sRGB → OKLab matrices unmodified. The cube root is the whole reason to
+         be here: it is what makes a step near black and a step near white the
+         same SIZE to a reader, which is what a palette means by a step. */
+      const of = (v: number) => {
+        const s = v / 255;
+        return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+      };
+      const out = new Array<number>(1001).fill(0);
+      for (let i = 0; i < data.length; i += 4 * 4) {
+        const R = of(data[i]!); const G = of(data[i + 1]!); const B = of(data[i + 2]!);
+        const l = Math.cbrt(0.4122214708 * R + 0.5363325363 * G + 0.0514459929 * B);
+        const m = Math.cbrt(0.2119034982 * R + 0.6806995451 * G + 0.1073969566 * B);
+        const s2 = Math.cbrt(0.0883024619 * R + 0.2817188376 * G + 0.6299787005 * B);
+        const L = 0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s2;
+        out[Math.max(0, Math.min(1000, Math.round(L * 1000)))]! += 1;
+      }
+      return out;
+    }, uri);
+
+    const total = bins.reduce((all, n) => all + n, 0);
+    const at = (share: number): number => {
+      let seen = 0;
+      for (let i = 0; i < bins.length; i++) {
+        seen += bins[i]!;
+        if (seen >= total * share) return i / 1000;
+      }
+      return 1;
+    };
+    const floor = at(PERCENTILES.floor);
+    const peak = at(PERCENTILES.peak);
+    /* ⚠️ THE DARKEST TENTH OF THE RANGE THIS PICTURE HAS, not of the whole
+       scale — a ground that never leaves the bottom would otherwise report all
+       of itself as deep, which is the "flat and dark" case this is meant to
+       tell apart from "deep and lit". */
+    const cut = floor + (peak - floor) * 0.1;
+    let under = 0;
+    for (let i = 0; i <= Math.round(cut * 1000); i++) under += bins[i]!;
+    return {
+      floor, peak, median: at(PERCENTILES.median),
+      spread: +(peak - floor).toFixed(4),
+      deep: +(under / Math.max(1, total)).toFixed(4),
+    };
+  } finally {
+    await page.close();
+  }
+}
+
 /* ------------------------------------------------------------- when it is --- */
 
 /**

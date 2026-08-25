@@ -405,6 +405,76 @@ export interface Rendered {
   readonly flare: string;
 }
 
+/* ------------------------------------------------------------------ depth --- */
+
+/**
+ * HOW DEEP A NIGHT IS — added by the ENGINE, under whatever the family drew.
+ *
+ * ⚠️ THE DARK GROUNDS WERE FLAT, AND THE NUMBER SAYS SO. Measured across all
+ * nine families with `litness`, in OKLab L over a whole 900×700 screen: the
+ * night grounds spanned 0.064 to 0.151 from their first percentile to their
+ * ninety-ninth, and their median sat almost exactly HALFWAY between the two.
+ * That is the histogram of a wash — an even field with a slight bias — and it is
+ * why a dark screen here reads as "grey page" rather than as a lit room. `tint`
+ * was the one exception at 0.370, and `tint` is the one family anybody described
+ * as looking expensive.
+ *
+ * ⚠️ WHAT A LIT SCENE ACTUALLY HAS IS A BOTTOM-WEIGHTED HISTOGRAM WITH A TAIL.
+ * Most of the frame near the floor, a small region much brighter, and a smooth
+ * ramp between them. The families already draw the tail — three poles and a
+ * crush is a source. What none of them drew was enough FLOOR for the source to
+ * be brighter than, so the whole picture floated in the middle.
+ *
+ * ⚠️ SO THIS IS ONE STAGE IN THE COMPOSER RATHER THAN NINE EDITS. "How dark is
+ * the dark" is a property of the SYSTEM — the thing D85 calls the material —
+ * and nine families each tuning their own floor is nine answers that agree until
+ * somebody edits one. A family declares what a world is MADE of; how deep its
+ * night goes is the engine's.
+ *
+ * ⚠️ AND IT IS SEEDED, SO IT IS NOT A FILTER OVER EVERYTHING. The centre and the
+ * reach vary per world within a range approved once — the same property that
+ * makes the families endless and governed at the same time. A fixed vignette on
+ * every screen is the "one afternoon, applied forever" this directory replaced.
+ *
+ * ⚠️ DAY IS UNTOUCHED, AND THAT IS NOT AN OVERSIGHT. On paper the light is the
+ * ABSENCE of tint (see `glow.ts`) — a crush added to a white ground is a grey
+ * ring, which is the one thing a bright room never has. The measured light
+ * spreads are already 0.061–0.153 and they read correctly.
+ */
+const NIGHT = /\.night$/;
+
+/** ⚠️ How far the deep reaches in, as a share of the frame. Wide, because a
+    vignette that starts at the edge reads as a frame rather than as falloff. */
+const REACH = { near: 10, far: 22 } as const;
+
+/** ⚠️ How black the corner gets. Below 0.4 nothing changed; above 0.7 the
+    corners read as a hole punched in the page rather than as distance. */
+const DEEP = { least: 0.55, most: 0.72 } as const;
+
+const depth = (family: Family, seed: string): readonly string[] => {
+  if (!NIGHT.test(family.id)) return [];
+  const r = prng(hash(`${family.id}|depth|${seed}`));
+  const pick = (lo: number, hi: number) => +(lo + r() * (hi - lo)).toFixed(2);
+  /*
+    ⚠️ AN ELLIPSE OFF CENTRE, BECAUSE A CENTRED ONE IS A LENS AND THIS IS A ROOM.
+    Perfectly centred it reads as a photograph's vignette — a property of the
+    camera — and what is wanted is the corner of a space being further from the
+    light than the middle of it.
+
+    ⚠️ AND IT IS `rgb(0 0 0 / …)` RATHER THAN A MIX WITH THE PALETTE. Every other
+    layer here is made OF the world's colours; this one is the absence of light,
+    which is the same in every world and must not pick up a hue — a tinted crush
+    is a coloured shadow, and a coloured shadow is the single most reliable tell
+    of a synthetic render.
+  */
+  return [
+    `radial-gradient(${pick(96, 132)}% ${pick(86, 118)}%`
+    + ` at ${pick(34, 66)}% ${pick(28, 52)}%,`
+    + ` rgb(0 0 0 / 0) ${pick(REACH.near, REACH.far)}%,`
+    + ` rgb(0 0 0 / ${pick(DEEP.least, DEEP.most)}) 100%)`,
+  ];
+};
+
 export function render(scene: Scene): Rendered {
   const { family, palette } = scene;
   const density = scene.density ?? 1;
@@ -576,7 +646,13 @@ export function render(scene: Scene): Rendered {
       const made = family.ground(palette, prng(hash(`${family.id}|ground|${scene.seed}`)));
       const parts = Array.isArray(made) ? { layers: made, flare: [] } : made as Ground;
       return {
-        ground: parts.layers.join(", "),
+        /* ⚠️ THE DEPTH GOES ON TOP, AND THE FIRST DRAFT PUT IT AT THE BOTTOM.
+           `background-image` reads TOPMOST FIRST, and every family's last layer
+           is an opaque base — so a crush appended after it is painted underneath
+           something with no transparency and changes not one pixel. Measured
+           that way and reported identical numbers across all nine families,
+           which is what a layer nobody can see looks like from a distance. */
+        ground: [...depth(family, scene.seed), ...parts.layers].join(", "),
         flare: (parts.flare ?? []).join(", "),
       };
     })(),
