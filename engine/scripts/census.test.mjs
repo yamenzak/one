@@ -213,6 +213,35 @@ if (shippedStages().has(String(RENDERER)) && !kinds.body) {
     + `${kinds.written} still written`);
 }
 
+/**
+ * HOW MANY SCREENS ARE STILL HAND-WRITTEN, AND IT MAY ONLY GO DOWN.
+ *
+ * ⚠️ A PORT WITH NO RATCHET IS A PORT THAT STALLS AT WHATEVER IS COMFORTABLE.
+ * Stage 96 proved a screen can be declared; stage 98 is where a written one
+ * becomes a failure. Between those two the count is the only thing standing
+ * between "the arc is proceeding" and "one screen was declared and everybody
+ * moved on", and a number nobody is asked to edit reports both identically.
+ *
+ * ⚠️ IT FAILS IN BOTH DIRECTIONS, WHICH IS WHAT MAKES IT A RATCHET RATHER THAN A
+ * REMINDER. Over the ceiling means a screen was written by hand that should have
+ * been declared — including a genuinely new one, which is the case worth
+ * catching, since a product mid-port growing hand-written screens is the port
+ * losing. Under it means somebody ported one and did not tighten the number, so
+ * the next regression is absorbed in silence instead of being reported.
+ */
+const WRITTEN_MOST = 29;
+if (kinds.written > WRITTEN_MOST) {
+  fail(`${kinds.written} screen(s) are still written by hand, over the ${WRITTEN_MOST} ceiling.\n`
+    + `       A new hand-written screen during the port is the port losing ground. Declare\n`
+    + `       it as a body or a story, or raise this deliberately with the reason.`);
+} else if (kinds.written < WRITTEN_MOST) {
+  fail(`${kinds.written} screen(s) are still written by hand, under the ${WRITTEN_MOST} ceiling.\n`
+    + `       Tighten it to ${kinds.written} in the commit that ported one — a ceiling left\n`
+    + `       above the count absorbs the next regression instead of reporting it.`);
+} else {
+  ok(`ratchet: ${kinds.written} screen(s) still written, at the ceiling and falling`);
+}
+
 console.log(bad
   ? `\ncensus: ${bad} finding(s) — a question that stops being asked is not a question answered.`
   : `\ncensus: every guard that sweeps a product says what happens to it when the screen is declared.`);

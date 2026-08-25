@@ -4113,6 +4113,15 @@
       "impl": "ground/test/declared.test.ts",
       "proves": "answers the views its body reads, with the rows in them",
       "fails": "a grammar that composes and a door that answers nothing, which is a renderer with no product on the other end of it"
+    },
+    {
+      "id": "a-hand-written-screen-count-may-only-fall",
+      "protects": "D92",
+      "stage": "96",
+      "status": "live",
+      "impl": "scripts/census.test.mjs",
+      "proves": "ratchet:",
+      "fails": "a port that stalls at one declared screen, and a product mid-port growing new hand-written ones — both of which read exactly like progress from outside"
     }
   ]
 }

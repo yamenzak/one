@@ -1060,6 +1060,7 @@ its own header, cited by other files, and doing nothing.
 | `a-body-reads-past-its-screens-permission-is-refused` | D92 | a `stock` screen with a supplier listing on it handing supplier rows to somebody holding `stock` alone — a manifest anybody could write, which composes, and which every other check is green on |
 | `a-view-is-run-only-through-what-the-collection-declares` | D92 | a sort naming a column nobody declared reaching SQL, and a paged list reporting its own page size as the total |
 | `a-declared-body-is-what-the-door-answers` | D92 | a grammar that composes and a door that answers nothing, which is a renderer with no product on the other end of it |
+| `a-hand-written-screen-count-may-only-fall` | D92 | a port that stalls at one declared screen, and a product mid-port growing new hand-written ones — both of which read exactly like progress from outside |
 <!-- /generated -->
 
 ### And how well each decision is defended
@@ -1158,7 +1159,7 @@ its own header, cited by other files, and doing nothing.
 | D89 | One ladder, and a rung has to reach the page | 5 |
 | D90 | A screen composes the vocabulary; it does not re-derive it | 5 |
 | D91 | A night is deep and lit, and the ladder's numbers are the ones that ship | 2 |
-| D92 | A screen is a body or a story, and what a body binds through is closed | 12 |
+| D92 | A screen is a body or a story, and what a body binds through is closed | 13 |
 <!-- /generated -->
 
 ---

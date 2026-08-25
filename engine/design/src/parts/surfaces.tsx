@@ -1195,7 +1195,15 @@ export function PersonRow({ name, under, when, unread, aside, goes, face, pick, 
       onPress={onOpen}
     >
       <span className={`flex w-full items-center ${ROW.gap} ${ROW.pad} ${ROW.tap}`}>
-        <Face of={face} name={name} />
+        {/* ⚠️ NO FACE, NO PLATE — and the alternative is what a declared list
+            found. `Face` falls back to an initial when it is given nothing,
+            which is right for a PERSON whose photograph has not loaded and
+            wrong for everything else: a list of notes drew "P", "O", "W", "S"
+            down its left edge, as though four things had identities. The plate
+            is for who or what; a row that is neither has no leading mark, and
+            every caller in this repository already passes one where there is
+            one to pass. */}
+        {face ? <Face of={face} name={name} /> : null}
         <Body label={name} under={under} />
         {/* ⚠️ `Chip`, NOT `Badge`, AND THE DIFFERENCE IS NOT COSMETIC. A HeroUI
             `Badge` is POSITIONED — it expects a `Badge.Anchor` around the thing

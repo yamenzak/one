@@ -49,9 +49,13 @@ const DIST = join(dirname(fileURLToPath(import.meta.url)), "..", "dist");
    this guard is what caught it, on the commit that did it, which is the only
    reason it was noticed. What is left in here is the `React.lazy` call, the
    Suspense boundary and Vite's manifest entry for the chunk. The trade is
-   explicit: 3.5 KiB of plumbing to keep 10 KiB of components out. */
+   explicit: 3.5 KiB of plumbing to keep 10 KiB of components out. Seven of
+   those bytes are a ternary in `PersonRow`: a row with no face draws no plate,
+   which the first declared list is what found — `Face` falls back to an initial
+   when given nothing, and four notes came out with monograms down the edge as
+   though they had identities. */
 const CEILING = {
-  js: { raw: 1_103_560, gzip: 330_000 },
+  js: { raw: 1_103_567, gzip: 330_000 },
   css: { raw: 470_000, gzip: 50_000 },
 };
 
