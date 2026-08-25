@@ -101,8 +101,22 @@ export const TYPE = {
    * reading as one object with air around them.
    */
   opening: "font-mark text-[3.5rem] md:text-[5.5rem] font-light tracking-[-0.045em] leading-none",
-  /** What this screen is. One per screen, at the top. */
-  title: "font-mark text-[1.75rem] font-semibold tracking-[-0.025em] leading-tight text-balance",
+  /**
+   * What this screen is. One per screen, at the top.
+   *
+   * ⚠️ 32px AND BOLD, WHICH WIDENS THE LADDER RATHER THAN SHOUTING. At 28px
+   * semibold it was one step above `section` (20px semibold) in size and no
+   * steps above it in weight, so a screen with two sections read as three
+   * headings of roughly equal rank and the eye had to find the top of the page
+   * by position. The gap is now 32 / 20 / 16 with the top rank a weight heavier,
+   * which is the difference between a hierarchy and a list.
+   *
+   * ⚠️ THE TRACKING TIGHTENS WITH THE SIZE, because it has to. Letter-spacing
+   * that reads as normal at 28px reads as loose at 32 — a display face's
+   * sidebearings are a fraction of the em, so the same em value is more space
+   * on a bigger word. Every other role here scales its tracking the same way.
+   */
+  title: "font-mark text-[2rem] font-bold tracking-[-0.03em] leading-[1.1] text-balance",
   /** What this part of the screen is. */
   section: "font-mark text-xl font-semibold tracking-[-0.015em] text-balance",
   /**

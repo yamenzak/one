@@ -1024,6 +1024,9 @@ its own header, cited by other files, and doing nothing.
 | `a-decode-is-paced-and-off-the-answering-thread` | D69 | a camera loop spending the one thread that answers a tap, so the screen stops responding while it is reading — and an unpaced decode is a phone that runs hot and a battery a person notices |
 | `the-first-paint-blocks-on-two-things` | D66 | a third blocking request joining the first wait unnoticed, because nothing said what the opening cost or what it may cost again |
 | `the-weight-ceilings-stay-within-reach` | D66 | a budget raised so far above the build that it stops being a budget, and half a megabyte arrives in the entry chunk with nobody noticing |
+| `the-neutral-ladder-carries-a-hue` | D85 | a colourless grey ladder, which is neutrality nobody chose and the house style three people independently named a competitor from — and which every provenance check passes, because `grey()` returning zero chroma is still the same function called from the same places |
+| `one-corner-reaches-every-component` | D85 | a radius override compiled into the stylesheet instead of appended after it, so the library's `:root` wins on source order and every corner in the product silently stays 0.5rem — or a `RADIUS` past 1rem, where three ranks of surface all clamp to 32px and the ladder stops being one |
+| `a-heading-outranks-what-it-heads` | D85 | two of the three heading ranks sharing a size or a weight, which makes a screen read as several pages stacked while every individual class list still looks sensible |
 <!-- /generated -->
 
 ### And how well each decision is defended
@@ -1115,6 +1118,7 @@ its own header, cited by other files, and doing nothing.
 | D82 | A manifest is built when something asks for it, not when the module loads | 1 |
 | D83 | The split D3 describes has not been taken, and the trigger is startup CPU | 0 |
 | D84 | A clause reads back to somebody who has left the step, not to somebody standing on it | 0 |
+| D85 | The interface is a warm material with one hot mark on it | 3 |
 <!-- /generated -->
 
 ---
@@ -1228,15 +1232,15 @@ a later decision superseded, so neither list can rot into a promise nobody owes.
 | 59 | A write says it worked — the sentence the operation declared, and the reads it made stale | shipped |
 | 60 | OneInventory exists — the model, the one chokepoint that moves a balance, and the arithmetic under both | shipped |
 | 61 | A product's screens reach each other — the route is the app's, the prefix is the platform's | shipped |
+| 62 | A list narrows and pages — the generated read answers past the first fifty, and says how many there are | shipped |
+| 63 | The guide and the milestones are ticked by what a workspace has actually done | shipped |
+| 64 | Itemised things — one object for its whole life, and the kits composed of them | shipped |
 | 65 | A model can be shown something — the vision lane carries a picture, and the reserve counts it | shipped |
 | 66 | The release rail — a run ends, a person releases, and a late result may contradict neither | shipped |
+| 67 | A screen can be gated on an entitlement, the way an operation already is | shipped |
 | 68 | A night’s work can tell somebody — a job raises events, and the nightly sweep uses it | shipped |
 | 69 | Labels — a QR from nothing, a printable sheet, and the decant label a hazard needs | shipped |
 | 70 | Reports — what went, what was wrong, what to buy, and how much of it anybody wrote down | shipped |
-| 67 | A screen can be gated on an entitlement, the way an operation already is | shipped |
-| 62 | A list narrows and pages — the generated read answers past the first fifty, and says how many there are | shipped |
-| 64 | Itemised things — one object for its whole life, and the kits composed of them | shipped |
-| 63 | The guide and the milestones are ticked by what a workspace has actually done | shipped |
 | 71 | The spreadsheet somebody already has — the import, and the supplier it names | shipped |
 | 72 | An operation's declared input is checked at the door, and `now` is one type | shipped |
 | 73 | The other half of OneInventory, driven — and the quarantine that was a badge on a screen | shipped |
@@ -1254,8 +1258,9 @@ a later decision superseded, so neither list can rot into a promise nobody owes.
 | 85 | The bar earns its material: bespoke marks, one lit destination, one movement | shipped |
 | 86 | A model is given something to hear, and the seconds are counted before they are spent | **planned** |
 | 87 | A wizard narrates: one question a screen, and what you answered stays said | shipped |
+| 88 | The interface stops looking like a fintech: warm material, one hot mark, generous corners | **planned** |
 
-**76 shipped, 10 planned, 1 superseded.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it, and nothing may defer to a superseded one — `scripts/docs.test.mjs` fails the build on either, which is the only reason this table can be read instead of the code.
+**76 shipped, 11 planned, 1 superseded.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it, and nothing may defer to a superseded one — `scripts/docs.test.mjs` fails the build on either, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---

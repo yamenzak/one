@@ -226,7 +226,44 @@ export const CONTROL_TINT = { light: 9, dark: 5 } as const;
  */
 export const CHOSEN_TINT = { light: 78, dark: 88 } as const;
 
-const grey = (l: number) => `oklch(${l} 0 0)`;
+/**
+ * THE NEUTRAL IS WARM, AND IT IS THE ONE EDIT THAT CHANGES EVERY SURFACE.
+ *
+ * ⚠️ ZERO CHROMA IS NOT NEUTRAL, IT IS A CHOICE — and the choice reads as
+ * clinical. `oklch(l 0 0)` is the grey of a spreadsheet and of every fintech
+ * built in the last five years; three people looking at this product named the
+ * same competitor without being asked, and this function is most of why. A
+ * ground with a hue in it is a ground somebody made.
+ *
+ * ⚠️ IT IS ONE HUE FOR THE WHOLE LADDER, WHICH IS WHAT KEEPS IT MONO. Mono was
+ * never "colourless": it is that the interface carries ONE colour family so the
+ * one thing outside that family is information. A warm ladder holds that rule
+ * exactly as a grey one did, and gives the accent something to be warm AGAINST.
+ *
+ * ⚠️ AND IT IS SMALL ON PURPOSE. Nobody shown a surface at 0.010 would call it
+ * brown; everybody shown one at 0.000 beside it can tell which of the two is
+ * made of something. Doubling it is a sepia product, halving it is the grey this
+ * replaces with extra arithmetic, and `ground.test.mjs`'s `warm:` holds both
+ * ends so the drift has to be deliberate.
+ */
+const WARMTH = { hue: 66, chroma: 0.01 } as const;
+
+/**
+ * ⚠️ THE CHROMA FADES OUT AT THE TOP OF THE LADDER AND NOWHERE ELSE. A card in
+ * the light theme is L=1 — pure white — and a hue at that lightness is not a
+ * warm white, it is out of gamut and clips to whatever the panel decides. The
+ * PAGE behind it carries the warmth, the card stays paper, and the difference
+ * between them is what makes a card read as laid ON something.
+ *
+ * ⚠️ THE DARK END KEEPS ALL OF IT, which is the half people notice. A warm
+ * near-black is the whole character of the dark theme here; tapered at both ends
+ * for symmetry it would come out at a third of the intended cast exactly where
+ * the reference material is warmest.
+ */
+const warmth = (l: number): number =>
+  (l >= 0.97 ? Math.max(0, (1 - l) / 0.03) * WARMTH.chroma : WARMTH.chroma);
+
+const grey = (l: number) => `oklch(${l} ${warmth(l).toFixed(4)} ${WARMTH.hue})`;
 
 /**
  * A value with a share of the BRAND mixed into it.
@@ -461,12 +498,20 @@ export const GROUND_CSS = [
     written later in the same stylesheet — wins without needing `!important`.
   */
   /*
-    ⚠️ THE LIBRARY'S OWN ACCENT, VERBATIM, so an un-branded deployment's ambience
-    is exactly what it was before the split. A default that is merely NEAR the
-    old one makes every screenshot in the repository subtly wrong and gives
-    nobody a reason for the difference.
+    ⚠️ THE DEPLOYMENT'S OWN, AND IT IS NOT THE LIBRARY'S BLUE ANY MORE. That blue
+    was inherited rather than chosen — it was HeroUI's default accent, kept
+    verbatim so the split that made the interface mono changed nothing visible.
+    It is also the single most common colour in software, and a warm ladder with
+    a cold hue on it is two products arguing.
+
+    ⚠️ THE LIGHTNESS IS THE BLUE'S, TO THE FOURTH DECIMAL, AND THAT IS THE POINT.
+    Every floor in this file was measured against `L=0.6204` — the ink on a
+    chosen segment, the fill of a lit field, the tint on six tiers. Changing the
+    HUE at the same lightness leaves all of it standing; picking a nicer orange a
+    tenth brighter would silently move every one of those relationships and the
+    guard would report the damage one screen at a time.
   */
-  `:root { --brand: oklch(0.6204 0.195 253.83); }`,
+  `:root { --brand: oklch(0.6204 0.19 40); }`,
   `:root { ${tier("light")} }`,
   `[data-theme="dark"] { ${tier("dark")} }`,
   /*

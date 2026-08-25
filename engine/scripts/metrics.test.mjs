@@ -433,6 +433,90 @@ if (!rows.length) {
   }
 }
 
+/**
+ * THE CORNER IS ONE NUMBER AND IT HAS TO REACH THE PAGE (D85).
+ *
+ * ⚠️ THE FAILURE THIS CATCHES IS SILENT AND LOOKS LIKE THE OVERRIDE NOT WORKING.
+ * `--radius` is declared on `:root` by the library's own built stylesheet, so a
+ * competing `:root` rule wins only on SOURCE ORDER — and `runtimeCss()` is the
+ * one string appended after that stylesheet. Compile the same rule into the CSS
+ * instead, or forget to join it into `runtimeCss`, and every corner in the
+ * product silently stays the library's 0.5rem with every check green.
+ *
+ * ⚠️ AND THE CEILING IS ARITHMETIC RATHER THAN TASTE. HeroUI clamps its own
+ * surfaces at `min(32px, …)`, so past 1rem the `2xl`, `2.5×` and `3xl` rungs all
+ * land on 32 and three ranks of surface become one number — a flatter product
+ * wearing rounder corners, which is the opposite of the change.
+ */
+{
+  const RUNTIME = readFileSync(join(ENGINE, "design/src/frame/runtime.ts"), "utf8");
+  const METRICS = readFileSync(join(ENGINE, "design/src/tokens/metrics.ts"), "utf8");
+  const rem = Number(/export const RADIUS = "([\d.]+)rem"/.exec(METRICS)?.[1]);
+
+  if (!Number.isFinite(rem)) {
+    fail("metrics.ts: no `RADIUS` — the corner is the library's default again, "
+       + "which is the one every dashboard shares (D85).");
+  } else if (rem < 0.625 || rem > 1) {
+    fail(`metrics.ts: RADIUS is ${rem}rem, outside 0.625–1.\n`
+       + "       Under the floor it is the library's own tight corner; at 1rem and above\n"
+       + "       three ranks of surface all clamp to 32px and the ladder stops being one.");
+  } else if (!/\bSHAPE_CSS\b/.test(/runtimeCss[^[]*\[([\s\S]*?)\]/.exec(RUNTIME)?.[1] ?? "")) {
+    /* ⚠️ THE JOINED LIST, NOT THE FILE. Reading the whole source passes on an
+       IMPORT with no use — which is the shape of the bug, not a different one:
+       every name is present, the diff looks complete, and nothing is emitted. */
+    fail("runtime.ts: `SHAPE_CSS` is not in `runtimeCss()`, so the corner never reaches\n"
+       + "       the page. The library declares `--radius` on `:root` in the BUILT\n"
+       + "       stylesheet; ours wins on source order and only from there.");
+  } else {
+    ok(`corner: one radius (${rem}rem), emitted after the stylesheet it overrides`);
+  }
+}
+
+/**
+ * A HEADING OUTRANKS WHAT IT HEADS, IN SIZE AND AT THE TOP IN WEIGHT (D85).
+ *
+ * ⚠️ TWO RANKS SHARING A SIZE IS NOT A SMALL FAULT, and it is invisible in a
+ * diff. A screen title at 28px over sections at 20 over groups at 16 is three
+ * ranks; move any two together and the screen reads as several pages stacked,
+ * whichever two they are — and every individual class list still looks sensible.
+ *
+ * ⚠️ AND THE TOP RANK CARRIES A WEIGHT THE OTHERS DO NOT, because size alone
+ * stops working the moment a title wraps to two lines beside a short section
+ * heading. This is the one difference that survives at any width.
+ */
+{
+  const TYPES = readFileSync(join(ENGINE, "design/src/tokens/type.ts"), "utf8");
+  const RANKS = ["title", "section", "group"];
+  const px = (set) => {
+    const arb = /\btext-\[([\d.]+)rem\]/.exec(set);
+    if (arb) return Number(arb[1]) * 16;
+    const NAMED = { "text-base": 16, "text-lg": 18, "text-xl": 20, "text-2xl": 24, "text-3xl": 30 };
+    return NAMED[/\btext-(?:base|lg|xl|2xl|3xl)\b/.exec(set)?.[0]] ?? null;
+  };
+  const sets = RANKS.map((r) => new RegExp(`^\\s*${r}: "([^"]+)"`, "m").exec(TYPES)?.[1] ?? null);
+
+  if (sets.some((s) => s === null)) {
+    fail(`type.ts: no \`${RANKS[sets.indexOf(null)]}\` role — this guard is blind.`);
+  } else {
+    const sizes = sets.map(px);
+    const unread = sizes.indexOf(null);
+    if (unread >= 0) {
+      fail(`type.ts: \`${RANKS[unread]}\` names a size this guard cannot read — `
+         + `add it to \`NAMED\` here rather than leaving the ladder unchecked.`);
+    } else if (!(sizes[0] > sizes[1] && sizes[1] > sizes[2])) {
+      fail(`type.ts: the heading ladder is ${sizes.join(" / ")}px and does not descend.\n`
+         + "       A heading that does not outrank what it heads is a heading doing no work,\n"
+         + "       and a screen of them reads as several pages stacked (D85).");
+    } else if (!/\bfont-bold\b/.test(sets[0]) || /\bfont-bold\b/.test(sets[1])) {
+      fail(`type.ts: \`title\` and \`section\` are the same weight.\n`
+         + "       Size alone stops separating them the moment a title wraps; the top rank\n"
+         + "       carries a weight the ranks under it do not (D85).");
+    } else {
+      ok(`ranks: the heading ladder is ${sizes.join(" / ")}px, and the top one is heavier`);
+    }
+  }
+}
+
 console.log(bad
   ? `\nmetrics: ${bad} finding(s) — spacing nobody owns drifts, and drift is invisible per diff.`
   : `\nmetrics: one source for every measurement, and a floor under every control.`);

@@ -2949,3 +2949,49 @@ what makes the right answer obvious before anybody has to be taught the field.
 **Therefore never:** a step that states its own answer above or below the control
 that sets it; a tick against a question in progress; a review line written
 anywhere but on the step it belongs to.
+
+
+## D85 — The interface is a warm material with one hot mark on it
+
+Three people shown this product named the same fintech without being asked. They
+were right, and the reason is three defaults nobody here ever chose: a
+zero-chroma neutral ladder, the library's blue as the deployment's colour, and a
+0.5rem corner. None of the three was a decision — each was what the framework
+shipped, kept because changing it would have changed something visible during a
+refactor that was meant not to.
+
+**So the direction is named, and it is three claims a screenshot can be held
+against.**
+
+**The interface is a warm material.** Every neutral in the ladder carries one
+hue at 0.010 chroma — below the threshold at which anybody would call a surface
+brown, above the one at which a screen feels made of glass rather than of
+something. It fades out at the top so a light card stays paper while the page
+behind it stays warm, and the difference between them is what makes a card read
+as laid ON something rather than cut out of it. Zero chroma is not neutrality; it
+is the specific choice every dashboard of the last five years made together.
+
+**One thing on a screen is hot, and it is never a control.** The interface is
+values — a button, a field, a focus ring is a lightness, not a hue (D7's mono
+rule, unchanged). What carries colour is the ground, the state of a control that
+is ON, and the data. The deployment's own default moved from the library's blue
+to a warm orange at the identical lightness, so every contrast relationship
+measured against `L=0.6204` still stands and only the hue moved.
+
+**The corner is generous, from one number.** `--radius` is 0.75rem, and the
+library derives its entire ladder from it — so every card, field, modal, drawer,
+tab and table in the product follows, including the ones no screen here draws.
+0.75 is the largest value that keeps the ladder a ladder: HeroUI clamps its own
+surfaces at 32px, so at 1rem three ranks of surface collapse onto one number and
+the product gets flatter as it gets rounder.
+
+**And the type ladder is 32 / 20 / 16 with the top rank a weight heavier.** At
+28px semibold a screen title was one step from a section heading in size and no
+steps in weight, so a screen with two sections read as three pages stacked.
+
+**Therefore never:** a neutral with no hue in it; a hue on a control, a button or
+a focus ring; a `rounded-*` class set on a component to correct its shape, which
+is the theme being edited from the outside and takes a workspace's branding with
+it; and a colour claim checked with HSV saturation, which divides by lightness
+and so reports the identical cast as six times stronger on a dark surface than on
+a light one.

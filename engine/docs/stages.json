@@ -339,6 +339,24 @@
       "ends": "A mounted screen is handed `go`, which takes the app's OWN route; `routeIn` adds the workspace prefix for the nav and for a row inside a screen alike, so the two are one address rather than two copies of one expression. Until it existed an app's list could not open the record it listed, and the only way it could have was by writing the centre's address scheme into a product."
     },
     {
+      "n": 62,
+      "status": "shipped",
+      "title": "A list narrows and pages — the generated read answers past the first fifty, and says how many there are",
+      "ends": "The generated `list` takes a filter over declared fields, a cursor and a count. `where` is equality over what the collection declares — a comparison language would be a query language arriving over the wire, and equality answers “this shelf's lines”, which is what a screen asks. The cursor is `(at, id)` rather than an offset, because rows arrive at the TOP: an offset of fifty on a collection that gained three since the first page steps over three the reader has never seen, silently. And the total is the collection's, counted over the same `WHERE` and WITHOUT the cursor, so it does not fall as somebody reads — a page of fifty out of two hundred was indistinguishable from a collection of fifty, and the screen drawing it said “fifty products” with complete confidence. The count runs BESIDE the page rather than before it, so the latency budget's `depth` is unchanged and only its trip count moved, 11 → 12, on purpose."
+    },
+    {
+      "n": 63,
+      "status": "shipped",
+      "title": "The guide and the milestones are ticked by what a workspace has actually done",
+      "ends": "A workspace's own tally — `tenant_event`, one row per (workspace, app, event), upserted on the way out of every successful operation that raises one — is what `guide.view` reads, so a step is ticked by what HAPPENED rather than by a screen deciding it looks done. Recorded beside `told` rather than inside it: the notification path returns early when an event has no audience, which is right for an inbox and wrong for a checklist. A milestone is said once and `tenant_milestone` is what stops it — `guide.seen` is a separate write, because a read that recorded the congratulation would spend it on a page somebody loaded and closed. And a step or milestone on an event only a JOB raises is refused at composition: the event exists, so the old check passed, and the step then sat unticked for ever because a sweep is not something anybody did."
+    },
+    {
+      "n": 64,
+      "status": "shipped",
+      "title": "Itemised things — one object for its whole life, and the kits composed of them",
+      "ends": "`unit` and `kit` are collections nothing can write by hand; issuing, taking back and retiring an object each move the shelf through the same chokepoint a box of gloves does, and `item-life.test.mjs` fails on a standing changed without one. A kit is checked against the recipe it was ASSEMBLED under, a build is refused while anything is short and a stray is reported rather than refused, and taking anything out of a built kit un-builds it. Our own label is the only code in a workspace that names one object rather than a type, which is what lets a count say \"you have already counted that one\"."
+    },
+    {
       "n": 65,
       "status": "shipped",
       "title": "A model can be shown something — the vision lane carries a picture, and the reserve counts it",
@@ -349,6 +367,12 @@
       "status": "shipped",
       "title": "The release rail — a run ends, a person releases, and a late result may contradict neither",
       "ends": "`process`, `process-item` and `job` are collections nothing writes by hand. Ending a run and releasing what it produced are separate acts under separate grants, because a green light is not a qualification. A quarantine freezes stock the chokepoint then REFUSES a take from, and lifts to needs-work — `release-ladder.test.mjs` fails on a release with no compare-and-set and on a lift that writes `released`. A late result that contradicts what is recorded is refused and names both facts; a late failure on a released run is a recall, which freezes what it can reach and NAMES what it cannot. And a job's trace is a query rather than a stored status, so a job correct on Tuesday acquires a concern on Thursday without anything about the job changing."
+    },
+    {
+      "n": 67,
+      "status": "shipped",
+      "title": "A screen can be gated on an entitlement, the way an operation already is",
+      "ends": "`ScreenSpec.features` names the capabilities a screen is FOR, and the boot read withholds the screen unless the plan includes one of them — so a destination the workspace did not buy has no nav row, no route and no way in by typing, which is the same three answers a flag already gave. It is asked on the SERVER rather than in the chrome: the page holds no plan, and giving it one would be a second round trip on the read every screen stands on plus a second opinion about what was bought. ANY rather than ALL, because a page carrying runs and work orders is worth opening on a tier that has only work orders. Composition refuses a screen gated on a key nothing sells, and deliberately does NOT count a screen as enforcement — hiding a nav row leaves the operations behind it callable, so a key whose only mention is a screen is still sold and withheld by nothing."
     },
     {
       "n": 68,
@@ -367,30 +391,6 @@
       "status": "shipped",
       "title": "Reports — what went, what was wrong, what to buy, and how much of it anybody wrote down",
       "ends": "Every figure is derived from the ledger and nothing is stored, because a correction made in March changes what February consumed and a stored number never learns that. One operation answers all four, so a screen cannot show a month’s usage beside a fortnight’s losses. The HERO is the recorded share — the number that makes the product look bad, and the only one that says whether the others mean anything. Short and over stay apart, because netting them off draws a shelf that is wildly wrong as a shelf that is fine. What to buy is ordered by what runs out FIRST against the workspace’s own lead time, never by what is smallest — which is how a store room runs out of the thing that takes a month to get. `inferred-consumption.test.mjs` fails if the id a count mints and the prefix the report reads ever drift apart, or if a close stops naming its session."
-    },
-    {
-      "n": 67,
-      "status": "shipped",
-      "title": "A screen can be gated on an entitlement, the way an operation already is",
-      "ends": "`ScreenSpec.features` names the capabilities a screen is FOR, and the boot read withholds the screen unless the plan includes one of them — so a destination the workspace did not buy has no nav row, no route and no way in by typing, which is the same three answers a flag already gave. It is asked on the SERVER rather than in the chrome: the page holds no plan, and giving it one would be a second round trip on the read every screen stands on plus a second opinion about what was bought. ANY rather than ALL, because a page carrying runs and work orders is worth opening on a tier that has only work orders. Composition refuses a screen gated on a key nothing sells, and deliberately does NOT count a screen as enforcement — hiding a nav row leaves the operations behind it callable, so a key whose only mention is a screen is still sold and withheld by nothing."
-    },
-    {
-      "n": 62,
-      "status": "shipped",
-      "title": "A list narrows and pages — the generated read answers past the first fifty, and says how many there are",
-      "ends": "The generated `list` takes a filter over declared fields, a cursor and a count. `where` is equality over what the collection declares — a comparison language would be a query language arriving over the wire, and equality answers “this shelf's lines”, which is what a screen asks. The cursor is `(at, id)` rather than an offset, because rows arrive at the TOP: an offset of fifty on a collection that gained three since the first page steps over three the reader has never seen, silently. And the total is the collection's, counted over the same `WHERE` and WITHOUT the cursor, so it does not fall as somebody reads — a page of fifty out of two hundred was indistinguishable from a collection of fifty, and the screen drawing it said “fifty products” with complete confidence. The count runs BESIDE the page rather than before it, so the latency budget's `depth` is unchanged and only its trip count moved, 11 → 12, on purpose."
-    },
-    {
-      "n": 64,
-      "status": "shipped",
-      "title": "Itemised things — one object for its whole life, and the kits composed of them",
-      "ends": "`unit` and `kit` are collections nothing can write by hand; issuing, taking back and retiring an object each move the shelf through the same chokepoint a box of gloves does, and `item-life.test.mjs` fails on a standing changed without one. A kit is checked against the recipe it was ASSEMBLED under, a build is refused while anything is short and a stray is reported rather than refused, and taking anything out of a built kit un-builds it. Our own label is the only code in a workspace that names one object rather than a type, which is what lets a count say \"you have already counted that one\"."
-    },
-    {
-      "n": 63,
-      "status": "shipped",
-      "title": "The guide and the milestones are ticked by what a workspace has actually done",
-      "ends": "A workspace's own tally — `tenant_event`, one row per (workspace, app, event), upserted on the way out of every successful operation that raises one — is what `guide.view` reads, so a step is ticked by what HAPPENED rather than by a screen deciding it looks done. Recorded beside `told` rather than inside it: the notification path returns early when an event has no audience, which is right for an inbox and wrong for a checklist. A milestone is said once and `tenant_milestone` is what stops it — `guide.seen` is a separate write, because a read that recorded the congratulation would spend it on a page somebody loaded and closed. And a step or milestone on an event only a JOB raises is refused at composition: the event exists, so the old check passed, and the step then sat unticked for ever because a sweep is not something anybody did."
     },
     {
       "n": 71,
@@ -493,6 +493,12 @@
       "status": "shipped",
       "title": "A wizard narrates: one question a screen, and what you answered stays said",
       "ends": "The register sheet was four headings over groups of fields, and the field under the third of them — the tracking rung, which decides what a person is asked at every future delivery — was four bare words with four explanations written beside them that reached nobody: it was a `Segmented`, and `Segmented` renders `o.label` and nothing else. Its own header says segments are for a choice worn on the surface and never for data entry. `Story` is the general answer: an `Ask` is a question, its controls, and the CLAUSE its answer makes — one string doing two jobs, the live echo under the control and the line in the recap, so they cannot drift. The recap doubles as navigation, which is what turns checking a model's twenty filled fields into reading eight sentences. Three things came out of building it. The pure `walk` found a real bug on its second test: the last step's own refusal was drawn as a row navigating to a DIFFERENT step, because the way-there was taken from the first owing step regardless of which branch supplied the sentence. The packing clause was rewritten by measurement rather than taste — \"A box holds 10 sheets, and a sheet holds 10 tablets — 100 tablets in a box\" is correct, readable and seventeen words, which on a phone is a recap row wrapping three times; \"A box of 10 sheets of 10 tablets\" is the same fact in the form a distributor already says it in. And the new guard found bugs in itself first, twice: `ask:` matched the proving ground's sample data, where it is a column meaning who asked and every value is an email address, and `step={` matched a number field's increment."
+    },
+    {
+      "n": 88,
+      "status": "planned",
+      "title": "The interface stops looking like a fintech: warm material, one hot mark, generous corners",
+      "ends": ""
     }
   ]
 }

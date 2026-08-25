@@ -25,6 +25,12 @@
  * it every assertion here measures `:root`'s resolution against the DEPLOYMENT's
  * neutral and reports grey, which is a true measurement of the wrong page.
  *
+ * ⚠️ AND WHAT IS MEASURED IS CHROMA, NOT SATURATION. "Has a hue in it" is a
+ * perceptual claim, so it needs a perceptual number; HSV saturation is a ratio
+ * to the brightest channel and therefore says a near-black button is six times
+ * more coloured than a near-white one painted from the identical mix. See
+ * `chromaOf` below.
+ *
  * ⚠️ SO THE CLASS CONTRACT IS ASSERTED FIRST, AND THAT IS WHAT MAKES THE REST
  * HONEST. Hand-written markup against a library's internal class names goes
  * silently dead the day the library renames one — the specimen still renders, our
@@ -71,7 +77,54 @@ const CONTRACT = [
   ".toggle-button", "--toggle-button-bg-selected",
 ];
 
-interface Painted { readonly sat: number; readonly rgb: string }
+interface Painted { readonly chroma: number; readonly rgb: string }
+
+/**
+ * ⚠️ CHROMA IN OKLCH, NOT SATURATION — AND THE DIFFERENCE IS NOT PEDANTRY. HSV
+ * saturation is `(max − min) / max`: a RATIO to the brightest channel, so it
+ * grows without bound as a colour darkens. The identical cast measures 0.048 on
+ * the light theme's near-white action and 0.267 on the light theme's near-black
+ * one — same paint, same eight points of spread between channels, and a verdict
+ * decided by how dark the button is rather than by whether anybody can see a
+ * hue in it. Every threshold in `ground.ts` is stated in OKLCH chroma for this
+ * reason; a browser check that measures something else is checking a different
+ * claim from the one the palette makes.
+ *
+ * ⚠️ THE PAGE HANDS BACK CHANNELS AND NOTHING ELSE. `getComputedStyle` answers
+ * in whatever space the browser resolved to — `rgb()` here — so a canvas
+ * readback is the only honest way to get numbers out; the arithmetic on them is
+ * ordinary code and belongs on this side, where it is readable rather than
+ * serialised into a `page.evaluate`. The matrices are the sRGB → OKLab pair,
+ * unmodified.
+ */
+const chromaOf = (r: number, g: number, b: number): number => {
+  const lin = (v: number) => {
+    const c = v / 255;
+    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  const [R, G, B] = [lin(r), lin(g), lin(b)];
+  const l = Math.cbrt(0.4122214708 * R + 0.5363325363 * G + 0.0514459929 * B);
+  const m = Math.cbrt(0.2119034982 * R + 0.6806995451 * G + 0.1073969566 * B);
+  const s = Math.cbrt(0.0883024619 * R + 0.2817188376 * G + 0.6299787005 * B);
+  return Math.hypot(
+    1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s,
+    0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s,
+  );
+};
+
+/**
+ * ⚠️ ONE NUMBER SEPARATES ALL THREE CLAIMS, AND IT IS THE FIELD'S LIFT. A
+ * focused input carries the smallest cast in the system that is still meant to
+ * read as colour (0.030 measured); the interface's own warm neutral carries
+ * 0.010, which is meant to read as material. 0.02 sits between them, so "the
+ * state is visible" and "the action is monochrome" are the two sides of one
+ * threshold rather than two numbers that can drift apart.
+ */
+const LIFT = 0.02;
+
+/** ⚠️ A FILLED CONTROL, NOT A LIFT — measured at 0.127, so this is a floor with
+    room under it rather than a value tuned to what today happens to render. */
+const FILLED = 0.05;
 
 const paintedIn = async (
   theme: "dark" | "light", selector: string, part: "" | "::before",
@@ -79,19 +132,23 @@ const paintedIn = async (
   const page = await browser.newPage({ viewport: { width: PHONE.width, height: PHONE.height } });
   try {
     await page.setContent(pageFor(SPECIMEN, css, theme));
-    return await page.evaluate(([sel, which]: readonly string[]) => {
+    const channels = await page.evaluate(([sel, which]: readonly string[]) => {
       const el = document.querySelector(sel!);
-      if (!el) return { sat: -1, rgb: "MISSING" };
+      if (!el) return null;
       const colour = getComputedStyle(el, which || null).backgroundColor;
       const probe = document.createElement("canvas").getContext("2d")!;
       probe.fillStyle = "#000";
       probe.fillStyle = colour;
       probe.fillRect(0, 0, 1, 1);
       const [r, g, b, a] = probe.getImageData(0, 0, 1, 1).data;
-      if (!a) return { sat: 0, rgb: "transparent" };
-      const most = Math.max(r!, g!, b!); const least = Math.min(r!, g!, b!);
-      return { sat: most === 0 ? 0 : (most - least) / most, rgb: `rgb(${r},${g},${b})` };
+      return [r!, g!, b!, a!] as const;
     }, [selector, part] as const);
+
+    if (!channels) return { chroma: -1, rgb: "MISSING" };
+    const [r, g, b, a] = channels;
+    if (!a) return { chroma: 0, rgb: "transparent" };
+    const chroma = chromaOf(r, g, b);
+    return { chroma, rgb: `rgb(${r},${g},${b}) C=${chroma.toFixed(4)}` };
   } finally {
     await page.close();
   }
@@ -126,9 +183,9 @@ describe("a control that is on", () => {
     for (const [says, selector, part] of ON) {
       it(`${says} carries the product's hue — ${theme}`, async () => {
         const seen = await paintedIn(theme, selector, part);
-        expect(seen.sat,
+        expect(seen.chroma,
           `${says} is ${seen.rgb} — no colour reached it, so its state reads as grey`)
-          .toBeGreaterThan(0.05);
+          .toBeGreaterThan(FILLED);
       }, 60_000);
     }
 
@@ -137,9 +194,9 @@ describe("a control that is on", () => {
        a fill, and a fill here would be a text field the colour of a button. */
     it(`a field being typed in is lit — ${theme}`, async () => {
       const seen = await paintedIn(theme, ".input--secondary[data-focused='true']", "");
-      expect(seen.sat,
+      expect(seen.chroma,
         `the focused field is ${seen.rgb} — the same value as a resting one`)
-        .toBeGreaterThan(0.02);
+        .toBeGreaterThan(LIFT);
     }, 60_000);
 
     /*
@@ -150,9 +207,9 @@ describe("a control that is on", () => {
     */
     it(`the primary action stays monochrome — ${theme}`, async () => {
       const seen = await paintedIn(theme, ".button--primary", "");
-      expect(seen.sat,
+      expect(seen.chroma,
         `the primary button is ${seen.rgb} — the one call to action has taken a hue`)
-        .toBeLessThan(0.05);
+        .toBeLessThan(LIFT);
     }, 60_000);
   }
 });

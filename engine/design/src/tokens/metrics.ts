@@ -25,6 +25,43 @@
  * real product rather than asserted.
  */
 
+/* ----------------------------------------------------------------- corner --- */
+
+/**
+ * HOW ROUND EVERYTHING IS, AS ONE NUMBER.
+ *
+ * ⚠️ A 0.5rem CORNER IS THE HOUSE STYLE OF EVERY DASHBOARD BUILT SINCE 2019, and
+ * it was the library's default rather than anybody's decision here. Three people
+ * shown this product named the same fintech unprompted; a tight corner on a
+ * white card is a large part of why. Softening it is the single cheapest edit
+ * with the widest reach in the whole system.
+ *
+ * ⚠️ AND IT IS ONE NUMBER BECAUSE THE LIBRARY DERIVES ITS WHOLE LADDER FROM IT.
+ * `--radius-xs` … `--radius-4xl` are `calc(var(--radius) * n)` and
+ * `--field-radius` is `* 1.5`, all declared on `:root` in the built stylesheet —
+ * so this one line reaches every card, field, modal, drawer, popover, tab and
+ * table in the product, including the ones no screen here draws. Setting a
+ * `rounded-*` class on a component instead is the restyling-behind-the-theme's-
+ * back that D7 refuses and `heroui.test.mjs` catches.
+ *
+ * ⚠️ 0.75rem IS THE LARGEST VALUE THAT KEEPS THE LADDER A LADDER, and that is
+ * arithmetic rather than taste. HeroUI clamps its own surfaces at `min(32px, …)`,
+ * so the top of the scale stops moving once `--radius` passes 0.667rem. At
+ * 0.75 the rungs are still distinct — field 18, `2xl` 24, tabs and tables 30,
+ * cards and modals 32. At 1rem `2xl`, `2.5×` and `3xl` all land on 32 and three
+ * ranks of surface become one, which is a flatter product wearing rounder
+ * corners.
+ *
+ * ⚠️ IT IS EMITTED AT RUNTIME, NOT WRITTEN INTO THE STYLESHEET. Same reason as
+ * every other token here: `runtimeCss()` is appended after the built CSS, so it
+ * wins on source order at equal specificity. A rule compiled INTO the stylesheet
+ * would land before the library's own `:root` and change nothing at all, with
+ * every check green.
+ */
+export const RADIUS = "0.75rem" as const;
+
+export const SHAPE_CSS = `:root { --radius: ${RADIUS}; }`;
+
 /* ------------------------------------------------------------------- rows --- */
 
 export const ROW = {

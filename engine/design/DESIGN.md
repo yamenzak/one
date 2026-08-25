@@ -14,6 +14,48 @@ Everything below is downstream of that one person.
 
 ---
 
+## The look
+
+**Everything after this section is about what a screen DOES. This one is about
+what it is made of** — and it comes first because the material is what somebody
+reacts to before they have read a word.
+
+**Warm material.** Every neutral carries one hue, faintly. A surface is a
+lightness on a warm ladder, never `oklch(l 0 0)` — a colourless grey is not
+neutral, it is the house style of every dashboard built since 2019, and it is
+what three people independently recognised this product as. The cast fades out at
+the top of the light ladder so a card stays paper against a page that does not.
+
+**One hot mark, and it is never a control.** The interface is values: a button, a
+field, a focus ring, a chip is a lightness. Colour belongs to three things and no
+others — the ground a screen sits on, a control that is ON, and data that
+measures. A screen where the primary action is the brightest hue is a screen
+where the loudest thing is no longer the thing to press.
+
+**Generous corners, from one number.** `RADIUS` in `metrics.ts` is 0.75rem and
+the library derives its whole ladder from it, so it reaches components no screen
+here draws. **Never set a `rounded-*` class to correct a component's shape** —
+that is the theme edited from outside, it takes a workspace's branding with it,
+and `heroui.test.mjs` refuses it.
+
+**A hierarchy you can see across the room.** 32 / 20 / 16, with the screen's
+title a weight heavier than everything under it. Two ranks sharing a size is a
+screen that reads as several pages stacked, whichever two they are.
+
+**Lead with the thing, not with a picture of the category.** Where a record has a
+photograph, the photograph is the content: it goes first, at a size worth
+looking at. An icon in a circle is what a record has INSTEAD of an object, not a
+decoration to put above one.
+
+**What this forbids:** a zero-chroma neutral anywhere; a hue on a control; a
+`rounded-*` override; a screen whose title does not outrank its sections; and a
+32×32 thumbnail beside a name where the object could have been the row.
+
+D85 is the argument. The values live in `tokens/ground.ts`, `tokens/metrics.ts`
+and `tokens/type.ts` — one file each, and nothing outside them writes one.
+
+---
+
 ## 1. The rules, shortest first
 
 Read these as tests you can apply to a screenshot without knowing the codebase.

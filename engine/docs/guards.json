@@ -3794,6 +3794,33 @@
       "impl": "one-space/test/weight.test.ts",
       "proves": "keeps the ceilings within reach of the build",
       "fails": "a budget raised so far above the build that it stops being a budget, and half a megabyte arrives in the entry chunk with nobody noticing"
+    },
+    {
+      "id": "the-neutral-ladder-carries-a-hue",
+      "protects": "D85",
+      "stage": "88",
+      "status": "live",
+      "impl": "scripts/ground.test.mjs",
+      "proves": "warm:",
+      "fails": "a colourless grey ladder, which is neutrality nobody chose and the house style three people independently named a competitor from — and which every provenance check passes, because `grey()` returning zero chroma is still the same function called from the same places"
+    },
+    {
+      "id": "one-corner-reaches-every-component",
+      "protects": "D85",
+      "stage": "88",
+      "status": "live",
+      "impl": "scripts/metrics.test.mjs",
+      "proves": "corner:",
+      "fails": "a radius override compiled into the stylesheet instead of appended after it, so the library's `:root` wins on source order and every corner in the product silently stays 0.5rem — or a `RADIUS` past 1rem, where three ranks of surface all clamp to 32px and the ladder stops being one"
+    },
+    {
+      "id": "a-heading-outranks-what-it-heads",
+      "protects": "D85",
+      "stage": "88",
+      "status": "live",
+      "impl": "scripts/metrics.test.mjs",
+      "proves": "ranks:",
+      "fails": "two of the three heading ranks sharing a size or a weight, which makes a screen read as several pages stacked while every individual class list still looks sensible"
     }
   ]
 }

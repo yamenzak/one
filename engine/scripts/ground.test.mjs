@@ -490,6 +490,79 @@ for (const file of FILES.filter((f) => rel(f).startsWith("design/src/chart/"))) 
 
 if (!mono) ok(`mono: the interface is values, the data is hues, and focus is neither`);
 
+/* ------------------------------------------------------------------ warm --- */
+
+/**
+ * THE NEUTRAL LADDER CARRIES A HUE, AND IT IS THE ONE CLAIM `mono` CANNOT MAKE
+ * (D85).
+ *
+ * ⚠️ `mono` IS A PROVENANCE CHECK AND THIS IS A VALUE ONE, WHICH IS WHY BOTH ARE
+ * NEEDED. Everything above asks where a colour CAME from — is this token built
+ * from `grey()`, is that tint mixed from `--brand`. A `grey()` that returned zero
+ * chroma would pass every one of them, because it is still the same function
+ * called from the same places. What it would produce is the colourless ladder
+ * that made three people name a competitor on sight.
+ *
+ * ⚠️ AND IT IS BOUNDED ON BOTH SIDES, because the failure has two directions and
+ * only one of them is obvious. Below the floor the product is a spreadsheet;
+ * above the ceiling it is sepia, and every surface reads as tinted rather than as
+ * material — which is the edit somebody makes when a screen "needs more warmth"
+ * and the fix is an image, not the ground under it.
+ *
+ * ⚠️ THE LITERAL SWEEP IS THE OTHER HALF. The value can also be defeated without
+ * touching it, by writing `oklch(l 0 h)` at a call site — so a zero-chroma
+ * neutral is refused anywhere in the design source, `grey()`'s own taper (which
+ * is where a card is deliberately paper) excepted by being inside the one file
+ * that defines the ladder.
+ *
+ * ⚠️ AND THE SWEEP READS CODE, NOT COMMENTS. Two of the first three findings were
+ * a measured value quoted in prose — "the library's `default` chip label computes
+ * to `oklch(0.9911 0 0)`" — which is the comment doing its job. A guard that
+ * makes a header inaccurate to stay green teaches people to stop writing the
+ * numbers down.
+ *
+ * ⚠️ A DEPLOYMENT'S OWN BRAND IS EXEMPT, AND IT IS THE ONLY THING THAT IS. The
+ * rule here is about the LADDER — the neutrals every surface is a rung of. What
+ * colour a deployment chooses for itself is its decision, including choosing
+ * none: One's is `ONE_ACCENT`, zero chroma on purpose and argued for in that
+ * file's header. It costs the ground nothing, because `tinted()` mixes a small
+ * share of the brand INTO `grey()` and the warmth lives in the grey.
+ */
+const BRAND_OWNED = new Set(["one-space/src/brand.ts"]);
+const WARM_FLOOR = 0.004;
+const WARM_CEIL = 0.02;
+
+let cold = 0;
+const warmth = /const WARMTH = \{ hue: ([\d.]+), chroma: ([\d.]+) \}/.exec(GROUND_SRC);
+if (!warmth) {
+  cold++;
+  fail(`ground.ts: no \`WARMTH\` declaration — the neutral ladder has no stated hue.\n` +
+       `       A grey with no hue in it is not neutrality, it is the house style of every\n` +
+       `       dashboard of the last five years, and it is what this product was mistaken\n` +
+       `       for (D85).`);
+} else if (Number(warmth[2]) < WARM_FLOOR || Number(warmth[2]) > WARM_CEIL) {
+  cold++;
+  fail(`ground.ts: WARMTH.chroma is ${warmth[2]}, outside ${WARM_FLOOR}–${WARM_CEIL}.\n` +
+       `       Under the floor the ladder is a colourless grey; over the ceiling every\n` +
+       `       surface reads as tinted rather than as material (D85).`);
+}
+
+const withoutComments = (src) =>
+  src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+
+for (const file of FILES) {
+  if (DEFINES.has(rel(file)) || BRAND_OWNED.has(rel(file))) continue;
+  const src = withoutComments(readFileSync(file, "utf8"));
+  for (const [, decl] of src.matchAll(/(oklch\(\s*[\d.]+\s+0(?:\.0+)?\s+[\d.]+\s*\))/g)) {
+    cold++;
+    fail(`${rel(file)}: \`${decl}\` — a neutral with no hue in it.\n` +
+         `       Every neutral in this product is a lightness on the warm ladder. Read a\n` +
+         `       tier, or call \`grey()\` if this is genuinely a new rung (D85).`);
+  }
+}
+
+if (!cold) ok(`warm: the neutral ladder carries a hue, and no surface writes a colourless one`);
+
 /* ------------------------------------------------------------- unlocked --- */
 
 /**
