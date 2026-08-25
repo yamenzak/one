@@ -277,6 +277,147 @@ const ALL = [
   }
 }
 
+/* -------------------------------------------------------------- how many --- */
+
+/**
+ * ⚠️ THE CHECK ABOVE ASKS ABOUT WAITING, AND WAITING IS ONLY HALF OF IT. A
+ * request may make a thousand subrequests, and a D1 query is one — so a read per
+ * row is a ceiling a customer's row count walks into whether the rows are asked
+ * for one after another or all at once. `Promise.all` over a map fixes the
+ * LATENCY and leaves the COUNT exactly where it was, which is why the operator's
+ * workspace list could spend six hundred subrequests on one screen with the
+ * sequential check green above it.
+ *
+ * ⚠️ SO WHAT IS CHECKED IS THE SHAPE, AND THE BOUND IS WRITTEN DOWN. A fan-out
+ * over a list somebody chose (five products, four packages) is a decision this
+ * repository made and can count; one over a list a customer grows is a cost they
+ * set. Nothing in the code tells the two apart, so each is carried by name with
+ * the bound that makes it safe — and the list can only shrink, because an entry
+ * that stops fanning out fails until it is deleted.
+ *
+ * ⚠️ AND IT FOLLOWS THE CALL RATHER THAN MATCHING `prepare`. Every one of these
+ * fan-outs calls a helper — `memberFor`, `unseenCount`, `holdingOf` — so a check
+ * looking for a literal `.prepare(` inside the callback finds NONE of them and
+ * says so in green. The reachable set is computed instead: a function whose body
+ * runs a statement, then anything that calls one of those, to a fixpoint.
+ */
+{
+  const HOME = ALL.filter(({ at }) => /^runtime\/src\//.test(at));
+
+  /* ⚠️ Bodies by brace column, which this tree's formatting makes reliable: a
+     top-level declaration closes on a `}` in column 0. A body this cannot find
+     is a body this cannot check, so failing to find any at all is a failure. */
+  const DECLARED = [
+    /^(?:export\s+)?(?:async\s+)?function\s+(\w+)[\s\S]*?^\}/gm,
+    /* ⚠️ THE HEAD MAY SPAN LINES AND MUST NOT SPAN A STATEMENT. `memberFor` puts
+       its parameters and its return type on three lines before the arrow, and
+       requiring the arrow on the first line missed it — which is one of the two
+       functions every fan-out here calls. Barring a `;` in the head is what
+       stops `const A_DAY = 86_400_000;` swallowing the next function. */
+    /^(?:export\s+)?const\s+(\w+)\s*=[^;]{0,300}?=>\s*\{[\s\S]*?^\};?/gm,
+    /^(?:export\s+)?const\s+(\w+)\s*=[^\n{]*=>[^\n{]*;$/gm,
+  ];
+  const bodies = new Map();
+  for (const { src } of HOME) {
+    const code = strip(src);
+    for (const shape of DECLARED) {
+      for (const [whole, name] of code.matchAll(shape)) {
+        /* ⚠️ The SHORTEST reading of a name wins: a greedy one that ran to a
+           later closing brace would call half the file this function's body. */
+        if (!bodies.has(name) || bodies.get(name).length > whole.length) bodies.set(name, whole);
+      }
+    }
+  }
+
+  /* ⚠️ ONE FIXPOINT, NOT ONE HOP. `unseenCount` may not touch the database
+     itself and may call something that does, and a check that stopped at the
+     first call would report the caller as free. */
+  const RUNS = /\.(prepare|exec|batch)\s*\(/;
+  const touches = new Set([...bodies].filter(([, b]) => RUNS.test(b)).map(([n]) => n));
+  for (let moved = true; moved;) {
+    moved = false;
+    for (const [name, body] of bodies) {
+      if (touches.has(name)) continue;
+      for (const other of touches) {
+        if (new RegExp(`\\b${other}\\s*\\(`).test(body)) { touches.add(name); moved = true; break; }
+      }
+    }
+  }
+
+  /** The balanced text of a call whose opening `(` is at `from`. */
+  const callAt = (code, from) => {
+    let depth = 0;
+    for (let i = from; i < code.length; i++) {
+      if (code[i] === "(") depth++;
+      else if (code[i] === ")" && !--depth) return code.slice(from, i + 1);
+    }
+    return null;
+  };
+
+  const fans = [];
+  let unread = 0;
+  for (const { at, src } of HOME) {
+    /* ⚠️ A SWEEP IS THE ONE CALLER THAT IS NOT A REQUEST — the same exemption
+       the sequential check makes, for the same reason. */
+    if (/\/(sweep|purge|move|resources)\.ts$/.test(at)) continue;
+    const code = strip(src);
+    for (const hit of code.matchAll(/\.map\(\s*async\b/g)) {
+      const body = callAt(code, code.indexOf("(", hit.index));
+      if (body === null) { unread++; continue; }
+      const reaches = RUNS.test(body)
+        || [...touches].some((n) => new RegExp(`\\b${n}\\s*\\(`).test(body));
+      if (reaches) fans.push(at);
+    }
+  }
+
+  const here = new Map();
+  for (const at of fans) here.set(at, (here.get(at) ?? 0) + 1);
+
+  /*
+    ⚠️ EACH ONE CARRIES THE BOUND THAT MAKES IT SAFE, and every bound here is a
+    number this repository chose rather than one a customer grows.
+
+    ⚠️ AND THE COUNT IS PART OF THE ENTRY, WHICH IS THE HALF THAT KEEPS BITING. A
+    file, once named, would be exempt for ever — the sixth fan-out added to
+    `personal.ts` would land inside an exemption written about the second, and
+    the guard would report it as read and approved. Pinning how many means a new
+    one fails until somebody writes down what bounds it.
+  */
+  const BOUNDED = new Map([
+    ["runtime/src/centre-ops.ts",
+      [1, "the products a workspace has switched on — the deployment's own catalogue"]],
+    ["runtime/src/operator.ts",
+      [2, "the workspaces one account belongs to, and the deployment's product list"]],
+    ["runtime/src/packages.ts", [1, "the packages one app declares"]],
+    ["runtime/src/personal.ts", [2, "the workspaces one person belongs to"]],
+    ["runtime/src/push.ts", [1, "the devices one person has registered"]],
+  ]);
+  const fresh = [...here].filter(([at, n]) => (BOUNDED.get(at)?.[0] ?? 0) < n)
+    .map(([at, n]) => `${at} (${n}, ${BOUNDED.get(at)?.[0] ?? 0} written down)`);
+  const gone = [...BOUNDED].filter(([at, [n]]) => (here.get(at) ?? 0) < n).map(([at]) => at);
+
+  if (!bodies.size || !touches.size) {
+    fail("runaway: read no function bodies out of runtime/src, so this check is\n" +
+         "       passing over nothing. The formatting it reads has changed.");
+  } else if (unread) {
+    fail(`runaway: ${unread} fan-out(s) could not be read to their end — the matcher\n` +
+         "       is broken rather than the tree being clean.");
+  } else if (fresh.length) {
+    fail(`${fresh.join(", ")} runs a query per row of a list. \`Promise.all\` makes\n` +
+         "       that one WAIT and leaves it N subrequests, against a ceiling of a\n" +
+         "       thousand — so the cost of the screen is set by how many rows a\n" +
+         "       customer has. Read the rows in one statement, or add the file here\n" +
+         "       with the bound that makes it safe.");
+  } else if (gone.length) {
+    fail(`${gone.join(", ")} is carried as having more bounded fan-outs than it has.\n` +
+         "       Correct the count or delete the entry — an exemption that outlives its\n" +
+         "       reason is how a guard stops guarding.");
+  } else {
+    ok(`count: ${touches.size} function(s) reach the database, ` +
+       `${fans.length} bounded fan-out(s) over them`);
+  }
+}
+
 console.log(bad
   ? `\nrunaway: ${bad} finding(s) — something here spends until it is stopped.`
   : `\nrunaway: nothing polls, retries for ever, walks unbounded or logs per request.`);

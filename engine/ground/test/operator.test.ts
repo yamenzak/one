@@ -190,9 +190,10 @@ describe("what the console can change", () => {
   /*
     ⚠️ EACH ROW CARRIES ITS OWN, WHICH IS THE THING A JOIN CAN GET WRONG. The
     list used to ask every workspace for its products and its membership one at
-    a time — 3N + 1 subrequests, over the fifty a Worker is allowed by the
-    seventeenth workspace, so the screen stopped answering rather than slowing
-    down. It reads three statements now, and the failure that replaces it is
+    a time — 3N + 1 subrequests, so the cost of opening the console was set by
+    how many customers the deployment had, and at its own page size it spent
+    most of the thousand a request may make. It reads three statements now, and
+    the failure that replaces it is
     quiet in the other direction: a map keyed wrongly hands every row the first
     row's answer, which looks like a working screen until two workspaces differ.
   */

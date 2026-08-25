@@ -706,10 +706,11 @@ export async function liveAppsOfTenant(db: Db, id: TenantId): Promise<readonly A
  *
  * ⚠️ A LIST SCREEN IS ONE STATEMENT PER TABLE, NEVER ONE PER ROW. The console
  * asked every workspace for its products and its membership one workspace at a
- * time, so two hundred rows were six hundred and one subrequests — over the
- * fifty a Worker is allowed, which means the screen did not get slower as a
- * deployment grew, it stopped answering. Nothing in the code says two hundred;
- * the limit is a number this file chose, and the walk was written as if it were
+ * time, so two hundred rows were six hundred and one subrequests against a
+ * ceiling of a thousand — a screen whose cost was set by how many customers the
+ * deployment has, three quarters of the way to not answering at all, and every
+ * one of those trips is also a wait. Nothing in the code says two hundred; the
+ * limit is a number this file chose, and the walk was written as if it were
  * free.
  *
  * ⚠️ THE WINDOW IS NAMED ONCE BECAUSE THREE STATEMENTS DESCRIBE IT. Two rows

@@ -3460,6 +3460,14 @@
       "fails": "a loop that is wrong until somebody notices, which is the one class of bug that does not degrade — a wrong answer is wrong once, and what a runaway costs is a function of how long it goes unseen"
     },
     {
+      "id": "a-read-per-row-is-a-ceiling-a-customer-walks-into",
+      "protects": "D37",
+      "status": "live",
+      "impl": "scripts/runaway.test.mjs",
+      "proves": "count: ${touches.size} function(s) reach the database",
+      "fails": "a screen whose subrequest count is set by how many rows a customer has — `Promise.all` fixes the waiting and leaves the count, so the sequential check above it reports green right up to the request that stops answering"
+    },
+    {
       "id": "one-function-holds-the-reserve-and-the-charge",
       "protects": "D27",
       "status": "live",

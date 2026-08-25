@@ -221,8 +221,8 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
         /* ⚠️ THREE STATEMENTS FOR THE WHOLE PAGE, AND THE SAME WINDOW IN ALL OF
            THEM. This walked every workspace asking for its products and its
            membership one at a time — 3N + 1 subrequests, so two hundred rows
-           blew through the fifty a Worker may make and the screen stopped
-           answering rather than merely slowing down. `newestTenants` is the
+           spent six hundred and one of the thousand a request may make, and
+           spent them as waits. `newestTenants` is the
            window; `appsOfTenantsIn` and `subscriptionsIn` join through it. */
         const within = newestTenants(PAGE);
         const [rows, products, subs, plans] = await Promise.all([

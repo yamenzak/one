@@ -982,6 +982,7 @@ its own header, cited by other files, and doing nothing.
 | `a-step-names-its-id-above-its-question` | D81 | a step the guard cannot name, so the manifest comparison silently reads the wrong id — a step whose controls declare their own options puts three of them between one question and the next, which is how the barcode step came to be called `loose` |
 | `a-destructive-statement-never-reaches-a-live-database` | D38 | a schema step that drops or rewrites a column on a database that is already serving — and the fault it was written after answered 503 on every door for an hour behind a green gate, because `boot` threw and static assets kept loading |
 | `no-unbounded-loop-waits-on-anything` | D37 | a loop that is wrong until somebody notices, which is the one class of bug that does not degrade — a wrong answer is wrong once, and what a runaway costs is a function of how long it goes unseen |
+| `a-read-per-row-is-a-ceiling-a-customer-walks-into` | D37 | a screen whose subrequest count is set by how many rows a customer has — `Promise.all` fixes the waiting and leaves the count, so the sequential check above it reports green right up to the request that stops answering |
 | `one-function-holds-the-reserve-and-the-charge` | D27 | a model call that reaches a provider and not the meter — settlement charges `min(held, actual)`, so every unit an estimate fails to anticipate is a unit the platform pays for and the customer does not, silently, on every call |
 | `a-price-is-discovered-and-a-decision-is-not` | D24 | a model an operator switched off answering again the next morning, because the nightly sync's UPDATE named a column somebody had decided |
 | `an-empty-catalogue-retires-nothing` | D24 | every model this deployment sells retired in one pass at 03:00, because a changed path or a wrong token answered `200 []` and the sweep believed it |
@@ -1062,7 +1063,7 @@ its own header, cited by other files, and doing nothing.
 | D34 | The prices are parsed from Google's own page, and a modality is a set | 0 |
 | D35 | A model answers more than one lane, and one task column could not say so | 0 |
 | D36 | The latency budget: how many round trips a screen costs | 1 |
-| D37 | Depth is the number, and unbounded is a different question from expensive | 1 |
+| D37 | Depth is the number, and unbounded is a different question from expensive | 2 |
 | D38 | Nothing that reads no table waits for a schema | 1 |
 | D39 | `locate` answers twice from one read | 0 |
 | D40 | The weight of the first screen is a number somebody has to raise | 1 |
