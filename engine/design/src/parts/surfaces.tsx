@@ -1123,7 +1123,7 @@ export function FieldRow({ label, value, under, onEdit }: {
  * ⚠️ THE TRAILING META IS TIME, NOT AN ACTION. A list of people is scanned for
  * "when", and putting a button there makes every row a decision.
  */
-export function PersonRow({ name, under, when, unread, aside, goes, face, onOpen }: {
+export function PersonRow({ name, under, when, unread, aside, goes, face, pick, onOpen }: {
   readonly name: string;
   readonly under?: string;
   readonly when?: string;
@@ -1146,10 +1146,34 @@ export function PersonRow({ name, under, when, unread, aside, goes, face, onOpen
   readonly goes?: boolean;
   /** ⚠️ WHO OR WHAT, NOT A PICTURE — see `Identity` and `face.tsx`. */
   readonly face?: FaceOf;
+  /**
+   * A CONTROL THAT LEADS THE ROW — today that is the selection tick, and there
+   * is nothing else it is for.
+   *
+   * ⚠️ IT IS A SIBLING OF THE PRESSABLE, NOT A CHILD OF IT, AND THAT IS THE
+   * WHOLE REASON THIS PROP EXISTS RATHER THAN A CALLER PUTTING A CHECKBOX IN
+   * `aside`. A row IS a `Button`; a checkbox inside it is a control inside a
+   * control — invalid HTML, a hydration error, and a press whose target the
+   * browser decides. Choosing a row would also OPEN it, which is the one thing
+   * somebody choosing rows never wants. Passed here the row splits: the tick
+   * takes its own target and the rest of the row stays one press.
+   *
+   * ⚠️ AND IT LEADS BECAUSE CHOOSING IS READ DOWN A COLUMN. A tick at the end
+   * of a wrapping row lands at a different x on every row — the eye has to find
+   * each one — while a leading tick is a straight edge somebody runs a thumb
+   * down. It costs the mark column its position, not its presence: the face
+   * moves right by one control and everything else is unchanged.
+   */
+  readonly pick?: React.ReactNode;
   readonly onOpen: () => void;
 }) {
-  return (
-    <Button data-row variant="ghost" className={`justify-start ${ROW.free} ${ROW.wrap} ${ROW.flush} ${ROW.press} ${ROW.tap}`} onPress={onOpen}>
+  const row = (
+    <Button
+      {...(pick ? {} : { "data-row": true })}
+      variant="ghost"
+      className={`justify-start ${ROW.free} ${ROW.wrap} ${ROW.flush} ${ROW.press} ${ROW.tap}`}
+      onPress={onOpen}
+    >
       <span className={`flex w-full items-center ${ROW.gap} ${ROW.pad} ${ROW.tap}`}>
         <Face of={face} name={name} />
         <Body label={name} under={under} />
@@ -1175,6 +1199,28 @@ export function PersonRow({ name, under, when, unread, aside, goes, face, onOpen
         </span>
       </span>
     </Button>
+  );
+  if (!pick) return row;
+  return (
+    /* ⚠️ `data-row` MOVES OUT HERE WITH THE WRAPPER, because the card's spacing
+       selector matches a DIRECT child (`CARD_OTHERS`) — left on the button it
+       would be one level in, and every chosen row would take the padding a
+       non-row gets on top of the padding it already has. */
+    <div data-row className={`flex items-center ${ROW.gap}`}>
+      {/* ⚠️ THE TICK TAKES THE ROW'S FULL HEIGHT, not the checkbox's. A 20px
+          control beside an 89px row is a 20px target in the middle of it, and
+          the two ends of the row do nothing — which reads as the tick being
+          unreliable rather than small. */}
+      <span className={`flex shrink-0 items-center ${ROW.tap}`}>{pick}</span>
+      {/* ⚠️ THE ROW IS WRAPPED RATHER THAN GIVEN THE FLEX CLASSES ITSELF, and
+          that is not indirection for its own sake. `ROW.press` gives the button
+          an EXPLICIT width so its pressed fill can bleed out to the card's
+          edges, and an explicit width beats `grow` — so the classes have to go
+          on something whose width the button then fills. It also keeps the
+          button's own class list unconditional, which is what `heroui.test.mjs`
+          can read. */}
+      <span className={`flex ${ROW.shared}`}>{row}</span>
+    </div>
   );
 }
 

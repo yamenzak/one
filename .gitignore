@@ -41,6 +41,11 @@ test-results/
 # used. See docs/help/README.md.
 apps/e2e/shots-out/
 
+# What the browser lane photographs on its way past (`pnpm engine:seen`).
+# Regenerated every run and never a source of truth — the specimen that draws
+# them is `engine/design/test/mount/`, which IS committed.
+engine/design/test/seen-out/
+
 # OS / editor
 .DS_Store
 Thumbs.db

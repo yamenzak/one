@@ -88,10 +88,10 @@ export function Note({ title, note, onBack, onPublish, onOpen }: {
           <Menu
             trigger={<Button variant="tertiary" size="sm">More</Button>}
             items={[
-              { id: "copy", label: "Duplicate", onDo: () => undefined },
-              { id: "pin", label: note.pinned ? "Unpin" : "Pin to the top", onDo: () => undefined },
+              { id: "copy", label: "Duplicate", icon: glyphOf("copy"), onDo: () => undefined },
+              { id: "pin", label: note.pinned ? "Unpin" : "Pin to the top", icon: glyphOf("star"), onDo: () => undefined },
               /* ⚠️ THE DESTRUCTIVE ITEM IS LAST AND THERE IS AT MOST ONE. */
-              { id: "delete", label: "Delete", tone: "danger", onDo: () => undefined },
+              { id: "delete", label: "Delete", icon: glyphOf("remove"), tone: "danger", onDo: () => undefined },
             ]}
           />
         </Row>

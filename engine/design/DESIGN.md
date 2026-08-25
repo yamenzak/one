@@ -1285,6 +1285,7 @@ Some of this is guarded and some is judgement:
 - `hand` — hand-written CSS names the properties it animates, gates hover on a pointer that hovers, and takes its curve from the library.
 - `heroui` — no component is restyled — layout utilities and tokens only.
 - `keeping` — a content-hashed asset is kept; the document that names it is not.
+- `menu` — a screen composes the vocabulary; it does not re-derive it.
 - `metrics` — one source for every measurement: no screen picks its own padding, gap or tap target, and a pressable row has a floor under it.
 - `motion` — one set of curves and roles, reduced motion answered both ways, and no pinned element whose travel changes the page's height.
 - `moving` — a tab switch is not a journey; only the journey still running may land.

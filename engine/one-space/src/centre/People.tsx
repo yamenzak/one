@@ -455,8 +455,8 @@ function AppHoldings({ app, member }: { readonly app: CentreApp; readonly member
                     <Menu
                       trigger={<Button variant="ghost" aria-label={`Manage ${h.name}`}>…</Button>}
                       items={[
-                        { id: "extend", label: "Extend one period", onDo: () => void grant(h.packageId) },
-                        { id: "revoke", label: "Take it away", tone: "danger", onDo: () => void revoke(h.packageId) },
+                        { id: "extend", label: "Extend one period", icon: glyphOf("calendar"), onDo: () => void grant(h.packageId) },
+                        { id: "revoke", label: "Take it away", icon: glyphOf("remove"), tone: "danger", onDo: () => void revoke(h.packageId) },
                       ]}
                     />
                   </div>

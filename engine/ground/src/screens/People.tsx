@@ -91,9 +91,9 @@ export function People({ title, of, again, onInvite, onOpen }: {
                phone and the last column on a desk. Written per shape they drift,
                and neither side can see the other. */
             acts={(p) => [
-              { id: "resend", label: "Send the invitation again", onDo: () => undefined },
-              { id: "role", label: "Change what they can do", onDo: () => { setOpen(p); } },
-              { id: "remove", label: "Remove from the workspace", tone: "danger", onDo: () => undefined },
+              { id: "resend", label: "Send the invitation again", icon: glyphOf("refresh"), onDo: () => undefined },
+              { id: "role", label: "Change what they can do", icon: glyphOf("key"), onDo: () => { setOpen(p); } },
+              { id: "remove", label: "Remove from the workspace", icon: glyphOf("leave"), tone: "danger", onDo: () => undefined },
             ]}
             chosen={chosen}
             onChoose={setChosen}

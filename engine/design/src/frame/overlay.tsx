@@ -29,7 +29,7 @@
 import * as React from "react";
 import { Button, Drawer, Dropdown, Label, Modal, Popover, Toast } from "@heroui/react";
 import { sayGate, useGate } from "../parts/gated.js";
-import { PRESENTED_PAD } from "../tokens/metrics.js";
+import { ICON, PRESENTED_PAD } from "../tokens/metrics.js";
 
 /* ------------------------------------------------------------------- tray --- */
 
@@ -263,6 +263,17 @@ export function Confirm({ trigger, title, children, act, cancel = "Cancel" }: {
 export interface MenuItem {
   readonly id: string;
   readonly label: string;
+  /**
+   * ⚠️ THE MARK, AND IT IS WHAT MAKES A MENU SCANNABLE RATHER THAN READ. Five
+   * items of two words each is five short lines a reader has to read all of to
+   * find one; with marks the eye goes to the shape it remembers and the words
+   * confirm it. A caller passes `glyphOf(…)` — the size and the ink are this
+   * component's, so a menu cannot come out with four marks at four sizes.
+   *
+   * ⚠️ OPTIONAL, BUT ALL OR NOTHING PER MENU. One item with a mark and four
+   * without indents the four by a mark's width against nothing, which reads as
+   * the marked one being wrong rather than as the others being bare.
+   */
   readonly icon?: React.ReactNode;
   readonly onDo: () => void;
   readonly disabled?: boolean;
@@ -285,7 +296,22 @@ export function Menu({ trigger, items }: {
     */
     <Dropdown>
       {trigger}
-      <Dropdown.Popover>
+      {/*
+        ⚠️ A FLOOR ON THE WIDTH, BECAUSE A MENU SIZES ITSELF TO ITS SHORTEST
+        SENSIBLE WIDTH AND THAT IS THE WRONG TARGET. Left to shrink-to-fit, a
+        menu of "Open", "Rename", "Remove" comes out about as wide as the word
+        "Rename" — a column of three short lines hanging off a trigger, which is
+        a shape a reader has to aim at rather than read. 224px is wide enough
+        that the marks, the words and the destructive one at the bottom read as
+        one list, and it is a floor rather than a width, so a longer label still
+        sets the size.
+
+        ⚠️ AND IT IS THE ONE PROPERTY BEING SET. `min-w-` is geometry, which is
+        what a caller is allowed to state; the fill, the radius and the shadow
+        stay the theme's, so a workspace's branding still reaches this surface
+        (D7).
+      */}
+      <Dropdown.Popover className="min-w-56">
         <Dropdown.Menu>
           {items.map((item) => (
             <Dropdown.Item
@@ -302,7 +328,28 @@ export function Menu({ trigger, items }: {
                  different reds on one screen, and only one of them is legible. */
               {...(item.tone === "danger" ? { "data-ink": "danger" } : {})}
             >
-              {item.icon}
+              {/*
+                ⚠️ THE MARK IS SIZED HERE AND INKED NOWHERE. `--icon` is the one
+                channel that sets a glyph's size (`ambience.ts`), so every mark
+                in every menu is `ICON.row` — the same 20px a list row's lead
+                glyph draws at, which is what makes a menu look like it belongs
+                to the row it opened from.
+
+                ⚠️ AND IT INHERITS ITS COLOUR RATHER THAN TAKING A MUTED ONE.
+                The item already carries `data-ink="danger"` where it applies,
+                so an inherited mark goes red with its own label; a mark pinned
+                to muted would leave the destructive item with a neutral glyph
+                beside red words, which reads as two rows rather than one.
+              */}
+              {item.icon ? (
+                <span
+                  aria-hidden="true"
+                  className="shrink-0"
+                  style={{ ["--icon" as string]: `${ICON.row}px` }}
+                >
+                  {item.icon}
+                </span>
+              ) : null}
               <Label>{item.label}</Label>
             </Dropdown.Item>
           ))}

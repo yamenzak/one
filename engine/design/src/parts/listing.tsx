@@ -288,11 +288,13 @@ export function Listing<T>(
           ? [...found].sort((a, b) => (order?.up ? sorter(a, b) : sorter(b, a)))
           : found;
         /*
-          ⚠️ CHOOSING IS A COLUMN ON A DESK AND A TRAILING BOX ON A PHONE, and
-          both come from one prop. A leading checkbox on a phone eats the mark
-          column — the face or the glyph that is how somebody finds the row — so
-          the box goes where the row's other controls are; on a desk the column
-          is the convention and there is room for it.
+          ⚠️ CHOOSING LEADS THE ROW IN BOTH SHAPES, and both come from one prop.
+          It was a trailing box on a phone on the argument that a leading one
+          eats the mark column; it does not — the face moves right by one
+          control — and what the trailing position actually cost was the
+          straight edge choosing is read down, since a wrapping row puts its end
+          at a different x on every line. It also put a checkbox INSIDE the
+          row's own button; `PersonRow`'s `pick` is where that is written down.
 
           ⚠️ AND THERE IS NO "CHOOSE ALL". A header checkbox chooses the rows on
           THIS page, which is not what anybody reads it as, and the shape that
@@ -320,6 +322,20 @@ export function Listing<T>(
         const named = (row: T) => asRow?.(row).name ?? rowKey(row);
         const box = (row: T) => (
           <Checkbox
+            /*
+              ⚠️ `primary` BECAUSE A SELECTION IS THE ONE PLACE WEIGHT IS WANTED.
+              The library documents `secondary` as lower emphasis "for use in
+              Surface components", which is where this sits — but the chosen
+              state is the whole message of the control, and it is carried by a
+              `::before` painted `--accent` that only `primary` turns on. Muted,
+              the two states differ by a checkmark glyph alone.
+
+              ⚠️ AND ON A MONO BRAND THAT DIFFERENCE IS SMALL EITHER WAY, which
+              is a property of the palette rather than a fault here. The tick,
+              the plate and the row's own name are three channels; this is one of
+              them.
+            */
+            variant="primary"
             isSelected={ticked.has(rowKey(row))}
             onChange={() => { tick(rowKey(row)); }}
           >
@@ -399,13 +415,8 @@ export function Listing<T>(
                            to act on the row are two different facts, and a
                            component that swapped one for the other would make
                            adding actions silently drop the state. */
-                        aside={sayActs(
-                          row,
-                          acts,
-                          picking
-                            ? <span className={`flex items-center ${SPACE.tight}`}>{it.aside}{box(row)}</span>
-                            : it.aside,
-                        )}
+                        aside={sayActs(row, acts, it.aside)}
+                        {...(picking ? { pick: box(row) } : {})}
                         face={it.face}
                         onOpen={() => onOpen?.(row)}
                       />

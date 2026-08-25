@@ -28,6 +28,7 @@ import {
   Banknote, Bell, Building2, Calendar, CheckCheck, Circle, ClipboardList, Clock, Cog, Coins, Database,
   Boxes, ChartColumn, FileText, House, Inbox as InboxGlyph, Mail, MapPin, NotebookPen, Package, Plus, Search,
   Power, Cpu, Shield, Star, Sun, Tag, TriangleAlert, UserRound, Users,
+  Copy as CopyIcon, Pencil, SquareArrowOutUpRight, Trash2,
 } from "lucide-react";
 /* ⚠️ OURS, BECAUSE THEIR MOTION IS INSIDE THEM — see `marks.tsx`. A bell rings
    by its clapper and a calendar turns its days over; neither is a transform on
@@ -139,6 +140,21 @@ const GLYPHS: Readonly<Record<string, React.ReactNode>> = {
      map's header describes, on the screen written after it. */
   key: <KeyMark />, layers: <LayersMark />,
   /*
+    ⚠️ THE FOUR VERBS A SECOND-TIER MENU IS MADE OF, and none of them was here.
+    Every `Menu` in the tree is some arrangement of copy / rename / open / remove
+    — which is what an ellipsis on a row is FOR — and all four fell through to
+    the neutral circle, so the one component whose whole job is to be scanned
+    was the one component that could not be. A menu of identical circles is
+    strictly worse than a menu of bare words: the marks are then noise the eye
+    has to read past to reach the labels.
+
+    ⚠️ `remove` IS A BIN AND `leave` IS A DOOR, and they are not the same act.
+    Leaving is something you do to your own membership; removing is something
+    you do to a record, and a menu that drew a door for "Delete this note" would
+    be promising it can be walked back.
+  */
+  copy: <CopyIcon />, edit: <Pencil />, remove: <Trash2 />, open: <SquareArrowOutUpRight />,
+  /*
     ⚠️ THREE MARKS THAT EXISTED ONLY AS A SPARKLE, WHICH IS HOW A SPARKLE CAME TO
     MEAN FIVE THINGS. A sync button, a model fault, a refusal to index, a list of
     flags and a screen about wording all drew the mark for "a model made this" —
@@ -230,6 +246,20 @@ export const STILL: readonly string[] = [
     the interface raising its voice.
   */
   "alert",
+  /*
+    ⚠️ THE FOUR MENU VERBS ARE STILL, AND THEY ARE VERBS — which makes this the
+    other entry here that is a decision rather than a shrug. A character plays on
+    the press of the nearest pressable ancestor (`Glyph`), and for these that
+    ancestor is a menu item: pressing it DISMISSES the menu, so the character
+    would be a quarter of a keyframe on a surface that is already unmounting.
+    Motion nobody can see is motion that only costs.
+
+    ⚠️ AND `remove` IS STILL FOR `alert`'S REASON AS WELL. It is the mark on the
+    one item in a menu that is already carrying a danger tone; a lifting bin lid
+    would make the destructive row the liveliest thing on a list of ordinary
+    ones, which is the interface raising its voice.
+  */
+  "copy", "edit", "remove", "open",
 ];
 
 /**

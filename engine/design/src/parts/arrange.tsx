@@ -193,7 +193,21 @@ export function Rail({ space = "snug", wide = "card", label, children }: {
      that looks broken until somebody uses it. */
   React.useEffect(read, [read]);
 
-  const pages = Math.max(1, Math.round(seen.all / Math.max(1, seen.width)));
+  /*
+    ⚠️ `ceil`, NOT `round`, AND THE DIFFERENCE IS A RAIL THAT LOOKS BROKEN.
+    Rounded, a rail whose content overruns by less than half a viewport reports
+    ONE page — so it returns the bare scroller, draws no dots and no steppers,
+    and the last card sits clipped at the edge with nothing on the screen saying
+    it can be reached. Measured at 1280 with four cards: 1.3 pages, no controls,
+    a card cut in half. What is being asked is "is anything off-screen", and one
+    pixel off-screen is a yes.
+
+    ⚠️ THE PIXEL OF SLACK IS FOR SUB-PIXEL WIDTHS. `scrollWidth` and
+    `clientWidth` are rounded independently, so a rail that fits exactly can
+    report one more than it has — and a second dot under a rail with nothing to
+    scroll to is the opposite mistake.
+  */
+  const pages = Math.max(1, Math.ceil((seen.all - 1) / Math.max(1, seen.width)));
   const page = Math.min(pages - 1, Math.round(seen.left / Math.max(1, seen.width)));
   const step = (by: number) => {
     at.current?.scrollBy({ left: by * seen.width, behavior: "smooth" });

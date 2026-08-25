@@ -11,7 +11,7 @@
 
 import * as React from "react";
 import { createRoot } from "react-dom/client";
-import { Listing, Screen, Stack } from "../../src/index.js";
+import { Listing, Screen, Stack, glyphOf } from "../../src/index.js";
 
 interface Row { readonly id: string; readonly name: string }
 
@@ -38,7 +38,14 @@ function Ready() {
             rowKey={(r) => r.id}
             asRow={(r) => ({ name: r.name })}
             cols={[{ id: "name", label: "Name", cell: (r) => r.name }]}
-            acts={() => [{ id: "x", label: "Remove", onDo: () => undefined }]}
+            /* ⚠️ THREE MARKED ITEMS, because one bare one is the shape that
+               cannot show what a menu looks like. The width floor and the marks
+               are both only visible against a real list. */
+            acts={() => [
+              { id: "open", label: "Open", icon: glyphOf("open"), onDo: () => undefined },
+              { id: "rename", label: "Rename", icon: glyphOf("edit"), onDo: () => undefined },
+              { id: "x", label: "Remove", icon: glyphOf("remove"), tone: "danger" as const, onDo: () => undefined },
+            ]}
             chosen={["a"]}
             onChoose={() => undefined}
             bulk={[{ id: "rm", label: "Remove", onDo: () => undefined }]}

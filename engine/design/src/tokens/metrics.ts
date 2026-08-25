@@ -75,6 +75,14 @@ export const ROW = {
   tap: "min-h-16",
   /** A row that is not pressable: a field, a note, a step. */
   still: "min-h-14",
+  /**
+   * ⚠️ WHAT A ROW BECOMES WHEN A CONTROL STANDS BESIDE IT rather than inside it
+   * — a selection tick is the case (`PersonRow`'s `pick`). The row stops being
+   * the whole width and becomes one flex child of it, and `min-w-0` is the half
+   * that is easy to leave out: a flex item's floor is its content, so without it
+   * a long name pushes the row past the card and the tick off the left edge.
+   */
+  shared: "min-w-0 grow",
   /** ⚠️ ONE value, on every row. This is the whole rhythm. */
   pad: "py-3",
   /** Between the lead glyph and the body. */

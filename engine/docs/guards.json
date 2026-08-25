@@ -2966,6 +2966,15 @@
       "fails": "a rule pointing at a component a rename retired, which is a rule nobody can obey and which reports nothing forever"
     },
     {
+      "id": "a-menu-is-all-marks-or-none",
+      "protects": "D90",
+      "stage": "88",
+      "status": "live",
+      "impl": "scripts/menu.test.mjs",
+      "proves": "written-out menu(s), each all marks or none",
+      "fails": "a menu with a step in its left edge, where the unmarked rows start at the marked ones' LABELS and read as rows that failed to load - every line of it correct on its own, which is why it survives a review"
+    },
+    {
       "id": "every-size-is-a-rung-of-one-ladder",
       "protects": "D89",
       "stage": "88",
