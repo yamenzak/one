@@ -23,7 +23,7 @@
 
 import * as React from "react";
 import {
-  AreaChart, BarChart, ChartPanel, ChartTable, ChartWaiting, ColumnChart,
+  Arc, AreaChart, BarChart, ChartPanel, ChartTable, ChartWaiting, ColumnChart,
   CompositionBar, Delta, DivergingChart, DonutChart, DumbbellChart, Gauge, Grid,
   HeatmapChart, Hero, LineChart, Meter, PeriodInput, Reveal, Ring, Rings, Row,
   ScatterChart, Screen, Section, Segmented, Sparkline, Stack, StackedChart, Stat,
@@ -267,6 +267,15 @@ export function Reports({ title, of, again, today, period, onPeriod }: {
                     is a problem. Being 62% through a checklist is not. */}
                 <Gauge value={62} label="Workspace set up" note="Three steps left" />
               </Stack>
+            </ChartPanel>
+
+            <ChartPanel label="Where it is kept">
+              {/* ⚠️ AN `Arc` RATHER THAN A `Ring`, AND THE FLOOR IS WHY. A cold
+                  room runs between 2 and 8 degrees; "62% of 8" is arithmetic
+                  nobody performs and a ring would print it. What a reader wants
+                  is where in the safe band this sits, which is the one question
+                  an open arc with its ends labelled answers. */}
+              <Arc label="Cold room" value={5.2} from={2} to={8} suffix="°C" />
             </ChartPanel>
           </Grid>
         </Section>

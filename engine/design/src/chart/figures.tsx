@@ -235,16 +235,44 @@ export function Meter({ label, value, limit, unit = "", suffix = "" }: {
           {unit}{say.compact(value)}{suffix} of {unit}{say.compact(limit)}{suffix}
         </span>
       </span>
+      {/*
+        ⚠️ THE FILL IS HATCHED, AND IT IS A SECOND CHANNEL RATHER THAN A FLOURISH.
+        A meter says one thing with colour, and colour is the channel that fails
+        first — colour-blind readers, a printout, a phone in sunlight, a
+        forced-colours mode. Ruled ink says "this part is spoken for" with
+        geometry, which survives all four; the hue still carries severity on top
+        of it for everybody else.
+
+        ⚠️ 2px OF INK IN EVERY 5 IS THE DUTY CYCLE, and it is bounded on both
+        sides by what the rule has to survive. Finer than about 1.5px and a
+        phone's rounding drops whole strokes, so the same bar is ruled on one
+        device and grey on another; coarser than about 3 in 7 and the bar reads
+        as a row of ticks rather than as a filled length, which is the one thing
+        a meter must not do.
+
+        ⚠️ 12px TALL, UP FROM 8, BECAUSE A HATCH NEEDS ROOM TO BE ONE. At 8 the
+        strokes are shorter than they are apart and the texture reads as noise.
+
+        ⚠️ AND THE GAPS SHOW THE TRACK, NOT THE PAGE. `transparent` here is
+        transparent BLACK and a gradient fading toward it darkens as it goes, so
+        the ruled part would sit in a grey haze on a light card — the same trap
+        the hem's last stop documents. The track's own colour is named twice.
+      */}
       <span
         role="meter"
         aria-valuenow={value} aria-valuemin={0} aria-valuemax={limit} aria-label={label}
-        className="flex h-2 w-full overflow-hidden rounded-full"
+        className="flex h-3 w-full overflow-hidden rounded-full"
         style={{ background: `color-mix(in oklab, var(--${tone}) 18%, var(--surface))` }}
       >
         <span
           data-draw="true"
           className="flex h-full rounded-full"
-          style={{ width: `${share * 100}%`, background: `var(--${tone})` }}
+          style={{
+            width: `${share * 100}%`,
+            background: `repeating-linear-gradient(90deg,`
+              + ` var(--${tone}) 0 2px,`
+              + ` color-mix(in oklab, var(--${tone}) 18%, var(--surface)) 2px 5px)`,
+          }}
         />
       </span>
     </div>

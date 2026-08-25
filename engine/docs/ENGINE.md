@@ -1121,6 +1121,7 @@ its own header, cited by other files, and doing nothing.
 | D84 | A clause reads back to somebody who has left the step, not to somebody standing on it | 0 |
 | D85 | The interface is a warm material with one hot mark on it | 3 |
 | D86 | The dock is a plate again, and it is dark in both themes | 1 |
+| D87 | Two data marks the vocabulary was missing: a position, and a texture | 0 |
 <!-- /generated -->
 
 ---

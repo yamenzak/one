@@ -47,6 +47,14 @@ photograph, the photograph is the content: it goes first, at a size worth
 looking at. An icon in a circle is what a record has INSTEAD of an object, not a
 decoration to put above one.
 
+**A measure is drawn, and which drawing depends on whether it has a zero.**
+`Ring` for a ratio against a limit — storage used, seats taken — where the track
+IS the whole. `Arc` for a position between two bounds that do not start at zero —
+a temperature, a weight, a safe band — with both ends printed under the arc's own
+ends. `Meter` for a ratio in a row, and its fill is **ruled rather than flat**,
+so what it says survives a colour-blind reader, a printout and a phone in
+sunlight. D87 is the argument.
+
 **What this forbids:** a zero-chroma neutral anywhere; a hue on a control; a
 `rounded-*` override; a screen whose title does not outrank its sections; and a
 32×32 thumbnail beside a name where the object could have been the row.

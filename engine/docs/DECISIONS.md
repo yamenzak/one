@@ -3038,3 +3038,40 @@ painted from a card tier, which is a white slab in the light theme; a dock that
 states a fill and no ink, which is a near-black glyph on a near-black plate that
 every contrast check in this repository would pass, because they all measure
 against the page; and a pill inside the plate, which is a plate on a plate.
+
+
+## D87 — Two data marks the vocabulary was missing: a position, and a texture
+
+**`Ring` answers "how much of the limit", and nothing answered "where in the
+range".** Those are different questions and only one of them has a zero. A cold
+room runs between 2°C and 8°C; a ring of that is "65% of 8", which is arithmetic
+nobody performs and which a reader would then have to undo. `Arc` is the open
+form: a value between two stated bounds, the bounds printed under its own ends,
+the number in the middle, and a knob where the value landed.
+
+**The opening is the whole argument.** A closed track says "there is a whole here
+and this is a part of it". An open one says "this is a scale and it has two
+ends", which is what a floor that is not zero requires. The gap goes at the
+BOTTOM — an arc opening at the top is a ring with a bite out of its crown and
+reads as damage — and it is 0.28 of a turn, which is wide enough that the ends
+read as ends and narrow enough that the mark still reads as round.
+
+**It is `Arc` rather than `Dial` because `Dial` is a control.** The slider in
+`forms.tsx` has that name and has had it longer. `Ring` and `Arc` also say the
+difference on their own: closed is a ratio, open is a position.
+
+**And the meter's fill is ruled rather than flat.** A meter said one thing with
+colour, and colour is the channel that fails first — colour-blind readers, a
+printout, a phone in sunlight, a forced-colours mode. Ruled ink says "this part
+is spoken for" with geometry, which survives all four, and the hue still carries
+severity on top of it for everybody else. Two pixels of ink in every five, which
+is bounded on both sides: finer and a phone's rounding drops whole strokes, so
+the same bar is ruled on one device and grey on another; coarser and the bar
+reads as a row of ticks rather than as a filled length.
+
+**Therefore never:** an `Arc` where the floor genuinely is zero, which is a
+`Ring` with a gap in it; an `Arc` with unlabelled ends, which is an angle with no
+scale to put it on and is the whole failure mode of a gauge; a knob that can be
+dragged, which is a control and needs a `slider` role, a step and a commit; and a
+hatch fading toward `transparent`, which is transparent BLACK and puts a grey
+haze over the ruled part of a light card.

@@ -36,7 +36,7 @@ import * as React from "react";
 import { CHART_TYPE, TYPE } from "../tokens/type.js";
 import { SPACE } from "../tokens/metrics.js";
 import { GRID, QUIET, assign, seriesColour } from "./palette.js";
-import { arcPath, arcs, compact } from "./scale.js";
+import { arcPath, arcs, compact, polar } from "./scale.js";
 import { useFigures } from "../parts/said.js";
 
 /* ⚠️ One coordinate space for every round chart — see `charts.tsx`'s `W`/`H`. */
@@ -145,6 +145,142 @@ export function Ring({ label, value, limit, unit = "", suffix = "", severity = t
       <figcaption className={`flex flex-col items-center ${TYPE.note}`}>
         <span className={TYPE.label}>{label}</span>
         <span>{reads}</span>
+      </figcaption>
+    </figure>
+  );
+}
+
+/* -------------------------------------------------------------------- arc --- */
+
+/**
+ * ⚠️ AN OPEN ARC, AND THE OPENING IS WHAT SAYS THIS IS NOT A RATIO. A closed
+ * ring means "out of a whole": the track is the total and the arc is the part of
+ * it. A dial has a FLOOR that is not zero — 16°C, 40 kg, a fifth of a tank — and
+ * a closed track would claim there is a whole here to be a fraction of.
+ *
+ * ⚠️ 0.72 OF A TURN, WHICH IS 259° AND NOT A ROUND NUMBER FOR A REASON. The gap
+ * has to be wide enough that the two ends read as ends rather than as a seam in
+ * a circle, and narrow enough that the arc still reads as most of a round. Below
+ * about a fifth of a turn the gap looks like a rendering fault; above a third the
+ * mark is a horseshoe and the number in it has nothing around it.
+ */
+const SWEEP = 0.72;
+
+/**
+ * ⚠️ AND THE GAP IS AT THE BOTTOM, WHICH IS THE HALF THAT IS EASY TO GET WRONG.
+ * `polar` puts turn 0 at twelve o'clock, so an arc drawn from `(1 − SWEEP) / 2`
+ * opens at the TOP — a ring with a bite out of its crown, which reads as damage
+ * rather than as a scale with two ends. Half a turn round puts the opening under
+ * the number, where the two bounds are printed and where a scale's ends belong.
+ */
+const START = 0.5 + (1 - SWEEP) / 2;
+
+/**
+ * WHERE ONE VALUE SITS BETWEEN TWO BOUNDS.
+ *
+ * ⚠️ AND IT IS `Arc` RATHER THAN `Dial` BECAUSE `Dial` IS A CONTROL. The slider
+ * in `forms.tsx` has that name and has had it longer; two components called the
+ * same thing in one library is a name that has to be disambiguated at every
+ * import, forever. `Ring` and `Arc` also say the difference on their own: one is
+ * closed and is a ratio, the other is open and is a position.
+ *
+ * ⚠️ THIS IS NOT `Ring` WITH DIFFERENT NUMBERS, AND THE DIFFERENCE IS THE FLOOR.
+ * `Ring` answers "how much of the limit is used", which is a ratio and starts at
+ * zero; a temperature between 16 and 32 has no meaningful percentage and a ring
+ * of one would be arithmetic nobody asked for. What a dial answers is "where in
+ * the range is this", which is the question a setting has and a quota does not.
+ *
+ * ⚠️ THE BOUNDS ARE PRINTED AT THE ENDS, and that is what makes the arc
+ * readable rather than decorative. Without them the reader has an angle and no
+ * scale to put it on — which is the whole failure mode of a gauge, and the
+ * reason most of them are worse than the number they surround.
+ *
+ * ⚠️ AND THE KNOB IS A READING, NOT A HANDLE. It marks where the value landed on
+ * a scale whose ends are stated; a dial that could be dragged would need a
+ * `slider` role, a keyboard step and a commit — which is a control, and controls
+ * live in `forms.tsx`. `role="img"` here says what this is: a picture of a
+ * number, with the number in it.
+ */
+export function Arc({
+  label, value, from, to, unit = "", suffix = "", tone = "data", describes,
+}: {
+  readonly label: string;
+  readonly value: number;
+  /** The bottom of the scale. Not assumed to be zero — that is the whole point. */
+  readonly from: number;
+  readonly to: number;
+  /** ⚠️ Before the number — a currency. See `Meter` for why there are two. */
+  readonly unit?: string;
+  /** ⚠️ After it — every other unit of measure there is. */
+  readonly suffix?: string;
+  /**
+   * ⚠️ NO SEVERITY LADDER, WHICH IS THE OPPOSITE OF `Ring` AND DELIBERATE. High
+   * on a ring means "near the limit" and is a warning; high on a dial means
+   * "near the top of the scale", which on a thermostat is a setting somebody
+   * chose. Where a bound genuinely is a danger the caller names the tone.
+   */
+  readonly tone?: "data" | "warning" | "danger";
+  readonly describes?: string;
+}) {
+  const say = useFigures();
+  const span = to - from;
+  const t = span > 0 ? Math.min(1, Math.max(0, (value - from) / span)) : 0;
+  const r = MID - THICK / 2;
+  /* ⚠️ THE KNOB SITS ON THE ARC'S CENTRELINE, which is `r` and not the outer
+     edge — a knob placed on the radius the STROKE starts at rides half its width
+     outside the track, and reads as a bead stuck to the outside of the dial. */
+  const at = polar(MID, MID, r, START + t * SWEEP);
+  const reads = `${unit}${say.compact(value)}${suffix}`;
+  const name = describes
+    ?? `${label}: ${reads}, between ${unit}${say.compact(from)}${suffix} and ${unit}${say.compact(to)}${suffix}`;
+
+  return (
+    <figure className={`flex flex-col items-center ${SPACE.tight}`}>
+      <svg viewBox={`0 0 ${BOX} ${BOX}`} className={ROUND} role="img" aria-label={name}>
+        <title>{name}</title>
+        {/* ⚠️ THE TRACK IS THE WHOLE SWEEP, ALWAYS. It is the SCALE — take it
+            away and the arc has nothing to be a position on, which is the one
+            thing this mark exists to show. */}
+        <path
+          d={arcPath(MID, MID, r, START, START + SWEEP)}
+          fill="none"
+          stroke={`color-mix(in oklab, var(--${tone}) 18%, var(--surface))`}
+          strokeWidth={THICK}
+          strokeLinecap="round"
+        />
+        <path
+          {...draw}
+          d={arcPath(MID, MID, r, START, START + t * SWEEP)}
+          fill="none"
+          stroke={`var(--${tone})`}
+          strokeWidth={THICK}
+          strokeLinecap="round"
+        />
+        {/* ⚠️ A RING RATHER THAN A DISC, AND THE HOLE IS THE SURFACE. A solid
+            knob the colour of the arc is invisible ON the arc, which is exactly
+            where it always is. */}
+        <circle
+          cx={at.x} cy={at.y} r={THICK / 2 - 1.5}
+          fill="var(--surface)" stroke={`var(--${tone})`} strokeWidth={2.5}
+        />
+        <text
+          x={MID} y={MID + 2} textAnchor="middle" dominantBaseline="middle"
+          className={TYPE.figure} fill="currentColor" style={{ fontSize: CHART_TYPE.centre }}
+        >
+          {say.compact(value)}
+          {suffix ? <tspan className={TYPE.minor}>{suffix}</tspan> : null}
+        </text>
+      </svg>
+      {/* ⚠️ THE BOUNDS SIT UNDER THE ARC'S OWN ENDS, which is why this row is as
+          wide as the drawing rather than as wide as the figure. Spread across
+          the whole column they would be two numbers floating at the margins with
+          nothing to belong to. */}
+      <figcaption className={`flex w-full max-w-40 flex-col items-center ${SPACE.tight}`}>
+        <span className={`flex w-full items-baseline justify-between ${TYPE.note} tabular-nums`}>
+          <span>{unit}{say.compact(from)}{suffix}</span>
+          <span>{unit}{say.compact(to)}{suffix}</span>
+        </span>
+        <span className={TYPE.label}>{label}</span>
       </figcaption>
     </figure>
   );
