@@ -53,9 +53,17 @@ const DIST = join(dirname(fileURLToPath(import.meta.url)), "..", "dist");
    those bytes are a ternary in `PersonRow`: a row with no face draws no plate,
    which the first declared list is what found — `Face` falls back to an initial
    when given nothing, and four notes came out with monograms down the edge as
-   though they had identities. */
+   though they had identities.
+
+   ⚠️ AND BY 1,219 ON 2026-08-25 FOR THE ONE HOP OVER A REFERENCE. `reachFor`,
+   `sayReach`, `hopsIn` and `columnsIn` are the kernel's, and the kernel is in
+   this chunk because the browser validates the manifest it was handed — so a
+   contract that grows is a first paint that grows. What is NOT in here is the
+   join itself: `runtime/src/joined.ts` runs on the worker and never reaches a
+   browser bundle at all. Twelve OneInventory screens cannot be declared without
+   it, which is the trade the number records. */
 const CEILING = {
-  js: { raw: 1_103_567, gzip: 330_000 },
+  js: { raw: 1_104_786, gzip: 330_000 },
   css: { raw: 470_000, gzip: 50_000 },
 };
 

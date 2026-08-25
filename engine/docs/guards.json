@@ -4122,6 +4122,33 @@
       "impl": "scripts/census.test.mjs",
       "proves": "ratchet:",
       "fails": "a port that stalls at one declared screen, and a product mid-port growing new hand-written ones — both of which read exactly like progress from outside"
+    },
+    {
+      "id": "a-body-may-reach-one-reference-and-no-further",
+      "protects": "D92",
+      "stage": "97",
+      "status": "live",
+      "impl": "kernel/test/surface.test.ts",
+      "proves": "refuses two hops",
+      "fails": "`product.supplier.name` in a manifest, which is where a declaration stops being one and starts needing a query planner — the same line `Match` draws at the first comparison operator"
+    },
+    {
+      "id": "a-join-asks-once-per-reference-not-once-per-row",
+      "protects": "D36",
+      "stage": "97",
+      "status": "live",
+      "impl": "runtime/test/joined.test.ts",
+      "proves": "asks once per reference, never once per row",
+      "fails": "fifty stock lines costing fifty subrequests on a warehouse phone — the right names at fifty times the price, which every value-only assertion in the file passes over"
+    },
+    {
+      "id": "a-reference-is-resolved-inside-the-callers-own-scope",
+      "protects": "D5",
+      "stage": "97",
+      "status": "live",
+      "impl": "runtime/test/joined.test.ts",
+      "proves": "refuses to resolve a reference from another workspace",
+      "fails": "a stale or forged id in a row becoming a way to read one workspace's records through another's screen"
     }
   ]
 }

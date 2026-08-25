@@ -482,6 +482,10 @@ export type SurfaceRefusal =
   | "goes_nowhere"
   | "span_too_wide" | "span_without_a_grid"
   | "shows_without_a_list" | "shows_field_unknown" | "nothing_unsaid"
+  /* ⚠️ THE SIX A DOTTED PATH CAN GET WRONG — see `reachFor`. They are separate
+     from `field_unknown` because the fix is different for each: a typo, a hop
+     through something that is not a reference, a second hop that is not coming. */
+  | ReachRefusal
   | "split_without_an_aside" | "aside_without_a_split"
   | "operation_unknown" | "nothing_on_it";
 
@@ -545,9 +549,120 @@ export const blocksIn = (
 export const viewsIn = (body: SurfaceSpec): readonly string[] =>
   readsIn(body).flatMap((r) => (r.of === "view" || r.of === "count" ? [r.view] : []));
 
+/**
+ * WHICH COLUMNS EACH VIEW IS ASKED FOR, BY VIEW ID.
+ *
+ * ⚠️ THE PATHS ARE PER BLOCK AND THE FETCHING IS PER VIEW, so this is where the
+ * two are joined up — a block names its columns, the view it binds is what those
+ * columns are of, and the runner needs one list per view rather than one per
+ * block. Two blocks over one view contribute to the same list, which is what
+ * stops the same reference being resolved twice in one screen.
+ *
+ * ⚠️ AND IT IS THE KERNEL'S BECAUSE IT IS A READING OF THE DECLARATION, not a
+ * fetching decision. The runtime does the query; what a body asked for is a
+ * question about the body, and `refuseSurface` has already checked every one of
+ * these against the collection.
+ */
+export const columnsIn = (body: SurfaceSpec): Readonly<Record<string, readonly string[]>> => {
+  const out: Record<string, string[]> = {};
+  for (const { block } of blocksIn(body)) {
+    if (!block.shows?.length) continue;
+    const read = Object.values(block.bind ?? {}).map((b) => b.from).find((r) => r.of === "view");
+    if (read?.of !== "view") continue;
+    const held = (out[read.view] ??= []);
+    for (const col of block.shows) if (!held.includes(col.field)) held.push(col.field);
+  }
+  return out;
+};
+
 /** Every `field` source a body reads — all of them off the screen's subject. */
 export const fieldsIn = (body: SurfaceSpec): readonly string[] =>
   readsIn(body).flatMap((r) => (r.of === "field" ? [r.field] : []));
+
+/* ------------------------------------------------------------ one hop over --- */
+
+/**
+ * A FIELD ON THE ROW, OR A FIELD ON WHAT THE ROW POINTS AT — `"product.name"`.
+ *
+ * ⚠️ WITHOUT THIS EVERY LIST IN EVERY PRODUCT IS A COLUMN OF IDS. A stock row
+ * holds `product` and `location` as `ref`s; the screen wants the product's name,
+ * its unit, its photograph and the location's name. Measured across
+ * OneInventory: twelve reading screens, and every one of them joins. A
+ * declaration that cannot say `product.name` is a declaration those screens
+ * cannot be written in, which was the finding that stopped the port.
+ *
+ * ⚠️ ONE HOP, AND THE SECOND ONE IS NOT COMING. `product.supplier.name` is where
+ * a manifest stops being a declaration and starts needing a query planner —
+ * which is the same line `Match` draws at the first comparison operator. A
+ * screen that needs two hops wants a field the collection computes, so the rule
+ * lives once and every reader agrees about it.
+ *
+ * ⚠️ AND IT IS RESOLVED ON THE SERVER, so the browser gets flat rows and the
+ * renderer needs no idea any of this happened — `row["product.name"]` is a plain
+ * key. A join done in the browser would be N requests, a second copy of the
+ * matching rule in every screen, and rows that are missing their names for the
+ * length of whichever fetch lost.
+ */
+export type Reach =
+  | { readonly on: "self"; readonly field: string }
+  | { readonly on: "ref"; readonly through: string; readonly to: string; readonly field: string };
+
+export type ReachRefusal =
+  | "path_too_deep" | "path_head_unknown" | "path_head_not_a_ref"
+  | "path_target_unknown" | "path_field_unknown" | "not_a_name";
+
+/**
+ * ⚠️ ONE RESOLVER, READ BY THE REFUSAL AND BY THE RUNNER. Two implementations of
+ * "what does `product.name` mean" is how a path the kernel accepts becomes a
+ * column the runner cannot find — a blank under a correct heading, which reads
+ * as missing data rather than as a fault.
+ */
+export function reachFor(
+  path: string, held: Fields, collections: readonly CollectionSpec[],
+): Reach | ReachRefusal {
+  const parts = path.split(".");
+  if (parts.length > 2) return "path_too_deep";
+  if (!parts.every((p) => FIELD_NAME.test(p))) return "not_a_name";
+  const [head, tail] = parts as [string, string | undefined];
+  if (tail === undefined) return head in held ? { on: "self", field: head } : "path_field_unknown";
+
+  const through = held[head];
+  if (!through) return "path_head_unknown";
+  if (through.kind !== "ref") return "path_head_not_a_ref";
+  const to = collections.find((c) => c.id === through.to);
+  if (!to) return "path_target_unknown";
+  if (!(tail in to.fields)) return "path_field_unknown";
+  return { on: "ref", through: head, to: to.id, field: tail };
+}
+
+/**
+ * ⚠️ ONE SENTENCE PER REFUSAL, SAID ONCE. The same six can be raised from a
+ * `field` binding and from a `shows` column, and two copies of the wording is how
+ * one of them comes to name the wrong collection.
+ */
+export const sayReach = (
+  why: ReachRefusal, path: string, of: string, held: Fields,
+): string => {
+  const head = path.split(".")[0]!;
+  switch (why) {
+    case "path_too_deep": return `"${path}" reaches through two references — a screen may `
+      + "read a field on the record or a field on what it points at, and no further";
+    case "not_a_name": return `"${path}", which is not a field name`;
+    case "path_head_unknown": return `"${path}", and "${of}" has no "${head}" to reach through`;
+    case "path_head_not_a_ref": return `"${path}", and "${head}" is a `
+      + `${(held[head] as { kind: string } | undefined)?.kind ?? "field"} rather than a reference`;
+    case "path_target_unknown": return `"${path}", and "${head}" points at a collection `
+      + "this app does not declare";
+    case "path_field_unknown": return `"${path}", which is not there`;
+  }
+};
+
+/** ⚠️ The hops a set of paths needs, deduplicated — one query each, never one per row. */
+export const hopsIn = (reaches: readonly Reach[]): readonly { through: string; to: string }[] => {
+  const out = new Map<string, { through: string; to: string }>();
+  for (const r of reaches) if (r.on === "ref") out.set(r.through, { through: r.through, to: r.to });
+  return [...out.values()];
+};
 
 /**
  * What one view declaration can get wrong.
@@ -669,14 +784,24 @@ export function refuseSurface(
     at("view_collection_unknown", `is about "${screen.of}", which this app does not declare`);
   }
   for (const name of fieldsIn(body)) {
-    if (!FIELD_NAME.test(name)) {
-      at("not_a_name", `binds "${name}", which is not a field name`);
-    } else if (!screen.of) {
+    if (!screen.of) {
       at("field_without_a_subject",
         `binds the field "${name}" and names no \`of\` — there is no record for it to be a field of`);
-    } else if (subject && !(name in subject)) {
-      at("field_unknown", `binds "${name}", which ${screen.of} does not have`);
+      continue;
     }
+    if (!subject) continue;
+    /* ⚠️ ONE HOP IS A FIELD TOO — see `reachFor`. A screen about a stock line
+       binding "product.name" is the ordinary case, not an exception. */
+    const reach = reachFor(name, subject, collections);
+    if (typeof reach !== "string") continue;
+    /* ⚠️ A BARE NAME KEEPS ITS OWN REFUSAL. `field_unknown` says "this screen's
+       subject has no such field", which is the whole story for a name with no
+       dot in it; the path codes exist because a dotted one has five other ways
+       to be wrong and the fix differs for each. */
+    at(reach === "path_field_unknown" && !name.includes(".") ? "field_unknown" : reach,
+      name.includes(".")
+        ? sayReach(reach, name, screen.of, subject)
+        : `binds "${name}", which ${screen.of} does not have`);
   }
 
   /* --- the dispatches --------------------------------------------------- */
@@ -826,9 +951,13 @@ export function refuseSurface(
       } else {
         const held = collections.find((c) => c.id === view.of)?.fields;
         for (const col of b.shows) {
-          if (held && !(col.field in held)) {
-            at("shows_field_unknown",
-              `${where} shows "${col.field}", which "${view.of}" does not have`);
+          if (!held) continue;
+          const reach = reachFor(col.field, held, collections);
+          if (typeof reach === "string") {
+            at(reach === "path_field_unknown" && !col.field.includes(".")
+              ? "shows_field_unknown"
+              : reach,
+              `${where} shows ${sayReach(reach, col.field, view.of, held)}`);
           }
         }
       }

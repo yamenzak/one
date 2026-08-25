@@ -38,10 +38,27 @@ const note = collection({
     words: field.number({ label: "Words", holds: "none" }),
     /* ⚠️ The axis a dispatch may branch on — see "what it turned out to be". */
     state: field.enum({ label: "State", holds: "none", values: ["draft", "live", "filed"] }),
+    author: field.ref({ label: "Written by", holds: "none", to: "person" }),
   },
 });
 
-const COLLECTIONS = [note];
+/* ⚠️ THE OTHER END OF A REFERENCE — see the "one hop over" block below. `note`
+   points at it, so `author.name` is a field a body may read and
+   `author.nothing` is one it may not. */
+const person = collection({
+  id: "person",
+  label: { one: "Person", many: "People" },
+  scope: { of: "tenant" },
+  permission: "member",
+  retention: null,
+  onClose: { then: "purge" },
+  fields: {
+    name: field.text({ label: "Name", required: true, holds: "none" }),
+    email: field.email({ label: "Email", holds: "none" }),
+  },
+});
+
+const COLLECTIONS = [note, person];
 
 const recent: ViewSpec = {
   id: "recent-notes",
@@ -115,6 +132,61 @@ describe("a body that composes", () => {
     }));
     expect(found).toContain("block_unknown");
     expect(found).toContain("field_unknown");
+  });
+});
+
+/* -------------------------------------------------------- one hop over --- */
+
+/**
+ * ⚠️ WITHOUT THIS EVERY DECLARED LIST IS A COLUMN OF IDS, which is the finding
+ * that stopped the port. A stock line holds `product` as a reference and the
+ * screen wants the product's NAME — measured across OneInventory, twelve
+ * reading screens and every one of them joining. What is checked here is that
+ * the path resolves against the declaration rather than at the database, because
+ * a path that does not is a blank under a correct heading: missing data to
+ * anybody reading the screen, and a typo four files away.
+ */
+describe("a body may read one hop over a reference", () => {
+  const reading = (path: string) => why(screen({
+    body: body({
+      blocks: [{ block: "Heading", bind: { says: { from: { of: "field", field: path } } } }],
+    }),
+  }));
+
+  it("accepts a field on what the record points at", () => {
+    expect(reading("author.name")).toEqual([]);
+  });
+
+  it("refuses a field the other end does not have", () => {
+    expect(reading("author.nothing")).toEqual(["path_field_unknown"]);
+  });
+
+  /*
+    ⚠️ A HOP THROUGH SOMETHING THAT IS NOT A REFERENCE IS THE SHARP ONE. `title`
+    is text; `title.length` looks like the property access every author's fingers
+    already know, and reaching a string's own members from a manifest is where a
+    declaration quietly becomes an expression language.
+  */
+  it("refuses a hop through a field that is not a reference", () => {
+    expect(reading("title.length")).toEqual(["path_head_not_a_ref"]);
+  });
+
+  it("refuses a hop through a field that is not there", () => {
+    expect(reading("nobody.name")).toEqual(["path_head_unknown"]);
+  });
+
+  /*
+    ⚠️ AND THE SECOND HOP IS NOT COMING. Two references deep is where a manifest
+    stops being a declaration and starts needing a query planner — the same line
+    `Match` draws at the first comparison operator, and for the same reason: the
+    third one is then free.
+  */
+  it("refuses two hops", () => {
+    expect(reading("author.team.name")).toEqual(["path_too_deep"]);
+  });
+
+  it("refuses a path that is not made of names", () => {
+    expect(reading("author.Name!")).toEqual(["not_a_name"]);
   });
 });
 
@@ -386,7 +458,7 @@ describe("a field is a field of something", () => {
   it("refuses a field the subject does not have", () => {
     expect(why(screen({
       body: body({
-        blocks: [{ block: "Heading", bind: { says: { from: { of: "field", field: "author" } } } }],
+        blocks: [{ block: "Heading", bind: { says: { from: { of: "field", field: "nobody" } } } }],
       }),
     }))).toContain("field_unknown");
   });
@@ -461,12 +533,12 @@ describe("a view is checked against the collection it reads", () => {
     four files away.
   */
   it("refuses one narrowing on a field the collection does not have", () => {
-    const bad = { ...recent, where: [{ field: "author", set: true }] } as ViewSpec;
+    const bad = { ...recent, where: [{ field: "nobody", set: true }] } as ViewSpec;
     expect(refuseView(bad, COLLECTIONS).map((p) => p.why)).toContain("view_field_unknown");
   });
 
   it("refuses one sorting by a field the collection does not have", () => {
-    const bad = { ...recent, sort: { by: "author", dir: "down" } } as ViewSpec;
+    const bad = { ...recent, sort: { by: "nobody", dir: "down" } } as ViewSpec;
     expect(refuseView(bad, COLLECTIONS).map((p) => p.why)).toContain("view_field_unknown");
   });
 

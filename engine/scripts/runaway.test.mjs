@@ -384,6 +384,14 @@ const ALL = [
     one fails until somebody writes down what bounds it.
   */
   const BOUNDED = new Map([
+    /* ⚠️ THE HOPS, NOT THE ROWS, AND THAT IS THE WHOLE POINT OF THE MODULE. A
+       body names a handful of `<ref>.<field>` paths; `hopsIn` deduplicates them
+       to one query per REFERENCE, and the ids of every row are collected into a
+       single `IN` list first. Fifty stock lines are two statements — product and
+       location — not a hundred, which is the shape this guard exists to refuse
+       and the reason the join is here rather than in each screen. */
+    ["runtime/src/joined.ts",
+      [1, "the references one body names, deduplicated — never one per row"]],
     ["runtime/src/centre-ops.ts",
       [1, "the products a workspace has switched on — the deployment's own catalogue"]],
     ["runtime/src/operator.ts",

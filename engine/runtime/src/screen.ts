@@ -23,7 +23,8 @@
  */
 
 import type { AppSpec, ScreenSpec } from "@engine/kernel";
-import { SCREEN_PATH, permissionFor, viewsIn } from "@engine/kernel";
+import type { Reach } from "@engine/kernel";
+import { SCREEN_PATH, columnsIn, permissionFor, reachFor, viewsIn } from "@engine/kernel";
 import { readOne } from "./records.js";
 import { runViews, type Viewed } from "./views.js";
 import { type Db } from "./sql.js";
@@ -90,6 +91,23 @@ export async function drawnFor(
   const reads = screen.body ? viewsIn(screen.body) : [];
   const here = { record: record ?? undefined, me: me ?? undefined };
 
+  /*
+    ⚠️ THE PATHS A BODY NAMES, RESOLVED ONCE HERE RATHER THAN GUESSED BY THE
+    RUNNER. `refuseSurface` has already refused a path that does not resolve, so
+    a `string` back from `reachFor` is a manifest that never composed — it is
+    dropped rather than thrown, because a screen that got this far has been
+    validated and re-raising here would be a second answer to one question.
+  */
+  const reaching: Record<string, readonly Reach[]> = {};
+  for (const [view, cols] of Object.entries(screen.body ? columnsIn(screen.body) : {})) {
+    const of = (app.views ?? []).find((v) => v.id === view);
+    const held = (app.collections ?? []).find((c) => c.id === of?.of)?.fields;
+    if (!held) continue;
+    reaching[view] = cols
+      .map((path) => reachFor(path, held, app.collections ?? []))
+      .filter((r): r is Reach => typeof r !== "string");
+  }
+
   /* ⚠️ THE RECORD AND THE VIEWS TOGETHER. Neither is an input to the other —
      `here` is the id, which the caller already had — and taken in sequence this
      charges every detail screen an extra hop in front of its own blocks. */
@@ -97,7 +115,7 @@ export async function drawnFor(
     screen.of && record
       ? readOne(db, (app.collections ?? []).find((c) => c.id === screen.of)!, scope, record)
       : Promise.resolve(null),
-    runViews(db, app, reads, scope, here),
+    runViews(db, app, reads, scope, here, reaching),
   ]);
 
   return { record: held ?? null, views };

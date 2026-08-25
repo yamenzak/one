@@ -21,8 +21,9 @@
  * which is not a declaration.
  */
 
-import type { AppSpec, CollectionSpec, Viewed, ViewSpec } from "@engine/kernel";
+import type { AppSpec, CollectionSpec, Reach, Viewed, ViewSpec } from "@engine/kernel";
 import { eraseBy } from "@engine/kernel";
+import { joinRows } from "./joined.js";
 import { narrow, type Here } from "./records.js";
 import { column, table, type Db } from "./sql.js";
 
@@ -45,6 +46,12 @@ export const collectionFor = (
 
 export async function runView(
   db: Db, app: AppSpec, view: ViewSpec, scope: string, here: Here = {},
+  /* ⚠️ THE PATHS THE BODY ASKED FOR, PASSED IN RATHER THAN DERIVED. A view does
+     not know which screen is reading it — two screens can name the same view and
+     want different joins — so what to fetch alongside is the CALLER's question.
+     Deriving it here would join every reference on every read, for every screen,
+     including the ones drawing nothing but a count. */
+  reaches: readonly Reach[] = [],
 ): Promise<Viewed> {
   const spec = collectionFor(app, view);
   if (!spec) return { items: [], count: 0 };
@@ -73,7 +80,9 @@ export async function runView(
       .bind(...bound, want).all(),
   ]);
 
-  return { items: rows.results, count: counted?.n ?? rows.results.length };
+  const items = await joinRows(
+    db, rows.results, reaches, app.collections ?? [], scope);
+  return { items, count: counted?.n ?? rows.results.length };
 }
 
 /**
@@ -85,8 +94,11 @@ export async function runView(
  */
 export async function runViews(
   db: Db, app: AppSpec, ids: readonly string[], scope: string, here: Here = {},
+  /** ⚠️ By view id, because a body's paths are per block and a block reads one view. */
+  reaches: Readonly<Record<string, readonly Reach[]>> = {},
 ): Promise<Readonly<Record<string, Viewed>>> {
   const wanted = (app.views ?? []).filter((v) => ids.includes(v.id));
-  const done = await Promise.all(wanted.map((v) => runView(db, app, v, scope, here)));
+  const done = await Promise.all(
+    wanted.map((v) => runView(db, app, v, scope, here, reaches[v.id] ?? [])));
   return Object.fromEntries(wanted.map((v, i) => [v.id, done[i]!]));
 }

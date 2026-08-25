@@ -234,6 +234,7 @@ if (what === "guards") {
     ["screen", "what a declared screen is handed: its record, its views, and the permission every one of them needs"],
     ["search", "what is findable: the ledger a write leaves, and the pass that carries it"],
     ["views", "a declared view, run: narrowed, sorted, bounded, and counted whole"],
+    ["joined", "a field on what a row points at, one query per reference rather than one per row"],
     ["search-ops", "the find operation a searchable collection gets, with its boundary already in it"],
     ["totals-ops", "how many of each thing there are, in one ask instead of one list read per number"],
     ["operator", "the deployment looking at itself"],
