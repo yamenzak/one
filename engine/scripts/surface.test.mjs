@@ -103,15 +103,15 @@ const SURFACES = {
   needs: { file: "design/src/rendered/legal.tsx", renders: "export function WhereItLives" },
 
   /*
-    ⚠️ THE FIRST THING OWED, AND IT IS OWED FOR EXACTLY AS LONG AS IT SHOULD BE.
-    A view is a query a screen's body names, and the body has a contract and no
-    renderer yet — so a view reaches a person through the block that reads it,
-    and until stage 96 draws one there is nothing to point at. Written here
-    rather than left silent, because a declaration nothing renders is the failure
-    this whole guard exists to catch (D12), and it looks identical whether it is
-    scheduled or forgotten.
+    ⚠️ A VIEW HAS NO SCREEN OF ITS OWN, AND THAT IS THE POINT OF IT. It reaches a
+    person through the block that reads it — a `Listing`, a `Stat`'s count — so
+    what is named here is the renderer that binds one, not a page called Views.
+    It was `owed: "96"` for four stages, which is what that field is for: a
+    declaration nothing renders is the failure this whole guard exists to catch
+    (D12), and scheduled looks identical to forgotten unless somebody writes down
+    which it is.
   */
-  views: { owed: "96" },
+  views: { file: "design/src/rendered/body.tsx", renders: "export function Body" },
 
   /* Not a surface: an app's own refusal wording is rendered wherever the
      refusal is, which is every screen. */

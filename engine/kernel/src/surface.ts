@@ -392,12 +392,12 @@ export interface SurfaceSpec {
 export type Bones =
   | "rows" | "hero" | "figure" | "chart" | "tiles" | "table" | "form" | "text";
 
-/* DEFER(engine-96) stage:96 — THE RENDERER IS WHAT READS THIS AT RUNTIME. Until
-   it exists the list is a type the compiler enforces and a set the registry's
-   own test walks; the map from a name to a skeleton component is stage 96's. */
-export const BONES: readonly Bones[] = [
-  "rows", "hero", "figure", "chart", "tiles", "table", "form", "text",
-];
+/* ⚠️ THERE IS NO RUNTIME LIST OF THESE, DELIBERATELY. `BlockEntry.bones` is
+   typed, so a registry entry naming an unknown skeleton is a compile error, and
+   the frame's own map is `Record<Bones, …>`, so a skeleton it cannot draw is
+   another one. An exported array beside them would be a third statement of the
+   same closed set that nothing keeps in step — which is what `CELLS` was before
+   it went the same way. */
 
 /**
  * WHAT ONE SLOT ON A BLOCK ACCEPTS.

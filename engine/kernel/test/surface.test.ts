@@ -17,7 +17,7 @@ import { describe, expect, it } from "vitest";
 import { collection } from "../src/collection.js";
 import { field } from "../src/field.js";
 import {
-  BONES, CELLS_MOST, blocksIn, fieldsIn, refuseSurface, refuseView, unreadViews,
+  CELLS_MOST, blocksIn, fieldsIn, refuseSurface, refuseView, unreadViews,
   viewsIn, type BlockIndex, type SurfaceSpec, type ViewSpec,
 } from "../src/surface.js";
 import { BLOCKS } from "../src/blocks.js";
@@ -608,21 +608,6 @@ describe("a block is registered, complete, and offers what exists", () => {
   it("refuses every block while the index is empty", () => {
     expect(refuseSurface(screen(), {}, [recent], COLLECTIONS, []).map((p) => p.why))
       .toContain("block_unknown");
-  });
-
-  /*
-    ⚠️ THE FOUR OUTCOMES ARE THE FRAME'S, AND WHAT THE BLOCK OWES IS THE SHAPE
-    OF ITS OWN ABSENCE. Building waiting, nothing, trouble and denied into forty
-    components would be thirty-nine copies of one decision — the shape this arc
-    exists to remove. So the type insists on a skeleton and nothing else, and a
-    block cannot be registered without saying what it looks like when it is not
-    there yet.
-  */
-  it("cannot be registered without saying what its absence looks like", () => {
-    for (const entry of Object.values(BLOCKS)) {
-      expect(BONES, `${entry.id} names "${entry.bones}", which is not a skeleton`)
-        .toContain(entry.bones);
-    }
   });
 
   it("refuses a block offering an operation the app does not declare", () => {

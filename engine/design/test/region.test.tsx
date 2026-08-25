@@ -16,7 +16,7 @@
 
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { BONES, PLATFORM_PROBLEMS, problem, type Bones } from "@engine/kernel";
+import { PLATFORM_PROBLEMS, problem, type Bones } from "@engine/kernel";
 import { BLOCKS } from "@engine/kernel";
 import { Allowed, Region, ready, trouble, waiting } from "../src/index.js";
 
@@ -113,7 +113,16 @@ describe("every skeleton a block can name is one the frame can draw", () => {
     skeleton looks like an empty screen, which is the outcome this component
     exists to stop being confused with.
   */
-  it.each(BONES)("draws something for %s", (bones: Bones) => {
+  /* ⚠️ EXHAUSTIVE BY THE COMPILER, NOT BY A LIST SOMEBODY MAINTAINS. A `Bones`
+     name added to the union and not to this record is a type error in this file,
+     so the sweep cannot narrow in silence — which is what an exported
+     `readonly Bones[]` beside the union could not promise. */
+  const EVERY: Readonly<Record<Bones, true>> = {
+    rows: true, hero: true, figure: true, chart: true,
+    tiles: true, table: true, form: true, text: true,
+  };
+
+  it.each(Object.keys(EVERY) as Bones[])("draws something for %s", (bones: Bones) => {
     expect(drawn(waiting<string>(), { bones })).not.toBe("");
   });
 

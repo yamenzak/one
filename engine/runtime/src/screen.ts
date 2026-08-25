@@ -23,10 +23,18 @@
  */
 
 import type { AppSpec, ScreenSpec } from "@engine/kernel";
-import { viewsIn } from "@engine/kernel";
+import { permissionFor, viewsIn } from "@engine/kernel";
 import { readOne } from "./records.js";
 import { runViews, type Viewed } from "./views.js";
 import { type Db } from "./sql.js";
+
+/**
+ * ⚠️ THE PATH SEGMENT, NAMED ONCE. An operation id may not contain a slash, so
+ * `screen/<id>` cannot collide with one — and naming the prefix here rather
+ * than spelling it at the door is what stops the browser and the worker
+ * disagreeing about the address by one character.
+ */
+export const SCREEN_PATH = "screen";
 
 export interface Drawn {
   readonly record: Record<string, unknown> | null;
@@ -62,21 +70,25 @@ export const collectionsFor = (app: AppSpec, screen: ScreenSpec): readonly strin
  * which reads as a workspace with no suppliers rather than as an account that
  * cannot see them, and is the worse of the two by a distance.
  */
-/**
- * ⚠️ DEFER(engine-96) stage:96 — the HTTP door that calls this is the one that
- * draws a declared screen, and nothing declares one yet. The order is the
- * runner, then this, then the route, then the first declaration: each is a thing
- * the next cannot be written without.
- */
 export async function drawnFor(
   db: Db, app: AppSpec, screen: ScreenSpec, scope: string,
   holds: (permission: string) => boolean,
   record: string | null = null,
   me: string | null = null,
 ): Promise<Drawn | Refused> {
+  /*
+    ⚠️ `permissionFor`, NOT `spec.permission`. A collection declares a PREFIX —
+    `note` — and the grant a reader actually holds is `note:read`, which the
+    kernel derives for every generated verb. Comparing the prefix asks for a
+    permission nobody is ever granted, so the door refuses everyone; spelling
+    `${spec.permission}:read` here instead would be a second copy of a rule the
+    kernel already owns, and the two drift the day a verb is added.
+  */
   for (const id of collectionsFor(app, screen)) {
     const spec = (app.collections ?? []).find((c) => c.id === id);
-    if (spec && !holds(spec.permission)) return { needs: spec.permission };
+    if (!spec) continue;
+    const needs = permissionFor(spec, "read");
+    if (!holds(needs)) return { needs };
   }
 
   const reads = screen.body ? viewsIn(screen.body) : [];

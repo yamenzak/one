@@ -85,10 +85,9 @@ export async function runView(
 /**
  * Every view a screen's body reads, run together.
  *
- * ⚠️ DEFER(engine-96) stage:96 — the door that calls this is the one that draws
- * a declared screen, and nothing declares one yet. The runner is here first on
- * purpose: a body cannot be written against a view that cannot be fetched, so
- * the order is the runner, then the route, then the first declaration.
+ * ⚠️ IN ONE ROUND TRIP, WHICH IS WHY IT IS A FUNCTION RATHER THAN N CALLS. A
+ * screen's regions each wait on their own outcome in the browser; the fetching
+ * does not get to be N sequential queries behind one door.
  */
 export async function runViews(
   db: Db, app: AppSpec, ids: readonly string[], scope: string, here: Here = {},

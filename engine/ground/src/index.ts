@@ -461,6 +461,24 @@ export const GROUND: AppSpec = defineApp({
   },
 
   collections: [note, checkIn],
+
+  /*
+    ⚠️ A VIEW IS A DECLARED READ OVER ONE COLLECTION, and `unreadViews` refuses
+    one no screen reads — so this list can only ever hold what something draws.
+    Newest first is the order a note list wants: what somebody wrote last is
+    what they came back for.
+  */
+  views: [
+    /*
+      ⚠️ NO `sort`, AND THAT IS THE ORDER IT WANTS. The first draft asked for
+      `at` descending and the kernel refused it — `at` is the row's own column
+      rather than a field this collection declares, so a view may not name it.
+      The refusal is right and the sort was redundant: newest-first is what a
+      view answers with when it names none, which is what a note list wants
+      anyway. What somebody wrote last is what they came back for.
+    */
+    { id: "every-note", of: "note", limit: 50 },
+  ],
   operations: [publish, ask, draft, start, teamCheckIns, share],
 
   /*
@@ -477,9 +495,38 @@ export const GROUND: AppSpec = defineApp({
     ones are somewhere else inside it.
   */
   screens: [
-    /* ⚠️ A list. The product's own lattice, and nothing of its own. */
+    /*
+      ⚠️ THE FIRST SCREEN IN THIS REPOSITORY DRAWN FROM WHAT IT DECLARES, and it
+      is the ground's because the ground is where a framework claim is asserted
+      before a product depends on it. A list of one collection is the smallest
+      honest body: a view, a block, and the words its emptiness means.
+
+      ⚠️ AND `shows` IS WHY IT IS A DECLARATION RATHER THAN A GUESS. Which fields
+      become columns, in what order and under what words, is a decision no
+      component can derive from a row — see `Listing`'s own header, which has
+      said so since it was written.
+    */
     { id: "notes", route: "/", label: "Notes", nav: "primary", icon: "note",
-      permission: "note:read", tone: "neutral" },
+      permission: "note:read", tone: "neutral",
+      body: {
+        shape: "list",
+        layout: { as: "stack" },
+        blocks: [{
+          block: "Listing",
+          shows: [
+            { field: "title", label: "Note" },
+            { field: "body", label: "What it says" },
+          ],
+          nothing: {
+            says: "No notes yet",
+            under: "Write one and it will be here",
+          },
+          bind: {
+            label: { from: { of: "words", says: "Notes" } },
+            of: { from: { of: "view", view: "every-note" } },
+          },
+        }],
+      } },
     { id: "people", route: "/people", label: "People", nav: "primary", icon: "people",
       permission: "member:read" },
     /*

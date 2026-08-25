@@ -75,6 +75,7 @@ import { generatorFor, streamerFor } from "./ai-run.js";
 import { gatewayProvider, gatewayStreamer, type Provider } from "./services.js";
 import type { GatewayAt } from "./gateway.js";
 import { searchIn, type Searcher } from "./search.js";
+import { SCREEN_PATH, drawnFor } from "./screen.js";
 
 /* ------------------------------------------------------------------ seams --- */
 
@@ -821,6 +822,52 @@ export function serve(wiring: Wiring): (request: Request) => Promise<Response> {
 
     const located = await locating.located;
     if (!located) return refusing(problem(PLATFORM_PROBLEMS, "platform.not_found"));
+
+    /*
+      ⚠️ A DECLARED SCREEN IS ANSWERED HERE, BEFORE THE OPERATION LOOKUP, AND IT
+      IS NOT AN OPERATION. What it hands back is a record and some views — no
+      write, no idempotency, no credit, no audit row — so routing it through
+      `performOperation` would mean an operation with none of the things that
+      function exists to do, declared by nobody, in every app.
+
+      ⚠️ AND IT IS STILL BEHIND MAINTENANCE AND STILL BEHIND PERMISSION. `full`
+      withholds it like every other read; the permission is checked per
+      COLLECTION inside `drawnFor`, because what comes back is rows and the
+      permission that governs a row is its collection's, not the screen's.
+    */
+    if (id.startsWith(`${SCREEN_PATH}/`)) {
+      const want = id.slice(SCREEN_PATH.length + 1);
+      for (const appId of located.apps) {
+        const make = wiring.apps[appId];
+        if (!make) continue;
+        const app = make();
+        const screen = (app.screens ?? []).find((one) => one.id === want && one.body);
+        if (!screen) continue;
+        if (request.method !== "GET") {
+          return refusing(problem(PLATFORM_PROBLEMS, "platform.not_found"));
+        }
+        const [closed, who, permissions] = await Promise.all([
+          caring,
+          identifying,
+          identifying.then((one) => one.permissionsIn(appId)),
+        ]);
+        if (closed === "full") {
+          return asProblem(problem(PLATFORM_PROBLEMS, "platform.maintenance"));
+        }
+        const held = new Set(permissions);
+        const drawn = await drawnFor(
+          located.db, app, screen, located.tenantId,
+          (need: string) => held.has(need),
+          url.searchParams.get("record"),
+          who.accountId,
+        );
+        if ("needs" in drawn) {
+          return asProblem(problem(PLATFORM_PROBLEMS, "platform.forbidden"));
+        }
+        return json(drawn);
+      }
+      return refusing(problem(PLATFORM_PROBLEMS, "platform.not_found"));
+    }
 
     /* ⚠️ ONLY THE APP THE OPERATION BELONGS TO IS COMPOSED (D4). Searching the
        tenant's own list rather than every registered app is what keeps the cost

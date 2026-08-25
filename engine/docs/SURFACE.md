@@ -387,17 +387,16 @@ renamed code because `includes` is a substring test.
 ⚠️ **The seventeen `unrepresentable` claims are the list stage 96 must not
 violate.** Each is a promise about what the renderer will *not* let a body say.
 
-### S8 — The renderer · **built; stage 96 ships with S9**
+### S8 — The renderer · **stage 96, shipped**
 
-⚠️ **The renderer is written, tested and reached by nothing, so the stage is not
-shipped — and the check that said so is S7's.** Marking 96 shipped turned three
-guards red at once: the census's arming pin (four guards have stood down in
-favour of a kernel refusal and no screen is drawn from a declaration), the
-capability guard (`AppSpec.views` owes a surface at 96), and the deferral ledger.
-All three are the same true thing. Built is not reached, which is the rule this
-whole repository is built on, and the machinery caught me claiming otherwise
-inside an hour of writing the pin. It flips when OneInventory declares its first
-body.
+⚠️ **Built is not reached, and the check that said so is S7's.** Marking 96
+shipped the day the renderer compiled turned three guards red at once: the
+census's arming pin (four guards have stood down in favour of a kernel refusal
+and no screen is drawn from a declaration), the capability guard (`AppSpec.views`
+owes a surface at 96), and the deferral ledger. All three were the same true
+thing, and the machinery caught the claim inside an hour of the pin being
+written. It went green when the proving ground declared the first body — the
+census reads **1 screen drawn from a body, 1 from a story, 29 still written**.
 
 `design/src/rendered/body.tsx`, reached at `@engine/design/body` — deliberately
 not through the index barrel, so the entry chunk carries the contract and not the
@@ -494,10 +493,36 @@ shipped first:
 - **The count is not `items.length`.** A block drawing "12" over a view capped at
   twelve is a screen reporting its own ceiling as a fact about the workspace.
 
-**Still owed before a screen can be ported:** the route that answers a screen's
-views, the browser side that fetches them and draws through `Body`, and the join
-— a read through a declared `ref`, which is what the twelve screens actually
-need. Then the ports, photographed at both widths and both themes.
+**`runtime/src/screen.ts` is the composer and `/api/screen/<id>` is its door**,
+and one thing in them is the whole point:
+
+- **The permission is the COLLECTION's, not the screen's.** A screen carries a
+  `permission` for whether it is OFFERED; this door hands back ROWS, and the
+  permission governing a row is its collection's. A `stock` screen with a
+  supplier listing on it is a manifest anybody could write; it composes, every
+  suite is green, and checking only the screen's would have the door carry it
+  out. It is derived by calling the kernel's own `permissionFor(spec, "read")`
+  rather than by spelling the prefix rule a second time — which is how the first
+  draft of this got it wrong, comparing against the bare prefix and 403ing a
+  caller who held the grant.
+- **And it refuses whole rather than serving the part it may.** Dropping the
+  views somebody cannot read draws a screen with a region missing, which reads as
+  a workspace with no suppliers rather than as an account that cannot see them,
+  and the person acts on the first reading.
+- **GET only, and `full` maintenance closes it** like every other door. A screen
+  is a read; there is no body a POST here could mean.
+
+**The first declaration is the proving ground's Notes screen**, which is now
+drawn from `views: [{ id: "every-note", of: "note", limit: 50 }]` and a `Listing`
+bound to it. The manifest refused two earlier attempts and was right both times:
+`everyNote` is not a name (ids are kebab), and `sort: { by: "at" }` names the
+row's own column rather than a declared field — and was redundant anyway, since
+the runner already orders `at DESC, id DESC`.
+
+**Still owed before OneInventory can be ported:** the browser side that fetches
+`/api/screen/<id>` and draws through `Body`, and the join — a read through a
+declared `ref`, which is what the twelve screens actually need. Then the ports,
+photographed at both widths and both themes.
 
 ### S9 — the plan as written
 Every screen is a `body` or a `story`, and nothing is a third thing. On the

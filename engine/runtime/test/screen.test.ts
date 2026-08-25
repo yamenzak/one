@@ -145,8 +145,8 @@ describe("every collection the screen touches is asked for by name", () => {
   });
 
   it("refuses when the caller does not hold the subject's permission", async () => {
-    const got = await drawnFor(shard(), APP, place, TENANT, only("supplier"), cold);
-    expect(got).toEqual({ needs: "stock" });
+    const got = await drawnFor(shard(), APP, place, TENANT, only("supplier:read"), cold);
+    expect(got).toEqual({ needs: "stock:read" });
   });
 
   /*
@@ -156,8 +156,8 @@ describe("every collection the screen touches is asked for by name", () => {
     `stock` alone.
   */
   it("refuses a screen whose body reads past its own permission", async () => {
-    const got = await drawnFor(shard(), APP, overreaching, TENANT, only("stock"), cold);
-    expect(got).toEqual({ needs: "supplier" });
+    const got = await drawnFor(shard(), APP, overreaching, TENANT, only("stock:read"), cold);
+    expect(got).toEqual({ needs: "supplier:read" });
   });
 
   /*
@@ -167,13 +167,13 @@ describe("every collection the screen touches is asked for by name", () => {
     and the person acts on the first reading.
   */
   it("answers nothing at all rather than the half it could", async () => {
-    const got = await drawnFor(shard(), APP, overreaching, TENANT, only("stock"), cold);
+    const got = await drawnFor(shard(), APP, overreaching, TENANT, only("stock:read"), cold);
     expect("views" in got).toBe(false);
   });
 
   it("answers in full when the caller holds both", async () => {
     const got = await drawnFor(
-      shard(), APP, overreaching, TENANT, only("stock", "supplier"), cold);
+      shard(), APP, overreaching, TENANT, only("stock:read", "supplier:read"), cold);
     if ("needs" in got) throw new Error(got.needs);
     expect(got.views["everyone"]?.items).toHaveLength(1);
   });
