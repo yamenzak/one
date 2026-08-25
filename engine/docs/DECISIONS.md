@@ -2893,3 +2893,31 @@ win, and it is the reason this decision has a number.
 **What this forbids:** a manifest declared as a top-level `const`, in any app.
 `scripts/apps.test.mjs` fails on a `defineApp` at column zero, beside the check
 that already fails on a `compose` there.
+
+
+## D83 — The split D3 describes has not been taken, and the trigger is startup CPU
+
+**D3 is written in the present tense about something that does not exist.** "`ai`
+and `notify` are separate workers reached through service bindings with RPC" —
+`one/wrangler.jsonc` declares no `services` block, `Env` carries no service
+binding, and it is the only wrangler config in the tree. Generation and mail run
+in-process, in the one worker, today.
+
+**The reasoning in D3 is right and the seam is built.** `runtime/src/services.ts`
+is written for exactly that boundary, so taking the split is a wiring change
+rather than a rewrite. What was wrong is only the tense — and the tense is what
+makes it the worst kind of stale entry, because D3 is the decision somebody
+consults to answer "have we already split, and when should we?" and it answers
+the first half wrongly.
+
+**So the trigger is recorded here rather than left to judgement.** Split when the
+AI catalogue, the provider clients, the MIME builder and the push encryption start
+showing up in the cold isolate's parse — the number `one/test/cold-cost.test.ts`
+and `one-space/test/weight.test.ts` between them already measure. **Never for
+size**, which SPAs do not count against a worker because they ship as assets, and
+**never for separation of concerns**, which the module boundaries and the boundary
+guard already give at compile time and for free.
+
+**Therefore never:** a service split argued from anything but a measured
+startup-CPU number; a service-to-service call made with `fetch` where a binding
+exists; and D3 read as a description of what this deployment runs.

@@ -309,7 +309,9 @@ const draft = operation<{ about: string; stream?: boolean }, { text: string }>({
  * see them, and must still honour them. The platform resolves the value; the
  * caller is told only the consequence.
  */
-const start = operation<Record<string, never>, { kind: string; pinned: boolean }>({
+const start = operation<Record<string, never>, {
+  kind: string; pinned: boolean; signature: string;
+}>({
   id: "note.start",
   kind: "read",
   summary: "What a new note starts as here",
@@ -317,6 +319,7 @@ const start = operation<Record<string, never>, { kind: string; pinned: boolean }
   output: {
     kind: field.text({ label: "Kind", holds: "none" }),
     pinned: field.bool({ label: "Pinned", holds: "none" }),
+    signature: field.text({ label: "Sign-off", holds: "none" }),
   },
   permission: "note:write",
   idempotency: { mode: "none" },
@@ -330,9 +333,15 @@ const start = operation<Record<string, never>, { kind: string; pinned: boolean }
        here would be a second answer to what a new note starts as — and it would
        MASK the platform failing to apply the declared one, which is how a screen
        and a handler come to disagree about what a workspace switched on. */
+    /* ⚠️ AND THE PERSON'S OWN SIGN-OFF, WHICH IS WHY THIS ANSWER MIXES LEVELS.
+       Two of these are the workspace's and one is the reader's, and a caller
+       cannot tell — nor should it: what a new note starts as is one question,
+       and splitting it by whose setting supplied each part would put the
+       platform's resolution order into a screen. */
     return {
       kind: String(await c.setting("notes.default_kind")),
       pinned: (await c.setting("notes.default_pinned")) === true,
+      signature: String((await c.setting("notes.signature")) ?? ""),
     };
   },
 });
@@ -345,23 +354,37 @@ const start = operation<Record<string, never>, { kind: string; pinned: boolean }
  * operation with a permission of its own, and the two are visibly different
  * things in the route table rather than one verb with a parameter.
  */
-const teamCheckIns = operation<{ week: string }, { items: readonly unknown[] }>({
+const teamCheckIns = operation<{ week: string }, {
+  items: readonly unknown[]; target: number;
+}>({
   id: "check-in.team",
   kind: "read",
   summary: "Everybody's check-in for a week",
   input: { week: field.day({ label: "Week beginning", required: true, holds: "none" }) },
-  output: { items: field.json({ label: "Check-ins", holds: "none" }) },
+  /* ⚠️ THE TARGET TRAVELS WITH THE COUNT, because a report that answers "twelve"
+     and leaves the reader to find out what twelve is measured against is two
+     round trips and a chance for the two to disagree. The number is the
+     workspace's own setting, resolved by the platform. */
+  output: {
+    items: field.json({ label: "Check-ins", holds: "none" }),
+    target: field.number({ label: "A week is measured against", holds: "none" }),
+  },
   permission: "check-in:review",
   idempotency: { mode: "none" },
   async handler(ctx, input) {
-    const c = ctx as { db: unknown };
+    const c = ctx as { db: unknown; setting: (id: string) => Promise<unknown> };
     const db = c.db as {
       prepare(q: string): { bind(...v: unknown[]): { all<T>(): Promise<{ results: T[] }> } };
     };
-    const rows = await db.prepare(
-      `SELECT id, person, week, went, said FROM check_in WHERE week = ? ORDER BY at`)
-      .bind(input.week).all<Record<string, unknown>>();
-    return { items: rows.results };
+    /* ⚠️ TOGETHER, because the setting is not derived from the rows and awaiting
+       it after them would be a second wait for a number the platform already
+       holds. */
+    const [rows, target] = await Promise.all([
+      db.prepare(`SELECT id, person, week, went, said FROM check_in WHERE week = ? ORDER BY at`)
+        .bind(input.week).all<Record<string, unknown>>(),
+      c.setting("notes.weekly_target"),
+    ]);
+    return { items: rows.results, target: Number(target ?? 0) };
   },
 });
 
@@ -651,9 +674,10 @@ export const GROUND: AppSpec = defineApp({
       fallback: "idea", needs: "tenant:manage",
       help: "Whoever writes it can still change it.",
     },
-    /* DEFER(engine-43) stage:43 — Reports draws against a hardcoded twenty
-       because nothing mounts it over the workspace's own records yet; the day it
-       does, this is the number it reads. */
+    /* ⚠️ THE FIXTURE'S NUMBER, AND IT STAYS ONE. Reports here draws against
+       twenty because the ground has no live half to draw against a workspace's
+       own records (D52) — so this setting is what a REAL app's report would
+       read, declared so the shape is proved, and nothing here reads it. */
     "notes.weekly_target": {
       id: "notes.weekly_target", level: "tenant", area: "notes",
       field: field.number({ label: "Notes a week", holds: "none", min: 0, max: 500 }),
@@ -676,8 +700,9 @@ export const GROUND: AppSpec = defineApp({
       field: field.enum({ label: "Density", holds: "none", values: ["comfortable", "compact"] }),
       fallback: "comfortable",
     },
-    /* DEFER(engine-43) stage:43 — ground has no composer: `onNew` is wired to
-       nothing on purpose, and a signature has nothing to sign. */
+    /* ⚠️ DECLARED WITH NOTHING TO SIGN, ON PURPOSE. The ground has no composer —
+       `onNew` is wired to nothing — so this proves a person-level text setting
+       renders and saves, which is the whole reason a fixture declares it (D52). */
     "notes.signature": {
       id: "notes.signature", level: "person", area: "appearance",
       field: field.text({ label: "How you sign a note", holds: "none", max: 60 }),

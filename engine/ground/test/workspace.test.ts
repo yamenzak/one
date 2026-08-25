@@ -690,8 +690,11 @@ describe("a setting a handler can read", () => {
   it("answers the declared fallback before anybody has chosen", async () => {
     const cookie = await workspace();
     const said = await get(SLUG, "/api/note.start", cookie).then((r) => r.json()) as
-      { kind: string; pinned: boolean };
-    expect(said).toEqual({ kind: "idea", pinned: false });
+      { kind: string; pinned: boolean; signature: string };
+    /* ⚠️ THE SIGN-OFF IS THE PERSON'S AND THE OTHER TWO ARE THE WORKSPACE'S, and
+       one answer carries all three — a caller cannot tell which level supplied
+       what, which is the platform's business and not a screen's. */
+    expect(said).toEqual({ kind: "idea", pinned: false, signature: "" });
   });
 
   it("answers what the workspace switched to, on the very next call", async () => {
@@ -701,9 +704,12 @@ describe("a setting a handler can read", () => {
     expect((await post(SLUG, "/api/setting.write",
       { app: "ground", id: "notes.default_pinned", value: true }, cookie)).status).toBe(200);
 
+    expect((await post(SLUG, "/api/setting.write",
+      { app: "ground", id: "notes.signature", value: "— Sam" }, cookie)).status).toBe(200);
+
     const said = await get(SLUG, "/api/note.start", cookie).then((r) => r.json()) as
-      { kind: string; pinned: boolean };
-    expect(said).toEqual({ kind: "decision", pinned: true });
+      { kind: string; pinned: boolean; signature: string };
+    expect(said).toEqual({ kind: "decision", pinned: true, signature: "— Sam" });
   });
 
   /*

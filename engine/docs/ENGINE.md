@@ -1113,6 +1113,7 @@ its own header, cited by other files, and doing nothing.
 | D80 | A multi-step flow asks questions and says the answers back | 4 |
 | D81 | A flow is declared in the manifest and drawn in a screen | 2 |
 | D82 | A manifest is built when something asks for it, not when the module loads | 1 |
+| D83 | The split D3 describes has not been taken, and the trigger is startup CPU | 0 |
 <!-- /generated -->
 
 ---
@@ -1121,9 +1122,15 @@ its own header, cited by other files, and doing nothing.
 
 ⚠️ **THIS IS THE SECTION TO READ BEFORE BELIEVING ANY OTHER ONE.** A capability
 with tables, tests and no address is invisible — no error, no failing test, every
-suite green — and it is the failure this whole framework is a catalogue of. Each
-row below is a declaration that exists, compiles, is tested, and is reached by
-nothing yet.
+suite green — and it is the failure this whole framework is a catalogue of.
+
+⚠️ **AND IT IS TWO TABLES, BECAUSE THE FIRST ONE IS NARROWER THAN THIS HEADING.**
+The first walks what a package EXPORTS: each row is a declaration that exists,
+compiles, is tested and is reached by nothing yet. The second is every `DEFER`
+marker in the tree, which is a larger number — a deferral on a FIELD inside a
+declaration (an operation's rate ceiling, the audio lane) is real, findable, and
+invisible to a walk over exports. A section that claimed to be the one to read
+and counted two of ten was the same gap it exists to close, one layer down.
 
 <!-- generated: node scripts/inventory.mjs waiting -->
 | Waiting on | Where | How many |
@@ -1134,6 +1141,24 @@ nothing yet.
 **2 declarations** are built and reached by nothing, each waiting on a
 stage it names in a `DEFER` marker. `scripts/capability.test.mjs` fails on one
 that names no stage, so this list cannot grow by forgetting.
+
+### Every deferral, including the ones inside a declaration
+
+| Waiting on | Where |
+|---|---|
+| **22** — OneSpace — `id`, `admin` and `setup` merge into one address off the workspace root | `kernel/src/door.ts` |
+| **35** — A workspace runs its own retention ladder against its own customers, and ours freezes it | `kernel/src/package.ts` |
+| **35** — A workspace runs its own retention ladder against its own customers, and ours freezes it | `runtime/src/jobs.ts` |
+| **48** — The deployment's legal identity is complete — the registered address it is written to, and whether selling where it sells needs a representative there | `one/src/index.ts` |
+| **48** — The deployment's legal identity is complete — the registered address it is written to, and whether selling where it sells needs a representative there | `one/src/index.ts` |
+| **53** — A workspace asks to change its jurisdiction, and the ask is the only thing that is new | `runtime/src/move.ts` |
+| **58** — An operation's ceiling is in force — calls per minute, per caller, refused rather than declared | `kernel/src/operation.ts` |
+| **86** — A model is given something to hear, and the seconds are counted before they are spent | `kernel/src/ai.ts` |
+
+**8 markers**, which is the real count: the table above walks what
+a package EXPORTS, so a deferral on a field inside a declaration is invisible to
+it. `scripts/docs.test.mjs` fails on a marker naming a stage that shipped or one
+a later decision superseded, so neither list can rot into a promise nobody owes.
 <!-- /generated -->
 
 ### The stages
@@ -1183,7 +1208,7 @@ that names no stage, so this list cannot grow by forgetting.
 | 40 | An app ships a screen — a product's browser half is a chunk of its own, loaded when its workspace opens it, drawing that workspace's own records through the door it is handed | shipped |
 | 41 | A workspace's brand reaches the screen — the surfaces it picked, and only the ones its products have | shipped |
 | 42 | A screen asks the gate before it draws a control, rather than after it is pressed | shipped |
-| 43 | Hello's remaining screens reach the workspace's own records — the report against its target, and writing a note | **planned** |
+| 43 | The proving ground's remaining screens reach a workspace's own records | ~~superseded by D52~~ |
 | 44 | A one-off purchase — a credit pack, and becoming a business — through the same checkout | shipped |
 | 45 | A plan is edited from the console, and everybody already on it keeps what they were sold | shipped |
 | 46 | The wallet tops itself up — a standing instruction, a cooldown, and a decline the customer can read | shipped |
@@ -1229,7 +1254,7 @@ that names no stage, so this list cannot grow by forgetting.
 | 86 | A model is given something to hear, and the seconds are counted before they are spent | **planned** |
 | 87 | A wizard narrates: one question a screen, and what you answered stays said | shipped |
 
-**76 shipped, 11 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**76 shipped, 10 planned, 1 superseded.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it, and nothing may defer to a superseded one — `scripts/docs.test.mjs` fails the build on either, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---

@@ -248,8 +248,16 @@ for (const g of owed) byStage[g.stage] = (byStage[g.stage] ?? 0) + 1;
   for (const s of rows) {
     if (seen.has(s.n)) fail(`docs/stages.json: stage ${s.n} appears twice, so one of the two is a row nothing can see`);
     seen.add(s.n);
-    if (s.status !== "shipped" && s.status !== "planned") {
-      fail(`docs/stages.json: stage ${s.n} is "${s.status}", which is neither shipped nor planned`);
+    /* ⚠️ THREE STATES, AND `superseded` MUST NAME WHAT OVERTOOK IT. A stage a
+       later decision removed the premise of is neither done nor outstanding, and
+       leaving it planned is how one came to sit in the count for ever with two
+       deferrals waiting on it. Unnamed, "superseded" is just "planned" with a
+       nicer word — the decision is what a reader needs. */
+    if (s.status === "superseded" && !s.by) {
+      fail(`docs/stages.json: stage ${s.n} is superseded and names no decision that did it`);
+    }
+    if (!["shipped", "planned", "superseded"].includes(s.status)) {
+      fail(`docs/stages.json: stage ${s.n} is "${s.status}", which is none of shipped, planned or superseded`);
     }
     if (!String(s.title ?? "").trim()) fail(`docs/stages.json: stage ${s.n} has no title`);
   }

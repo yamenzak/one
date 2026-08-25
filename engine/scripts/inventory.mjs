@@ -303,17 +303,26 @@ if (what === "guards") {
 
   console.log("| # | Stage | |");
   console.log("|---|---|---|");
+  /* ⚠️ A THIRD STATE, BECAUSE A STAGE CAN BE OVERTAKEN RATHER THAN DONE OR
+     PENDING. One was left `planned` after a later decision removed the thing it
+     was about, so it could never be discharged and it counted, for ever, among
+     the work outstanding — and two `DEFER` markers sat waiting on it. Rolled in
+     with the planned it is a number that only grows. */
   for (const s of stages) {
-    const mark = s.status === "shipped" ? "shipped" : "**planned**";
+    const mark = s.status === "shipped" ? "shipped"
+      : s.status === "superseded" ? `~~superseded by ${s.by ?? "a later decision"}~~`
+        : "**planned**";
     const debt = owed[String(s.n)] ? ` · ${owed[String(s.n)]} guard(s) owed` : "";
     console.log(`| ${s.n} | ${s.title} | ${mark}${debt} |`);
   }
   const done = stages.filter((s) => s.status === "shipped").length;
+  const past = stages.filter((s) => s.status === "superseded").length;
   console.log("");
-  console.log(`**${done} shipped, ${stages.length - done} planned.** A stage cannot be `
-    + "shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` "
-    + "fails the build if one does, which is the only reason this table can be read "
-    + "instead of the code.");
+  console.log(`**${done} shipped, ${stages.length - done - past} planned`
+    + `${past ? `, ${past} superseded` : ""}.** A stage cannot be `
+    + "shipped while a `DEFER(engine-N)` marker names it, and nothing may defer to "
+    + "a superseded one — `scripts/docs.test.mjs` fails the build on either, which "
+    + "is the only reason this table can be read instead of the code.");
 
 } else if (what === "surface" || what === "personal" || what === "operator"
   || what === "doors" || what === "problems" || what === "stores") {
@@ -475,6 +484,52 @@ if (what === "guards") {
     console.log(`**${total} declarations** are built and reached by nothing, each waiting on a`);
     console.log("stage it names in a `DEFER` marker. `scripts/capability.test.mjs` fails on one");
     console.log("that names no stage, so this list cannot grow by forgetting.");
+  }
+
+  /*
+    ⚠️ AND EVERY OTHER DEFERRAL, BECAUSE THE TABLE ABOVE IS NARROWER THAN THIS
+    SECTION'S HEADING. `resolveCapabilities` walks what a package EXPORTS, so a
+    deferral on a field inside a declaration — `operation.rate`, a security
+    control, and the audio lane — is real, findable and absent from it. A section
+    headed "read this before believing any other one" that counts two of ten is
+    the same gap it exists to close, one layer down.
+  */
+  const marked = [];
+  const walkFor = (dir) => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      if (e.name === "node_modules" || e.name === ".turbo" || e.name === "dist") continue;
+      const at = join(dir, e.name);
+      if (e.isDirectory()) { walkFor(at); continue; }
+      if (!/\.(ts|tsx|mjs)$/.test(e.name)) continue;
+      const src = readFileSync(at, "utf8");
+      for (const m of src.matchAll(/DEFER\(engine-\d+\)\s*stage:(\d+)/g)) {
+        marked.push({ at: at.slice(ENGINE.length + 1), stage: Number(m[1]) });
+      }
+    }
+  };
+  walkFor(ENGINE);
+  marked.sort((a, b) => a.stage - b.stage || a.at.localeCompare(b.at));
+
+  console.log("");
+  console.log("### Every deferral, including the ones inside a declaration");
+  console.log("");
+  if (!marked.length) {
+    console.log("None. Nothing in the tree is waiting on a stage.");
+  } else {
+    /* ⚠️ THE STAGE AND THE FILE, AND NOT THE MARKER'S OWN SENTENCE. Read the
+       file: the sentence is written to be read in place, beside the code it is
+       about, and cut to a table cell it becomes a fragment that misleads. */
+    console.log("| Waiting on | Where |");
+    console.log("|---|---|");
+    for (const d of marked) {
+      console.log(`| **${d.stage}** — ${titleOf[String(d.stage)] ?? "*no such stage*"} `
+        + `| \`${d.at}\` |`);
+    }
+    console.log("");
+    console.log(`**${marked.length} markers**, which is the real count: the table above walks what`);
+    console.log("a package EXPORTS, so a deferral on a field inside a declaration is invisible to");
+    console.log("it. `scripts/docs.test.mjs` fails on a marker naming a stage that shipped or one");
+    console.log("a later decision superseded, so neither list can rot into a promise nobody owes.");
   }
 
 } else if (what === "gates") {

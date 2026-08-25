@@ -15,7 +15,7 @@ import { readFileSync, writeFileSync, readdirSync, existsSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { shippedStages } from "./lib/stages.mjs";
+import { shippedStages, supersededStages } from "./lib/stages.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ENGINE = join(HERE, "..");
@@ -108,13 +108,27 @@ for (const file of source) {
 }
 
 const shipped = shippedStages();
+/*
+  ⚠️ AND NOTHING MAY WAIT ON A STAGE THAT WAS OVERTAKEN. A deferral is the one
+  mechanism between "planned" and "forgotten", so the single kind that must never
+  sit in it is one nobody can ever discharge — which is exactly what two markers
+  became when a later decision removed the thing their stage was about. It is the
+  same failure as deferring to a shipped stage, from the other end.
+*/
+const past = supersededStages();
 for (const d of markers) {
   if (shipped.has(d.stage)) {
     fail(`${d.file}: ${d.id} defers to stage ${d.stage}, which the stage registry calls shipped.\n` +
          `       A stage cannot be shipped while something still waits on it.`);
   }
+  if (past.has(d.stage)) {
+    fail(`${d.file}: ${d.id} defers to stage ${d.stage}, which a later decision superseded.\n` +
+         `       That marker can never be discharged. Say what the code does now, or\n` +
+         `       name a stage somebody could still ship.`);
+  }
 }
-ok(`defer: ${markers.length} marker(s) open, ${shipped.size} stage(s) shipped`);
+ok(`defer: ${markers.length} marker(s) open, ${shipped.size} stage(s) shipped, `
+  + `${past.size} superseded`);
 
 /* ------------------------------------------------------------- generated --- */
 

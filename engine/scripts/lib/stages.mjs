@@ -31,3 +31,11 @@ export const shippedStages = () =>
   new Set(stages().filter((s) => s.status === "shipped").map((s) => String(s.n)));
 
 export const knownStages = () => new Set(stages().map((s) => String(s.n)));
+
+/**
+ * ⚠️ A STAGE A LATER DECISION OVERTOOK, WHICH IS NEITHER SHIPPED NOR PLANNED. It
+ * is here because the third state is not cosmetic: a deferral naming one can
+ * never be discharged, so it has to be a failure rather than a row in a table.
+ */
+export const supersededStages = () =>
+  new Set(stages().filter((s) => s.status === "superseded").map((s) => String(s.n)));
