@@ -137,41 +137,64 @@ delivery's date on every future one.
 An itemised object has a second clock of its own: its **service**. It is a
 different working day from an expiry, which is why the two never share a list.
 
-### Registering a product is a story, not a form
+### Registering a thing is a quiz, not a form
 
-**Nine questions, one a screen, each phrased about the thing rather than about
-the record.** "What do you count it in?", "Does it come inside something?", "How
-closely do you follow it?" — and every answer is repeated straight back in the
-same words: *"Counted in tablets, whole ones only"*, *"A box of 10 sheets of 10
-tablets — 100 tablets in all"*, *"Each delivery is kept apart, so you can expire
-one or recall one"*.
+**Ten questions, one a screen, each about the object rather than about the
+record.** "What is one of them?", "Do they arrive packed?", "Does it go out of
+date?", "How much do you need to know about each one?" — and every answer is
+repeated straight back in the same words: *"You count these in litres, and half a
+litre is a real amount"*, *"A case of 4 boxes of 10 screws — 40 screws in all"*,
+*"You will know which delivery any of it came from"*.
 
 ⚠️ **THE SENTENCES ARE THE DOCUMENTATION, AND THAT IS THE POINT.** This flow was
-four headings over groups of fields, and under the third of them sat `Tracked as:
+four headings over groups of fields, and under the third sat `Tracked as:
 [Listed] [Counted] [Batched] [Itemised]` — the single most consequential field on
-a product, offered as four words that mean nothing to anybody who has not been
-taught them. Being taught is an induction, a wiki page and a person in the
-warehouse who knows; a new employee costs all three, every time. A question with
-its answer said back costs nothing and is read by everybody.
+the record, offered as four adjectives that mean nothing to anybody who has not
+been taught them. Being taught is an induction, a wiki page and a person in the
+warehouse who knows; a new employee costs all three, every time.
 
-The four explanations for those rungs had in fact been written, and reached
-nobody: the control was a `Segmented`, and `Segmented` draws `o.label` and
-nothing else. Its own header says segments are for a choice worn on the surface —
-a view, a period, a mode — and never for data entry. It is `OneOf` now, which
-draws the consequence beside each option.
+The four options are named by **what you will be able to answer later** — *That
+we have it* / *How many we have* / *Which delivery it came from* / *Every single
+one* — and each carries the kind of thing it suits: screws and paper against
+medicine and chemicals against machines and cylinders. An example settles the
+question for somebody holding a bottle in a way no definition ever will.
+
+Their explanations had in fact been written and reached nobody: the control was a
+`Segmented`, which draws `o.label` and nothing else. Its own header says segments
+are for a choice worn on the surface — a view, a period, a mode — and never for
+data entry. It is `OneOf` now.
+
+⚠️ **EVERY LABEL AND PLACEHOLDER IS BUILT FROM THE ANSWERS ALREADY GIVEN.** Say
+you count in metres and the next screen asks whether you can have half **a
+metre**, the one after that asks how many **metres** are in a box, and the
+barcode step asks how many **metres** it covers. The packing editor used to be
+headed "The smallest one has a name" with the placeholders `sheet` and `box`
+hardcoded — fixed strings that stayed put whatever anybody counted in, so the
+control read as broken at exactly the moment somebody corrected themselves.
+
+⚠️ **AND AN ANSWER REMOVES THE QUESTIONS IT CONTRADICTS.** *That we have it*
+means nothing is ever counted, so packs, barcodes and dates are not asked at all
+and the flow is six screens rather than ten. *Every single one* means each is
+followed separately, so a pack size is meaningless and that step goes too.
+Skipped, never greyed out — and dropped from the payload, so somebody who filled
+in packs and then changed their mind does not register a shape they have just
+denied.
 
 **The clauses are `src/saying.ts`, pure and tested**, because a sentence
 assembled inline in a screen reads "1 tablets in a box" on the one path nobody
-clicked through — and a customer meets that path on their first product.
+clicked through — and a customer meets that path on their first product. The test
+that keeps them honest asserts something unusual: that **no clause contains a
+word somebody would have to be taught**.
 
-**The story so far stays on screen, and every line is one press from the step
-that wrote it.** That is what makes the camera lane checkable: six photographs
-come back as a name, a brand, a unit, a rung, a shelf life and four filing words,
-which as twenty fields across nine screens is something nobody audits, and as
-eight short sentences is something anybody reads.
+**The summary is the last step.** Every screen before it is the question and
+nothing else; the review reads the whole story as short sentences, shows what is
+still unset, and puts every line one press from the step that wrote it. That is
+what makes the camera lane checkable — six photographs come back as twenty fields
+across ten screens, which nobody audits, and as one screen of sentences, which
+anybody reads.
 
 The frame is the engine's — `Story` in `@engine/design` (DESIGN.md). This app
-supplies the nine questions and their sentences and nothing else.
+supplies the ten questions and their sentences and nothing else.
 
 ### Five verbs, not one with a parameter
 
@@ -464,7 +487,7 @@ container in `src/screens/live.tsx`, and rendered over a sample world by
 | `/ask` | Ask | secondary | `stock:read` | `screens/Ask.tsx:54` | `screens/live.tsx:1356` |
 | `/import` | Import | secondary | `product:write` | `screens/Import.tsx:131` | `screens/live.tsx:1806` |
 | `/suppliers` | Suppliers | secondary | `product:write` | `screens/Suppliers.tsx:77` | `screens/live.tsx:1806` |
-| `/register` | Add a product | none | `product:write` | `screens/Register.tsx:232` | `screens/live.tsx:2104` |
+| `/register` | Add a product | none | `product:write` | `screens/Register.tsx:243` | `screens/live.tsx:2104` |
 | `/start` | Getting started | secondary | `product:read` | `screens/Start.tsx:67` | `screens/live.tsx:1940` |
 
 ### The surfaces that are not routes

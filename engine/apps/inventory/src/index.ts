@@ -6002,8 +6002,41 @@ export const INVENTORY: AppSpec = defineApp({
       reads as having left the product rather than as having gone one level in.
       Every other screen here is work over a shelf and stays plain.
     */
-    { id: "register", route: "/register", label: "Add a product", nav: "none",
-      icon: "add", permission: "product:write", sky: "neon" },
+    {
+      id: "register",
+      route: "/register",
+      label: "Add a product",
+      nav: "none",
+      icon: "add",
+      permission: "product:write",
+      sky: "neon",
+      /*
+        ⚠️ THE FLOW IS DECLARED HERE AND DRAWN IN `screens/Register.tsx`, and the
+        guard proves the two agree. Before this, `permission: "product:write"`
+        and the screen's own `op: "product.register"` were two hand-typed strings
+        in two files with nothing checking they named the same gate — so a flow
+        could take somebody through ten questions and be refused by the write.
+
+        ⚠️ AND THE SKIPPED STEPS ARE DECLARED TOO. `when` says which answer can
+        remove a question; listing only the unconditional ones would describe a
+        flow nobody ever walks.
+      */
+      story: {
+        writes: "product.register",
+        asks: [
+          { id: "photos", ask: "Start with a photo?" },
+          { id: "what", ask: "What is it?" },
+          { id: "finding", ask: "How would you look for it later?" },
+          { id: "unit", ask: "What is one of them?" },
+          { id: "detail", ask: "How much do you need to know about each one?" },
+          { id: "packs", ask: "Do they arrive packed?", when: "it is counted or followed by delivery" },
+          { id: "codes", ask: "Is there a barcode on it?", when: "anything is counted" },
+          { id: "dates", ask: "Does it go out of date?", when: "anything is counted" },
+          { id: "care", ask: "Anything special about keeping it?", when: "anything is counted" },
+          { id: "more", ask: "Where do you get more?" },
+        ],
+      },
+    },
     { id: "receive", route: "/receive", label: "Receive", nav: "none", icon: "add",
       permission: "stock:move" },
     /*

@@ -1710,29 +1710,55 @@ describe("saying how many, in the words somebody is holding", () => {
     many tablets in a box" is a multiplication they should not be doing, and
     reading `per` as base units is silently wrong by a factor of the rung below.
   */
-  it("asks a ladder in the rung below, never in base units", () => {
+  it("asks each number in the pack below it, never in single units", () => {
     const out = renderToStaticMarkup(
       <Ladder unit="tablet" levels={AMOXI} onChange={() => undefined} />,
     );
-    expect(out).toContain("How many tablets in a sheet");
-    expect(out).toContain("How many sheets in a box");
+    expect(out).toContain("How many tablets in one sheet?");
+    expect(out).toContain("How many sheets in one box?");
+    /* ⚠️ NEVER THE MULTIPLIED-OUT NUMBER. A box holds 3 sheets, not 30 tablets,
+       and asking for the second is asking somebody to do arithmetic the screen
+       is about to do anyway — wrongly, the first time they get it wrong. */
+    expect(out).not.toContain("How many tablets in one box");
   });
 
-  /* ⚠️ AND THE FEAR IT ANSWERS IS REAL. Somebody adding a ladder wonders whether
-     their shelf numbers are about to change; they are not, and one sentence
-     under the control is where that belongs. */
-  it("says the shelf is still counted in the base unit", () => {
+  /*
+    ⚠️ EVERY LABEL IS BUILT FROM WHAT IS ALREADY TYPED, AND THIS IS THE
+    ASSERTION THAT SAYS SO. Reported as "I tried changing box and it didn't":
+    the fields were headed "The smallest one has a name" and placeholdered
+    "sheet"/"box" — fixed strings that stayed put whatever anybody counted in,
+    so the control read as broken at exactly the moment somebody corrected
+    themselves.
+  */
+  it("re-words itself around the unit somebody actually typed", () => {
+    const out = renderToStaticMarkup(
+      <Ladder unit="metre" levels={[{ name: "reel", per: 50 }]} onChange={() => undefined} />,
+    );
+    expect(out).toContain("What are the metres packed in?");
+    expect(out).toContain("How many metres in one reel?");
+    expect(out).toContain("Your totals stay in metres");
+    expect(out).not.toContain("tablet");
+    expect(out).not.toContain("sheet");
+  });
+
+  /* ⚠️ AND THE FEAR IT ANSWERS IS REAL. Somebody describing packaging wonders
+     whether the numbers on their shelves are about to turn into something else.
+     They are not, and one sentence under the control is where that belongs. */
+  it("says the totals do not change, in the plural", () => {
     const out = renderToStaticMarkup(
       <Ladder unit="tablet" levels={AMOXI} onChange={() => undefined} />,
     );
-    expect(out).toContain("still counted in tablet");
+    expect(out).toContain("Your totals stay in tablets");
   });
 
-  it("invites a ladder rather than assuming one", () => {
+  it("invites a pack rather than assuming one", () => {
     const out = renderToStaticMarkup(
       <Ladder unit="tablet" levels={[]} onChange={() => undefined} />,
     );
-    expect(out).toContain("It comes in packs");
+    expect(out).toContain("Add the pack");
     expect(out).not.toContain("How many");
+    /* ⚠️ AND SAYS NOTHING ABOUT TOTALS EITHER — a reassurance about a change
+       nobody has made yet is a sentence that plants the worry it answers. */
+    expect(out).not.toContain("Your totals stay");
   });
 });

@@ -12,27 +12,33 @@
  * you follow it?" — and the moment somebody chooses, the screen says back
  * *"Each delivery is kept apart, so you can expire one or recall one"*. That
  * sentence is not help text. Help text sits under a field explaining a word;
- * this is the app
- * repeating the decision in the language the decision was made in, which is the
- * only form of explanation nobody has to be told to read.
+ * this is the app repeating the decision in the language the decision was made
+ * in, which is the only form of explanation nobody has to be told to read.
  *
  * ⚠️ AND THE SENTENCE IS ONE STRING DOING TWO JOBS, WHICH IS THE WHOLE
  * MECHANISM. `says` is the live echo under the control AND the line in the
- * recap above. Written twice they would drift the first time somebody edited
- * one — and a recap that disagrees with the screen it summarises is worse than
- * no recap, because it is the half people trust.
+ * review at the end. Written twice they would drift the first time somebody
+ * edited one — and a summary that disagrees with the screen it summarises is
+ * worse than none, because it is the half people trust.
  *
- * ⚠️ THE RECAP IS ALSO THE NAVIGATION, AND THAT IS WHAT MAKES A MODEL'S ANSWER
- * CHECKABLE. Six photographs come back as a name, a brand, a unit, a rung, a
- * shelf life and four words to file it under — twenty fields spread over eight
- * screens, which nobody audits. As eight short sentences, each one press from
- * the step that owns it, checking becomes reading. This is the difference
- * between an app that fills something in for you and one you can trust to.
+ * ⚠️ THE SUMMARY IS A STEP, NOT A BAND ON EVERY SCREEN. A recap riding along
+ * above each question was tried and was wrong both ways round: closed it showed
+ * one clause and a count, which is a fragment with a number after it; open it
+ * was eight lines of context between somebody and the one thing being asked.
+ * Every screen is the question and nothing else now, and the whole story is the
+ * LAST step — where a summary is actually read, immediately above the button
+ * that commits it, with every line one press from the step that wrote it.
+ *
+ * ⚠️ THAT IS ALSO WHAT MAKES A MODEL'S ANSWER CHECKABLE. Six photographs come
+ * back as a name, a brand, a unit, a rung, a shelf life and four filing words —
+ * twenty fields over eight screens, which nobody audits. As one screen of short
+ * sentences, checking becomes reading.
  *
  * ⚠️ A STEP THAT DOES NOT APPLY IS SKIPPED, NEVER DISABLED. `when: false` takes
- * the ask out of the flow entirely — out of the count, out of the dots, out of
- * the recap. A greyed-out step is a question somebody has to work out they are
- * not being asked.
+ * the ask out of the flow entirely — out of the count, out of the progress, out
+ * of the review. A greyed-out step is a question somebody has to work out they
+ * are not being asked, and a flow that eliminates four of its ten steps because
+ * of one answer is the difference between a wizard and an interrogation.
  *
  * ⚠️ AND THE FLOW OWNS THE PHONE'S BACK GESTURE, ONCE, HERE. Every wizard that
  * hand-rolls its steps writes this and most of them write it wrong: forward
@@ -48,10 +54,10 @@
 import * as React from "react";
 import { Screen, type Act } from "./screen.js";
 import { travel } from "./travel.js";
+import { DURATION, EASE } from "../tokens/motion.js";
 import { glyphOf } from "./shell.js";
-import { Reveal, Steps } from "../parts/blocks.js";
 import { Section } from "../parts/heads.js";
-import { ActionRow, Group, NoteRow } from "../parts/surfaces.js";
+import { ActionRow, NoteRow } from "../parts/surfaces.js";
 import { Stack } from "../parts/arrange.js";
 
 /* ------------------------------------------------------------------- ask --- */
@@ -122,7 +128,20 @@ export interface StoryProps {
   /** ⚠️ The word on the way forward, where "Next" is wrong for this flow. */
   readonly next?: string;
   /**
-   * ONE LINE OVER THE RECAP, SAID ONCE — not per field. See DESIGN.md §1.
+   * THE LAST STEP, WHICH IS THE WHOLE STORY WITH EVERY LINE PRESSABLE.
+   *
+   * ⚠️ APPENDED HERE RATHER THAN DECLARED BY EACH FLOW, because a review is not
+   * a question — it is the same list of clauses the flow already has, and a flow
+   * that wrote its own would be re-deriving `says` in its own words. It is also
+   * the step people forget, and the one that catches a half-filled record.
+   *
+   * ⚠️ `false` IS FOR A FLOW TOO SHORT TO NEED ONE. Two questions and a review is
+   * three screens to say one thing, and the review restates what is still on the
+   * screen behind it.
+   */
+  readonly review?: boolean | { readonly ask?: string; readonly under?: string };
+  /**
+   * ONE LINE OVER THE QUESTION, SAID ONCE — not per field. See DESIGN.md §1.
    *
    * ⚠️ THE WHOLE ROW, MARK INCLUDED, RATHER THAN JUST THE WORDS. A flow with a
    * note has a reason for it, and the reason decides the mark: "a model filled
@@ -133,46 +152,98 @@ export interface StoryProps {
   readonly note?: React.ReactNode;
 }
 
-/* ----------------------------------------------------------------- so far --- */
+/* ----------------------------------------------------------------- along --- */
 
 /**
- * WHAT HAS BEEN SAID, AND ONE PRESS BACK TO ANY OF IT.
+ * HOW FAR IN, AS A LENGTH RATHER THAN A NUMBER.
  *
- * ⚠️ CLOSED BY DEFAULT, AND THE REASON IS A PHONE. Eight clauses above the
- * question is a hundred and fifty pixels of context between somebody and the
- * one thing the screen is asking — which is the wall of text this whole design
- * exists to avoid, arrived at from the helpful direction.
+ * ⚠️ THIS REPLACED NUMBERED DOTS AND THE COUNT IS WHY. Nine circles joined by
+ * rules is a row of things to read across the top of every screen in the flow,
+ * and the fact they carry is the least useful one available: somebody answering
+ * question four does not need to be told it is question four. What they want to
+ * know is whether this is nearly over.
  *
- * ⚠️ THE CLOSED LINE IS THE FIRST CLAUSE AND A COUNT, NOT A TRUNCATED JOIN. Six
- * clauses run together and cut mid-word is a line nobody reads; the first one is
- * what the thing IS, which is the one somebody wants confirmed while answering
- * everything else about it.
+ * ⚠️ AND A LENGTH SURVIVES A FLOW THAT SKIPS. Dots have to disappear when three
+ * steps are eliminated, which is a row of chrome rearranging itself under the
+ * heading; a line just moves further along.
+ *
+ * ⚠️ IT IS NOT A `ProgressBar`. That is the mark for work being done TO
+ * somebody — an upload, a sync, a job — and it comes with a label, a percentage
+ * and a role that announces itself as busy. This is where they are in something
+ * they are doing, so it is `presentation` and it says nothing aloud: the heading
+ * under it is what a screen reader should be reading.
  */
-function SoFar({ told, onGo }: {
-  readonly told: readonly { readonly id: string; readonly ask: string; readonly says: string }[];
+function Along({ at, of }: { readonly at: number; readonly of: number }) {
+  if (of < 2) return null;
+  const through = Math.max(0, Math.min(1, at / of));
+  return (
+    <div aria-hidden className="h-0.5 w-full overflow-hidden rounded-full bg-[var(--line)]">
+      <div
+        className="h-full rounded-full bg-[var(--brand)]"
+        style={{
+          width: `${(through * 100).toFixed(2)}%`,
+          /* ⚠️ IT MOVES BECAUSE THE DISTANCE IS THE MESSAGE — a bar that jumps
+             has told somebody nothing about how far the jump was, and a flow
+             that just eliminated three steps jumps a long way on purpose.
+             `travel` is the curve for something covering ground; `moderate` is
+             the pace, because this happens on every press and `stately` is for
+             the moment somebody sees once. */
+          transition: `width ${DURATION.moderate} ${EASE.travel}`,
+        }}
+      />
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------- review --- */
+
+/**
+ * ⚠️ THE ID IS RESERVED, so a flow declaring a step of its own by this name gets
+ * one review rather than two that disagree.
+ */
+export const REVIEW = "review";
+
+/**
+ * THE LAST STEP IS THE WHOLE STORY, AND IT REPLACED A DISCLOSURE.
+ *
+ * ⚠️ THE RECAP USED TO RIDE ALONG ON EVERY SCREEN, closed, above the question —
+ * and closed it showed one clause and a count, which is not a summary, it is a
+ * fragment with a number after it. Open it was eight lines of context between
+ * somebody and the one thing the screen was asking. Neither state was worth the
+ * room, and both were on nine screens.
+ *
+ * ⚠️ SO IT IS A STEP. Every intermediate screen is now the question and nothing
+ * else, and the summary happens once, at the end, where a summary is actually
+ * read — immediately above the button that commits it.
+ *
+ * ⚠️ AND IT SHOWS WHAT IS *NOT* SET AS WELL. A review listing only the answered
+ * steps is a review that cannot show an omission, which is the commonest thing
+ * wrong with a half-filled record. An unanswered step reads as its own question
+ * with "Nothing set" under it, and is pressable like every other line.
+ */
+function Review({ live, onGo }: {
+  readonly live: readonly Ask[];
   readonly onGo: (id: string) => void;
 }) {
-  if (!told.length) return null;
-  const first = told[0] as { readonly says: string };
-  const rest = told.length - 1;
   return (
-    <Group>
-      <Reveal label={rest ? `${first.says} · and ${rest} more` : first.says}>
-        <Stack space="tight">
-          {told.map((one) => (
-            /* ⚠️ THE CLAUSE IS THE LABEL AND THE QUESTION IS UNDER IT, which is
-               the way round somebody scans. They are looking for the ANSWER that
-               is wrong, and the question is how they confirm they found it. */
-            <ActionRow
-              key={one.id}
-              label={one.says}
-              under={one.ask}
-              onDo={() => { onGo(one.id); }}
-            />
-          ))}
-        </Stack>
-      </Reveal>
-    </Group>
+    <Stack space="tight">
+      {live
+        .filter((one) => one.id !== REVIEW)
+        .map((one) => (
+          /* ⚠️ THE ANSWER IS THE LABEL AND THE QUESTION IS UNDER IT, which is
+             the way round somebody scans a review: they are hunting for the
+             ANSWER that is wrong, and the question is how they confirm they
+             found it. Reversed where there is no answer — then the question is
+             the only thing to recognise the row by. */
+          <ActionRow
+            key={one.id}
+            label={one.says ?? one.ask}
+            under={one.says ? one.ask : "Nothing set"}
+            tone={one.short ? "warning" : "neutral"}
+            onDo={() => { onGo(one.id); }}
+          />
+        ))}
+    </Stack>
   );
 }
 
@@ -247,9 +318,23 @@ export function walk(asks: readonly Ask[], on: string): Walk {
 /* ----------------------------------------------------------------- story --- */
 
 export function Story({
-  asks, at, onGo, leave, title, does, next = "Next", note,
+  asks, at, onGo, leave, title, does, next = "Next", review = true, note,
 }: StoryProps) {
-  const { live, at: i, here, last, short, owed: owedElsewhere, told } = walk(asks, at);
+  /* ⚠️ APPENDED BEFORE THE WALK, so the review is a step like any other — in the
+     count, in the progress, in the history, and holding the flow's whole debt
+     because it is the last one. Bolted on afterwards it would be a screen
+     outside every rule the frame enforces. */
+  const said = typeof review === "object" ? review : {};
+  const whole: readonly Ask[] = review === false ? asks : [
+    ...asks.filter((one) => one.id !== REVIEW),
+    {
+      id: REVIEW,
+      ask: said.ask ?? "Does this look right?",
+      under: said.under ?? "Press any line to change it",
+      children: null,
+    },
+  ];
+  const { live, at: i, here, last, short, owed: owedElsewhere } = walk(whole, at);
 
   /* ⚠️ A STEP IS A MOVE, SO IT TRAVELS. The same engine that carries one screen
      to the next carries one question to the next, which is what stops a flow
@@ -334,12 +419,23 @@ export function Story({
       step={{ back: i === 0 ? undefined : () => { go(i - 1); } }}
     >
       <Stack>
-        <Steps at={here.id} steps={live.map((one) => ({ id: one.id, label: one.ask }))} />
+        {/*
+          ⚠️ A LINE, NOT NUMBERED DOTS, AND THE COUNT IS THE PROBLEM WITH DOTS.
+          Nine circles with rules between them is a row of things to READ across
+          the top of every screen in the flow — and the number they show is the
+          least useful fact available, because a person answering question four
+          does not need to know it is question four. What they want is whether
+          this is nearly over, which is a length rather than a figure.
+
+          ⚠️ AND IT IS AGAINST THE LIVE LIST, so a flow that just skipped three
+          steps jumps forward instead of quietly promising screens that are no
+          longer coming.
+        */}
+        <Along at={i + 1} of={live.length} />
         {note}
-        <SoFar told={told} onGo={jump} />
 
         <Section label={here.ask}>
-          {here.children}
+          {here.id === REVIEW ? <Review live={live} onGo={jump} /> : here.children}
 
           {/* ⚠️ THE ANSWER, SAID BACK, IN THE WORDS THE ANSWER WAS GIVEN IN.
               Under the controls rather than over them: over them it is a

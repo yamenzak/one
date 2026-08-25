@@ -1,33 +1,38 @@
 /**
- * HOW A THING IS PACKAGED — the editor for the rungs between a carton and a
- * tablet.
+ * HOW A THING ARRIVES PACKED — a case of boxes of sheets, a pallet of cases of
+ * cans.
  *
- * ⚠️ IT IS ITS OWN FILE BECAUSE IT IS A LIST INSIDE A FORM, which is the shape
- * that makes a form file long. Registering a product is already photographs, a
- * name, tags, several barcodes, how it is counted, how it keeps and who sells
- * it; a repeating pair of fields inline there is fifty lines nobody can see the
- * end of.
+ * ⚠️ EVERY LABEL HERE IS BUILT FROM WHAT IS ALREADY TYPED, AND THAT IS THE WHOLE
+ * DESIGN OF THE CONTROL. The pair of fields on their own is meaningless — a
+ * name and a number, twice — so the labels have to carry the sentence: "How many
+ * screws in a box?", then "How many boxes in a case?". Change the unit from
+ * screws to metres and every label in the list changes with it, because none of
+ * them is a fixed string.
  *
- * ⚠️ `per` IS PER THE RUNG BELOW, AND THE COPY HAS TO SAY SO. Somebody entering
- * a ladder knows "a box holds 3 sheets" — they do not know, and must not have to
- * multiply out, that a box holds 30 tablets. Read as base units the second rung
- * is silently wrong by a factor of the first, and it renders perfectly.
+ * ⚠️ IT USED TO SAY "The smallest one has a name" AND "The shelf is still
+ * counted in box." Both were written from inside the model rather than from the
+ * bench: the first is a sentence about the data structure, and the second names
+ * the unit in the singular, unpluralised, in a place where nobody had asked
+ * whether their totals were about to change. Neither told anybody what to type.
  *
- * ⚠️ AND IT NEVER CHANGES WHAT THE SHELF IS COUNTED IN. Stock is always in the
- * base unit, so a rung is a named multiplier and nothing more: the way somebody
- * says "two boxes" while holding two boxes, and the way a number reads back in
- * the words they think in.
+ * ⚠️ `per` IS PER THE PACK BELOW, AND THE COPY HAS TO SAY SO. Somebody entering
+ * this knows "a case holds 4 boxes" — they do not know, and must not have to
+ * multiply out, that a case holds 400 screws. Read as single units the second
+ * row is silently wrong by a factor of the first, and it renders perfectly.
+ *
+ * ⚠️ AND IT NEVER CHANGES WHAT THE TOTAL IS IN. Stock is always counted in the
+ * one unit, so a pack is a named multiplier and nothing more: the way somebody
+ * says "two cases" while holding two cases.
  */
 
 import * as React from "react";
 import {
-  Group, NoteRow, NumberInput, Row, Spacer, TextInput,
+  NoteRow, NumberInput, Row, Spacer, TextInput,
 } from "@engine/design";
 import { Button } from "@heroui/react";
-/* ⚠️ ONE PLURAL RULE FOR THE WHOLE PRODUCT — see `packing.ts`. */
-import { plural } from "../packing.js";
+import { some } from "../saying.js";
 
-/** One rung. Mirrors `packing.ts`'s `Level`, which the worker owns. */
+/** One pack. Mirrors `packing.ts`'s `Level`, which the worker owns. */
 export interface Rung {
   readonly name: string;
   readonly per: number;
@@ -42,74 +47,91 @@ export interface Rung {
 export const MOST_RUNGS = 6;
 
 export interface LadderProps {
-  /** What one is counted in — the floor every rung multiplies up from. */
+  /** What one is counted in — the floor every pack multiplies up from. */
   readonly unit: string;
   readonly levels: readonly Rung[];
   readonly onChange: (next: readonly Rung[]) => void;
 }
 
 /**
- * WHAT THE RUNG BELOW THIS ONE IS CALLED, which is what `per` counts.
+ * WHAT IS INSIDE THE PACK AT THIS POSITION, PLURAL — the thing `per` counts.
  *
- * ⚠️ PLURAL, ALWAYS, because `per` is at least two. "How many sheet in a box" is
- * the label reading as a typo on every ladder anybody enters, and the fix is the
+ * ⚠️ PLURAL ALWAYS, because `per` is at least two. "How many screw in a box" is
+ * the label reading as a typo on every list anybody enters, and the fix is the
  * rule the reader already uses rather than a second one written here.
+ *
+ * ⚠️ AND IT FALLS BACK TO THE UNIT AT THE BOTTOM. The first pack holds units;
+ * every one after that holds the pack below it.
  */
-export const under = (
+export const inside = (
   levels: readonly Rung[], at: number, unit: string,
 ): string => {
   const below = at > 0 ? levels[at - 1]?.name.trim() : "";
-  return plural(below || unit.trim() || "units", 2);
+  return some(below || unit);
 };
+
+/**
+ * ⚠️ A SUGGESTION THAT CLIMBS, so the placeholders read as a real example of the
+ * thing being described rather than as the same two words repeated.
+ */
+const LIKELY = ["box", "case", "pallet", "container", "load", "shipment"] as const;
 
 export function Ladder({ unit, levels, onChange }: LadderProps) {
   const set = (at: number, of: Partial<Rung>) => {
-    onChange(levels.map((one, i) => (i === at ? { ...one, ...of } : one)));
+    onChange(levels.map((rung, i) => (i === at ? { ...rung, ...of } : rung)));
   };
 
   return (
-    <Group label="How it is packaged">
-      {levels.map((rung, at) => (
-        /* ⚠️ KEYED ON POSITION, DELIBERATELY. The name is what somebody is
-           typing, so keying on it remounts the field on every keystroke and the
-           caret jumps to the end — which is the bug that makes a form feel
-           broken without ever failing. */
-        <React.Fragment key={at}>
-          <TextInput
-            label={at === 0 ? "The smallest one has a name" : "And then"}
-            value={rung.name}
-            onChange={(name) => { set(at, { name }); }}
-            placeholder={at === 0 ? "sheet" : "box"}
-            name={`rung-${at}`}
-          />
-          <NumberInput
-            /* ⚠️ THE LABEL NAMES THE RUNG BELOW, which is the whole ergonomics
-               of this field — "How many sheets in a box", never "how many
-               tablets", because the second is a multiplication the person should
-               not be doing. */
-            label={`How many ${under(levels, at, unit)} in ${
-              rung.name.trim() ? `a ${rung.name.trim()}` : "one"}`}
-            value={rung.per}
-            onChange={(per) => { set(at, { per }); }}
-            min={2}
-          />
-          <Row space="tight">
-            <Spacer />
-            <Button
-              size="sm"
-              variant="ghost"
-              aria-label={`Remove ${rung.name.trim() || "this level"}`}
-              /* ⚠️ EVERYTHING ABOVE IT GOES TOO. A ladder is a chain — removing
-                 the middle rung would leave the one above counting a thing that
-                 no longer exists, and its `per` would silently start meaning
-                 something else. */
-              onPress={() => { onChange(levels.slice(0, at)); }}
-            >
-              Remove
-            </Button>
-          </Row>
-        </React.Fragment>
-      ))}
+    <>
+      {levels.map((rung, at) => {
+        const named = rung.name.trim();
+        const holds = inside(levels, at, unit);
+        return (
+          /* ⚠️ KEYED ON POSITION, DELIBERATELY. The name is what somebody is
+             typing, so keying on it remounts the field on every keystroke and
+             the caret jumps to the end — the bug that makes a form feel broken
+             without ever failing. */
+          <React.Fragment key={at}>
+            <TextInput
+              /* ⚠️ THE LABEL NAMES WHAT IS INSIDE, so the question is answerable
+                 without looking anywhere else on the screen. */
+              label={at === 0
+                ? `What are the ${holds} packed in?`
+                : `And what holds the ${holds}?`}
+              value={rung.name}
+              onChange={(name) => { set(at, { name }); }}
+              placeholder={LIKELY[Math.min(at, LIKELY.length - 1)]}
+              name={`pack-${at}`}
+            />
+            <NumberInput
+              /* ⚠️ THE NUMBER IS THE PACK BELOW, NEVER THE UNIT — "how many
+                 boxes in a case", not "how many screws", because the second is a
+                 multiplication the person should not be doing. */
+              label={named
+                ? `How many ${holds} in one ${named}?`
+                : `How many ${holds} in one?`}
+              value={rung.per}
+              onChange={(per) => { set(at, { per }); }}
+              min={2}
+            />
+            <Row space="tight">
+              <Spacer />
+              <Button
+                size="sm"
+                variant="ghost"
+                aria-label={`Remove ${named || "this pack"}`}
+                /* ⚠️ EVERYTHING ABOVE IT GOES TOO. This is a chain — removing a
+                   pack from the middle would leave the one above counting a
+                   thing that no longer exists, and its number would silently
+                   start meaning something else. */
+                onPress={() => { onChange(levels.slice(0, at)); }}
+              >
+                Remove
+              </Button>
+            </Row>
+          </React.Fragment>
+        );
+      })}
 
       {levels.length < MOST_RUNGS
         ? (
@@ -117,20 +139,21 @@ export function Ladder({ unit, levels, onChange }: LadderProps) {
             variant="secondary"
             onPress={() => { onChange([...levels, { name: "", per: 2 }]); }}
           >
-            {levels.length ? "Add another level" : "It comes in packs"}
+            {levels.length ? "And those come in something bigger" : "Add the pack"}
           </Button>
         )
         : null}
 
-      {/* ⚠️ SAID ONCE, UNDER THE CONTROL, AND ONLY WHERE IT IS RELEVANT. The
-          fear this answers is real — somebody adding a ladder wonders whether
-          their shelf numbers are about to change — and it is a sentence rather
-          than a paragraph. */}
-      <NoteRow>
-        {levels.length
-          ? `The shelf is still counted in ${unit.trim() || "single units"}. This is only how you say it.`
-          : "A box of sheets of tablets, a case of packs of cans — add one if it comes that way."}
-      </NoteRow>
-    </Group>
+      {/* ⚠️ THE FEAR THIS ANSWERS IS REAL AND IT IS ASKED ONCE. Somebody
+          describing packaging wonders whether the numbers on their shelves are
+          about to change into something else. They are not. */}
+      {levels.length
+        ? (
+          <NoteRow>
+            {`Your totals stay in ${some(unit)}. Packs only save you typing when things arrive`}
+          </NoteRow>
+        )
+        : null}
+    </>
   );
 }

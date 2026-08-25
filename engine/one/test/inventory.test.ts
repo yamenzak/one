@@ -983,3 +983,48 @@ describe("changing what a product is counted in", () => {
     expect((await write("product.recount", { product })).status).toBe(400);
   });
 });
+
+/*
+  ⚠️ WHAT A PERSON IS WALKED THROUGH, TOLD TO AN AGENT TOO. `product.register`
+  takes twenty fields; the SCREEN asks ten plain questions in an order, some of
+  them skipped by earlier answers, and that order is the product's own
+  understanding of the thing being made. An agent given only the field names is
+  guessing at exactly the reasoning the flow already encodes.
+
+  ⚠️ AND IT IS THE MANIFEST'S OWN DECLARATION, checked against the screen that
+  draws it by `scripts/story.test.mjs` — so this cannot become a second
+  description that drifts from the one people actually see.
+*/
+describe("a flow reaches the agent door", () => {
+  const tools = async (): Promise<readonly { name: string; description: string }[]> => {
+    const res = await at("/mcp", {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
+    });
+    const body = await res.json() as {
+      result: { tools: readonly { name: string; description: string }[] };
+    };
+    return body.result.tools;
+  };
+
+  it("tells an agent the questions behind a declared flow", async () => {
+    const found = (await tools()).find((tool) => tool.name === "product.register");
+    expect(found, "product.register is not on the agent door").toBeTruthy();
+    const said = found?.description ?? "";
+    expect(said).toContain("What is one of them?");
+    expect(said).toContain("How much do you need to know about each one?");
+    /* ⚠️ INCLUDING WHAT REMOVES A QUESTION. Half the flow disappears on one
+       answer, and an agent that does not know which half will ask for fields
+       nobody would ever be asked for. */
+    expect(said).toContain("only when anything is counted");
+  });
+
+  /* ⚠️ AND AN OPERATION WITH NO FLOW IS UNCHANGED — the summary alone. A
+     description that grew a trailing "A person reaching this is asked:" with
+     nothing after it would be the seam leaking into every other tool. */
+  it("leaves an operation nobody walks to alone", async () => {
+    const found = (await tools()).find((tool) => tool.name === "product.recount");
+    expect(found?.description).not.toContain("A person reaching this is asked");
+  });
+});

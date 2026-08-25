@@ -135,6 +135,61 @@ export interface ScreenSpec {
   /** The ambience. Derived from theme tokens, so branding reaches it (D7). */
   readonly sky?: string;
   readonly tone?: Tone;
+  /**
+   * THIS SCREEN IS A FLOW OF QUESTIONS RATHER THAN A PAGE — see `Story`.
+   *
+   * ⚠️ THE SHAPE IS DECLARED AND THE CONTROLS ARE NOT, WHICH IS THE WHOLE
+   * DESIGN. A wizard's questions are FACTS about the product — what it asks, in
+   * what order, to reach which write — and every one of them is worth knowing
+   * outside the browser: the docs list them, an agent can be told what a flow
+   * will want before it starts one, and an operator can see what a person is
+   * taken through. The CONTROLS cannot be declared and should not be: a camera,
+   * a barcode viewfinder and a packing editor are not fields, and a manifest
+   * that could express them would be a second React.
+   *
+   * ⚠️ SO WHAT THIS BUYS IS AGREEMENT, NOT GENERATION. The screen still draws
+   * itself; the guard proves it draws exactly what was declared, that `writes`
+   * is a real operation, and that the screen's own `permission` is the one that
+   * operation demands. Those last two were two hand-typed strings in two files
+   * with nothing checking they matched — so a flow could take somebody through
+   * ten questions and be refused by the write at the end.
+   */
+  readonly story?: StorySpec;
+}
+
+/** A flow of questions, declared. */
+export interface StorySpec {
+  /**
+   * THE ONE OPERATION THE WHOLE FLOW EXISTS TO REACH.
+   *
+   * ⚠️ ONE, AND THAT IS A DEFINITION RATHER THAN A LIMIT. A flow with two writes
+   * is two flows, and the moment a second is needed the honest edit is a second
+   * story — because the review at the end summarises ONE thing being made, and a
+   * screen that commits two of them cannot be reviewed at all.
+   */
+  readonly writes: string;
+  /**
+   * THE QUESTIONS, IN ORDER, INCLUDING THE ONES THAT ARE OFTEN SKIPPED.
+   *
+   * ⚠️ DECLARED EVEN WHERE `when` REMOVES THEM AT RUNTIME. This is what the flow
+   * CAN ask; which of them a given person is actually asked depends on their
+   * answers, and a manifest that only listed the unconditional steps would
+   * describe a flow nobody ever walks.
+   */
+  readonly asks: readonly StepSpec[];
+}
+
+export interface StepSpec {
+  readonly id: string;
+  /**
+   * ⚠️ A QUESTION, AND THE `?` IS LOAD-BEARING. A step headed "Counting" names
+   * the area of the record being written and leaves the person to work out what
+   * is wanted of them; a question has an answer, and somebody who can answer it
+   * needs no training to. The guard refuses a heading.
+   */
+  readonly ask: string;
+  /** ⚠️ Named where an answer earlier in the flow can remove this one. */
+  readonly when?: string;
 }
 
 /**

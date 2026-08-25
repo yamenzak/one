@@ -1,46 +1,46 @@
 /**
- * REGISTER A PRODUCT — a story told one question at a time.
+ * REGISTER A THING — a quiz about the object in your hand.
  *
- * ⚠️ THE ONBOARDING TAX IS WHY PEOPLE ABANDON INVENTORY APPS. Eight hundred
- * products typed in by hand is a project nobody finishes, so the first thing
- * here is a camera: six photographs of a thing on a bench come back named,
- * described, categorised and with a rung suggested. Everything after it is the
- * same set of questions somebody can answer by hand, always, with nothing hidden
- * behind a mode.
+ * ⚠️ TWO TAXES, AND THIS FILE IS ABOUT THE SECOND ONE. The first is typing: eight
+ * hundred things entered by hand is a project nobody finishes, which is why the
+ * camera is the first question. The second is TRAINING, and it is the one that
+ * never appears in a diff — a screen headed "Counting" with `Tracked as: [Listed]
+ * [Counted] [Batched] [Itemised]` under it needs an induction, a wiki page and a
+ * person in the warehouse who knows. All three are paid for per customer, per new
+ * employee, forever.
  *
- * ⚠️ AND THE SECOND TAX IS TRAINING, WHICH IS THE ONE THIS REWRITE IS ABOUT.
- * The four steps this replaces were four HEADINGS over groups of fields —
- * "What it is", "Barcodes", "Counting", "Keeping" — and a heading names the area
- * of the database being written. `Tracked as: [Listed] [Counted] [Batched]
- * [Itemised]` is four words nobody can choose between without being taught, and
- * taught is an induction, a wiki page, and a person in the warehouse who knows.
- * Every one of those is a cost this product pays forever, per customer, per new
- * employee.
+ * ⚠️ SO EVERY STEP IS ONE QUESTION IN PLAIN WORDS, AND EVERY ANSWER IS SAID BACK.
+ * "How much do you need to know about each one?" — and the four options are
+ * *That we have it* / *How many we have* / *Which delivery it came from* /
+ * *Every single one*, each with the kind of thing it suits underneath. Nobody has
+ * to be told what those mean. The clauses are `saying.ts`, pure and tested.
  *
- * ⚠️ SO EVERY STEP IS A QUESTION WITH AN ANSWER SAID BACK IN THE SAME WORDS. "How
- * closely do you follow it?" — and the moment somebody chooses, the screen says
- * *"Each delivery is kept apart, so you can expire one or recall one"*. The
- * sentences are `saying.ts`, pure and tested, because a sentence assembled
- * inline reads "1 tablets in a box" on the path nobody clicked.
+ * ⚠️ AND IT HAS TO WORK FOR A BASEMENT SHELF AND A DISTRIBUTOR. The thing being
+ * described is a tin of paint, a box of screws, a pallet of drinks, a surgical
+ * tray or a laptop — so every example given here spans that range on purpose, and
+ * no question assumes a warehouse or a pharmacy.
  *
- * ⚠️ THE ORDER IS THE ORDER SOMEBODY DESCRIBES A THING IN, NOT THE ORDER THE
- * TABLE'S COLUMNS ARE IN. What it looks like, what it is, what kind of thing it
- * is, how closely you follow it, what you count it in, what it comes inside,
- * what is printed on it, how long it keeps, where more comes from.
+ * ⚠️ EVERY LABEL AND PLACEHOLDER IS BUILT FROM THE ANSWERS ALREADY GIVEN. Say you
+ * count in metres and the next screen asks whether you can have half A METRE, the
+ * one after that asks how many METRES are in a box, and the barcode asks how many
+ * METRES it covers. A wizard whose wording does not move when you change your
+ * mind is a form with a progress bar on it.
  *
- * ⚠️ AND A STEP THAT DOES NOT APPLY IS NOT ASKED. A product you never count has
- * no packaging question — how many are in a box is a fact with no consequence
- * when nothing is counting them. `Story` takes it out of the flow entirely
- * rather than greying it out.
+ * ⚠️ AND AN ANSWER REMOVES THE QUESTIONS IT CONTRADICTS. "That we have it"
+ * means nothing is ever counted — so packs, barcodes and expiry dates are not
+ * asked at all, and the flow is six screens instead of ten. "Every single one"
+ * means each has its own number, so a pack size is meaningless and that step goes
+ * too. Skipped, never greyed out: a disabled step is a question somebody has to
+ * work out they are not being asked.
+ *
+ * ⚠️ THE SUMMARY IS THE LAST STEP AND IT IS THE FRAME'S. Every screen here is the
+ * question and nothing else; `Story` appends the review, where the whole story
+ * reads as a list of short sentences with every line one press from the step that
+ * wrote it. That is what makes the camera's answer checkable.
  *
  * ⚠️ A PAGE RATHER THAN A DRAWER, AND AN ADDRESS IS THE HALF A DRAWER CANNOT
- * HAVE. Home's first action, a checklist step, an empty catalogue and a scan
- * that resolved to nothing all want to send somebody HERE — and a page survives
- * a reload, a shared link and the back gesture.
- *
- * ⚠️ EVERYTHING ELSE — the steps, the dots, the recap, the dock's Back and Next,
- * the phone's own back gesture — IS `Story`'s, in `@engine/design`. This file is
- * nine questions and their sentences.
+ * HAVE. Home's first action, a checklist step, an empty catalogue and a scan that
+ * resolved to nothing all want to send somebody HERE.
  */
 
 import * as React from "react";
@@ -55,8 +55,7 @@ import { MOST_BYTES, sayList } from "@engine/kernel";
 /* ⚠️ ONE BOX IS ONE CODE — the fold the reader has no way to know. */
 import { foldScan } from "../code.js";
 import {
-  sayCodes, sayCounting, sayGettingMore, sayKeeping, sayNamed, sayPacking, sayPhotos,
-  sayTracking,
+  one, sayCodes, sayDates, sayDetail, sayMore, sayNamed, sayPacks, sayPhotos, sayUnit, some,
 } from "../saying.js";
 import { Ladder, type Rung } from "./Ladder.js";
 
@@ -80,12 +79,11 @@ export interface Guessed {
   readonly openDays: number;
   /**
    * ⚠️ THE DATE ON THIS BOX, WHICH IS NOT A SHELF LIFE AND IS REPORTED SO THE
-   * SCREEN CAN SAY WHY IT LEFT ONE BLANK. A pharmaceutical carton prints "use
-   * by 08/2029" and no manufacturing date, so no duration can be worked out —
-   * the model is right to answer zero, and a person who has just photographed a
-   * date sitting beside an empty "Shelf life" reasonably reads that as a
-   * failure. It is also the wrong FIELD: this date belongs to one delivery, and
-   * is captured from the batch when the box is received.
+   * SCREEN CAN SAY WHY IT LEFT ONE BLANK. A carton prints "use by 08/2029" and
+   * no manufacturing date, so no duration can be worked out — the model is right
+   * to answer zero, and a person who has just photographed a date sitting beside
+   * an empty field reasonably reads that as a failure. It is also the wrong
+   * FIELD: this date belongs to one delivery, and is captured on arrival.
    */
   readonly labelExpiry: string;
   /** ⚠️ A pictogram was SEEN. Which class it declares is the label reader's. */
@@ -104,7 +102,7 @@ export interface Match {
 export interface CodeRow {
   readonly value: string;
   readonly kind: string;
-  /** ⚠️ How many base units the thing this code is printed on holds. */
+  /** ⚠️ How many single units the thing this code is printed on holds. */
   readonly pack: number;
 }
 
@@ -119,7 +117,7 @@ export interface Registering {
   readonly name: string;
   readonly brand: string;
   readonly description: string;
-  /** ⚠️ How it is packaged. Empty for most things — see `Ladder`. */
+  /** ⚠️ How it arrives packed. Empty for most things — see `Ladder`. */
   readonly levels: readonly Rung[];
   readonly unit: string;
   readonly tracking: string;
@@ -145,24 +143,23 @@ export interface RegisterProps {
   /** Where the back arrow goes from the first question. */
   readonly back: () => void;
   /**
-   * ⚠️ THE WORDS THIS WORKSPACE ALREADY FILES THINGS UNDER. Sent with the
-   * photographs so a model CHOOSES from them, and offered in the `Words` control
-   * so a person does too — one vocabulary, reached two ways.
+   * ⚠️ THE WORDS THIS WORKSPACE ALREADY USES. Sent with the photographs so a
+   * model CHOOSES from them, and offered in the `Words` control so a person does
+   * too — one vocabulary, reached two ways.
    */
   readonly knownTags: readonly Option[];
   /**
-   * ⚠️ THE UNITS THIS WORKSPACE ALREADY COUNTS IN. Same argument as the tags one
-   * word over: typed free, a catalogue collects `box`, `Box`, `boxes` and `BX`
-   * as four units that are one, on products that can then never be totalled.
-   * Offered rather than enforced — anything typed is still accepted.
+   * ⚠️ THE UNITS THIS WORKSPACE ALREADY COUNTS IN. Typed free, a catalogue
+   * collects `box`, `Box`, `boxes` and `BX` as four units that are one, on things
+   * that can then never be totalled. Offered rather than enforced.
    */
   readonly knownUnits: readonly Option[];
   readonly suppliers: readonly Option[];
   /**
    * ⚠️ WHAT ALREADY LOOKS LIKE THIS, WHILE IT IS STILL BEING TYPED. `null` means
-   * nothing has been asked yet, which is not the same as "nothing matched" —
-   * an empty list under a name is a claim, and it is the claim that makes
-   * somebody stop looking.
+   * nothing has been asked yet, which is not the same as "nothing matched" — an
+   * empty list under a name is a claim, and it is the claim that makes somebody
+   * stop looking.
    */
   readonly resembles: Loaded<readonly Match[] | null>;
   readonly onLook: (of: { name: string; brand: string }) => void;
@@ -180,43 +177,57 @@ export interface RegisterProps {
 }
 
 /*
-  ⚠️ THE LADDER, IN THE ORDER SOMEBODY CLIMBS IT, and `assembled` is absent on
-  purpose. A kit is made out of other products rather than declared as one, so
-  offering it here would be a rung nothing behind this flow can honour.
+  ⚠️ THE FOUR LEVELS OF DETAIL, NAMED BY WHAT YOU WILL BE ABLE TO ANSWER LATER
+  RATHER THAN BY WHAT THE SYSTEM CALLS THEM. These were `Listed`, `Counted`,
+  `Batched` and `Itemised`, which is four adjectives nobody can choose between
+  without being taught — and being taught is the cost this whole flow exists to
+  remove.
 
-  ⚠️ AND THE HELP IS THE CONTROL'S REASON FOR EXISTING, WHICH `Segmented` DROPS.
-  This was a segmented control and `Segmented` renders `o.label` and nothing
-  else — so every one of these sentences was written, committed, and reached
-  nobody. Its own header says segments are "for a choice worn on the surface —
-  a view, a period, a mode — never for data entry", which this is: the single
-  most consequential field on the product record.
+  ⚠️ AND EACH ONE NAMES THE KIND OF THING IT SUITS. An example does more work
+  than any definition: "medicine, food, chemicals" settles the question for
+  somebody holding a bottle of anything, in a way "deliveries are kept separate"
+  never will.
+
+  ⚠️ `assembled` IS ABSENT ON PURPOSE. A kit is made out of other things rather
+  than declared as one, so offering it here would be a level nothing behind this
+  flow can honour.
 */
-const RUNGS: readonly Option[] = [
-  { id: "listed", label: "Not counted", help: "It is on the catalogue and you never count it" },
-  { id: "counted", label: "Counted", help: "You keep a running number of how many there are" },
-  { id: "batched", label: "By delivery", help: "Each delivery stays separate — for expiry dates and recalls" },
-  { id: "itemised", label: "One by one", help: "Every single one is followed by its own serial number" },
-];
-
-/** ⚠️ It comes as it is, or it comes inside something — see the packing step. */
-const PACKED: readonly Option[] = [
-  { id: "loose", label: "As it is" },
-  { id: "packed", label: "Inside packaging" },
+const DETAIL: readonly Option[] = [
+  {
+    id: "listed",
+    label: "That we have it",
+    help: "It is on the list so you can find it and order it. Nothing is ever counted",
+  },
+  {
+    id: "counted",
+    label: "How many we have",
+    help: "One running total. Screws, paper, gloves, cleaning supplies — most things",
+  },
+  {
+    id: "batched",
+    label: "Which delivery it came from",
+    help: "Deliveries stay apart, so you can trace a recall or an expiry. Medicine, food, chemicals, paint",
+  },
+  {
+    id: "itemised",
+    label: "Every single one",
+    help: "Each has its own number and its own history. Machines, tools, laptops, gas cylinders",
+  },
 ];
 
 /**
  * ⚠️ WHAT A CODE IS, WORKED OUT RATHER THAN ASKED. The step used to offer four
  * options — Barcode, QR, Square code, Other — and every one of them was a
- * SYMBOLOGY, which is not what the field holds. `CODE_KINDS` is what a code
- * NAMES: a retail GTIN, a supplier's part number, one of our own labels. The
- * control was asking a question about the picture and storing the answer in a
- * column about the namespace.
+ * SYMBOLOGY, which is not what the field holds. What a code NAMES is a retail
+ * GTIN, a supplier's part number, or one of our own labels. The control was
+ * asking about the picture and storing the answer in a column about the
+ * namespace.
  *
- * ⚠️ AND BOTH ARE KNOWABLE WITHOUT ASKING. Eight, twelve or thirteen digits
- * whose last one is the weighted sum of the rest is a GTIN and nothing else is;
- * the camera hands back the symbology it decoded. A form asking a person to
- * re-state what the machine read is a form nobody can get right more often than
- * the machine.
+ * ⚠️ AND BOTH ARE KNOWABLE WITHOUT ASKING. Eight, twelve or thirteen digits whose
+ * last one is the weighted sum of the rest is a GTIN and nothing else is; the
+ * camera hands back the symbology it decoded. A form asking a person to re-state
+ * what the machine read is a form nobody can get right more often than the
+ * machine.
  */
 const namespaceOf = (value: string): string =>
   (kindOf(value) === "other" ? "other" : "gtin");
@@ -243,23 +254,28 @@ export function Register({
   const [brand, setBrand] = React.useState("");
   const [description, setDescription] = React.useState("");
   const [unit, setUnit] = React.useState("");
-  /* ⚠️ HOW IT IS PACKAGED — see `Ladder` and `packing.ts`. Empty for most
-     things, which is why the editor draws one blank row and no more. */
   const [levels, setLevels] = React.useState<readonly Rung[]>([]);
   const [packed, setPacked] = React.useState("loose");
-  const [tracking, setTracking] = React.useState("counted");
+  const [detail, setDetail] = React.useState("counted");
   const [whole, setWhole] = React.useState(true);
   const [par, setPar] = React.useState<number | null>(null);
   const [storage, setStorage] = React.useState("");
   const [handling, setHandling] = React.useState("");
+  /*
+    ⚠️ A QUESTION OF ITS OWN, AND IT USED TO BE TWO EMPTY NUMBER FIELDS. "Shelf
+    life: 0" and "nobody has said whether this goes off" are different facts, and
+    a blank field cannot tell them apart — so a thing that genuinely never
+    expires was indistinguishable from a step somebody skipped, on the screen and
+    in the record.
+  */
+  const [expires, setExpires] = React.useState(false);
   const [shelfDays, setShelfDays] = React.useState<number | null>(null);
   const [openDays, setOpenDays] = React.useState<number | null>(null);
   const [tags, setTags] = React.useState<readonly string[]>([]);
   /* ⚠️ EMPTY, NOT ONE BLANK ROW. A row with no code in it was a card with no
      barcode on it and a pack size for a thing nobody had named. */
   const [codes, setCodes] = React.useState<readonly CodeRow[]>([]);
-  /* ⚠️ WHAT THE MODEL READ OFF THE BOX, WAITING FOR A BARCODE TO BELONG TO —
-     see the extraction below. */
+  /* ⚠️ WHAT THE MODEL READ OFF THE BOX, WAITING FOR A BARCODE TO BELONG TO. */
   const [readPack, setReadPack] = React.useState<number | null>(null);
   const [sources, setSources] = React.useState<readonly SourceRow[]>([]);
   const [supplier, setSupplier] = React.useState("");
@@ -270,20 +286,15 @@ export function Register({
 
   /*
     ⚠️ FILLS WHAT IS EMPTY AND ARGUES WITH NOTHING. Somebody who typed a name and
-    then photographed the box meant the name they typed — see the header. The
-    tags are a UNION for the same reason: a word somebody chose is not a word a
-    model gets to remove.
+    then photographed the box meant the name they typed. The words are a UNION
+    for the same reason: one somebody chose is not one a model gets to remove.
   */
   const answer = guessed.status === "ready" ? guessed.data : null;
   React.useEffect(() => {
     if (!answer) return;
-    /*
-      ⚠️ AN ANSWER MOVES SOMEBODY ON, RATHER THAN FILLING IN A SCREEN THEY ARE NOT
-      LOOKING AT. Pressing "fill this in from the photographs" and staying on the
-      photographs is a button whose whole effect is somewhere else. It lands on
-      the first question the answer actually touched, with the values in place —
-      and the recap above every question after it is the check.
-    */
+    /* ⚠️ AN ANSWER MOVES SOMEBODY ON rather than filling in a screen they are not
+       looking at. It lands on the first question the answer touched, and the
+       review at the end is the check. */
     setWhere((held) => (held === "photos" ? "what" : held));
     setName((held) => held || answer.name);
     setBrand((held) => held || answer.brand);
@@ -291,26 +302,33 @@ export function Register({
     setUnit((held) => held || answer.unit);
     setStorage((held) => held || answer.storage);
     setHandling((held) => held || answer.handling);
-    /* ⚠️ ZERO IS "NOTHING SAID SO", NOT A SHELF LIFE OF NONE — see the field. */
-    if (answer.shelfDays > 0) setShelfDays((held) => held ?? answer.shelfDays);
-    if (answer.openDays > 0) setOpenDays((held) => held ?? answer.openDays);
-    if (answer.tracking) setTracking((held) => (held === "counted" ? answer.tracking : held));
+    /* ⚠️ A DURATION IS ALSO THE ANSWER TO "DOES IT GO OFF", so reading one off
+       the label answers the question before it is asked rather than leaving
+       somebody to set a switch the model has already decided. */
+    if (answer.shelfDays > 0) {
+      setShelfDays((held) => held ?? answer.shelfDays);
+      setExpires(true);
+    }
+    if (answer.openDays > 0) {
+      setOpenDays((held) => held ?? answer.openDays);
+      setExpires(true);
+    }
+    if (answer.labelExpiry) setExpires(true);
+    if (answer.tracking) setDetail((held) => (held === "counted" ? answer.tracking : held));
     setTags((held) => {
-      const seen = new Set(held.map((t) => t.toLowerCase()));
-      return [...held, ...answer.tags.filter((t: string) => !seen.has(t.toLowerCase()))];
+      const seen = new Set(held.map((word) => word.toLowerCase()));
+      return [...held, ...answer.tags.filter((word: string) => !seen.has(word.toLowerCase()))];
     });
     /*
-      ⚠️ THE PACK GOES ON THE FIRST BARCODE, NOT ON THE PRODUCT. "It holds 30" is
-      a fact about the box the code is printed on — a product counted in gloves
-      has no pack of its own, and a carton and an inner both do.
+      ⚠️ THE PACK GOES ON THE FIRST BARCODE, NOT ON THE THING. "It holds 30" is a
+      fact about the box the code is printed on — something counted in gloves has
+      no pack of its own, and an outer case and an inner both do.
 
-      ⚠️ AND IT IS REMEMBERED RATHER THAN WRITTEN, WHICH IS THE WHOLE FIX. This
-      mapped over `codes` — which is EMPTY when the answer arrives, because the
-      photographs are the first question and the barcodes are the seventh.
-      `[].map()` is `[]`, so a model that had correctly read "30 Filmtabletten"
-      off the box had its answer dropped without a word, every time. Held here,
-      it becomes the first scanned code's pack when there is finally a code to
-      put it on.
+      ⚠️ AND IT IS REMEMBERED RATHER THAN WRITTEN. This mapped over `codes` —
+      which is EMPTY when the answer arrives, because photographs are the first
+      question and barcodes are the seventh. `[].map()` is `[]`, so a model that
+      had correctly read "30 Filmtabletten" off the box had its answer dropped
+      without a word, every time.
     */
     if (answer.pack > 1) setReadPack(answer.pack);
   }, [answer]);
@@ -319,11 +337,10 @@ export function Register({
     ⚠️ ASKED AS THEY TYPE, SETTLED BEFORE THEY SAVE. A catalogue fills with
     duplicates one careful person at a time — somebody searches "gloves nitrile"
     in a hurry, finds nothing, and adds a second row that half the stock then
-    lives under. The moment to say so is while the name is being typed.
+    lives under.
 
     ⚠️ AND IT IS DEBOUNCED RATHER THAN PER KEYSTROKE. A read on every letter of
-    "nitrile gloves" is fourteen round trips for one answer, and the one that
-    matters is the last.
+    "nitrile gloves" is fourteen round trips for one answer.
   */
   React.useEffect(() => {
     if (name.trim().length < 3) return undefined;
@@ -332,46 +349,47 @@ export function Register({
   }, [name, brand, onLook]);
 
   const matches = resembles.status === "ready" ? resembles.data : null;
-  const strong = (matches ?? []).some((m: Match) => m.why !== "similar name");
+  const strong = (matches ?? []).some((match: Match) => match.why !== "similar name");
 
   const setCode = (at: number, next: Partial<CodeRow>) => {
     setCodes((held) => held.map((row, i) => (i === at ? { ...row, ...next } : row)));
   };
 
-  /* ⚠️ ONLY THE ROWS SOMEBODY FINISHED. A half-typed rung — a name with no
+  /* ⚠️ ONLY THE ROWS SOMEBODY FINISHED. A half-typed pack — a name with no
      number — is refused at the door, so sending it would turn an unfinished line
      into a refusal about a field the person had not got to yet. */
-  const rungs = levels.filter((one) => one.name.trim() && one.per > 1);
+  const rungs = levels.filter((rung) => rung.name.trim() && rung.per > 1);
+  /* ⚠️ NOTHING IS COUNTED, SO NOTHING BELOW DEPENDS ON A COUNT — see the header.
+     This is the one answer that removes whole questions. */
+  const counts = detail !== "listed";
 
   const send = () => {
     onRegister({
       name: name.trim(), brand: brand.trim(), description: description.trim(),
-      unit: unit.trim(), tracking, whole, par,
-      /* ⚠️ "As it is" MEANS NO LADDER, WHATEVER WAS TYPED BEFORE IT WAS CHOSEN.
-         Somebody who filled in two rungs and then said the thing comes loose has
-         changed their mind, and sending the rungs anyway would register a
-         packaging they had just told the screen it does not have. */
-      levels: packed === "packed" ? rungs : [],
+      unit: unit.trim(), tracking: detail, whole, par,
+      /* ⚠️ EVERY ELIMINATED ANSWER IS DROPPED HERE, and that is what makes the
+         skipping honest. Somebody who filled in packs and then chose "every
+         single one" has changed their mind; sending the packs anyway would
+         register a shape they had just told the screen it does not have. */
+      levels: counts && packed === "packed" ? rungs : [],
       storage: storage.trim(), handling: handling.trim(),
-      shelfDays, openDays,
+      shelfDays: counts && expires ? shelfDays : null,
+      openDays: counts && expires ? openDays : null,
       supplier, reorder, reorderQty,
-      codes: codes.filter((one) => one.value.trim().length > 0),
+      codes: counts ? codes.filter((code) => code.value.trim().length > 0) : [],
       tags, sources, photos, anyway,
     });
   };
 
-  const orderedFrom = suppliers.find((one) => one.id === supplier)?.label ?? null;
+  const orderedFrom = suppliers.find((row) => row.id === supplier)?.label ?? null;
+  const noted = [storage.trim() ? "storing it" : "", handling.trim() ? "handling it" : ""]
+    .filter(Boolean);
 
-  /*
-    ⚠️ NINE QUESTIONS, EACH ANSWERABLE WITHOUT KNOWING THE NEXT — which is the
-    property that makes a step a step rather than a page break. Every one fits a
-    phone without scrolling, and every one carries the sentence its answer makes.
-  */
   const ASKS: readonly Ask[] = [
     {
       id: "photos",
       ask: "Start with a photo?",
-      under: "Photograph it and the rest fills itself in",
+      under: "The camera can fill in most of the rest",
       says: sayPhotos(photos.length, Boolean(answer)),
       children: (
         <>
@@ -380,40 +398,31 @@ export function Register({
             /*
               ⚠️ THE TRANSPORT'S OWN CEILING, NOT A NUMBER PICKED HERE. This was
               two megabytes, which refuses every photograph a phone has taken
-              since about 2015 — chosen because `product.see` caps a batch at
-              eight and nothing was making the pictures smaller. `shrunk` is what
-              was missing; with it, six photographs off any phone come to well
-              under that, and the only ceiling left is what `media.upload` will
-              actually accept.
+              since about 2015. `shrunk` is what was missing.
             */
             most={MOST_BYTES}
-            says={photos.length ? "Add another angle" : "Take a photo of the product"}
+            says={photos.length ? "Add another angle" : "Take a photo"}
             /*
-              ⚠️ THE LABEL IS NAMED, BECAUSE IT IS THE PICTURE THAT PAYS. Net
+              ⚠️ THE LABEL IS NAMED, BECAUSE IT IS THE PICTURE THAT PAYS. The
               contents, the printed name, the storage line and the shelf life are
-              on the label and nowhere else on the packaging — somebody who
-              photographs three sides of a box and not the back gets a worse
-              answer and never learns why.
+              on the label and nowhere else — somebody who photographs three
+              sides of a box and not the back gets a worse answer and never
+              learns why.
             */
             under={photos.length
-              ? `${photos.length} of ${MOST_PHOTOS}. The first one is the one people check against`
-              : "The front, the back and the label. The label is where the detail is"}
+              ? `${photos.length} of ${MOST_PHOTOS}. The first one is what people check against`
+              : "The front, the back, and the label. The label is where the detail is"}
             label="Take a photo"
             busy={busy}
-            /*
-              ⚠️ AS MANY AS THERE IS ROOM FOR, IN ONE TRIP. The six a person takes
-              of a box are adjacent in their camera roll a minute later, and six
-              trips through the picker to fetch six adjacent files was the control
-              charging somebody for a limit nobody had decided.
-            */
+            /* ⚠️ AS MANY AS THERE IS ROOM FOR, IN ONE TRIP. Six photographs are
+               adjacent in a camera roll a minute later, and six trips through
+               the picker to fetch six adjacent files was a limit nobody had
+               decided. */
             atOnce={Math.max(1, MOST_PHOTOS - photos.length)}
-            /*
-              ⚠️ SHRUNK ON THE WAY IN, ONCE, RATHER THAN ON THE WAY OUT. Held at
-              full size the six would be forty megabytes in React state on a
-              phone — and the two places that send them (the upload and the model)
-              would each have to remember to reduce, which is two chances to
-              forget and one of them is the one that costs credits.
-            */
+            /* ⚠️ SHRUNK ON THE WAY IN, ONCE. Held at full size the six would be
+               forty megabytes in React state on a phone — and the two places
+               that send them would each have to remember to reduce, which is two
+               chances to forget and one of them costs credits. */
             onPick={(bytes, file) => {
               void (async () => {
                 const small = await shrunk(bytes, file.type);
@@ -424,22 +433,17 @@ export function Register({
 
           {/*
             ⚠️ A STRIP THAT SCROLLS, NOT A GRID THAT REFLOWS. A grid on a phone
-            spends the width it has on however many tiles happen to exist, so six
-            photographs are six thumbnails too small to check. A strip gives each
-            one a size that does not change with the count, and the gesture for
-            "what else did I take" is the one a phone already teaches.
-
-            ⚠️ THE FIRST TILE IS FIRST, AND THAT IS ALL THE MARKING IT NEEDS. It
-            becomes `product.photo` — what somebody checks the thing in their hand
-            against — and a caption saying so on every tile is texture.
+            spends the width it has on however many tiles exist, so six photos
+            are six thumbnails too small to check. A strip gives each one a size
+            that does not change with the count.
           */}
           {photos.length ? (
             <Rail wide="tile" space="tight">
-              {photos.map((one, at) => (
-                <div key={one.slice(-24)} className="relative overflow-hidden rounded-xl">
+              {photos.map((shot, at) => (
+                <div key={shot.slice(-24)} className="relative overflow-hidden rounded-xl">
                   <img
-                    src={one}
-                    alt={at === 0 ? "The picture of record" : `Angle ${at + 1}`}
+                    src={shot}
+                    alt={at === 0 ? "The main picture" : `Angle ${at + 1}`}
                     className="aspect-square h-full w-full object-cover"
                   />
                   {/* ⚠️ ON THE TILE, NOT IN A ROW UNDER IT. A remove that is not
@@ -449,37 +453,31 @@ export function Register({
                     <Button
                       size="sm"
                       variant="secondary"
-                      aria-label={at === 0 ? "Remove the picture of record" : `Remove angle ${at + 1}`}
+                      aria-label={at === 0 ? "Remove the main picture" : `Remove angle ${at + 1}`}
                       onPress={() => { setPhotos((held) => held.filter((_, i) => i !== at)); }}
                     >
                       ✕
                     </Button>
                   </div>
                   {/*
-                    ⚠️ AND PROMOTING ONE IS A MOVE, NOT A FLAG. Which photograph is
-                    the picture of record is decided by ORDER — the first is the
-                    one — so "use this one" puts it first rather than setting a
-                    field beside it. One fact, one place: a `primary` flag
-                    alongside an ordered list is two answers to the same question,
-                    and they disagree the first time somebody deletes the flagged
-                    one.
-
-                    ⚠️ OFFERED ONLY WHERE IT WOULD DO SOMETHING. On the tile that
-                    is already first it is a control that changes nothing, which
-                    is read as broken.
+                    ⚠️ PROMOTING ONE IS A MOVE, NOT A FLAG. Which photograph is
+                    the main one is decided by ORDER, so "use this one" puts it
+                    first rather than setting a field beside it. A `primary` flag
+                    alongside an ordered list is two answers to one question, and
+                    they disagree the first time somebody deletes the flagged one.
                   */}
                   {at === 0 ? null : (
                     <div className="absolute inset-x-1 bottom-1">
                       <Button
                         size="sm"
                         variant="secondary"
-                        aria-label={`Make angle ${at + 1} the picture of record`}
+                        aria-label={`Make angle ${at + 1} the main picture`}
                         onPress={() => {
                           setPhotos((held) => [
                             held[at] as string,
                             ...held.filter((_, i) => i !== at),
                           ]);
-                          tell.did("Now the picture of record");
+                          tell.did("Now the main picture");
                         }}
                       >
                         Use this
@@ -491,12 +489,10 @@ export function Register({
             </Rail>
           ) : null}
 
-          {/*
-            ⚠️ ONE PRESS, AND IT SAYS WHAT IT COSTS BY SAYING WHAT IT DOES.
-            Identifying reserves credits, so it never runs on its own — a screen
-            that asked a model every time somebody opened the camera would bill a
-            workspace for photographs nobody finished taking.
-          */}
+          {/* ⚠️ ONE PRESS, AND IT SAYS WHAT IT COSTS BY SAYING WHAT IT DOES.
+              Reading the photos reserves credits, so it never runs on its own —
+              a screen that asked a model every time somebody opened the camera
+              would bill a workspace for photographs nobody finished taking. */}
           {onIdentify && photos.length
             ? (
               <Button
@@ -504,17 +500,12 @@ export function Register({
                 isDisabled={busy === true || guessed.status === "waiting"}
                 onPress={() => { onIdentify(photos); }}
               >
-                {guessed.status === "waiting" ? "Looking…" : "Fill this in from the photos"}
+                {guessed.status === "waiting" ? "Reading…" : "Read the photos"}
               </Button>
             )
             : null}
 
-          <Await
-            of={guessed}
-            again={again}
-            waiting={<RowsWaiting rows={2} lead={false} />}
-            then={() => null}
-          />
+          <Await of={guessed} again={again} waiting={<RowsWaiting rows={2} lead={false} />} then={() => null} />
         </>
       ),
     },
@@ -522,14 +513,13 @@ export function Register({
     {
       id: "what",
       ask: "What is it?",
-      under: "The name somebody would call it on a shelf",
+      under: "The name somebody would use looking for it on a shelf",
       says: sayNamed(brand, name),
       short: !name.trim()
         ? "Give it a name"
-        /* ⚠️ THE RESEMBLANCE IS NOT A REFUSAL UNTIL IT IS THE STRONG KIND, and
-           even then it is answerable in place. A form somebody fills in
-           completely and is then told to throw away is how people learn to press
-           past a warning without reading it. */
+        /* ⚠️ NOT A REFUSAL UNTIL IT IS THE STRONG KIND, and even then it is
+           answerable in place. A form somebody fills in completely and is then
+           told to throw away is how people learn to press past a warning. */
         : strong && !anyway
           ? "Say it is a different thing, or open the one you have"
           : undefined,
@@ -539,31 +529,33 @@ export function Register({
             label="Name"
             value={name}
             onChange={setName}
-            placeholder="What somebody calls it on a shelf"
+            placeholder="Nitrile gloves, medium"
             name="name"
             autoFocus
           />
-          <TextInput label="Brand" value={brand} onChange={setBrand} name="brand" />
-          {/*
-            ⚠️ `Written` RATHER THAN A ONE-LINE FIELD, AND THE CONTROL IS THE
-            BRIEF. A model reading six photographs writes real prose here — what
-            it is, what size, what form, what it is not — and drawn at the default
-            height it arrived in a box one line tall, so what came back looked
-            like a fragment and what people typed was a fragment.
-          */}
+          <TextInput
+            label="Brand or maker"
+            value={brand}
+            onChange={setBrand}
+            placeholder="Ansell"
+            help="Leave it empty if it has none"
+            name="brand"
+          />
+          {/* ⚠️ `Written` RATHER THAN A ONE-LINE FIELD, AND THE CONTROL IS THE
+              BRIEF. A model reading six photographs writes real prose here, and
+              drawn one line tall what came back looked like a fragment — so what
+              people typed was a fragment too. */}
           <Written
-            label="Description"
+            label="Anything else worth knowing"
             value={description}
             onChange={setDescription}
-            placeholder="What it is, what size, what form"
+            placeholder="Powder-free, blue, 100 to a box"
             rows={5}
           />
 
-          {/*
-            ⚠️ WHAT ALREADY LOOKS LIKE THIS, UNDER THE NAME THAT CAUSED IT. A list
-            of near-duplicates at the foot of a long sheet is a list nobody
-            scrolls to, and the decision it informs is being made here.
-          */}
+          {/* ⚠️ WHAT ALREADY LOOKS LIKE THIS, UNDER THE NAME THAT CAUSED IT. A
+              list of near-duplicates at the foot of a long sheet is a list
+              nobody scrolls to, and the decision it informs is made here. */}
           {matches?.length
             ? (
               <>
@@ -572,14 +564,14 @@ export function Register({
                     ? "You may already have this one"
                     : `${matches.length} things here look like this`}
                 </NoteRow>
-                {matches.map((one: Match) => (
+                {matches.map((match: Match) => (
                   <ActionRow
-                    key={one.id}
-                    label={[one.brand, one.name].filter(Boolean).join(" · ")}
-                    under={one.why === "same code" ? "Has the barcode you typed"
-                      : one.why === "same name and brand" ? "The same name and brand"
+                    key={match.id}
+                    label={[match.brand, match.name].filter(Boolean).join(" · ")}
+                    under={match.why === "same code" ? "Has the barcode you typed"
+                      : match.why === "same name and brand" ? "The same name and brand"
                         : "A similar name"}
-                    tone={one.why === "similar name" ? "neutral" : "warning"}
+                    tone={match.why === "similar name" ? "neutral" : "warning"}
                   />
                 ))}
                 {strong
@@ -600,104 +592,118 @@ export function Register({
     },
 
     {
-      id: "kinds",
-      ask: "What kind of thing is it?",
-      under: "So it can be found by what it is, not only by its name",
-      says: tags.length ? `Filed under ${sayList(shown, [...tags])}` : null,
+      id: "finding",
+      ask: "How would you look for it later?",
+      under: "Words that group it with everything like it",
+      says: tags.length ? `Filed under ${sayList(shown, [...tags])}` : "Not filed under anything",
       children: (
         /*
-          ⚠️ ONE CONTROL, AND IT WAS FOUR. A `Tags` display, a text field, an Add
+          ⚠️ ONE CONTROL, AND IT WAS FOUR. A tag display, a text field, an Add
           button and a stack of rows listing the workspace's own words — a third
-          of a phone screen for one question. `Words` is all of it, and the words
-          already in use narrow as you type rather than showing an arbitrary
+          of a phone screen for one question. `Words` is all of it, and what is
+          already in use narrows as you type instead of showing an arbitrary
           eight.
         */
         <Words
-          label="Filed under"
+          label="Words to find it by"
           value={tags}
           onChange={setTags}
           known={knownTags}
-          placeholder="antibiotics, refrigerated, prescription"
-          help="Words this workspace already uses appear as you type"
+          placeholder="gloves, ppe, consumables"
+          help="Words already used here appear as you type"
         />
       ),
     },
 
     {
-      id: "tracking",
-      ask: "How closely do you follow it?",
-      under: "This decides what you are asked when a delivery arrives",
-      says: sayTracking(tracking),
-      children: (
-        /* ⚠️ RADIOS, NOT SEGMENTS — see `RUNGS`. Four consequences that have to be
-           readable BEFORE the choice; `Segmented` draws labels only. */
-        <OneOf label="Following it" value={tracking} onChange={setTracking} options={RUNGS} />
-      ),
-    },
-
-    {
-      id: "counting",
-      ask: "What do you count it in?",
-      under: "The unit shown beside every number this product ever reports",
-      says: sayCounting(unit, whole),
-      short: !unit.trim() ? "Say what it is counted in" : undefined,
+      id: "unit",
+      ask: "What is one of them?",
+      under: "The word that finishes “we have twelve…”",
+      says: sayUnit(unit, whole),
+      short: !unit.trim() ? "Say what one of them is called" : undefined,
       children: (
         <>
           {/*
             ⚠️ WHAT THIS WORKSPACE ALREADY COUNTS IN, OFFERED RATHER THAN
             REMEMBERED. Typed free, one catalogue ends up with `box`, `Box`,
-            `boxes` and `BX` — four units that are one unit, on four products that
+            `boxes` and `BX` — four units that are one unit, on four things that
             can never be compared or totalled. `Lookup` still takes anything
             typed, so a new unit costs nothing; it just stops the fifth spelling
             of an old one being the path of least resistance.
           */}
           <Lookup
-            label="Counted in"
+            label="One is called"
             value={unit}
             onChange={setUnit}
             options={knownUnits}
-            placeholder="glove, box, kg"
+            placeholder="piece, box, kg, litre, roll, metre"
             help="One of these, or type your own"
             name="unit"
           />
+          {/*
+            ⚠️ THE QUESTION USES THE WORD THEY JUST TYPED, and that is the point
+            of asking it here rather than as a switch called "Whole units only".
+            "Can you have half a litre?" answers itself; "Whole units only: off"
+            is a setting somebody has to reason about.
+          */}
           <ToggleRow
-            label="Whole units only"
-            under="Off where a half is a real quantity"
-            value={whole}
-            onChange={setWhole}
+            label={`Can you have half ${one(unit)}?`}
+            under="Yes for weights, lengths and liquids"
+            value={!whole}
+            onChange={(half) => { setWhole(!half); }}
           />
         </>
       ),
     },
 
     {
-      id: "packing",
-      ask: "Does it come inside something?",
-      under: "A carton of boxes of sheets — as deep as it really goes",
+      id: "detail",
+      ask: "How much do you need to know about each one?",
+      under: "This decides what you are asked every time some arrives",
+      says: sayDetail(detail),
+      children: (
+        /* ⚠️ RADIOS, NOT SEGMENTS — see `DETAIL`. Four consequences that have to
+           be readable BEFORE the choice; `Segmented` draws labels only, which is
+           how four carefully written explanations reached nobody for a month. */
+        <OneOf label="How much detail" value={detail} onChange={setDetail} options={DETAIL} />
+      ),
+    },
+
+    {
+      id: "packs",
+      ask: "Do they arrive packed?",
+      under: "A box of 10, a case of 4 boxes — however deep it goes",
       /*
-        ⚠️ NOT ASKED OF A THING NOBODY COUNTS. How many are in a box is a fact
-        with no consequence when nothing is counting them, and a question with no
-        consequence is a question that teaches people to press past questions.
+        ⚠️ NOT ASKED WHERE IT COULD NOT MATTER. Nothing is counted on `listed`, so
+        a pack size has nothing to multiply; on `itemised` each one is followed
+        separately, so a pack is a delivery detail rather than a property of the
+        thing. Both are questions with no consequence, and a question with no
+        consequence teaches people to press past questions.
       */
-      when: tracking !== "listed",
-      /* ⚠️ "As it is" MEANS NO LADDER WHATEVER WAS TYPED BEFORE IT WAS CHOSEN,
-         and the clause has to agree with what will be SENT — see `send`. Read
-         off `rungs` regardless, somebody who filled in two rungs and then said
-         the thing comes loose would be told it comes in a box of ten. */
-      says: sayPacking(packed === "packed" ? rungs : [], unit),
+      when: detail === "counted" || detail === "batched",
+      says: sayPacks(packed === "packed" ? rungs : [], unit),
       children: (
         <>
-          <Segmented label="How it arrives" value={packed} onChange={setPacked} options={PACKED} />
+          <Segmented
+            label="How they arrive"
+            value={packed}
+            onChange={setPacked}
+            options={[
+              /* ⚠️ THE UNIT THEY TYPED, not the word "loose". "Single metres" and
+                 "single cans" both read; "loose" reads for neither. */
+              { id: "loose", label: `Single ${some(unit)}` },
+              { id: "packed", label: "In packs" },
+            ]}
+          />
           {/*
-            ⚠️ THE SHELF IS STILL COUNTED IN ONE UNIT. A rung is a NAMED
-            MULTIPLIER — the way somebody says "two boxes" while holding two
-            boxes, and the way a number reads back in the words they think in.
-            Nothing here changes what the balance is in.
+            ⚠️ THE TOTAL IS STILL IN ONE UNIT. A pack is a named multiplier — the
+            way somebody says "two cases" while holding two cases — and nothing
+            here changes what a shelf is counted in.
 
-            ⚠️ AND IT IS THE ONLY PLACE A BLISTER SHEET CAN EXIST. A sheet inside
-            a box carries no barcode, so it can never be a code; before this there
-            was nowhere to put it and anybody issuing by the sheet typed 10 every
-            time and hoped.
+            ⚠️ AND IT IS THE ONLY PLACE A BLISTER SHEET OR AN INNER TRAY CAN
+            EXIST. Something inside a box carries no barcode, so it can never be
+            a code; before this there was nowhere to put it and anybody issuing
+            by the sheet typed 10 every time and hoped.
           */}
           {packed === "packed"
             ? <Ladder unit={unit} levels={levels} onChange={setLevels} />
@@ -708,54 +714,47 @@ export function Register({
 
     {
       id: "codes",
-      ask: "What is printed on it?",
-      under: "Every barcode it carries — the item, the inner and the carton",
+      ask: "Is there a barcode on it?",
+      under: "Scan every one it carries — the item, the inner and the case",
+      when: counts,
       says: sayCodes(codes, unit),
       children: (
         <>
           {/*
             ⚠️ ONE WAY IN, AND IT WAS TWO. `Viewfinder` carries its own typed
             field — that is the shape of the control, so every scanning surface
-            has a keyboard route whether or not whoever wrote it thought about the
-            camera failing. This step then drew a SECOND text field per code row,
-            so it had two boxes asking for the same digits one above the other,
-            and neither said which one the scan would fill.
+            has a keyboard route. This step then drew a SECOND text field per
+            row, so it had two boxes asking for the same digits one above the
+            other and neither said which one the scan would fill.
 
             ⚠️ AND A CODE ALREADY ON THE LIST IS IGNORED RATHER THAN ADDED TWICE.
-            A label sits in front of a lens for a second and decodes thirty times;
-            `Viewfinder` collapses that into one read, and this is what stops the
-            second deliberate scan of the same box from making a duplicate row
-            nobody asked for.
+            A label sits in front of a lens for a second and decodes thirty
+            times; `Viewfinder` collapses that into one read, and this is what
+            stops the second deliberate scan of the same box making a duplicate.
           */}
           <Viewfinder
             says="Hold each barcode up in turn"
-            /*
-              ⚠️ WHAT IS ALREADY ON THE LIST, SO A SECOND LOOK SAYS SO. Without it
-              the reader compares against the last thing it saw, and two boxes on
-              a bench alternating in front of a lens each look new every time the
-              other one intervenes.
-            */
-            held={codes.map((one) => one.value)}
-            /* ⚠️ ONE BOX IS ONE CODE — see `foldScan`. This pack carries an EAN-13
-               and a DataMatrix, and without this it registered as two products. */
+            /* ⚠️ WHAT IS ALREADY ON THE LIST, SO A SECOND LOOK SAYS SO. Without
+               it the reader compares against the last thing it saw, and two
+               boxes alternating in front of a lens each look new every time. */
+            held={codes.map((code) => code.value)}
+            /* ⚠️ ONE BOX IS ONE CODE — see `foldScan`. A pack carrying an EAN-13
+               and a DataMatrix registered as two things without this. */
             fold={foldScan}
             typed={{
-              label: "Or type a code",
-              placeholder: "What is printed under the bars",
-              help: "The item, the inner box and the carton can all be added",
+              label: "Or type the number",
+              placeholder: "The digits printed under the bars",
+              help: "Add the item, the inner box and the outer case",
             }}
             onRead={(code) => {
               const said = code.trim();
               if (!said) return;
               setCodes((held) => {
-                if (held.some((one) => one.value === said)) return held;
-                /*
-                  ⚠️ THE MODEL'S COUNT LANDS ON THE FIRST CODE AND NOWHERE ELSE.
-                  "30 per box" was read off the box the first barcode is printed
-                  on; the second code is the carton or the inner, and giving it
-                  the same number would say the carton holds thirty too. It is a
-                  starting value on one row, editable like any other.
-                */
+                if (held.some((row) => row.value === said)) return held;
+                /* ⚠️ THE MODEL'S COUNT LANDS ON THE FIRST CODE AND NOWHERE ELSE.
+                   "30 per box" was read off the box the first barcode is printed
+                   on; the second code is the case or the inner, and giving it
+                   the same number would say the case holds thirty too. */
                 const pack = held.length === 0 && readPack ? readPack : 1;
                 return [...held, { value: said, kind: namespaceOf(said), pack }];
               });
@@ -767,30 +766,20 @@ export function Register({
             field, a four-way "what kind" and a number — twelve controls for three
             barcodes, on a phone, to record something the camera had already read.
             A code that has been read is a FACT: it is drawn, it is named, and the
-            one thing nobody can know from looking at it is how many the pack
-            holds.
-
-            ⚠️ AND THEY SCROLL SIDEWAYS RATHER THAN STACKING. Three of these down
-            the page is the step's whole height for its least important part; in a
-            row they are one glance, and the barcode itself is what somebody
-            checks against the box.
+            one thing nobody can know from looking at it is how many it covers.
           */}
           {codes.length ? (
             <Rail wide="panel">
               {/* ⚠️ THE SIZING IS OUTSIDE THE CARD AND THE COLUMN IS THE CARD'S.
                   A `Stack` inside a `Group` is a second column in something that
                   is already one — a second inset and a second gap, which is what
-                  "double padding" means (`rhythm`). The div carries a width and
-                  nothing else. */}
+                  "double padding" means. */}
               {codes.map((row, at) => (
                 <div key={row.value || at}>
                   <Group label={sayKind(row.value)}>
-                    {/*
-                      ⚠️ DRAWN WHERE IT CAN BE, AND ONLY THERE. `Bars` answers
-                      nothing for a Code-128 or a number somebody typed — a
-                      convincing picture of the wrong symbology scans as the wrong
-                      product, which is worse than no picture at all.
-                    */}
+                    {/* ⚠️ DRAWN WHERE IT CAN BE, AND ONLY THERE. A convincing
+                        picture of the wrong symbology scans as the wrong thing,
+                        which is worse than no picture at all. */}
                     <Bars of={row.value} onScreen />
                     <Row space="tight">
                       <span className="tabular-nums truncate">{row.value}</span>
@@ -799,19 +788,20 @@ export function Register({
                         size="sm"
                         variant="ghost"
                         aria-label={`Remove ${row.value}`}
-                        onPress={() => {
-                          setCodes((held) => held.filter((_, i) => i !== at));
-                        }}
+                        onPress={() => { setCodes((held) => held.filter((_, i) => i !== at)); }}
                       >
                         Remove
                       </Button>
                     </Row>
                     <NumberInput
-                      label="How many it holds"
+                      /* ⚠️ IN THE UNIT THEY TYPED, ON EVERY ROW. "How many does
+                         this cover" is unanswerable without knowing what it is
+                         counting, and the answer is three screens back. */
+                      label={`How many ${some(unit)} does this cover?`}
                       value={row.pack}
                       onChange={(next) => { setCode(at, { pack: Math.max(1, next) }); }}
                       min={1}
-                      help={unit ? `In ${unit}. One for a single item` : "One for a single item"}
+                      help={`1 for ${one(unit)} on its own. 24 for a case of 24`}
                     />
                   </Group>
                 </div>
@@ -823,82 +813,98 @@ export function Register({
     },
 
     {
-      id: "keeping",
-      ask: "How long does it keep?",
-      under: "How long the product lasts, never one delivery's printed date",
-      says: sayKeeping(shelfDays, openDays),
+      id: "dates",
+      ask: "Does it go out of date?",
+      under: "Food, medicine, chemicals, adhesives — anything with a printed date",
+      when: counts,
+      says: sayDates(expires, shelfDays, openDays),
       children: (
         <>
-          {/*
-            ⚠️ HOW LONG IT KEEPS IS THE PRODUCT'S; WHEN THIS ONE EXPIRES IS THE
-            DELIVERY'S. Two boxes of the same thing made in March and in September
-            go off six months apart — so this asks for the DURATION and never for
-            a date, and the date is read off each box as it arrives. A field here
-            holding "expires 2027-03-31" would put one delivery's date on every
-            future one.
-          */}
-          <NumberInput
-            label="Shelf life"
-            value={numberOr(shelfDays)}
-            onChange={(next) => { setShelfDays(next > 0 ? next : null); }}
-            min={0}
-            help="Days from the day it was made. 730 is two years. Zero never expires"
-          />
-          {/*
-            ⚠️ WHY IT IS EMPTY, WHERE IT IS EMPTY, AND ONLY WHEN A DATE WAS
-            ACTUALLY SEEN. A shelf life is a DURATION and a carton prints a DATE —
-            with no manufacturing date beside it nothing can work one out, so
-            leaving this blank is the model being right. Somebody who has just
-            photographed "verwendbar bis 08 2029" and finds the field empty reads
-            that as the reading having failed, and either types a number they
-            guessed or stops trusting the extraction.
-          */}
-          {!shelfDays && answer?.labelExpiry
-            ? (
-              <NoteRow icon={glyphOf("model")}>
-                {`The label says ${answer.labelExpiry}. That is this box's date, `
-                  + "not how long the product keeps — it is recorded when you receive it."}
-              </NoteRow>
-            )
-            : null}
-          <NumberInput
-            label="Once opened"
-            value={numberOr(openDays)}
-            onChange={(next) => { setOpenDays(next > 0 ? next : null); }}
-            min={0}
-            help="The open-jar symbol on the label — 12M is 365 days"
+          <Segmented
+            label="Goes out of date"
+            value={expires ? "yes" : "no"}
+            onChange={(said) => { setExpires(said === "yes"); }}
+            options={[{ id: "no", label: "No" }, { id: "yes", label: "Yes" }]}
           />
 
-          {/*
-            ⚠️ THE TWO FIELDS `Written` WAS BUILT FOR. Storage and handling are
-            where a model writes headed paragraphs and a list of what a thing must
-            not sit beside — and this is read at a shelf by somebody holding a
-            box, which is the one place a wall of grey is useless. Markdown in,
-            structure out.
-          */}
+          {expires ? (
+            <>
+              {/*
+                ⚠️ HOW LONG IT LASTS IS THE THING'S; WHEN THIS ONE EXPIRES IS THE
+                DELIVERY'S. Two boxes of the same thing made in March and in
+                September go off six months apart — so this asks for the LENGTH
+                and never for a date, and the date is read off each box as it
+                arrives. A field here holding "expires 2027-03-31" would put one
+                delivery's date on every future one.
+              */}
+              <NumberInput
+                label="How long does it last?"
+                value={numberOr(shelfDays)}
+                onChange={(next) => { setShelfDays(next > 0 ? next : null); }}
+                min={0}
+                help="Days from the day it was made. 730 is two years. Leave it at zero if only the printed date matters"
+              />
+              <NumberInput
+                label="And once it is opened?"
+                value={numberOr(openDays)}
+                onChange={(next) => { setOpenDays(next > 0 ? next : null); }}
+                min={0}
+                help="The open-jar symbol on the label. 12M is 365 days"
+              />
+              {/*
+                ⚠️ WHY A FIELD IS EMPTY, WHERE IT IS EMPTY, AND ONLY WHEN A DATE
+                WAS ACTUALLY SEEN. A length is a duration and a carton prints a
+                DATE — with no manufacturing date beside it nothing can work one
+                out, so leaving this blank is the model being right. Somebody who
+                has just photographed "verwendbar bis 08 2029" and finds the
+                field empty reads that as the reading having failed.
+              */}
+              {!shelfDays && answer?.labelExpiry
+                ? (
+                  <NoteRow icon={glyphOf("model")}>
+                    {`The label says ${answer.labelExpiry}. That is this box's date, `
+                      + "not how long the thing lasts — it is recorded when you receive it."}
+                  </NoteRow>
+                )
+                : null}
+            </>
+          ) : null}
+        </>
+      ),
+    },
+
+    {
+      id: "care",
+      ask: "Anything special about keeping it?",
+      under: "What somebody standing at the shelf needs to know",
+      when: counts,
+      says: noted.length ? `Notes on ${sayList(shown, noted)}` : "Nothing special to remember",
+      children: (
+        <>
+          {/* ⚠️ THE TWO FIELDS `Written` WAS BUILT FOR. A model writes headed
+              paragraphs and a list of what a thing must not sit beside — and
+              this is read at a shelf by somebody holding a box, which is the one
+              place a wall of grey is useless. Markdown in, structure out. */}
           <Written
             label="How to store it"
             value={storage}
             onChange={setStorage}
-            placeholder="Cool, dry, upright — and what it must not sit beside"
-            rows={6}
+            placeholder="Cool, dry, upright. Not next to food"
+            rows={5}
           />
           <Written
             label="How to handle it"
             value={handling}
             onChange={setHandling}
-            placeholder="Gloves, two people, keep flat"
-            rows={6}
+            placeholder="Gloves. Two people. Keep flat"
+            rows={5}
           />
 
-          {/*
-            ⚠️ A PICTOGRAM WAS SEEN, AND SAYING SO IS THE WHOLE VALUE. Which class
-            an orange diamond declares is a legal statement the label reader makes
-            against a photograph of the printed label, where the words are legible
-            — but a screen that stayed silent would let somebody register a
-            solvent as though it were shampoo and find out the first time they
-            decant it.
-          */}
+          {/* ⚠️ A PICTOGRAM WAS SEEN, AND SAYING SO IS THE WHOLE VALUE. Which
+              class an orange diamond declares is a legal statement the label
+              reader makes against the printed words — but a screen that stayed
+              silent would let somebody register a solvent as though it were
+              shampoo and find out the first time they decant it. */}
           {answer?.hazardous
             ? (
               <NoteRow icon={glyphOf("alert")}>
@@ -913,35 +919,31 @@ export function Register({
 
     {
       id: "more",
-      ask: "Where does more come from?",
+      ask: "Where do you get more?",
       under: "Nothing is ordered and nobody is emailed — this is a list",
-      says: sayGettingMore(orderedFrom, par, unit),
+      says: sayMore(orderedFrom, par, unit),
       children: (
         <>
           {suppliers.length
             ? (
               <>
-                {suppliers.map((one) => {
-                  const listed = sources.some((s) => s.supplier === one.id);
+                {suppliers.map((row) => {
+                  const listed = sources.some((source) => source.supplier === row.id);
                   return (
                     <ToggleRow
-                      key={one.id}
-                      label={one.label}
-                      under={supplier === one.id ? "Orders go here" : undefined}
+                      key={row.id}
+                      label={row.label}
+                      under={supplier === row.id ? "Orders go here" : undefined}
                       value={listed}
                       onChange={(next) => {
                         setSources((held) => (next
-                          ? [...held, { supplier: one.id, ref: "", leadDays: null }]
-                          : held.filter((s) => s.supplier !== one.id)));
-                        /*
-                          ⚠️ THE PREFERRED ONE MUST BE AMONG THEM. An order
-                          addressed to somebody the catalogue does not say sells it
-                          is an order nobody can explain — so removing a supplier
-                          clears the preference it held, and the first one added
-                          takes it.
-                        */
-                        if (!next && supplier === one.id) setSupplier("");
-                        if (next && !supplier) setSupplier(one.id);
+                          ? [...held, { supplier: row.id, ref: "", leadDays: null }]
+                          : held.filter((source) => source.supplier !== row.id)));
+                        /* ⚠️ THE PREFERRED ONE MUST BE AMONG THEM. An order
+                           addressed to somebody the catalogue does not say sells
+                           it is an order nobody can explain. */
+                        if (!next && supplier === row.id) setSupplier("");
+                        if (next && !supplier) setSupplier(row.id);
                       }}
                     />
                   );
@@ -952,39 +954,41 @@ export function Register({
                       label="Order from"
                       value={supplier}
                       onChange={setSupplier}
-                      options={sources.map((s) => ({
-                        id: s.supplier,
-                        label: suppliers.find((o) => o.id === s.supplier)?.label ?? s.supplier,
+                      options={sources.map((source) => ({
+                        id: source.supplier,
+                        label: suppliers.find((row) => row.id === source.supplier)?.label
+                          ?? source.supplier,
                       }))}
                     />
                   )
                   : null}
               </>
             )
-            : <NoteRow>No suppliers yet. You can add them later</NoteRow>}
+            : <NoteRow>No suppliers here yet. You can add them later</NoteRow>}
 
           {/*
             ⚠️ WHEN TO SAY SOMETHING, NOT WHEN TO REFUSE. Running out is a fact
             about the world; an app that refused a take because a number went
             under a line is an app people work around.
 
-            ⚠️ AND IT IS HERE RATHER THAN WITH THE COUNTING, because "running low"
-            is a question about getting more. Beside the unit it read as part of
-            the arithmetic; beside the supplier it reads as what it is for.
+            ⚠️ AND IT IS HERE RATHER THAN WITH THE UNIT, because "running low" is
+            a question about getting more. Beside the unit it read as part of the
+            arithmetic; beside the supplier it reads as what it is for.
           */}
-          <NumberInput
-            label="Running low at"
-            value={numberOr(par)}
-            onChange={(next) => { setPar(next > 0 ? next : null); }}
-            min={0}
-            help={unit ? `In ${unit}. Zero means never` : "Zero means never"}
-          />
-          {/*
-            ⚠️ IT JOINS A LIST; IT DOES NOT SEND ANYTHING. The email to the
-            supplier is not built — `DEFER(inventory-reorder)` — and a switch
-            whose label promises one is worse than no switch, so the label says
-            what it actually does.
-          */}
+          {counts
+            ? (
+              <NumberInput
+                label="Tell you when it drops to"
+                value={numberOr(par)}
+                onChange={(next) => { setPar(next > 0 ? next : null); }}
+                min={0}
+                help={`In ${some(unit)}. Zero means never`}
+              />
+            )
+            : null}
+          {/* ⚠️ IT JOINS A LIST; IT DOES NOT SEND ANYTHING. The email to the
+              supplier is not built — `DEFER(inventory-reorder)` — and a switch
+              whose label promises one is worse than no switch. */}
           <ToggleRow
             label="Put it on the reorder list"
             under="It joins Reports · To reorder. Nothing is ordered and nobody is emailed"
@@ -998,7 +1002,7 @@ export function Register({
                 value={numberOr(reorderQty)}
                 onChange={(next) => { setReorderQty(next > 0 ? next : null); }}
                 min={0}
-                help={unit ? `In ${unit}` : undefined}
+                help={`In ${some(unit)}`}
               />
             )
             : null}
@@ -1014,27 +1018,24 @@ export function Register({
       at={where}
       onGo={setWhere}
       leave={back}
-      /* ⚠️ SAID ONCE, OVER THE RECAP — not a badge on every field a model
-         touched. The recap is what makes it checkable; this is what makes it
-         worth checking. */
+      review={{ ask: "Does this look right?", under: "Press any line to change it" }}
+      /* ⚠️ SAID ONCE, OVER THE QUESTION — not a badge on every field a model
+         touched. The review at the end is what makes it checkable; this is what
+         makes it worth checking. */
       note={answer
         ? (
           <NoteRow icon={glyphOf("model")}>
             {answer.why
-              ? `Filled in by a model — ${answer.why.toLowerCase()}. Check each line before you add it`
-              : "Filled in by a model. Check each line before you add it"}
+              ? `Read from the photos — ${answer.why.toLowerCase()}. Check each line before you add it`
+              : "Read from the photos. Check each line before you add it"}
           </NoteRow>
         )
         : undefined}
       does={{
-        /*
-          ⚠️ THE NOUN, BECAUSE "IT" IS ONLY OBVIOUS TO WHOEVER WROTE IT. Nine
-          questions later, the last control on the screen says what it adds — and
-          "Add it" reads as a fragment of a sentence the interface started
-          somewhere the person cannot see.
-        */
+        /* ⚠️ THE NOUN, BECAUSE "IT" IS ONLY OBVIOUS TO WHOEVER WROTE IT. Ten
+           questions later, the last control says what it adds. */
         op: "product.register",
-        label: "Add product",
+        label: "Add it",
         onDo: send,
         disabled: busy === true,
       }}

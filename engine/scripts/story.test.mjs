@@ -127,16 +127,58 @@ const HISTORIANS = new Set([
   step's own; a greedy match would read step A's question against step B's
   clause and pass whatever B happened to declare.
 */
-const STEP = /\bid:\s*"[^"]+"[\s\S]{0,1500}?\bask:\s*"([^"\\]{2,})"([\s\S]{0,6000}?)\bchildren:/g;
+/*
+  ⚠️ ANCHORED ON `ask`, NOT ON `id`, AND THE FIRST DRAFT WAS THE OTHER WAY ROUND.
+  Starting at the nearest preceding `id:` reads whatever id happens to be closest
+  — and a step whose controls declare options (`{ id: "loose", label: … }`) puts
+  three of them between one question and the next, so the barcode step reported
+  its id as `loose`. A question is unambiguous; the id is then read BACKWARD from
+  it, and a step that does not put the two together is reported rather than
+  quietly skipped.
+*/
+const STEP = /\bask:\s*"([^"\\]{2,})"([\s\S]{0,6000}?)\bchildren:/g;
+const NAMED = /\bid:\s*"([^"]+)",\s*$/;
+
+/** The step's own id, or null where it is not written next to the question. */
+const idOf = (src, at) => NAMED.exec(src.slice(Math.max(0, at - 200), at))?.[1] ?? null;
+
+/**
+ * ⚠️ THE FRAME ITSELF SYNTHESISES ONE STEP AND IT IS EXEMPT, NAMED HERE RATHER
+ * THAN BY LUCK. `Story` appends the review — a step with a question and no
+ * clause, which is correct: a review has nothing to add to a story because it IS
+ * the story. It currently escapes the pattern above only because its id is the
+ * constant `REVIEW` rather than a quoted string, and a rule that holds by an
+ * accident of quoting is a rule that breaks the day somebody inlines it.
+ */
+const FRAME = "design/src/frame/story.tsx";
 
 {
   let checked = 0;
   let headings = 0;
   let silent = 0;
+  let unnamed = 0;
   for (const file of DRAWS) {
+    if (rel(file) === FRAME) continue;
     const src = code(readFileSync(file, "utf8"));
-    for (const [, text, head] of src.matchAll(STEP)) {
+    for (const match of src.matchAll(STEP)) {
+      const [, text, head] = match;
       checked++;
+      /*
+        ⚠️ THE ID GOES DIRECTLY ABOVE THE QUESTION, AND A STEP THAT PUTS IT
+        ELSEWHERE IS REPORTED RATHER THAN SKIPPED. Read from anywhere else it is
+        whichever id happened to be nearest — a step whose controls declare
+        options puts three of them between one question and the next, which is
+        how the barcode step came to be called `loose`. The manifest that
+        declares this flow is compared against it BY ID, so a step the guard
+        cannot name is a step the comparison silently gets wrong.
+      */
+      if (!idOf(src, match.index)) {
+        unnamed++;
+        fail(`${rel(file)}: the step asking "${text.slice(0, 40)}" does not name its id\n`
+          + `       directly above the question. Written apart, nothing here can tell which\n`
+          + `       step a question belongs to — and the manifest declaring this flow is\n`
+          + `       compared against it by id.`);
+      }
       /*
         ⚠️ A QUESTION, AND THE `?` IS THE CHECK BECAUSE THE QUESTION IS THE
         DESIGN. "Counting" is a heading: it names the area of the record being
@@ -173,9 +215,106 @@ const STEP = /\bid:\s*"[^"]+"[\s\S]{0,1500}?\bask:\s*"([^"\\]{2,})"([\s\S]{0,600
       + "       words in one, so a pattern that finds none is two checks that stopped\n"
       + "       looking rather than two rules being kept.");
   } else {
-    if (!headings) ok(`asked: every step asks a question — ${checked} step(s)`);
+    if (!headings && !unnamed) ok(`asked: every step asks a question — ${checked} step(s)`);
     if (!silent) ok(`narrates: every declared step carries the clause its answer makes — ${checked}`);
   }
+}
+
+/* ------------------------------------------------------------- declared --- */
+
+/**
+ * A FLOW IS DECLARED IN THE MANIFEST AND DRAWN IN A SCREEN, AND THE TWO AGREE.
+ *
+ * ⚠️ THE HOLE THIS CLOSES IS TWO HAND-TYPED STRINGS IN TWO FILES. A screen
+ * declares `permission: "product:write"`; the flow inside it declares
+ * `op: "product.register"`. Nothing checked that the second demands the first —
+ * so a wizard could take somebody through ten questions, past a gate that said
+ * yes, and be refused by the write at the end. That is the offer-and-refuse
+ * failure the whole `op` mechanism exists to prevent, reproduced one level up.
+ *
+ * ⚠️ AND A DECLARATION NOBODY CHECKS IS WORSE THAN NONE, because it is read as
+ * true. The manifest's list of questions is what the docs print and what an
+ * agent is told a flow will want; drifted from the screen it describes a product
+ * that does not exist. The ids and the questions are compared literally.
+ */
+{
+  const MANIFESTS = appDirs().flatMap((dir) => filesIn(dir, /^index\.tsx?$/));
+  let flows = 0;
+
+  for (const file of MANIFESTS) {
+    const src = code(readFileSync(file, "utf8"));
+    for (const [, block] of src.matchAll(/\bstory:\s*\{([\s\S]*?)\n(\s{4,6})\},/g)) {
+      flows++;
+      const name = rel(file);
+      const writes = /\bwrites:\s*"([^"]+)"/.exec(block)?.[1];
+      if (!writes) {
+        fail(`${name}: a declared flow names no \`writes\`.\n`
+          + `       A flow exists to reach ONE operation; without it nothing can check\n`
+          + `       that the screen's permission is the one that write demands.`);
+        continue;
+      }
+      /* ⚠️ THE OPERATION HAS TO EXIST — a flow pointed at a name nothing answers
+         is ten questions ending in a 404. */
+      if (!new RegExp(`\\bid:\\s*"${writes.replace(".", "\\.")}"`).test(src)) {
+        fail(`${name}: a flow writes \`${writes}\`, which this app does not declare.\n`
+          + `       Ten questions ending at an operation nothing answers.`);
+      }
+      const declared = [...block.matchAll(/\bid:\s*"([^"]+)",\s*ask:\s*"([^"\\]+)"/g)]
+        .map(([, id, ask]) => `${id}\u0000${ask}`);
+      if (!declared.length) {
+        fail(`${name}: a declared flow asks nothing.\n`
+          + `       The questions are what the docs print and what an agent is told the\n`
+          + `       flow will want; an empty list describes a screen nobody can prepare for.`);
+        continue;
+      }
+      /*
+        ⚠️ COMPARED AGAINST THE SCREEN THAT DRAWS IT, LITERALLY. The screen is
+        found by the operation it writes, which is the one string both halves
+        already have to share — matching on a filename would break the day
+        somebody renamed one.
+      */
+      /*
+        ⚠️ FOUND BY THE OPERATION IT WRITES, NOT BY A FILENAME. That string is
+        the one thing both halves already have to share, so matching on it
+        survives a screen being renamed or moved — and a guard that breaks on a
+        rename is a guard somebody deletes.
+      */
+      /*
+        ⚠️ NOT THE MANIFEST ITSELF, WHICH NOW ALSO CARRIES `ask:` — the file that
+        declares the flow names the operation and the questions, so an unfiltered
+        search finds the declaration and compares it against itself. It passed,
+        which is the worst way for this to be wrong.
+
+        ⚠️ AND A SCREEN IS A FILE WITH REAL STEPS IN IT — `children:` after a
+        question. That is what separates something that DRAWS the flow from
+        something that merely mentions the operation, which the container that
+        calls the write does on every screen in the product.
+      */
+      const drawn = DRAWS
+        .filter((f) => rel(f) !== FRAME && !MANIFESTS.includes(f))
+        .map((f) => code(readFileSync(f, "utf8")))
+        .filter((s) => s.includes(`"${writes}"`) && [...s.matchAll(STEP)].length > 0);
+      if (!drawn.length) {
+        fail(`${name}: nothing draws the flow that writes \`${writes}\`.\n`
+          + `       A declared flow with no screen is a promise in the docs and in the\n`
+          + `       agent surface that resolves to a page nobody built.`);
+        continue;
+      }
+      const screen = drawn[0];
+      const actual = [...screen.matchAll(STEP)]
+        .map((m) => `${idOf(screen, m.index) ?? "?"}\u0000${m[1]}`);
+      const say = (list) => list.map((s) => s.replace("\u0000", " — ")).join("\n         ");
+      if (say(declared) !== say(actual)) {
+        fail(`${name}: the declared flow and the screen that draws it disagree.\n`
+          + `       declared:\n         ${say(declared)}\n`
+          + `       drawn:\n         ${say(actual)}\n`
+          + `       The manifest is what the docs print and what an agent is handed. Drifted,\n`
+          + `       it describes a product that does not exist.`);
+      }
+    }
+  }
+
+  if (flows) ok(`declared: every flow in a manifest is the flow its screen draws — ${flows}`);
 }
 
 /* -------------------------------------------------------------- paired --- */
@@ -197,7 +336,7 @@ const STEP = /\bid:\s*"[^"]+"[\s\S]{0,1500}?\bask:\s*"([^"\\]{2,})"([\s\S]{0,600
   */
   const PAIRS = /\bstep=\{\{/;
   const strays = DRAWS
-    .filter((f) => rel(f) !== "design/src/frame/story.tsx")
+    .filter((f) => rel(f) !== FRAME)
     .filter((f) => PAIRS.test(code(readFileSync(f, "utf8"))))
     .map(rel);
   for (const name of strays) {
@@ -207,7 +346,7 @@ const STEP = /\bid:\s*"[^"]+"[\s\S]{0,1500}?\bask:\s*"([^"\\]{2,})"([\s\S]{0,600
       + `       no recap, no per-step refusal, and no answer to the phone's own gesture.`);
   }
 
-  const story = join(ENGINE, "design/src/frame/story.tsx");
+  const story = join(ENGINE, FRAME);
   if (!existsSync(story) || !PAIRS.test(readFileSync(story, "utf8"))) {
     fail("design/src/frame/story.tsx: no longer hands `Screen` a `step`, so the flow\n"
       + "       draws no way back and this check is guarding an empty rule.");

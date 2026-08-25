@@ -152,10 +152,40 @@ async function listTools(wiring: Wiring, located: Located, who: Who): Promise<re
       seen.add(resolved.id);
       if (!maySee(resolved, who, permissions)) continue;
       const tool = toolFor(resolved.spec);
-      if (tool) out.push(tool);
+      if (tool) out.push(walkedThrough(tool, composed));
     }
   }
   return out.sort((a, b) => (a.name < b.name ? -1 : 1));
+}
+
+/**
+ * WHAT A PERSON IS ASKED ON THE WAY TO THIS WRITE, TOLD TO THE AGENT TOO.
+ *
+ * ⚠️ AN OPERATION REACHED THROUGH A FLOW HAS A CONTEXT ITS INPUT SCHEMA CANNOT
+ * CARRY. `product.register` takes twenty fields; what the SCREEN does is ask ten
+ * plain questions, in an order, some of which are skipped depending on the
+ * answers before them. That order is the product's own understanding of the
+ * thing being made — and an agent given only the field names is guessing at
+ * exactly the reasoning the flow already encodes.
+ *
+ * ⚠️ IT IS THE SAME DECLARATION THE SCREEN IS BUILT FROM, which is what stops it
+ * becoming a second description that drifts: `story` in the manifest, checked
+ * against the screen that draws it by `scripts/story.test.mjs`.
+ *
+ * ⚠️ AND IT IS APPENDED RATHER THAN REPLACING THE SUMMARY. The summary says what
+ * the operation DOES; this says what a person is walked through to reach it, and
+ * an agent needs both — one to choose the tool, the other to fill it in.
+ */
+function walkedThrough(tool: McpTool, composed: Composed): McpTool {
+  const flow = composed.app.screens.find((screen) => screen.story?.writes === tool.name)?.story;
+  if (!flow) return tool;
+  const asked = flow.asks
+    .map((step) => (step.when ? `${step.ask} (only when ${step.when})` : step.ask))
+    .join(" ");
+  return {
+    ...tool,
+    description: `${tool.description} A person reaching this is asked: ${asked}`,
+  };
 }
 
 const maySee = (resolved: Resolved, who: Who, permissions: ReadonlySet<string>): boolean =>

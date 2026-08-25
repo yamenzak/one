@@ -2834,3 +2834,35 @@ sheet wrote raw `pushState` calls with the whole gate green.
 **What this forbids:** a step headed rather than asked; a step with no clause; a
 screen that hand-rolls the dock's Back; and history written anywhere but the
 router and the flow.
+
+
+## D81 — A flow is declared in the manifest and drawn in a screen
+
+**Two hand-typed strings in two files, with nothing checking they matched.** A
+screen declares `permission: "product:write"`; the flow inside it declares
+`op: "product.register"`. Nothing proved the second demands the first — so a
+wizard could take somebody through ten questions, past a gate that said yes, and
+be refused by the write at the end. That is the offer-and-refuse failure the
+whole `op` mechanism exists to prevent, reproduced one level up.
+
+**So `ScreenSpec.story` declares the SHAPE and never the controls.** What a flow
+asks, in what order, to reach which write — every one of those is a fact about
+the product worth knowing outside the browser. The controls cannot be declared
+and should not be: a camera, a barcode viewfinder and a packing editor are not
+fields, and a manifest that could express them would be a second React.
+
+**What it buys is agreement, not generation.** The screen still draws itself;
+`scripts/story.test.mjs` proves it draws exactly what was declared, that `writes`
+names a real operation, and that a step puts its id directly above its question
+so the comparison can be made at all.
+
+**And the declaration is READ, which is what stops it being ceremony.** The agent
+door appends the questions to that operation's tool description: `product.register`
+takes twenty fields, and what the screen does is ask ten plain ones in an order,
+half of which vanish on a single answer. An agent given only the field names is
+guessing at exactly the reasoning the flow already encodes — including which
+fields nobody would ever be asked for.
+
+**What this forbids:** a story declared and not drawn, drawn and not declared,
+pointing at an operation the app does not have, or a step whose id is written
+somewhere the guard cannot read it.

@@ -977,6 +977,8 @@ its own header, cited by other files, and doing nothing.
 | `a-step-asks-rather-than-heads` | D80 | a flow that reads as a form again — a heading names the area of the record being written and leaves the person to work out what is wanted of them, which is the difference between a screen anybody can answer and one that needs an induction |
 | `every-step-carries-its-clause` | D80 | a step that vanishes from the recap without a trace: the screen draws, Next works, and the one answer somebody most wanted to check is the one they can never see again or get back to |
 | `the-docks-pair-belongs-to-the-flow` | D80 | a Back button over none of the wiring it implies — no recap, no per-step refusal, and no answer to the phone's own back gesture, which is the one that loses five screens of typing |
+| `a-declared-flow-is-the-flow-its-screen-draws` | D81 | a manifest describing a product that does not exist — the declared questions are what the docs print and what an agent is handed before it starts a flow, and drifted from the screen they promise a page nobody built; it also catches a flow whose `writes` names an operation the app never declared, which is ten questions ending in a 404 |
+| `a-step-names-its-id-above-its-question` | D81 | a step the guard cannot name, so the manifest comparison silently reads the wrong id — a step whose controls declare their own options puts three of them between one question and the next, which is how the barcode step came to be called `loose` |
 <!-- /generated -->
 
 ### And how well each decision is defended
@@ -1064,6 +1066,7 @@ its own header, cited by other files, and doing nothing.
 | D78 | Some fields are set once, and the write is what says so | 0 |
 | D79 | A design guard that spares the apps is a guard about the wrong tree | 0 |
 | D80 | A multi-step flow asks questions and says the answers back | 4 |
+| D81 | A flow is declared in the manifest and drawn in a screen | 2 |
 <!-- /generated -->
 
 ---

@@ -551,6 +551,41 @@ to describe the one that is there.
 
 ---
 
+## 7a. A flow of questions is a `Story`, and it is declared
+
+⚠️ **THE COST A WIZARD IMPOSES IS TRAINING, AND IT NEVER APPEARS IN A DIFF.** A
+screen headed "Counting" with `Tracked as: [Listed] [Counted] [Batched]
+[Itemised]` under it needs an induction, a wiki page and a person in the
+warehouse who knows — three costs paid per customer, per new employee, forever.
+Nothing about that screen is broken, so nothing catches it.
+
+**So a step is a question and its answer is repeated back in the same words.**
+`Story` in `@engine/design` owns the shape: the order, the skipping, the per-step
+refusal, the transition, the review at the end and the phone's back gesture. An
+app writes the questions and the sentences, and nothing else.
+
+**Four things a new flow has to get right, and the guard checks all of them.**
+
+- **A step ASKS.** `ask: "What is one of them?"`, not `ask: "Counting"`. A
+  heading names the area of the record being written and leaves the person to
+  work out what is wanted; a question has an answer.
+- **A step carries `says`** — the clause its answer makes, in the person's own
+  words. One string does two jobs: the live echo under the control and the line
+  in the review. Written twice they drift.
+- **An answer removes the questions it contradicts.** `when: false` takes a step
+  out of the flow entirely — out of the count, the progress and the review — and
+  the payload drops what it collected. Never greyed out.
+- **It is declared in the manifest.** `ScreenSpec.story` names the operation the
+  flow reaches and lists its questions; `scripts/story.test.mjs` proves the
+  screen draws exactly that. The declaration is what the agent door hands a model
+  before it calls the same write (D81).
+
+**Every label and placeholder is built from the answers already given.** Say you
+count in metres and the next screen asks whether you can have half **a metre**.
+A wizard whose wording does not move when somebody changes their mind is a form
+with a progress bar on it — and it reads as broken at exactly the moment somebody
+corrects themselves.
+
 ## 8. Before a screen is finished
 
 ⚠️ **THIS SECTION EXISTS BECAUSE A ROUND OF FEEDBACK ARRIVED WITH ELEVEN ITEMS ON

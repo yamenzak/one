@@ -3416,6 +3416,24 @@
       "impl": "scripts/story.test.mjs",
       "proves": "the dock's second control is the flow's, not a screen's",
       "fails": "a Back button over none of the wiring it implies \u2014 no recap, no per-step refusal, and no answer to the phone's own back gesture, which is the one that loses five screens of typing"
+    },
+    {
+      "id": "a-declared-flow-is-the-flow-its-screen-draws",
+      "protects": "D81",
+      "stage": "87",
+      "status": "live",
+      "impl": "scripts/story.test.mjs",
+      "proves": "every flow in a manifest is the flow its screen draws",
+      "fails": "a manifest describing a product that does not exist \u2014 the declared questions are what the docs print and what an agent is handed before it starts a flow, and drifted from the screen they promise a page nobody built; it also catches a flow whose `writes` names an operation the app never declared, which is ten questions ending in a 404"
+    },
+    {
+      "id": "a-step-names-its-id-above-its-question",
+      "protects": "D81",
+      "stage": "87",
+      "status": "live",
+      "impl": "scripts/story.test.mjs",
+      "proves": "does not name its id",
+      "fails": "a step the guard cannot name, so the manifest comparison silently reads the wrong id \u2014 a step whose controls declare their own options puts three of them between one question and the next, which is how the barcode step came to be called `loose`"
     }
   ]
 }

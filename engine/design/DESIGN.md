@@ -883,15 +883,27 @@ the decision in the language the decision was made in, which is the only
 explanation nobody has to be told to read.
 
 **One string does both jobs, and that is the mechanism.** `says` is the live echo
-under the control AND the line in the recap of everything answered so far.
-Written twice they drift the first time somebody edits one, and a recap that
-disagrees with the screen it summarises is worse than none — it is the half
-people trust.
+under the control AND the line in the review at the end. Written twice they drift
+the first time somebody edits one, and a summary that disagrees with the screen
+it summarises is worse than none — it is the half people trust.
 
-**The recap is the navigation too**, which is what makes a model's answer
-checkable: twenty fields filled in across nine screens is something nobody
-audits; eight short sentences, each one press from the step that owns it, turns
+**The summary is a step, not a band on every screen.** A recap riding along above
+each question was tried and was wrong both ways round: closed it showed one
+clause and a count, which is a fragment with a number after it; open it was eight
+lines of context between somebody and the one thing being asked. Every screen is
+the question and nothing else now, and the whole story is the LAST step — where a
+summary is read, immediately above the button that commits it, with every line
+one press from the step that wrote it and every unanswered one showing as
+"Nothing set". That is also what makes a model's answer checkable: twenty fields
+across ten screens is something nobody audits; one screen of sentences turns
 checking into reading.
+
+**How far in is a length, not a number.** Numbered dots are a row of things to
+READ across the top of every screen in the flow, and the fact they carry is the
+least useful one available — somebody answering question four does not need to be
+told it is question four. What they want to know is whether this is nearly over.
+A line also survives elimination: dots have to disappear when three steps are
+removed, which is chrome rearranging itself under the heading.
 
 **A step that does not apply is skipped, never disabled.** `when: false` takes it
 out of the flow entirely — out of the count, out of the dots, out of the recap. A
