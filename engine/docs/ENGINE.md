@@ -930,6 +930,9 @@ its own header, cited by other files, and doing nothing.
 | `the-reference-app-is-measured-too` | D7 | a layout fault in the app every new screen is tried in first, which is then copied into a product before anything measures it |
 | `the-frame-is-measured-with-the-screen-inside-it` | D7 | the half of every screen a product cannot opt out of — the world, the hem, the nav, the crown, the room reserved for the island — measured by nothing, so a screen that fits on its own is still pushed sideways by the chrome around it |
 | `the-gate-answers-before-a-control-is-drawn` | D15 | a primary action drawn, pressed and answered 402 — the refusal landing as a toast over whatever the person just filled in, and the work gone |
+| `the-read-the-curtain-waits-for-has-a-depth` | D63 | the one read nothing can be drawn before quietly gaining a wave, and a wave is a fifth of a second of blank screen on every visit — the source says nothing about it, because `await` reads the same whether a query waited or ran beside another |
+| `a-generated-collection-read-has-a-depth` | D63 | a round trip added to the one function every collection in every app is read through — so every list in the deployment gets slower at once, and no single screen's test is the one that notices |
+| `the-consoles-workspace-list-has-a-depth` | D63 | the one read whose cost grows with the business rather than with a page going back to a query per workspace, which is how it came to spend six hundred subrequests on one screen |
 | `an-act-names-the-operation-it-calls` | D15 | one act with no `op`, which renders and works on every tier that happens to be allowed and gives the one that is not the old behaviour with nothing saying so |
 | `a-blocked-control-says-which-gate-stopped-it` | D7 | one sentence for all nine gates, which is a boolean wearing a name — "you cannot yet" and "your plan does not include this" are different controls |
 | `a-brand-reaches-only-the-surfaces-it-was-asked-to` | D22 | every switch on the branding screen saving and changing nothing — the tile painted from the entitlement alone, so a business that turned its icon off still installed as itself |
@@ -1090,7 +1093,7 @@ its own header, cited by other files, and doing nothing.
 | D60 | A worker's one thread is a shared resource, and drawing is what spends it | 0 |
 | D61 | A cold isolate is the ordinary case, so its boot is a latency budget | 0 |
 | D62 | The centre is asked for before the bundle, not after the session | 0 |
-| D63 | What a request waits for is measured, per operation, and budgeted | 1 |
+| D63 | What a request waits for is measured, per operation, and budgeted | 4 |
 | D64 | Where a database goes is declared once, and both paths that make one read it | 2 |
 | D65 | A copy is verified by counting rows, and the window it needs is read, not asserted | 1 |
 | D66 | The first paint has a weight, and nothing joins the first wait unbudgeted | 2 |

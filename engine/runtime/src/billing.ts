@@ -55,6 +55,15 @@ export const BILLING_SCHEMA: SchemaModule = {
       arithmetic that is neither.
     */
     `CREATE TABLE IF NOT EXISTS billing_account (tenant_id TEXT PRIMARY KEY, customer_ref TEXT, currency TEXT NOT NULL, granted INTEGER, bought INTEGER, held INTEGER NOT NULL, auto_pack TEXT, auto_below INTEGER, auto_at TEXT, auto_error TEXT, storage_milli INTEGER, granted_at TEXT, at TEXT NOT NULL);`,
+    /*
+      ⚠️ AND THE CUSTOMER REFERENCE IS INDEXED BECAUSE STRIPE READS BY IT. An
+      event that carries no workspace of ours is attributed by asking which
+      account holds this customer, and that read is on the money path — where a
+      slow answer is a webhook Stripe times out and retries, and a retry is the
+      same payment arriving twice. Every other column here is reached by the
+      primary key; this one is reached from outside.
+    */
+    `CREATE INDEX IF NOT EXISTS ix_billing_customer ON billing_account (customer_ref);`,
     /* ⚠️ AND ONE PER PRODUCT THEY HAVE SWITCHED ON. */
     /* ⚠️ `comped_at` IS A PLAN NOBODY IS PAYING FOR, and it is a column rather
        than a derivation. "No customer record" would nearly answer it and would

@@ -111,8 +111,11 @@ const held = (lag: number) => ({
   SHARD_EU_1: slow(env.SHARD_EU_1 as never, lag),
 }) as never;
 
-const ask = (op: string, env_: never) =>
-  worker.fetch(new Request(`http://${SLUG}.localhost:8080/api/${op}`,
+/* ⚠️ THE DOOR IS A PARAMETER BECAUSE THE OPERATOR'S READS ARE NOT ON THIS ONE.
+   The console answers at `admin.` and nowhere else, and its list of workspaces
+   is the read whose cost grows with the deployment rather than with a page. */
+const ask = (op: string, env_: never, host = `${SLUG}.localhost`) =>
+  worker.fetch(new Request(`http://${host}:8080/api/${op}`,
     { headers: { cookie } }), env_, ctx);
 
 /**
@@ -120,11 +123,11 @@ const ask = (op: string, env_: never) =>
  * pays for the schema check and whatever the settings hold has let go of, and
  * measuring that reports the cold path under the warm one's name.
  */
-const timed = async (op: string, lag: number) => {
+const timed = async (op: string, lag: number, host?: string) => {
   const at = held(lag);
-  await ask(op, at);
+  await ask(op, at, host);
   const began = Date.now();
-  const res = await ask(op, at);
+  const res = await ask(op, at, host);
   return { ms: Date.now() - began, status: res.status };
 };
 
@@ -167,9 +170,9 @@ const TRIES = 5;
  */
 const IMPOSSIBLE = -FAST / 2;
 
-const once = async (op: string) => {
-  const fast = await timed(op, FAST);
-  const slower = await timed(op, SLOW);
+const once = async (op: string, host?: string) => {
+  const fast = await timed(op, FAST, host);
+  const slower = await timed(op, SLOW, host);
   const deep = (slower.ms - fast.ms) / (SLOW - FAST);
   return {
     status: slower.status,
@@ -181,14 +184,14 @@ const once = async (op: string) => {
   };
 };
 
-const spent = async (op: string) => {
+const spent = async (op: string, host?: string) => {
   /* ⚠️ WARMED AND DISCARDED. The first call of an operation does work the second
      does not — a lazily built cache, a memo that is empty once — and timing it
      puts that one-off cost into the number this is trying to isolate. */
-  await timed(op, FAST);
+  await timed(op, FAST, host);
 
-  let last = await once(op);
-  for (let n = 1; n < TRIES && last.fixed < IMPOSSIBLE; n += 1) last = await once(op);
+  let last = await once(op, host);
+  for (let n = 1; n < TRIES && last.fixed < IMPOSSIBLE; n += 1) last = await once(op, host);
   if (last.fixed < IMPOSSIBLE) {
     throw new Error(
       `${op}: ${TRIES} readings all implied a negative fixed cost — the last was `
@@ -234,6 +237,37 @@ describe("what a warm request costs", () => {
         .toBeLessThanOrEqual(deep);
     }, 60_000);
   }
+
+  /*
+    ⚠️ ONE GENERATED READ STANDS FOR ALL OF THEM, WHICH IS WHY THIS IS ONE LINE
+    RATHER THAN A HUNDRED. Every collection in every app is answered by the same
+    function in `records.ts` — the same gate walk, the same scope filter, the
+    same count beside the page — so a change that puts a round trip into the
+    shape puts it into all of them at once, and a single representative catches
+    that. Budgeting each collection instead would be a hundred numbers measuring
+    one thing, and a hundred numbers nobody reads.
+  */
+  it("answers a generated collection read five round trips deep", async () => {
+    const at = await spent("product.list");
+    expect(at.status).toBe(200);
+    expect(at.deep, `${at.deep.toFixed(1)} round trips (${at.ms})`)
+      .toBeLessThanOrEqual(6);
+  }, 60_000);
+
+  /*
+    ⚠️ AND THE ONE OPERATOR READ WHOSE COST GROWS WITH THE DEPLOYMENT. Every
+    other budget here is a page: what it costs is what it costs whoever opens it.
+    The console's workspace list is the read that gets dearer as the business
+    succeeds — it walked every workspace for its products and its membership, so
+    it was three subrequests a row and as many waves as the slowest of them.
+    A budget is what stops that coming back as somebody's convenience.
+  */
+  it("answers the console's workspace list two round trips deep", async () => {
+    const at = await spent("op.tenants", "admin.localhost");
+    expect(at.status).toBe(200);
+    expect(at.deep, `${at.deep.toFixed(1)} round trips (${at.ms})`)
+      .toBeLessThanOrEqual(3);
+  }, 60_000);
 
   /*
     ⚠️ AND NOTHING MAY ANSWER WITHOUT ASKING. A budget is met perfectly by a

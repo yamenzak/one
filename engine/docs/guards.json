@@ -2978,6 +2978,30 @@
       "fails": "a primary action drawn, pressed and answered 402 — the refusal landing as a toast over whatever the person just filled in, and the work gone"
     },
     {
+      "id": "the-read-the-curtain-waits-for-has-a-depth",
+      "protects": "D63",
+      "status": "live",
+      "impl": "one/test/request-cost.test.ts",
+      "proves": "answers me.who four round trips deep",
+      "fails": "the one read nothing can be drawn before quietly gaining a wave, and a wave is a fifth of a second of blank screen on every visit — the source says nothing about it, because `await` reads the same whether a query waited or ran beside another"
+    },
+    {
+      "id": "a-generated-collection-read-has-a-depth",
+      "protects": "D63",
+      "status": "live",
+      "impl": "one/test/request-cost.test.ts",
+      "proves": "answers a generated collection read five round trips deep",
+      "fails": "a round trip added to the one function every collection in every app is read through — so every list in the deployment gets slower at once, and no single screen's test is the one that notices"
+    },
+    {
+      "id": "the-consoles-workspace-list-has-a-depth",
+      "protects": "D63",
+      "status": "live",
+      "impl": "one/test/request-cost.test.ts",
+      "proves": "answers the console's workspace list two round trips deep",
+      "fails": "the one read whose cost grows with the business rather than with a page going back to a query per workspace, which is how it came to spend six hundred subrequests on one screen"
+    },
+    {
       "id": "an-act-names-the-operation-it-calls",
       "protects": "D15",
       "stage": "42",
