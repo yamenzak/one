@@ -151,8 +151,15 @@ const metricClasses = (cls) => {
   return value === undefined ? null : value.split(/\s+/).filter(Boolean);
 };
 
-/** ⚠️ A responsive or state prefix does not change what the utility IS. */
-const bare = (cls) => cls.replace(/^(?:[a-z0-9]+:)+/, "").replace(/^[!-]/, "");
+/**
+ * ⚠️ A RESPONSIVE OR STATE PREFIX DOES NOT CHANGE WHAT THE UTILITY IS.
+ *
+ * ⚠️ AND A CONTAINER PREFIX IS ONE OF THEM. `@2xl:grow-0` is the same placement
+ * decision as `sm:grow-0` and was refused as a restyle, because the pattern only
+ * knew the viewport spelling — so moving a component onto its own box, which is
+ * the rule D92 requires, failed the guard that exists to protect D7.
+ */
+const bare = (cls) => cls.replace(/^(?:@?[a-z0-9]+:)+/, "").replace(/^[!-]/, "");
 
 const plainLayout = (cls) => LAYOUT.some((re) => re.test(bare(cls)));
 

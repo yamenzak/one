@@ -3954,6 +3954,25 @@
       "impl": "scripts/vocabulary.test.mjs",
       "proves": "block(s), every one a real export",
       "fails": "a renamed component leaving its registry entry pointing at nothing - a manifest refused for naming a block that plainly exists, or a blank region where a card was; and the silent half, a component that could be a block and is in no registry, which exists and works and passes every guard while no screen can ever ask for it, so the next app hand-rolls the thing that was already built"
+    },
+    {
+      "id": "a-block-may-not-name-a-breakpoint",
+      "protects": "D92",
+      "stage": "92",
+      "status": "live",
+      "impl": "scripts/reflow.test.mjs",
+      "proves": "file(s) swept, none deciding by the width of the window",
+      "fails": "a component that reflows on the viewport while sitting in a box the viewport knows nothing about - four columns drawn into 300 pixels on a 1440px monitor, every one of them a word per line, and the reverse where a list given the whole of a tablet stays a phone list; plus a container rule with no container over it, which resolves against whatever ancestor happens to be one and fires on somebody else's width"
+    },
+    {
+      "id": "a-list-decides-by-its-own-box-on-one-unchanging-screen",
+      "protects": "D92",
+      "stage": "92",
+      "status": "live",
+      "impl": "design/test/reflow.seen.test.tsx",
+      "lane": "seen",
+      "proves": "draws rows in a narrow box and columns in a wide one",
+      "fails": "a breakpoint passing for a container query - the two are indistinguishable in every reading that varies the window, since both collapse a list on a phone and open it on a desk; held at ONE viewport width and given two boxes, only a container query can answer differently"
     }
   ]
 }

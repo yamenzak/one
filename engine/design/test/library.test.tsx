@@ -206,12 +206,19 @@ describe("a period", () => {
     Wrapping puts the odd one on a second row, which is also the right reading —
     `Dates` is the escape from the named periods rather than one of them.
   */
+  /*
+    ⚠️ ITS OWN BOX, NOT THE SCREEN'S (D92). The measurement this was written from
+    was taken inside a desk-wide card, which is the case a viewport breakpoint
+    gets right; the same control in one column of a two-column page is 320px on
+    the same monitor, and `sm:` says "wide" for both.
+  */
   it("fills a narrow container and lets the segments share it", () => {
     const html = renderToStaticMarkup(
       <PeriodInput value="month" today="2026-08-16" onChange={nothing} />,
     );
-    expect(html).toContain("w-full flex-wrap sm:w-auto sm:flex-nowrap");
-    expect(html).toContain("grow basis-0 sm:grow-0 sm:basis-auto");
+    expect(html).toContain("@container");
+    expect(html).toContain("flex-wrap w-full @2xl:w-auto @2xl:flex-nowrap");
+    expect(html).toContain("grow basis-0 @2xl:grow-0 @2xl:basis-auto");
   });
 
   it("offers every named stretch and the exact case", () => {

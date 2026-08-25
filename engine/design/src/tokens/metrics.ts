@@ -720,6 +720,56 @@ export const CARD_MEDIA = "h-44" as const;
 /** Between a section's heading and the card under it. */
 export const HEAD_GAP = "gap-2" as const;
 
+/* --------------------------------------------------------------- the box --- */
+
+/**
+ * A BLOCK REFLOWS BY ITS OWN MEASURED BOX, NEVER BY THE VIEWPORT.
+ *
+ * ⚠️ A BREAKPOINT IS A CLAIM ABOUT THE SCREEN, AND A BLOCK KNOWS NOTHING ABOUT
+ * THE SCREEN. `Listing` collapsed to rows below `md:` and opened into columns
+ * above it — correct while a list was always the width of the page, and wrong
+ * the moment one sits in a narrow cell of a board: on a 1440px desktop the
+ * viewport says "wide", so four columns are drawn into 300px and every one of
+ * them is a word per line. The reverse is the same fault: a list given the whole
+ * of a 700px tablet stays a phone list because the viewport is under the
+ * breakpoint.
+ *
+ * ⚠️ AND IT IS THE RULE THAT MAKES A DECLARED LAYOUT POSSIBLE AT ALL. A block
+ * told "you are in a 2×1" works in the layouts that use that vocabulary and
+ * breaks in every one that does not — including the ones nobody has designed
+ * yet. A block that measures its OWN box works in all of them, for ever, and it
+ * is the reason a `Span` is what the layout is told and never what the block
+ * reads (see `surface.ts`).
+ *
+ * ⚠️ THE CLASSES ARE WRITTEN OUT WHOLE BECAUSE TAILWIND ONLY EMITS WHAT IT HAS
+ * SEEN. `` `${AT.wide}:hidden` `` is invisible to the compiler, so the rule
+ * would exist in TypeScript and in no stylesheet — the same silence that made a
+ * whole token file inert until the SPA was rebuilt (stage 85). Every value here
+ * is a literal a scanner can find.
+ */
+export const BOX = "@container" as const;
+
+/**
+ * ⚠️ ONE THRESHOLD, AND IT IS THE WIDTH A TABLE NEEDS. Tailwind's `@2xl` is
+ * 672px, which is where four columns of real words stop being four columns of
+ * one word each — measured, not chosen. A second threshold is a second decision
+ * per block and the beginning of a breakpoint system inside a container system.
+ */
+export const ROOM = {
+  /** Drawn only once the block's own box is wide. */
+  wide: "hidden @2xl:block" as const,
+  /** Its opposite, and one of the pair is always the answer. */
+  narrow: "@2xl:hidden" as const,
+  /** Stacked in a narrow box, side by side in a wide one. */
+  beside: "flex-col @2xl:flex-row" as const,
+  /** A fixed side column, but only where there is room for one. */
+  side: "w-full shrink-0 @2xl:w-72" as const,
+  /** Drawn first where there is room to draw it beside rather than above. */
+  first: "@2xl:order-first" as const,
+  /** An inline control that fills a narrow box and sits to one side in a wide one. */
+  fits: "w-full @2xl:w-auto" as const,
+} as const;
+
 /**
  * THE PAGE GUTTER, AND THE ONLY ONE.
  *

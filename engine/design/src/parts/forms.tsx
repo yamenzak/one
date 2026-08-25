@@ -36,7 +36,7 @@ import {
 import { dayOf, instant } from "@engine/kernel";
 /* ⚠️ The one glyph registry — a switch does not draw its own tick. */
 import { glyphOf } from "../frame/shell.js";
-import { CODE_SLOT, SPACE } from "../tokens/metrics.js";
+import { BOX, CODE_SLOT, ROOM, SPACE } from "../tokens/metrics.js";
 import { TYPE } from "../tokens/type.js";
 
 /**
@@ -658,10 +658,15 @@ export function Segmented({ value, onChange, options, ...p }: Omit<Said, "error"
          card, with the library's own `justify-center` then floating four
          segments in the middle of a thousand pixels of nothing. The intent
          above was written and did not happen. */
-      className="w-full flex-wrap sm:w-auto sm:flex-nowrap"
+      /* ⚠️ AND THE WIDTH IT WATCHES IS ITS OWN BOX, NOT THE SCREEN'S — see
+         `BOX`. The measurement above was taken inside a desk-wide card, which
+         is the case a viewport breakpoint gets right; the same control in one
+         column of a two-column settings page is 320px on the same monitor, and
+         `sm:` says "wide" for both. */
+      className={`flex-wrap ${ROOM.fits} @2xl:flex-nowrap`}
     >
       {options.map((o, i) => (
-        <ToggleButton key={o.id} id={o.id} className="grow basis-0 sm:grow-0 sm:basis-auto">
+        <ToggleButton key={o.id} id={o.id} className="grow basis-0 @2xl:grow-0 @2xl:basis-auto">
           {i > 0 ? <ToggleButtonGroup.Separator /> : null}
           {o.label}
         </ToggleButton>
@@ -679,7 +684,7 @@ export function Segmented({ value, onChange, options, ...p }: Omit<Said, "error"
      rather than a regression on every row that already prints the name. Same
      context, same rule, same as its nine neighbours. */
   return (
-    <div className={`flex w-full flex-col ${SPACE.tight} sm:w-auto sm:self-start`}>
+    <div className={`${BOX} flex flex-col ${SPACE.tight} ${ROOM.fits} @2xl:self-start`}>
       <Naming>{p.label}</Naming>
       {group}
       <Tail help={p.help} />

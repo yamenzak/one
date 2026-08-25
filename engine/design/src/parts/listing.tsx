@@ -48,7 +48,7 @@ import { Group, PersonRow } from "./surfaces.js";
 import { TextInput } from "./forms.js";
 import { glyphOf } from "../frame/shell.js";
 import { Menu, type MenuItem } from "../frame/overlay.js";
-import { SPACE } from "../tokens/metrics.js";
+import { BOX, ROOM, SPACE } from "../tokens/metrics.js";
 import { TYPE } from "../tokens/type.js";
 import { Tally } from "./tally.js";
 import { Hint } from "./beside.js";
@@ -370,7 +370,12 @@ export function Listing<T>(
              own edge and the whole screen scrolled sideways, while the
              `ScrollContainer` that exists to prevent exactly that sat there
              with nothing to do. */
-          <div className={`flex min-w-0 flex-col ${finding || picking ? SPACE.snug : ""}`}>
+          /* ⚠️ AND THE LIST IS ITS OWN QUERY CONTAINER, which is what makes the
+             collapse below correct in a cell of a board as well as on a page.
+             See `BOX`: the viewport says "wide" on a 1440px desktop while this
+             list is 300px, and four columns of one word each is what that
+             produced. */
+          <div className={`${BOX} flex min-w-0 flex-col ${finding || picking ? SPACE.snug : ""}`}>
             {finding ? (
               <TextInput
                 label={finding.label ?? "Find one"}
@@ -400,7 +405,7 @@ export function Listing<T>(
             ) : null}
 
             {asRow ? (
-              <div className="md:hidden">
+              <div data-part="rows" className={ROOM.narrow}>
                 <Group>
                   {shown.map((row) => {
                     const it = asRow(row);
@@ -426,7 +431,7 @@ export function Listing<T>(
               </div>
             ) : null}
 
-            <div className={asRow ? "hidden md:block" : undefined}>
+            <div data-part="columns" className={asRow ? ROOM.wide : undefined}>
               {/* ⚠️ THE FALLBACK IS THE SAME SKELETON THE LOAD USES, so the
                   wait for the chunk and the wait for the rows look like one
                   wait rather than two different faults. */}

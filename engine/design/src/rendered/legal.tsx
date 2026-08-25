@@ -20,7 +20,7 @@ import { glyphOf } from "../frame/shell.js";
 import { AgreedMark } from "../parts/marks.js";
 import { useShown } from "../parts/said.js";
 import { TableWaiting } from "../parts/state.js";
-import { SPACE } from "../tokens/metrics.js";
+import { BOX, ROOM, SPACE } from "../tokens/metrics.js";
 import { TYPE } from "../tokens/type.js";
 
 /**
@@ -153,7 +153,12 @@ export function Documents({ documents, outstanding = [], signed, onOpen }: Docum
 export function SubProcessors({ book }: { readonly book: SubProcessorBook }) {
   const all = Object.values(book);
   return (
-    <>
+    /* ⚠️ ITS OWN BOX, NOT THE SCREEN'S — see `BOX`. This is the same collapse
+       `Listing` makes, and it was making it on the viewport: a disclosure drawn
+       in one column of a two-column page got the four-column table because the
+       MONITOR was wide, which is the case the paragraph below was written to
+       prevent. */
+    <div className={BOX}>
       {/*
         ⚠️ FOUR COLUMNS IN A PHONE'S WIDTH IS NOT A TABLE. It rendered as a
         sideways scroll box with "Runs the service and stores the records" broken
@@ -162,7 +167,7 @@ export function SubProcessors({ book }: { readonly book: SubProcessorBook }) {
         on a phone each party is a small block of labelled facts, which is what
         `FieldRow` is for.
       */}
-      <div className={`md:hidden flex flex-col ${SPACE.snug}`}>
+      <div className={`${ROOM.narrow} flex flex-col ${SPACE.snug}`}>
         {all.map((p) => (
           <Group key={p.id} label={p.name}>
             <FieldRow label="What they do" value={p.role} />
@@ -184,7 +189,7 @@ export function SubProcessors({ book }: { readonly book: SubProcessorBook }) {
         it took the WHOLE Data & Trust screen down to a blank page, in every
         build, while the typechecker and every suite stayed green.
       */}
-      <div className="hidden md:block">
+      <div className={ROOM.wide}>
         <React.Suspense fallback={<TableWaiting cols={4} rows={Math.min(all.length, 6)} />}>
           <Grid
             label="Sub-processors"
@@ -201,7 +206,7 @@ export function SubProcessors({ book }: { readonly book: SubProcessorBook }) {
           />
         </React.Suspense>
       </div>
-    </>
+    </div>
   );
 }
 

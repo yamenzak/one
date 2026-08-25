@@ -240,12 +240,38 @@ Three things the building settled, each a change to what S1 shipped:
   navigate, and `does` could only name operations. A route typed in a body would
   be a second spelling of an address the manifest already holds.
 
-### S4 — Blocks reflow by their own size
+### S4 — A block reflows by its own box · **stage 92, shipped**
+
 ⚠️ **Container queries, not slot coordinates.** A block that knows it is "in a
 2×1" breaks in the first layout that does not use that vocabulary; a block that
 responds to its own measured box works in every container forever, including ones
-nobody has designed yet. Guarded by measurement: render at two widths, assert the
-geometry actually differs in the intended way — `geometryOf` already does this.
+nobody has designed yet. It is why a `Span` is what the layout is told and never
+what the block reads.
+
+`BOX` and `ROOM` in `metrics.ts` are the whole mechanism — one threshold, at the
+width a table of real words actually needs, with every class written out whole
+because Tailwind emits only what it has SEEN.
+
+**Two real instances, and the second was found by the guard.** `Listing`
+collapsed on `md:`: on a 1440px monitor the viewport says "wide", so four columns
+get drawn into a 300px cell and every one is a word per line — and the reverse,
+a list given the whole of a 700px tablet staying a phone list. `SubProcessors` in
+`legal.tsx` had the identical collapse, on a disclosure whose own comment argues
+at length why four columns in a phone's width is not a table.
+
+**The measured half is what a static check cannot do.** A breakpoint and a
+container query are indistinguishable in any reading that varies the window —
+both collapse on a phone and open on a desk. `reflowOf` holds the viewport at
+1440 and gives the block three boxes; only a container query answers differently.
+The middle reading, 400px inside a 1440px window, is the single measurement that
+separates the two mechanisms.
+
+Two guards fell out of it, both of which had to be widened rather than waived:
+`heroui` refused `@2xl:grow-0` as a restyle because its prefix pattern only knew
+the viewport spelling, so obeying D92 failed the guard protecting D7; and the
+`present` guard read `${ROOM.until}` as a stored date, because `until` is a
+date-shaped field name in the kernel. The token is `ROOM.narrow`/`ROOM.wide` now,
+which is better English anyway.
 
 ### S5 — The four outcomes, drawn once
 waiting · nothing · trouble · denied. Partly exists — `Loaded`, `Await`,

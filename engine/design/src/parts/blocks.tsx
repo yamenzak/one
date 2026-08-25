@@ -18,7 +18,7 @@ import {
 import { Check } from "lucide-react";
 import { passagesOf } from "@engine/kernel";
 import {
-  NUDGE, ROW, SPACE, WIDTH,
+  BOX, NUDGE, ROW, SPACE, WIDTH,
 } from "../tokens/metrics.js";
 import { TYPE } from "../tokens/type.js";
 import { Group, NavRow } from "./surfaces.js";
@@ -119,7 +119,10 @@ export function Steps({ at, steps }: {
 }) {
   const here = steps.findIndex((s) => s.id === at);
   return (
-    <ol className={`flex items-center ${SPACE.snug}`} aria-label="Progress">
+    /* ⚠️ ITS OWN BOX — see `BOX`. How much room the rule between two circles
+       gets is a question about this row's width, and this row is as wide as
+       whatever card it was put in. */
+    <ol className={`${BOX} flex items-center ${SPACE.snug}`} aria-label="Progress">
       {steps.map((s, i) => {
         const done = i < here;
         const now = i === here;
@@ -129,7 +132,7 @@ export function Steps({ at, steps }: {
                 circles read as a sequence instead of as a row of chips, and at
                 `min-w` it still does that in a third of the room. */}
             {i > 0 ? (
-              <span aria-hidden className="h-px min-w-2 flex-1 bg-current opacity-30 sm:max-w-6" />
+              <span aria-hidden className="h-px min-w-2 flex-1 bg-current opacity-30 @2xl:max-w-6" />
             ) : null}
             <li
               className={`flex min-w-0 items-center ${SPACE.tight} ${now ? "" : "text-muted"}`}

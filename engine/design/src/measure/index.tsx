@@ -1210,3 +1210,71 @@ export async function stillness(
   }), selector);
   if (!settled) throw new Error(`${selector} never stopped moving within ${patience}ms`);
 }
+
+/* ---------------------------------------------------------------- reflow --- */
+
+/**
+ * WHAT A BLOCK DOES WHEN ITS OWN BOX CHANGES, WITH THE SCREEN HELD STILL.
+ *
+ * ⚠️ THE VIEWPORT IS FIXED ON PURPOSE, AND THAT IS THE WHOLE ASSERTION. A
+ * breakpoint and a container query are indistinguishable in every reading that
+ * varies the window — both collapse a list on a phone and open it on a desk, so
+ * a sweep at two viewport widths reports success either way. Held at ONE width
+ * and given two boxes, only a container query can answer differently: a
+ * breakpoint says "wide" for both, draws four columns into 300 pixels, and every
+ * one of them is a word per line.
+ *
+ * ⚠️ AND WHAT IS READ IS WHETHER A PART IS LAID OUT, not whether it is in the
+ * document. Both halves of a collapse are always in the markup — one is
+ * `display:none` — so `querySelector` finds them at every width and a check
+ * built on presence passes over a component that never reflowed at all.
+ * `getClientRects().length` is the question actually being asked.
+ */
+export interface Reflow {
+  /** The width the block's own box was given. */
+  readonly at: number;
+  /** How tall it came out. */
+  readonly height: number;
+  /** Which `data-part` regions were actually laid out, in document order. */
+  readonly shown: readonly string[];
+}
+
+export async function reflowOf(
+  browser: Browser,
+  markup: string,
+  css: string,
+  widths: readonly number[],
+  viewport: { width: number; height: number },
+  theme: "dark" | "light" = "dark",
+): Promise<readonly Reflow[]> {
+  const page = await browser.newPage({ viewport });
+  try {
+    /*
+      ⚠️ THE BLOCK IS PUT IN A BOX THAT IS RESIZED, RATHER THAN RE-RENDERED PER
+      WIDTH. A fresh render per measurement compares two different trees and
+      would report a difference that came from the mount rather than from the
+      width — which is the fault this is meant to catch, wearing the evidence
+      for it.
+    */
+    await page.setContent(pageFor(
+      `<div id="reflow-box" style="width:320px">${markup}</div>`, css, theme,
+    ));
+    const out: Reflow[] = [];
+    for (const at of widths) {
+      out.push(await page.evaluate(async (width: number) => {
+        const box = document.getElementById("reflow-box");
+        if (!box) throw new Error("the box the block was put in is not there");
+        box.style.width = `${width}px`;
+        await new Promise((go) => requestAnimationFrame(() => requestAnimationFrame(() => go(null))));
+        const shown: string[] = [];
+        for (const el of Array.prototype.slice.call(box.querySelectorAll("[data-part]")) as HTMLElement[]) {
+          if (el.getClientRects().length) shown.push(el.dataset.part ?? "");
+        }
+        return { at: width, height: Math.round(box.getBoundingClientRect().height), shown };
+      }, at));
+    }
+    return out;
+  } finally {
+    await page.close();
+  }
+}

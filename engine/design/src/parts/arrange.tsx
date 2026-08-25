@@ -19,7 +19,7 @@ import {
   BAND_PAD, BLEED_PULL, GUTTER, SCROLL_GUTTER, SPACE,
 } from "../tokens/metrics.js";
 import type { Space } from "../tokens/metrics.js";
-import { WIDTH } from "../tokens/metrics.js";
+import { BOX, ROOM, WIDTH } from "../tokens/metrics.js";
 import type { Width } from "../tokens/metrics.js";
 
 /* ⚠️ THE MEASUREMENTS A SCREEN LEGITIMATELY NEEDS, RE-EXPORTED BESIDE THE
@@ -106,9 +106,12 @@ export function Columns({ aside, side = "end", space = "roomy", children }: {
   readonly children: React.ReactNode;
 }) {
   return (
-    <div className={`flex flex-col md:flex-row ${SPACE[space]}`}>
+    /* ⚠️ ITS OWN BOX, NOT THE SCREEN'S — see `BOX`. Two columns are right where
+       there is room for two columns, and a `Columns` nested inside a narrow
+       region on a wide monitor has none. */
+    <div className={`${BOX} flex ${ROOM.beside} ${SPACE[space]}`}>
       <div className="min-w-0 grow">{children}</div>
-      <aside className={`w-full shrink-0 md:w-72 ${side === "start" ? "md:order-first" : ""}`}>
+      <aside className={`${ROOM.side} ${side === "start" ? ROOM.first : ""}`}>
         {aside}
       </aside>
     </div>

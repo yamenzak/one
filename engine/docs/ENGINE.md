@@ -1047,6 +1047,8 @@ its own header, cited by other files, and doing nothing.
 | `a-heading-outranks-what-it-heads` | D85 | two of the three heading ranks sharing a size or a weight, which makes a screen read as several pages stacked while every individual class list still looks sensible |
 | `the-dock-is-a-plate-and-its-ink-travels-with-it` | D86 | a dock painted from a card tier — a white slab in the light theme — or one that states a fill and no ink, which is a near-black glyph on a near-black plate that every contrast check here passes because they all measure ink against the PAGE |
 | `every-block-is-real-and-everything-that-could-be-one-is-placed` | D92 | a renamed component leaving its registry entry pointing at nothing - a manifest refused for naming a block that plainly exists, or a blank region where a card was; and the silent half, a component that could be a block and is in no registry, which exists and works and passes every guard while no screen can ever ask for it, so the next app hand-rolls the thing that was already built |
+| `a-block-may-not-name-a-breakpoint` | D92 | a component that reflows on the viewport while sitting in a box the viewport knows nothing about - four columns drawn into 300 pixels on a 1440px monitor, every one of them a word per line, and the reverse where a list given the whole of a tablet stays a phone list; plus a container rule with no container over it, which resolves against whatever ancestor happens to be one and fires on somebody else's width |
+| `a-list-decides-by-its-own-box-on-one-unchanging-screen` | D92 | a breakpoint passing for a container query - the two are indistinguishable in every reading that varies the window, since both collapse a list on a phone and open it on a desk; held at ONE viewport width and given two boxes, only a container query can answer differently |
 <!-- /generated -->
 
 ### And how well each decision is defended
@@ -1145,7 +1147,7 @@ its own header, cited by other files, and doing nothing.
 | D89 | One ladder, and a rung has to reach the page | 5 |
 | D90 | A screen composes the vocabulary; it does not re-derive it | 5 |
 | D91 | A night is deep and lit, and the ladder's numbers are the ones that ship | 2 |
-| D92 | A screen is a body or a story, and what a body binds through is closed | 1 |
+| D92 | A screen is a body or a story, and what a body binds through is closed | 3 |
 <!-- /generated -->
 
 ---
@@ -1294,7 +1296,7 @@ a later decision superseded, so neither list can rot into a promise nobody owes.
 | 89 | The declared surface — the contract | shipped |
 | 90 | The spike: the three hardest screens, and the easy one that was mistaken for the general case | shipped |
 | 91 | The block registry: forty blocks, counted rather than surveyed | shipped |
-| 92 | A block reflows by its own measured box, not by a slot it was told about | **planned** |
+| 92 | A block reflows by its own measured box, and the screen is held still to prove it | shipped |
 | 93 | Every block ships its whole state set, and the caller stops wiring them | **planned** |
 | 94 | The layouts: relationships rather than breakpoints | **planned** |
 | 95 | The guards, re-founded on the schema | **planned** |
@@ -1302,7 +1304,7 @@ a later decision superseded, so neither list can rot into a promise nobody owes.
 | 97 | OneInventory, ported — 25 screens, no escape hatch | **planned** |
 | 98 | The door closes: no private UI in an app | **planned** |
 
-**79 shipped, 18 planned, 1 superseded.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it, and nothing may defer to a superseded one — `scripts/docs.test.mjs` fails the build on either, which is the only reason this table can be read instead of the code.
+**80 shipped, 17 planned, 1 superseded.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it, and nothing may defer to a superseded one — `scripts/docs.test.mjs` fails the build on either, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---
