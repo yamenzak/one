@@ -553,7 +553,12 @@ const withoutComments = (src) =>
 for (const file of FILES) {
   if (DEFINES.has(rel(file)) || BRAND_OWNED.has(rel(file))) continue;
   const src = withoutComments(readFileSync(file, "utf8"));
-  for (const [, decl] of src.matchAll(/(oklch\(\s*[\d.]+\s+0(?:\.0+)?\s+[\d.]+\s*\))/g)) {
+  /* ⚠️ THE LIGHTNESS MAY BE INTERPOLATED, AND THAT IS THE SPELLING THAT HID ONE.
+     `opening.tsx` declared `oklch(${l} 0 0)` — a HELPER, which is how a neutral
+     is written when a file needs more than one of them, so the interpolated form
+     is the likelier of the two rather than an edge case. Matching only literal
+     numbers left the curtain colourless with the guard green. */
+  for (const [, decl] of src.matchAll(/(oklch\(\s*(?:[\d.]+|\$\{[^}]*\})\s+0(?:\.0+)?\s+[\d.]+\s*\))/g)) {
     cold++;
     fail(`${rel(file)}: \`${decl}\` — a neutral with no hue in it.\n` +
          `       Every neutral in this product is a lightness on the warm ladder. Read a\n` +

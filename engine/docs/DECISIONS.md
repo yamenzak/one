@@ -2995,3 +2995,46 @@ is the theme being edited from the outside and takes a workspace's branding with
 it; and a colour claim checked with HSV saturation, which divides by lightness
 and so reports the identical cast as six times stronger on a dark surface than on
 a light one.
+
+
+## D86 — The dock is a plate again, and it is dark in both themes
+
+The nav lost its plate for a measured reason and the reason was only half
+right. A capsule the width of its own content left the page's next row visible
+in the gaps either side, sliced by the capsule's rounded ends — a face cut in
+half down the gutter, a heading reappearing beside the bar. What fixed that was
+the HEM: full width, on the `nav` rather than on the bar inside it, dissolving
+the content before it arrives anywhere. Removing the plate as well was one
+change past the fix, and what it left was four grey glyphs and a white one
+standing on the page, which is honest and reads as unfinished.
+
+**So the plate is back and the hem stays.** The collision is solved by the thing
+that solved it; the object is solved by the object.
+
+**And it is dark in both themes, which is the property worth having.** A step
+lighter than a near-black ground so it separates, a long way darker than a cream
+one so it reads as hardware laid on the page rather than as another card. Both
+readings are the same reading — a floating surface goes AWAY from the page —
+and because the plate is dark either way its ink is near-white either way. The
+dock is one object, not two that share a shape. Three things fall out of that
+for free: the halo under the active destination is one strength instead of two;
+a destination can be a CIRCLE, because on a plate a round item is a hole in a
+surface rather than the ring around a glyph that D7 refuses; and the four ink
+channels on it are four numbers instead of eight.
+
+**It is off the elevation ladder on purpose.** Every tier in `GROUND` is a step
+in one stack — a card over a page, a control over a card. The dock is over all
+of it, always, on every screen, and giving it a rung would mean choosing which
+content it is one step above. The answer is all of it.
+
+**The act moved out of the plate, and that gave the bar its word back.** Inside,
+the two shared one label's worth of width, so `open = isHere && !act` blanked the
+answer to "where am I" on every screen with something to do — which is most of
+them. Beside it they are two objects with two jobs and neither has to yield.
+
+**Therefore never:** a fill on the crown or the hem, which ARE welded to an edge
+and where a plate draws the hard line the vignette exists to avoid; a dock
+painted from a card tier, which is a white slab in the light theme; a dock that
+states a fill and no ink, which is a near-black glyph on a near-black plate that
+every contrast check in this repository would pass, because they all measure
+against the page; and a pill inside the plate, which is a plate on a plate.

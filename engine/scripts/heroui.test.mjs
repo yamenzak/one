@@ -660,8 +660,14 @@ if (!uneven) ok(`peers: ${EQUALS.length} group(s) of equals share their width`);
     */
     const marks = /data-here=\{isHere/.test(body);
     const named = /maxWidth:\s*(\w+)/.exec(body)?.[1] ?? "";
+    /* ⚠️ A PLAIN ASSIGNMENT IS THE STRONGEST FORM OF THE INVARIANT, and this
+       accepted only the weaker one. `const open = isHere && …` is admitted
+       because a narrowing of `isHere` can never be true where `isHere` is
+       false; `const open = isHere` is that with nothing narrowing it, and it
+       failed. A guard that refuses the exact thing it is asking for is one
+       somebody edits the CODE to satisfy, which is the wrong direction. */
     const names = named === "isHere"
-      || new RegExp(`const ${named}\\s*=\\s*isHere\\s*&&`).test(body);
+      || new RegExp(`const ${named}\\s*=\\s*isHere\\s*(?:&&|;)`).test(body);
     /* ⚠️ `overflow-hidden` IS NOT `hidden`, and the first version of this could
        not tell them apart — `\b` matches after a dash, so the utility that makes
        the label narrow read as the utility that removes it. The closed label is

@@ -572,7 +572,23 @@ const DRAWN = [...filesIn("design/src"), ...filesIn("one-space/src")];
     naming that attribute, which is the one place worth guarding.
   */
   const asrc = readFileSync(join(ENGINE, "design/src/tokens/ambience.ts"), "utf8");
-  const EDGES = ["data-island", "data-hem", "data-crown"];
+  /*
+    ⚠️ THE DOCK IS OFF THIS LIST NOW, AND IT IS THE ONLY ONE THAT COMES OFF. The
+    argument above is about a surface WELDED TO AN EDGE — a crown across the top
+    or a hem across the bottom, where a fill draws a hard line the vignette
+    exists to avoid. The dock is not welded to anything: it floats clear of both
+    edges with the page's own ground all the way round it, so its ends are an
+    outline rather than a seam, and the hem under it still dissolves what passes
+    behind (D86).
+
+    ⚠️ AND WHAT REPLACES THE BAN IS STRICTER THAN IT, which is the point of
+    moving it rather than deleting it. A ban says "no fill"; the check below says
+    the fill must be the DOCK TIER and must arrive with the dock's own ink — so
+    the failure it now catches is the one a bare ban could not see at all: a
+    plate painted from `--surface` with the page's near-black ink on it, which in
+    the light theme is a control nobody can find.
+  */
+  const EDGES = ["data-hem", "data-crown"];
   let plated = 0;
   for (const attr of EDGES) {
     /* ⚠️ THE RULE'S OWN BODY, never a descendant's — `[data-island] button { … }`
@@ -593,6 +609,38 @@ const DRAWN = [...filesIn("design/src"), ...filesIn("one-space/src")];
     }
   }
   if (!plated) ok(`plate: ${EDGES.length} pinned surface(s), all of them the ground itself`);
+
+  /*
+    ⚠️ THE DOCK IS A PAIR — A FILL AND AN INK — AND HALF OF IT IS INVISIBLE TO
+    EVERY OTHER CHECK. The plate is dark in BOTH themes (`DOCK` in `ground.ts`),
+    which is what makes it one object rather than two; it also means nothing on
+    it may take `--foreground`, because in the light theme that is a near-black
+    glyph on a near-black plate. Every contrast guard in this repository measures
+    ink against the PAGE, so a dock whose items inherited the page's ink would
+    pass all of them and be unreadable on half the product.
+
+    ⚠️ AND THE FILL HAS TO BE THE TIER RATHER THAN A COLOUR. `--surface` here is
+    a card-coloured bar — correct-looking in dark, a white slab in light — and it
+    is the value somebody reaches for who has not read `DOCK`.
+  */
+  const dock = /\[data-island="true"\]\s*\{`,\s*`([^`]*)`,\s*`([^`]*)`/.exec(asrc);
+  const body = `${dock?.[1] ?? ""} ${dock?.[2] ?? ""}`;
+  if (!dock) {
+    fail("design/src/tokens/ambience.ts: `[data-island]` has no rule of its own.\n"
+       + "       The dock is a plate, and a plate nothing paints is five glyphs standing\n"
+       + "       on the page — which is the state that made it read as unfinished (D86).");
+  } else if (!/background-color:\s*var\(--tier-dock\)/.test(body)) {
+    fail("design/src/tokens/ambience.ts: the dock is not painted from `--tier-dock`.\n"
+       + "       A card tier here is a white slab in the light theme. The dock is off the\n"
+       + "       elevation ladder on purpose and has one value (D86).");
+  } else if (!/color:\s*var\(--dock-ink\)/.test(body)) {
+    fail("design/src/tokens/ambience.ts: the dock states a fill and no ink.\n"
+       + "       The plate is dark in BOTH themes, so anything inheriting `--foreground`\n"
+       + "       is a near-black glyph on a near-black plate in light — and every contrast\n"
+       + "       check here measures against the PAGE, so nothing else would say so.");
+  } else {
+    ok("dock: the plate is the dock tier, and its ink travels with it");
+  }
 }
 
 /* ------------------- a source is placed where its mask keeps it --- */

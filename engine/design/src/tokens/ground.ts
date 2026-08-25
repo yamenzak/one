@@ -126,6 +126,45 @@ export const GROUND = {
 export const MIN_DELTA = 0.04;
 
 /**
+ * THE DOCK — the one plate in the product, and it is deliberately not on the
+ * ladder above.
+ *
+ * ⚠️ THE LADDER ANSWERS "WHICH SURFACE IS ABOVE WHICH", AND THE DOCK IS NOT IN
+ * THAT STACK. Every tier in `GROUND` is a step in one elevation: a card over a
+ * page, a control over a card, an overlay over both. The dock is over ALL of it,
+ * always, on every screen, and it is the only object in the product that never
+ * goes away. Giving it a rung would mean choosing which content it is one step
+ * above, and the answer is all of it.
+ *
+ * ⚠️ SO IT IS THE SAME OBJECT IN BOTH THEMES, WHICH IS THE PROPERTY WORTH
+ * HAVING. It is dark on a light page and dark on a dark one — a step LIGHTER
+ * than a near-black ground so it separates, a long way DARKER than a cream one
+ * so it reads as hardware laid on the page rather than as another card. Both
+ * readings are the same reading, and because the plate is dark either way its
+ * ink is near-white either way: one dock, not two that happen to share a shape.
+ *
+ * ⚠️ THE PLATE IS WHY THE DESTINATIONS CAN BE CIRCLES AT ALL. Without it a nav
+ * item is a glyph on the page's own ground and a ring around it is an edge (D7);
+ * on a plate the circle is a hole in a surface, which is a different thing and
+ * the one the reference material is made of.
+ *
+ * ⚠️ AND THE HEM IS STILL THE ANSWER TO CONTENT ARRIVING AT ITS ENDS. The
+ * earlier plate was removed because the page's next row was sliced by the
+ * capsule's rounded ends — a face cut in half, a heading reappearing in the gaps
+ * either side. The hem on the `nav` around it is full width and dissolves that
+ * content before it reaches either the plate or the gaps, so what killed the
+ * plate is fixed rather than reintroduced.
+ */
+export const DOCK = {
+  /** Near the ink, so it is the highest-contrast object on a cream page. */
+  light: 0.215,
+  /** One step off the floor — the same distance a raised surface goes. */
+  dark: 0.195,
+  /** Its own ink, and it is the same in both themes because the plate is. */
+  ink: 0.97,
+} as const;
+
+/**
  * How much of the BRAND each surface is made of.
  *
  * ⚠️ LIGHT TAKES MORE THAN DARK, and that is not symmetry lost. A tint on white
@@ -164,7 +203,7 @@ export const GROUND_TINT = { light: 9, dark: 4 } as const;
  * banding threshold of an 8-bit panel at this size, and twice that is a visible
  * halo.
  *
- * ⚠️ ZERO CHROMA, LIKE EVERY OTHER VALUE HERE. A full-bleed gradient is the
+ * ⚠️ ON THE LADDER, LIKE EVERY OTHER VALUE HERE. A full-bleed gradient is the
  * first place a hue nobody chose shows up, and it is the first thing anybody
  * sees of the product.
  */
@@ -263,7 +302,22 @@ const WARMTH = { hue: 66, chroma: 0.01 } as const;
 const warmth = (l: number): number =>
   (l >= 0.97 ? Math.max(0, (1 - l) / 0.03) * WARMTH.chroma : WARMTH.chroma);
 
-const grey = (l: number) => `oklch(${l} ${warmth(l).toFixed(4)} ${WARMTH.hue})`;
+/**
+ * ONE LIGHTNESS ON THE WARM LADDER, AND IT IS EXPORTED BECAUSE A SECOND COPY OF
+ * IT IS HOW HALF THE PRODUCT STAYED GREY.
+ *
+ * ⚠️ `opening.tsx` HAD ITS OWN, AND IT WAS THE FIRST THING ANYBODY SEES. The
+ * curtain declared `oklch(l 0 0)` locally with a comment arguing for zero chroma
+ * — correct while the whole ladder was colourless, and exactly backwards after
+ * it stopped being: a neutral curtain handing over to a warm app is the hue
+ * arriving late, on the one screen whose entire job is the first impression.
+ *
+ * ⚠️ SO THERE IS ONE FUNCTION AND NOTHING ELSE MAY WRITE A NEUTRAL. That is what
+ * `warm:` refuses — including the interpolated spelling, which is what let this
+ * one live: a guard matching `oklch(0.115 0 0)` sees nothing wrong with
+ * `oklch(${l} 0 0)`, and the second is the form a helper is written in.
+ */
+export const grey = (l: number) => `oklch(${l} ${warmth(l).toFixed(4)} ${WARMTH.hue})`;
 
 /**
  * A value with a share of the BRAND mixed into it.
@@ -349,6 +403,19 @@ function tier(mode: "light" | "dark"): string {
        fill in the product that is a colour rather than a value, and the mono rule
        is the argument for it rather than against it. */
     `--tier-chosen: ${tinted(g.chosen, CHOSEN_TINT[mode])};`,
+    /*
+      ⚠️ THE DOCK CARRIES THE BRAND LIKE EVERY OTHER SURFACE, at the ground's own
+      share rather than a card's. It is the surface nearest the page in the
+      reading the design has of it — a plate laid ON the world rather than a
+      thing cut out of paper — so it is made of the same mix the world is.
+
+      ⚠️ AND ITS INK IS STATED HERE RATHER THAN INHERITED. `--foreground` is the
+      ink for the page's own ground, which in light is near-black; on a plate at
+      0.215 that is invisible. Nothing about the plate's darkness is knowable
+      from inside a component, so the pair travels together.
+    */
+    `--tier-dock: ${tinted(DOCK[mode], GROUND_TINT[mode])};`,
+    `--dock-ink: ${grey(DOCK.ink)};`,
 
     `--background: var(--tier-page);`,
     `--surface: var(--tier-base);`,

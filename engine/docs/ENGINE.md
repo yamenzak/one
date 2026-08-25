@@ -1027,6 +1027,7 @@ its own header, cited by other files, and doing nothing.
 | `the-neutral-ladder-carries-a-hue` | D85 | a colourless grey ladder, which is neutrality nobody chose and the house style three people independently named a competitor from — and which every provenance check passes, because `grey()` returning zero chroma is still the same function called from the same places |
 | `one-corner-reaches-every-component` | D85 | a radius override compiled into the stylesheet instead of appended after it, so the library's `:root` wins on source order and every corner in the product silently stays 0.5rem — or a `RADIUS` past 1rem, where three ranks of surface all clamp to 32px and the ladder stops being one |
 | `a-heading-outranks-what-it-heads` | D85 | two of the three heading ranks sharing a size or a weight, which makes a screen read as several pages stacked while every individual class list still looks sensible |
+| `the-dock-is-a-plate-and-its-ink-travels-with-it` | D86 | a dock painted from a card tier — a white slab in the light theme — or one that states a fill and no ink, which is a near-black glyph on a near-black plate that every contrast check here passes because they all measure ink against the PAGE |
 <!-- /generated -->
 
 ### And how well each decision is defended
@@ -1119,6 +1120,7 @@ its own header, cited by other files, and doing nothing.
 | D83 | The split D3 describes has not been taken, and the trigger is startup CPU | 0 |
 | D84 | A clause reads back to somebody who has left the step, not to somebody standing on it | 0 |
 | D85 | The interface is a warm material with one hot mark on it | 3 |
+| D86 | The dock is a plate again, and it is dark in both themes | 1 |
 <!-- /generated -->
 
 ---

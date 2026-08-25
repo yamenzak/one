@@ -541,11 +541,33 @@ export function Crown({
                nobody has seen them before — and this is the one row on every
                screen. The `aria-label` said what they do and everybody not using
                a screen reader got a shape. */
+            /*
+              ⚠️ A FILL, NOT A GHOST, AND THE GROUND UNDER IT IS THE ARGUMENT.
+              These are the only controls in the product that sit directly on the
+              AMBIENCE — a generated world with a light in it, at whatever
+              strength the screen declared — so a bare glyph up here is a mark
+              whose contrast is decided by the wallpaper behind it. The control
+              tier is the one value chosen to clear all three grounds it can land
+              on (`GROUND.control`), which is exactly the guarantee a glyph over a
+              moving field needs.
+
+              ⚠️ `tertiary`, NOT `secondary`, AND THE DIFFERENCE IS THE INK. Both
+              take the same fill; `.button--secondary` also sets `--button-fg` to
+              `accent-soft-foreground`, so an icon-only control wearing it is a
+              glyph drawn in the accent — a coloured mark in the chrome, which is
+              the one thing D7 reserves for the destination somebody is on.
+
+              ⚠️ AND THE FILL IS WHAT MAKES THEM CIRCLES. `isIconOnly` gives a
+              square box and `.button` is `rounded-3xl`, which the browser clamps
+              to half the shorter side — so a filled icon-only control IS a
+              circle, with no `rounded-full` at a call site for `heroui.test` to
+              refuse and no radius set behind the theme's back.
+            */
             <Hint key={a.id} says={a.label}>
               <Button
                 isIconOnly
                 size={CROWN_SIZE}
-                variant="ghost"
+                variant="tertiary"
                 aria-label={a.label}
                 onPress={a.onDo}
               >

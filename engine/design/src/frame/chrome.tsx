@@ -16,7 +16,8 @@ import * as React from "react";
 import { PRIMARY_MAX, screenFor } from "@engine/kernel";
 import { Button } from "@heroui/react";
 import {
-  GUTTER, ICON, ISLAND_HERE, ISLAND_ITEM, ISLAND_ITEM_MAX, ISLAND_PAD, PAD, ROW, SAFE_BOTTOM, SPACE, WIDTH,
+  DOCK_ACT, DOCK_PLATE, GUTTER, ICON, ISLAND_HERE, ISLAND_ITEM, ISLAND_ITEM_MAX, ISLAND_PAD, PAD, ROW,
+  SAFE_BOTTOM, SPACE, WIDTH,
 } from "../tokens/metrics.js";
 import type { Width } from "../tokens/metrics.js";
 import { MOTION, transition, useStill } from "../tokens/motion.js";
@@ -99,11 +100,25 @@ export function Docked({ width = "read", children }: {
  * the label that is showing is the only one anybody needs — a person does not
  * read the nav to find out where they are not.
  *
- * ⚠️ NOTHING HERE IS A SURFACE. No bar, no pill: the hem under the nav is the
- * background (`data-hem`), and where you are is INK — full foreground against a
- * distinctly recessive muted, plus the one word. Every surface this used to have
- * was solving a problem the hem solves better: the bar was holding contrast
- * against a moving field, and the pill was clearing the bar.
+ * ⚠️ IT IS A PLATE, AND IT IS THE ONE OBJECT IN THE PRODUCT THAT NEVER GOES
+ * AWAY. There was no surface here at all for a while, and the reason was sound:
+ * a capsule the width of its own content left the page's next row visible in the
+ * gaps either side, sliced by its rounded ends — a face cut in half, a heading
+ * reappearing beside the bar. What fixed that is the HEM, which is full width
+ * and dissolves the content before it arrives; removing the plate as well was
+ * one change too many, and what it left was four grey glyphs and a white one
+ * standing on the page.
+ *
+ * ⚠️ THE PLATE IS DARK IN BOTH THEMES (`DOCK`), so everything on it is light in
+ * both and the dock is one object rather than two that share a shape. That is
+ * also what lets a destination be a CIRCLE: on the page's own ground a ring
+ * around a glyph is an edge, which D7 refuses; on a plate it is a hole in a
+ * surface.
+ *
+ * ⚠️ AND WHERE YOU ARE IS STILL INK PLUS A LIGHT, not a second surface. A pill
+ * inside the plate would be a plate on a plate — the shape this design spent a
+ * pass removing — so the active destination keeps the brand-lit glyph and the
+ * one open word, now read against the dock's own ink rather than the page's.
  *
  * ⚠️ THE EXPANSION IS THE TRAVEL, WHICH REPLACES A PILL THAT SLID. There was one
  * absolutely-positioned pill stepping by `index × 100%` of an equal column, and
@@ -232,30 +247,24 @@ export function Island({ items, here, onGo, act, only }: {
         clip with no job is not free: it is what silently cut a destination off
         the right edge the day two items opened at once.
       */
-      className={`sticky bottom-0 z-10 flex justify-center ${GUTTER} ${PAD} ${SAFE_BOTTOM}`
+      className={`sticky bottom-0 z-10 flex items-center justify-center ${SPACE.tight}`
+        + ` ${GUTTER} ${PAD} ${SAFE_BOTTOM}`
         + (only === "phone" ? " md:hidden" : "")}
     >
       {/*
-        ⚠️ IT SPANS THE COLUMN AND THE CLOSED ITEMS SHARE WHAT IS LEFT. A bar
-        sized to its own content came out 234px of 430 with a visible gap either
-        side, which reads as a control that did not finish loading rather than as
-        something floating over the page — and it packs four tap targets into the
-        middle third of the screen, which is the half of the argument that is
-        about thumbs rather than taste. The open pill takes the room its word
-        needs and the four glyphs divide the rest, so the bar is the same width
-        on every screen and the spacing falls out of the arithmetic.
+        ⚠️ SIZED BY ITS CONTENT, WITH A FLOOR — see `DOCK_PLATE`. It spanned the
+        whole column while it had no fill, because a bar of loose glyphs narrower
+        than the screen reads as something that did not finish loading. With the
+        plate under it the gap either side is what makes it an object; the floor
+        is what keeps the outer destinations inside a thumb's reach.
 
-        ⚠️ AND IT CARRIES NO FILL AT ALL. It was `data-chrome` — the ground's own
-        colour, a capsule — and that is a plate with rounded ends, so the page's
-        next row arrived at those ends and was sliced by them: a face cut in half
-        down the gutter, a heading reappearing in the gaps either side. The hem
-        on the nav around it dissolves the content instead, which fixes the
-        collision rather than out-contrasting it, and leaves the five items
-        standing on the page.
+        ⚠️ THE PLATE IS PAINTED BY `[data-island]` IN `ambienceStylesheet`, NOT
+        HERE. A component that names a colour is a component a workspace's
+        branding never reaches (D7) — and the dock's fill and its ink are a PAIR
+        (a light glyph on a dark plate), so they have to be stated together in
+        one place or a control added later inherits the page's ink onto a
+        near-black surface and is invisible rather than merely wrong.
       */}
-      {/* ⚠️ AND NO `data-capsule` EITHER — there is no surface left to round.
-          The attribute would still match its rule and change nothing, which is
-          the state it was in before anybody noticed the nav was a rectangle. */}
       <div
         data-island="true"
         /* ⚠️ `justify-center`, AND IT ONLY DOES ANYTHING BELOW FIVE. With five
@@ -265,7 +274,7 @@ export function Island({ items, here, onGo, act, only }: {
            the right end, which is a bar with a hole in it rather than a bar
            with fewer items. Centred, the marks keep their pitch and the slack
            splits between the ends. */
-        className={`flex w-full ${WIDTH.read} flex-row items-center justify-center`
+        className={`flex ${DOCK_PLATE} ${WIDTH.read} flex-row items-center justify-center`
           + ` ${SPACE.hair} ${ISLAND_PAD}`}
       >
         {shown.map((item) => {
@@ -276,7 +285,12 @@ export function Island({ items, here, onGo, act, only }: {
              with nothing marked the moment anybody opened a record; asking each
              item on its own lit two. */
           const isHere = item.route === at?.route;
-          const open = isHere && !act;
+          /* ⚠️ THE WORD NO LONGER YIELDS TO THE ACT, because the act is no longer
+             in the plate. This read `isHere && !act` for as long as the two
+             shared a row and one label's worth of width between them — which
+             meant the answer to "where am I" went blank on every screen with
+             something to do, which is most of them. */
+          const open = isHere;
           return (
             <Button
               key={item.id}
@@ -301,7 +315,7 @@ export function Island({ items, here, onGo, act, only }: {
                  drop whatever fell off the right edge. */
               className={`flex-row items-center justify-center ${SPACE.tight} ${ROW.free} `
                 + (open ? `shrink-0 ${ISLAND_HERE}` : `shrink-0 ${ISLAND_ITEM}`)
-                + (act ? "" : open ? "" : ` grow basis-0 min-w-0 ${ISLAND_ITEM_MAX}`)}
+                + (open ? "" : ` grow basis-0 min-w-0 ${ISLAND_ITEM_MAX}`)}
               onPress={() => onGo(item.route)}
             >
               {/* ⚠️ NO HINT HERE, AND THAT IS THE ONE DELIBERATE OMISSION. The
@@ -369,46 +383,57 @@ export function Island({ items, here, onGo, act, only }: {
           );
         })}
 
-        {/*
-          ⚠️ THE ACT TAKES WHAT IS LEFT, AND IT IS THE ONLY FILLED THING IN THE
-          BAR. The destinations are ink on the page's own ground (see above);
-          one primary among them is what makes it a primary rather than a sixth
-          glyph. `min-w-0` with a truncating label so five destinations and a
-          long verb degrade to a shorter verb rather than to a bar that wraps or
-          a destination that vanishes.
-        */}
-        {act ? (
-          <Button
-            /* ⚠️ NAMED, BECAUSE THE BAR PAINTS ITS BUTTONS MUTED — see the
-               `[data-island]` rule. The act is the one that keeps its variant's
-               own colour. */
-            data-act="true"
-            variant={act.tone === "danger" ? "danger" : "primary"}
-            isDisabled={act.disabled}
-            onPress={act.onDo}
-            className={`grow min-w-0 flex-row items-center justify-center ${SPACE.tight} ${ROW.free} ${ISLAND_HERE}`}
-          >
-            {act.icon ? (
-              <span
-                aria-hidden="true"
-                className="flex shrink-0 items-center"
-                style={{ ["--icon" as string]: `${ICON.nav}px` }}
-              >
-                {act.icon}
-              </span>
-            ) : null}
-            {/* ⚠️ NO TYPE CLASS AT ALL, AND THIS IS THE SECOND TIME IN THIS FILE.
-                `TYPE.note` is `text-sm text-muted` — a caption's colour, which on
-                a FILLED control beats the foreground its variant sets, so the one
-                word on the primary rendered grey on white. The destination label
-                three elements up carries the same warning for the same reason,
-                and answers it by overriding the colour; a filled button has no
-                colour to override it WITH, because the right one is the
-                variant's. So the button styles its own word, which is D7. */}
-            <span className="truncate leading-none">{act.label}</span>
-          </Button>
-        ) : null}
       </div>
+
+      {/*
+        ⚠️ THE ACT IS BESIDE THE PLATE, NOT ON IT — see `DOCK_ACT`. It was inside,
+        and being inside cost the bar its one word: the destinations closed
+        whenever a screen had something to do, so "where am I" went blank exactly
+        on the screens somebody is deepest into. Two objects, two jobs, neither
+        yielding.
+
+        ⚠️ IT IS THE ONLY FILLED THING IN THE CHROME, and it is filled with the
+        ACCENT, which is monochrome (D7). The product's own colour touches the
+        chrome at one point and that point is the light under the active
+        destination.
+
+        ⚠️ `min-w-0` WITH A TRUNCATING LABEL, so five destinations and a long verb
+        degrade to a shorter verb rather than to a dock that wraps.
+      */}
+      {act ? (
+        <Button
+          /* ⚠️ NAMED, BECAUSE THE PLATE PAINTS ITS BUTTONS IN ITS OWN INK — see
+             the `[data-island]` rule. It is outside the plate now and so is not
+             matched by it, and the attribute is kept anyway: the exclusion is
+             what documents that this button owns its colour, and a future dock
+             that nests it again would need it back. */
+          data-act="true"
+          variant={act.tone === "danger" ? "danger" : "primary"}
+          isDisabled={act.disabled}
+          onPress={act.onDo}
+          className={`${DOCK_ACT} min-w-0 flex-row items-center justify-center`
+            + ` ${SPACE.tight} ${ROW.free} ${ISLAND_HERE}`}
+        >
+          {act.icon ? (
+            <span
+              aria-hidden="true"
+              className="flex shrink-0 items-center"
+              style={{ ["--icon" as string]: `${ICON.nav}px` }}
+            >
+              {act.icon}
+            </span>
+          ) : null}
+          {/* ⚠️ NO TYPE CLASS AT ALL, AND THIS IS THE SECOND TIME IN THIS FILE.
+              `TYPE.note` is `text-sm text-muted` — a caption's colour, which on
+              a FILLED control beats the foreground its variant sets, so the one
+              word on the primary rendered grey on white. The destination label
+              above carries the same warning for the same reason, and answers it
+              by overriding the colour; a filled button has no colour to override
+              it WITH, because the right one is the variant's. So the button
+              styles its own word, which is D7. */}
+          <span className="truncate leading-none">{act.label}</span>
+        </Button>
+      ) : null}
     </nav>
   );
 }

@@ -1066,8 +1066,28 @@ export function ambienceStylesheet(): string {
       variant, because "which button is the act" is the bar's fact and not the
       library's.
     */
+    /*
+      ⚠️ THE PLATE, AND IT IS THE ONE SURFACE IN THE PRODUCT THAT IS THE SAME IN
+      BOTH THEMES. See `DOCK` in `ground.ts` for why the dock is not on the
+      elevation ladder. What it buys the rules below is an ink that does not
+      depend on the theme: everything inside a dark plate is light, so the four
+      channels here — resting, active, muted, lit — are four numbers instead of
+      eight.
+
+      ⚠️ ITS INK IS SET ON THE PLATE, NOT ON THE ITEMS. A glyph in it inherits;
+      an item that needs to differ overrides. Painting each button instead is how
+      a control added later comes out in the page's ink on a near-black plate,
+      which is invisible rather than merely wrong.
+    */
+    `[data-island="true"] {`,
+    `  background-color: var(--tier-dock); color: var(--dock-ink);`,
+    `  border-radius: 9999px; }`,
+    /* ⚠️ THE PLATE'S OWN INK, NOT `--muted`. That token is calibrated against the
+       PAGE's ground and is a near-black in the light theme — on the plate it is
+       a glyph nobody can see. An alpha on the dock's own ink follows the plate
+       instead, in both themes, under every workspace. */
     `[data-island="true"] button:not([data-here="true"]):not([data-act="true"]) {`,
-    `  color: color-mix(in oklab, var(--muted) 58%, transparent); }`,
+    `  color: color-mix(in oklab, var(--dock-ink) 62%, transparent); }`,
     /*
       ⚠️ WHERE YOU ARE IS INK, AND THAT ONLY BECAME POSSIBLE WITH THE HEM. This
       painted `--default` — the control tier — and it had to: the bar under it
@@ -1076,7 +1096,7 @@ export function ambienceStylesheet(): string {
       lozenge inside nothing is a shape drawn round a word for its own sake: one
       more edge, in a system that spent a whole pass removing them.
     */
-    `[data-here="true"] { color: var(--foreground); }`,
+    `[data-island="true"] [data-here="true"] { color: var(--dock-ink); }`,
     /*
       ⚠️ THE ONE PLACE A PRODUCT'S OWN COLOUR TOUCHES THE CHROME, AND IT IS A
       LIGHT RATHER THAN A SURFACE. The bar carries no fill by design — every
@@ -1102,13 +1122,17 @@ export function ambienceStylesheet(): string {
       repaints it on every frame of the travel, on the one control that is on
       screen for the whole session — the gradient IS the blur, for nothing.
     */
-    /* ⚠️ THE LIGHT IS WEAKER ON A BRIGHT GROUND, AND THAT IS PHYSICS RATHER THAN
-       TASTE. On black a warm halo adds luminance and reads as something lit; on
-       cream the same mix subtracts it and reads as a stain under the mark —
-       rendered at one strength in both, the light theme came out looking like
-       highlighter. Two numbers, one for each ground it has to work on. */
-    `[data-island="true"] { --nav-lit: 30% }`,
-    `[data-theme="light"] [data-island="true"] { --nav-lit: 16% }`,
+    /*
+      ⚠️ ONE STRENGTH NOW, AND THE PLATE IS WHY. This was two numbers, and the
+      reason was sound: on black a warm halo ADDS luminance and reads as
+      something lit, while on cream the same mix subtracts it and reads as a
+      stain — so a single value came out looking like highlighter in the light
+      theme. The light theme no longer has cream under this mark. The dock is
+      dark on both grounds (`DOCK` in `ground.ts`), so the halo is doing the
+      same thing in both, and the second number would now be the wrong one
+      twice.
+    */
+    `[data-island="true"] { --nav-lit: 34% }`,
     `[data-island="true"] button[data-here="true"] { position: relative }`,
     `[data-island="true"] button[data-here="true"]::before {`,
     `  content: ""; position: absolute; z-index: 0;`,

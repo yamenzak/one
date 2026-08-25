@@ -32,7 +32,7 @@
 import * as React from "react";
 import { Button } from "@heroui/react";
 import { GRAIN, GRAIN_OPACITY } from "../tokens/ambience.js";
-import { CURTAIN } from "../tokens/ground.js";
+import { CURTAIN, grey } from "../tokens/ground.js";
 import { SAID, useStillness } from "../tokens/motion.js";
 import { WIDTH } from "../tokens/metrics.js";
 import { TYPE } from "../tokens/type.js";
@@ -170,7 +170,11 @@ function TurningO({ done = false }: { readonly done?: boolean }) {
 
 /* -------------------------------------------------------------- the curtain --- */
 
-const shade = (l: number) => `oklch(${l} 0 0)`;
+/* ⚠️ THE LADDER'S OWN, NOT A LOCAL COPY. See `grey` in `ground.ts`: this file
+   had its own zero-chroma spelling, so the curtain stayed colourless after every
+   other surface in the product went warm — on the one screen that exists to be
+   a first impression. */
+const shade = grey;
 
 export interface OpeningProps {
   /**

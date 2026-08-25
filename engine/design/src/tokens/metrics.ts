@@ -324,7 +324,15 @@ export const TITLE_PAD = "pb-10" as const;
  * labels and 40 without — a bar with sixteen pixels of nothing around a row of
  * pills. Four is what a pill needs to not touch the edge it sits in.
  */
-export const ISLAND_PAD = "p-1.5" as const;
+/**
+ * ⚠️ AND IT WENT UP WHEN THE PLATE CAME BACK, which is the same argument in the
+ * other direction. At `p-1.5` the bar was 56px tall — right for a row of loose
+ * glyphs on the page's own ground, where the only thing setting the height is
+ * the marks themselves. A PLATE has a size of its own: at 56 it reads as a strip
+ * somebody squeezed the items into, and at 64 the items are sitting in it. Eight
+ * pixels, and it is the difference between chrome and a container.
+ */
+export const ISLAND_PAD = "p-2" as const;
 
 /**
  * ⚠️ AND THE ITEM INSIDE IT HAS A HEIGHT, OR ITS CONTENT TOUCHES THE EDGES. With
@@ -351,7 +359,15 @@ export const ISLAND_PAD = "p-1.5" as const;
  * from the bar it sits in — which is the single most visible way this shape goes
  * wrong, because the eye reads the mismatch as a rendering fault.
  */
-export const ISLAND_ITEM = "px-2 py-2.5" as const;
+/**
+ * ⚠️ AND THE CLOSED ONE IS A CIRCLE NOW, WHICH IS GEOMETRY RATHER THAN A CLASS.
+ * `.button` is `rounded-3xl` and the browser clamps a radius to half the shorter
+ * side, so any item whose padding makes it roughly square IS a circle — no
+ * `rounded-full` at a call site, which `heroui.test.mjs` would refuse and which
+ * would take a workspace's branding with it (D7). At 12px each side of a 24px
+ * glyph the box is 48 × 48, and that is the whole of it.
+ */
+export const ISLAND_ITEM = "px-3 py-3" as const;
 
 /**
  * HOW WIDE A CLOSED NAV ITEM MAY GROW.
@@ -374,7 +390,41 @@ export const ISLAND_ITEM = "px-2 py-2.5" as const;
  * pitch whether there are three of them or five.
  */
 export const ISLAND_ITEM_MAX = "max-w-[4.5rem]" as const;
-export const ISLAND_HERE = "px-4 py-2.5" as const;
+export const ISLAND_HERE = "px-4 py-3" as const;
+
+/**
+ * THE DOCK IS SIZED BY ITS CONTENT, AND THAT IS ONLY TRUE NOW THAT IT HAS A
+ * SURFACE.
+ *
+ * ⚠️ THE BAR USED TO SPAN THE COLUMN, and the argument was right at the time: a
+ * bar with no fill sized to its own content came out 234px of 430 with a visible
+ * gap either side, which reads as a control that did not finish loading rather
+ * than as something floating over the page. Nothing was there to float. With the
+ * plate under it (`DOCK`) the gap either side is what makes it an OBJECT, which
+ * is the same fact read the other way round.
+ *
+ * ⚠️ AND THE THUMB HALF OF THAT ARGUMENT SURVIVES, WHICH IS WHY THERE IS A
+ * FLOOR. Content-sizing packs the tap targets toward the middle; below about
+ * three quarters of a phone's width the outer destinations start needing a
+ * stretch rather than a reach. The floor is stated as a fraction of the reading
+ * column so it holds at every width instead of being a number that is right on
+ * one phone.
+ */
+export const DOCK_PLATE = "w-fit min-w-[75%] max-w-full" as const;
+
+/**
+ * ⚠️ THE ACT IS BESIDE THE PLATE, NOT ON IT, and that is the whole reason the
+ * destinations keep their word. The bar carried ONE label — the act took it when
+ * a screen had something to do, so the answer to "where am I" disappeared
+ * exactly on the screens where somebody is deepest into a task. Outside the
+ * plate they are two objects with two jobs and neither has to yield.
+ *
+ * ⚠️ IT IS THE ONE FILLED THING IN THE CHROME, and it is filled with the
+ * ACCENT — which is monochrome (D7), so this is a value rather than a hue. The
+ * product's own colour reaches the chrome at exactly one point and that point is
+ * the light under the active destination, not this.
+ */
+export const DOCK_ACT = "shrink-0" as const;
 
 /**
  * ⚠️ A CODE BOX IS TALLER THAN IT IS WIDE, AND THE LIBRARY'S DEFAULT IS NOT.
