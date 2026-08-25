@@ -296,10 +296,42 @@ hand-wiring the same three. Screens whose answer can never legitimately be empty
 — the plan catalogue, the maintenance modes — keep `Await`, and that is the line:
 `Region` is for a block whose answer can be nothing.
 
-### S6 — The layouts
-The declared arrangements: the stack, the grid, the split, the board. Container
-queries throughout, so a layout is a set of relationships rather than a set of
-breakpoints.
+### S6 — The layouts · **stage 94, shipped**
+
+Three arrangements, not four: `stack`, `grid`, `split`. The board was folded into
+the grid — a board is a grid of tiles, and the only thing distinguishing the two
+declarations was how wide a cell was allowed to be, which is now a field.
+
+**A column count is a slot coordinate one level up, and it had to go the same
+way.** `{ as: "grid", cols: 3 }` names a number that is right at exactly one
+width; every other width needs a breakpoint, which is the thing S4 spent a whole
+stage removing from the blocks. It is `{ as: "grid", least: "tile" | "panel" |
+"card" }` now — the narrowest a cell may be, with `auto-fit` deciding how many
+fit. `Grid`'s own header had already argued this and the layout contract had
+gone the other way. The same edit ran through `split`, whose `lead: number` (a
+percentage) became `aside: "start" | "end"` — which side it is DRAWN on, with the
+reading order fixed — and through `Span`, whose `cols` became `cells`, bounded by
+`CELLS_MOST = 3`.
+
+**`beside: true` is how a block claims the aside**, and both directions refuse:
+a `split` where nothing claims it (or two things do) is `split_without_an_aside`,
+a `beside` on a stack or a grid is `aside_without_a_split`. A split with no aside
+does not fail — it draws one column and an empty gutter, which reads as a screen
+that loaded half of itself.
+
+**And the measurement found a real regression I had introduced in S4.** `Columns`
+and `Segmented` each carried `@container` and their `@2xl:` rules on the SAME
+element. An element cannot query itself, so both rules were completely inert at
+every width: the declaration typechecked, the classes shipped in the stylesheet,
+and the columns never separated. Nothing static saw it — `reflow.test.mjs`'s
+"every file that queries a box also declares one" was satisfied, because the file
+did declare one. Only asking a browser how many columns actually came out could
+answer it. Both are wrappers now, `reflow.test.mjs` has a fourth check for it,
+and `arranged.seen.test.tsx` is the reading: a stack draws one column, a grid
+draws more than one, tiles fit more across than cards at the same width, and a
+split's aside is beside its main column rather than under it — found by
+`querySelector("aside")` and `previousElementSibling`, because a reading that
+counts DOM levels breaks on the correct fix and passes on the incorrect one.
 
 ### S7 — The guards, re-founded
 The 69 source-scanning guards become schema-scanning guards. Each one keeps its

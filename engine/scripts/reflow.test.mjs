@@ -162,6 +162,41 @@ files.push("design/src/tokens/metrics.ts", "design/src/tokens/type.ts");
   if (!loose) ok("containers: every file that queries a box also declares one");
 }
 
+/* ------------------------------------------------------ and it is not itself --- */
+
+/**
+ * ⚠️ AN ELEMENT CANNOT QUERY ITSELF, AND THE RULE IS SIMPLY INERT WHEN IT TRIES.
+ * `Columns` and `Segmented` both carried `@container` and their `@2xl:` rules on
+ * ONE element: the declaration typechecked, the class was in the stylesheet, and
+ * the columns never separated at any width. Nothing static could see it and
+ * nothing visual reported it — the component looked converted and behaved as it
+ * had before, which is the exact silence this whole arc is a catalogue of.
+ *
+ * ⚠️ IT WAS FOUND BY A BROWSER ASKING HOW MANY COLUMNS CAME OUT, which is why
+ * the measured half exists. This check is the cheap version of that reading, so
+ * the third instance is caught before somebody has to write another one.
+ */
+{
+  let itself = 0;
+  for (const at of files) {
+    const text = readFileSync(join(ENGINE, at), "utf8");
+    /* One `className={…}` at a time — a whole-file test cannot tell two
+       neighbouring elements from one. */
+    for (const m of text.matchAll(/className=\{(`[^`]*`|"[^"]*")\}/g)) {
+      const cls = m[1];
+      const container = /\$\{BOX\}/.test(cls) || /@container/.test(cls);
+      const queries = /@(?:xs|sm|md|lg|xl|2xl|3xl):/.test(cls) || /\$\{ROOM\./.test(cls);
+      if (!container || !queries) continue;
+      itself++;
+      fail(`${at}: one element is both the container and the thing querying it.\n`
+        + `       ${cls.slice(0, 90)}\n`
+        + `       An element cannot query itself, so the rule is inert at every width — `
+        + `it typechecks, the class ships, and nothing ever moves. Wrap it.`);
+    }
+  }
+  if (!itself) ok("boxes: no element is both the container and what measures it");
+}
+
 console.log(bad
   ? "\nreflow: something decides by the window rather than by its own box."
   : "\nreflow: a block reflows by the box it was given, and says which box that is.");

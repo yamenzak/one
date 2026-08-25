@@ -137,7 +137,7 @@ export function Start({ title, said, raised, counts, already, held, onGo }: {
           </Section>
         ) : null}
 
-        <Grid min="20rem" space="roomy">
+        <Grid least="card" space="roomy">
           <Section label="About stock">
             {/* ⚠️ KEYED BY SCREEN, FROM THE APP'S OWN BOOK. Help written into a
                 page is help nobody can search. */}

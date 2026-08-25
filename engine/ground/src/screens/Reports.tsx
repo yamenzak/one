@@ -147,7 +147,7 @@ export function Reports({ title, of, again, today, period, onPeriod }: {
         </Section>
 
         <Section label="What gets written">
-          <Grid min="20rem" space="roomy">
+          <Grid least="card" space="roomy">
             <ChartPanel label="By kind" under="Every note has exactly one">
               <ColumnChart
                 describes="How many notes of each kind"
@@ -192,7 +192,7 @@ export function Reports({ title, of, again, today, period, onPeriod }: {
         </Section>
 
         <Section label="Rhythm">
-          <Grid min="20rem" space="roomy">
+          <Grid least="card" space="roomy">
             <ChartPanel label="When people write" under="Blank means never, not none">
               {/* ⚠️ THE HOLES ARE THE TEST. A grid that shades a missing reading
                   the same as a quiet one invents data, and the invention is
@@ -233,7 +233,7 @@ export function Reports({ title, of, again, today, period, onPeriod }: {
         </Section>
 
         <Section label="What the plan allows">
-          <Grid min="16rem" space="roomy">
+          <Grid least="panel" space="roomy">
             <ChartPanel label="This month">
               <Stack space="roomy">
                 {/* ⚠️ A METER AND A RING ARE THE SAME FACT AT TWO SIZES, and the

@@ -684,10 +684,14 @@ export function Segmented({ value, onChange, options, ...p }: Omit<Said, "error"
      rather than a regression on every row that already prints the name. Same
      context, same rule, same as its nine neighbours. */
   return (
-    <div className={`${BOX} flex flex-col ${SPACE.tight} ${ROOM.fits} @2xl:self-start`}>
-      <Naming>{p.label}</Naming>
-      {group}
-      <Tail help={p.help} />
+    /* ⚠️ THE CONTAINER IS A WRAPPER — an element cannot query itself, and both on
+       one element leaves the rule inert at every width. See `Columns`. */
+    <div className={BOX}>
+      <div className={`flex flex-col ${SPACE.tight} ${ROOM.fits} @2xl:self-start`}>
+        <Naming>{p.label}</Naming>
+        {group}
+        <Tail help={p.help} />
+      </div>
     </div>
   );
 }

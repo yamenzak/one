@@ -132,11 +132,11 @@ export function Write({ title, onBack, onSave }: {
             {/* ⚠️ TWO ACROSS ON A DESKTOP AND ONE ON A PHONE, from a minimum
                 rather than a column count — a grid declared as "two columns"
                 needs a breakpoint for every size it does not fit. */}
-            <Grid min="14rem" space="snug">
+            <Grid least="panel" space="snug">
               <DateInput label="Happened on" onChange={() => undefined} />
               <TimeInput label="Time" onChange={() => undefined} />
             </Grid>
-            <Grid min="14rem" space="snug">
+            <Grid least="panel" space="snug">
               <NumberInput
                 label="Minutes it took"
                 value={minutes}

@@ -172,7 +172,7 @@ export function Start({ title, raised, counts, held, onGo }: {
           </Stack>
         </Section>
 
-        <Grid min="20rem" space="roomy">
+        <Grid least="card" space="roomy">
           <Section label="About this screen">
             {/* ⚠️ THE HELP IS THE APP'S OWN BOOK, KEYED BY SCREEN. Help written
                 into a page is help nobody can search, and a search that misses

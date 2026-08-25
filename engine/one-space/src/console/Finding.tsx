@@ -98,7 +98,7 @@ export function Finding() {
             one column on a phone with no breakpoint written anywhere.
           */}
           <Group label="What is in the index">
-            <Grid min="8rem">
+            <Grid least="tile">
               <Stat label="Findable" value={at.indexed} />
               {/* ⚠️ WAITING IS ORDINARY, NOT A FAULT. The job runs every quarter
                   hour, so a number here is the system working. */}

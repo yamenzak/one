@@ -19,7 +19,8 @@ import {
   BAND_PAD, BLEED_PULL, GUTTER, SCROLL_GUTTER, SPACE,
 } from "../tokens/metrics.js";
 import type { Space } from "../tokens/metrics.js";
-import { BOX, ROOM, WIDTH } from "../tokens/metrics.js";
+import type { Cell, Layout } from "@engine/kernel";
+import { BOX, CELL, ROOM, WIDTH } from "../tokens/metrics.js";
 import type { Width } from "../tokens/metrics.js";
 
 /* ⚠️ THE MEASUREMENTS A SCREEN LEGITIMATELY NEEDS, RE-EXPORTED BESIDE THE
@@ -68,16 +69,21 @@ export function Row(
  * ⚠️ `auto-fit` WITH A MINIMUM, NOT A COLUMN COUNT. A grid declared as "three
  * columns" needs a breakpoint for every size it does not fit; this one has none
  * and cannot be wrong on a device nobody tested.
+ *
+ * ⚠️ AND THE MINIMUM IS A NAME NOW — see `CELL`. It was a free string, and the
+ * product held five different answers to "how narrow may a cell be": `8rem`,
+ * `15rem`, `20rem` and two defaults. None was wrong on its own and no two of
+ * them agreed, which is the drift a closed set exists to make impossible.
  */
 export function Grid(
-  { min = "16rem", space = "snug", children }: {
-    readonly min?: string; readonly space?: Space; readonly children?: React.ReactNode;
+  { least = "panel", space = "snug", children }: {
+    readonly least?: Cell; readonly space?: Space; readonly children?: React.ReactNode;
   },
 ) {
   return (
     <div
       className={`grid ${SPACE[space]}`}
-      style={{ gridTemplateColumns: `repeat(auto-fit, minmax(min(${min}, 100%), 1fr))` }}
+      style={{ gridTemplateColumns: `repeat(auto-fit, minmax(min(${CELL[least]}, 100%), 1fr))` }}
     >
       {children}
     </div>
@@ -106,14 +112,24 @@ export function Columns({ aside, side = "end", space = "roomy", children }: {
   readonly children: React.ReactNode;
 }) {
   return (
-    /* ⚠️ ITS OWN BOX, NOT THE SCREEN'S — see `BOX`. Two columns are right where
-       there is room for two columns, and a `Columns` nested inside a narrow
-       region on a wide monitor has none. */
-    <div className={`${BOX} flex ${ROOM.beside} ${SPACE[space]}`}>
-      <div className="min-w-0 grow">{children}</div>
-      <aside className={`${ROOM.side} ${side === "start" ? ROOM.first : ""}`}>
-        {aside}
-      </aside>
+    /*
+      ⚠️ ITS OWN BOX, NOT THE SCREEN'S — see `BOX`. Two columns are right where
+      there is room for two columns, and a `Columns` nested inside a narrow
+      region on a wide monitor has none.
+
+      ⚠️ AND THE CONTAINER IS A WRAPPER, BECAUSE AN ELEMENT CANNOT QUERY ITSELF.
+      Both were on one element and the whole rule was inert: the declaration
+      typechecked, the class was in the stylesheet, and the columns never
+      separated at any width. Nothing static could see it — only a browser asked
+      how many columns actually came out.
+    */
+    <div className={BOX}>
+      <div className={`flex ${ROOM.beside} ${SPACE[space]}`}>
+        <div className="min-w-0 grow">{children}</div>
+        <aside className={`${ROOM.side} ${side === "start" ? ROOM.first : ""}`}>
+          {aside}
+        </aside>
+      </div>
     </div>
   );
 }
@@ -322,3 +338,49 @@ export function Center({ space = "roomy", children }: {
 
 /** Pushes what follows it to the bottom of a flex column. */
 export const Spacer = () => <div className="flex-1" />;
+
+/* -------------------------------------------------------------- arranged --- */
+
+/**
+ * A DECLARED LAYOUT, DRAWN — and there are three of them.
+ *
+ * ⚠️ NONE OF THE THREE IS A COORDINATE, WHICH IS THE PROPERTY THEY ARE CHOSEN
+ * FOR. A stack is an order; a grid is a narrowest cell and however many fit; a
+ * split is a main thing and one aside. What none of them says is "row 2, column
+ * 3" — because a position is a placement the author makes, and an author placing
+ * pixels is one who has taken responsibility for reflow away from the blocks
+ * (D92).
+ *
+ * ⚠️ AND THE ASIDE IS NAMED BY THE THING ITSELF, NOT BY ITS POSITION. "The last
+ * block is the sidebar" reads as an accident the first time somebody reorders a
+ * body, and reordering a body is the one edit a declaration is supposed to make
+ * safe. `beside` is one bit on one block, and `refuseSurface` insists there is
+ * exactly one of it.
+ */
+export function Arranged({ layout, children, aside }: {
+  readonly layout: Layout;
+  readonly children: React.ReactNode;
+  /** ⚠️ Required by `split` and refused by the other two — see `refuseSurface`. */
+  readonly aside?: React.ReactNode;
+}) {
+  if (layout.as === "grid") return <Grid least={layout.least} space="roomy">{children}</Grid>;
+  if (layout.as === "split") {
+    return <Columns aside={aside} side={layout.aside}>{children}</Columns>;
+  }
+  /* ⚠️ `blocks`, because the rhythm between a screen's blocks is measured from
+     the DOM rather than from a walk over React children — see `rhythm`. */
+  return <Stack space="roomy" blocks>{children}</Stack>;
+}
+
+/**
+ * ⚠️ HOW MANY CELLS ONE THING TAKES, AS A STYLE RATHER THAN A CLASS. Tailwind
+ * emits only what it has seen, so `col-span-${n}` is a class that exists in no
+ * stylesheet — the silent half of the same fault that left a whole token file
+ * inert. A span is a number from a declaration, so it is set as a property.
+ *
+ * ⚠️ AND IT IS CLAMPED BY THE GRID ITSELF. `auto-fit` has no fixed count, so a
+ * span of three in a grid that fits two takes the two — the browser's answer,
+ * and the right one at every width including the ones nobody anticipated.
+ */
+export const spanning = (cells: number | undefined): React.CSSProperties =>
+  (cells && cells > 1 ? { gridColumn: `span ${cells}` } : {});

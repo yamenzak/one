@@ -211,24 +211,49 @@ export type Presence =
  * opening, a phone rotating or a workspace nobody anticipated.
  */
 export interface Span {
-  readonly cols?: number;
-  readonly rows?: number;
+  /**
+   * ⚠️ HOW MANY CELLS, NOT WHICH ONES. A block that names a position is placed
+   * by the author; a block that asks for room is placed by the layout, and only
+   * the second survives a grid that fits a different number of cells on a
+   * different screen.
+   */
+  readonly cells?: number;
 }
 
 /**
- * ⚠️ FOUR COLUMNS IS THE CEILING AND IT IS A DESIGN DECISION, NOT A LIMITATION.
- * Past four, a declaration has stopped arranging and started placing pixels —
- * and the moment an author is placing pixels the block can no longer be
- * responsible for its own reflow, because somebody else is doing it for them.
- * A screen wanting twelve columns wants a different shape.
+ * ⚠️ THREE CELLS IS THE CEILING, AND IT IS A DESIGN DECISION RATHER THAN A
+ * LIMITATION. A block spanning most of a grid is a block that wanted to be
+ * outside the grid — put it above or below, where it is one thing on its own,
+ * rather than making the grid pretend to be a page layout.
  */
-export const COLS_MOST = 4;
+export const CELLS_MOST = 3;
 
+/**
+ * HOW NARROW A CELL MAY BE — a named width, never a number.
+ *
+ * ⚠️ AND NEVER A COLUMN COUNT, WHICH IS THE SAME MISTAKE `Grid` ALREADY REFUSES
+ * ONE LEVEL DOWN. "Three columns" needs a breakpoint for every size it does not
+ * fit; a narrowest-cell has none and cannot be wrong on a device nobody tested.
+ * The number of columns is then whatever fits, which is the answer at every
+ * width including the ones nobody anticipated.
+ *
+ * ⚠️ AND IT IS THE SAME CLOSED SET A RAIL'S CARDS USE, because a tile beside a
+ * tile should be the same tile whether it is scrolled to or laid out.
+ */
+export type Cell = "tile" | "panel" | "card";
+
+/**
+ * HOW A SCREEN'S BLOCKS ARE ARRANGED — three, and none of them is a coordinate.
+ *
+ * ⚠️ `split` NAMES A SIDE RATHER THAN A WIDTH, and the side is only about where
+ * the aside is DRAWN: the reading order never changes, because putting a filter
+ * panel before the results in the DOM because it is drawn on the left is how a
+ * page becomes unusable without being wrong.
+ */
 export type Layout =
   | { readonly as: "stack" }
-  | { readonly as: "grid"; readonly cols: number }
-  /** ⚠️ `lead` is how many of the grid's columns the first block takes. */
-  | { readonly as: "split"; readonly lead: number };
+  | { readonly as: "grid"; readonly least: Cell }
+  | { readonly as: "split"; readonly aside: "start" | "end" };
 
 /**
  * ONE THING ON A SCREEN.
@@ -255,6 +280,13 @@ export interface BlockSpec {
    * the first time a screen moved.
    */
   readonly goes?: string;
+  /**
+   * ⚠️ THIS IS THE ASIDE OF A SPLIT, AND EXACTLY ONE THING MAY SAY SO. The
+   * alternative is positional — "the last block is the sidebar" — which reads as
+   * an accident the first time somebody reorders a body, and reordering a body
+   * is the one edit a declaration is supposed to make safe.
+   */
+  readonly beside?: true;
 }
 
 /**
@@ -276,6 +308,8 @@ export interface GroupSpec {
   readonly of: readonly BlockSpec[];
   readonly when?: Presence;
   readonly span?: Span;
+  /** ⚠️ See `BlockSpec.beside` — a group can be the aside just as a block can. */
+  readonly beside?: true;
 }
 
 export type Placed = BlockSpec | GroupSpec;
@@ -362,7 +396,8 @@ export type SurfaceRefusal =
   | "field_unknown" | "field_without_a_subject" | "format_wrong"
   | "dispatch_not_closed" | "dispatch_unreachable" | "two_kinds_of_screen"
   | "goes_nowhere"
-  | "span_overflows" | "span_without_a_grid" | "grid_too_wide"
+  | "span_too_wide" | "span_without_a_grid"
+  | "split_without_an_aside" | "aside_without_a_split"
   | "operation_unknown" | "nothing_on_it";
 
 export interface SurfaceProblem {
@@ -370,10 +405,6 @@ export interface SurfaceProblem {
   readonly why: SurfaceRefusal;
   readonly detail: string;
 }
-
-/** How many columns a layout has to hand out. */
-export const colsOf = (layout: Layout): number =>
-  layout.as === "grid" ? layout.cols : layout.as === "split" ? COLS_MOST : 1;
 
 /**
  * The one place a `when` is taken apart.
@@ -515,19 +546,27 @@ export function refuseSurface(
 
   /* --- the layout ------------------------------------------------------- */
 
-  if (body.layout.as === "grid" && (body.layout.cols < 2 || body.layout.cols > COLS_MOST)) {
-    at("grid_too_wide",
-      `a grid of ${body.layout.cols} — two to ${COLS_MOST} columns is arranging, and more `
-      + `than that is placing pixels a block can no longer reflow inside`);
-  }
-  if (body.layout.as === "split" && (body.layout.lead < 1 || body.layout.lead >= COLS_MOST)) {
-    at("span_overflows", `a split leading with ${body.layout.lead} of ${COLS_MOST} columns leaves nothing beside it`);
-  }
   if (body.blocks.length === 0) {
     at("nothing_on_it", "declares a body with no blocks in it, which draws a title over an empty page");
   }
 
-  const cols = colsOf(body.layout);
+  /*
+    ⚠️ A SPLIT WITH NO ASIDE IS ONE COLUMN WEARING A TWO-COLUMN DECLARATION, and
+    it does not fail — it draws the main content and an empty gutter beside it,
+    which reads as a screen that failed to load half of itself. Two asides is the
+    same fault from the other end: the second silently replaces the first.
+  */
+  const asides = body.blocks.filter((p) => p.beside).length;
+  if (body.layout.as === "split" && asides !== 1) {
+    at("split_without_an_aside",
+      asides === 0
+        ? "is a split and nothing declares itself the aside, so one column is drawn beside an empty gutter"
+        : `is a split and ${asides} things claim to be the aside — a split has one`);
+  }
+  if (body.layout.as !== "split" && asides > 0) {
+    at("aside_without_a_split",
+      `declares an aside on a ${body.layout.as}, which has nothing to put it beside`);
+  }
 
   /* --- the subject ------------------------------------------------------ */
 
@@ -624,12 +663,15 @@ export function refuseSurface(
   */
   for (const placed of body.blocks) {
     const said = isGroup(placed) ? `the "${placed.group ?? "unnamed"}" group` : placed.block;
-    if (placed.span && body.layout.as === "stack") {
+    if (placed.span && body.layout.as !== "grid") {
       at("span_without_a_grid",
-        `${said} asks for ${placed.span.cols ?? 1} columns on a stack, which has one`);
+        `${said} asks for ${placed.span.cells ?? 1} cells, and a ${body.layout.as} has none to give`);
     }
-    if (placed.span?.cols && placed.span.cols > cols) {
-      at("span_overflows", `${said} asks for ${placed.span.cols} of ${cols} columns`);
+    if (placed.span?.cells !== undefined
+      && (placed.span.cells < 2 || placed.span.cells > CELLS_MOST)) {
+      at("span_too_wide",
+        `${said} asks for ${placed.span.cells} cells — one is the default and more than `
+        + `${CELLS_MOST} is a block that wanted to be outside the grid`);
     }
     if (!isGroup(placed)) continue;
     if (placed.of.length === 0) {

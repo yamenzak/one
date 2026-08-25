@@ -77,7 +77,7 @@ function Console() {
         <NavRow label="Three" under="a fact" onOpen={() => {}} />
       </Group>
       <Group label="Figures">
-        <Grid min="8rem">
+        <Grid least="tile">
           <Stat label="Findable" value={12} />
           <Stat label="Waiting" value={3} />
         </Grid>

@@ -17,7 +17,7 @@ import { describe, expect, it } from "vitest";
 import { collection } from "../src/collection.js";
 import { field } from "../src/field.js";
 import {
-  BONES, COLS_MOST, blocksIn, colsOf, fieldsIn, refuseSurface, refuseView, unreadViews,
+  BONES, CELLS_MOST, blocksIn, fieldsIn, refuseSurface, refuseView, unreadViews,
   viewsIn, type BlockIndex, type SurfaceSpec, type ViewSpec,
 } from "../src/surface.js";
 import { BLOCKS } from "../src/blocks.js";
@@ -310,12 +310,12 @@ describe("blocks sit under one heading, and the nesting stops there", () => {
   it("refuses a span inside a group, whose blocks stack", () => {
     expect(why(screen({
       body: body({
-        layout: { as: "grid", cols: 2 },
+        layout: { as: "grid", least: "card" },
         blocks: [{
           group: "Label",
           of: [{
             block: "Heading",
-            span: { cols: 2 },
+            span: { cells: 2 },
             bind: { says: { from: { of: "words", says: "Note" } } },
           }],
         }],
@@ -324,7 +324,7 @@ describe("blocks sit under one heading, and the nesting stops there", () => {
   });
 
   it("lets the group itself ask for room", () => {
-    expect(why(grouped({ layout: { as: "grid", cols: 2 } }))).toEqual([]);
+    expect(why(grouped({ layout: { as: "grid", least: "card" } }))).toEqual([]);
   });
 
   it("flattens every block with the group it is under", () => {
@@ -523,45 +523,72 @@ describe("a view is checked against the collection it reads", () => {
 /* ---------------------------------------------------------------- layouts --- */
 
 describe("a block asks for room the layout has", () => {
-  it("hands out one column on a stack", () => {
-    expect(colsOf({ as: "stack" })).toBe(1);
-    expect(colsOf({ as: "grid", cols: 3 })).toBe(3);
-  });
-
-  it("refuses a span on a stack, which has one column", () => {
+  it("refuses a span on a stack, which has no cells to give", () => {
     expect(why(screen({
       body: body({
         blocks: [{
           block: "Heading",
-          span: { cols: 2 },
+          span: { cells: 2 },
           bind: { says: { from: { of: "words", says: "Note" } } },
         }],
       }),
     }))).toContain("span_without_a_grid");
   });
 
-  it("refuses a span wider than its grid", () => {
+  /*
+    ⚠️ A SPLIT WITH NO ASIDE DOES NOT FAIL — it draws the main content and an
+    empty gutter beside it, which reads as a screen that failed to load half of
+    itself. Two asides is the same fault from the other end: the second silently
+    replaces the first.
+  */
+  it("refuses a split with nothing declaring itself the aside", () => {
+    expect(why(screen({ body: body({ layout: { as: "split", aside: "end" } }) })))
+      .toContain("split_without_an_aside");
+  });
+
+  it("refuses a split with two of them", () => {
     expect(why(screen({
       body: body({
-        layout: { as: "grid", cols: 2 },
+        layout: { as: "split", aside: "end" },
+        blocks: [
+          { block: "Heading", beside: true, bind: { says: { from: { of: "words", says: "A" } } } },
+          { block: "Heading", beside: true, bind: { says: { from: { of: "words", says: "B" } } } },
+        ],
+      }),
+    }))).toContain("split_without_an_aside");
+  });
+
+  it("accepts a split with exactly one", () => {
+    expect(why(screen({
+      body: body({
+        layout: { as: "split", aside: "end" },
+        blocks: [
+          { block: "Heading", bind: { says: { from: { of: "words", says: "A" } } } },
+          { block: "Heading", beside: true, bind: { says: { from: { of: "words", says: "B" } } } },
+        ],
+      }),
+    }))).toEqual([]);
+  });
+
+  it("refuses an aside on a layout that has nothing to put it beside", () => {
+    expect(why(screen({
+      body: body({
+        blocks: [{ block: "Heading", beside: true, bind: { says: { from: { of: "words", says: "A" } } } }],
+      }),
+    }))).toContain("aside_without_a_split");
+  });
+
+  it("refuses a span wide enough to be a page layout", () => {
+    expect(why(screen({
+      body: body({
+        layout: { as: "grid", least: "card" },
         blocks: [{
           block: "Heading",
-          span: { cols: 3 },
+          span: { cells: CELLS_MOST + 1 },
           bind: { says: { from: { of: "words", says: "Note" } } },
         }],
       }),
-    }))).toContain("span_overflows");
-  });
-
-  /*
-    ⚠️ THE CEILING IS A DESIGN DECISION RATHER THAN A LIMITATION. Past four
-    columns a declaration has stopped arranging and started placing pixels, and
-    the moment an author is placing pixels the block can no longer be
-    responsible for its own reflow — somebody else is doing it for them.
-  */
-  it("refuses a grid wide enough to be a coordinate system", () => {
-    expect(why(screen({ body: body({ layout: { as: "grid", cols: COLS_MOST + 1 } }) })))
-      .toContain("grid_too_wide");
+    }))).toContain("span_too_wide");
   });
 
   it("refuses a body with nothing on it", () => {

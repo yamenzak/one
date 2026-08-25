@@ -105,7 +105,7 @@ function Specimen() {
               `Grid`'s job, which is why it takes whatever it is handed rather
               than a spec.
             */}
-            <Grid min="14rem">
+            <Grid least="panel">
               {SHELVES.map((one) => (
                 <Group
                   key={one.id}

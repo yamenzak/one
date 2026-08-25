@@ -265,7 +265,7 @@ export function Wallet({
 
       {/* ⚠️ Auto-fit for the same reason the plan shelf is — a catalogue has
           however many packs somebody priced. See `Shelf`. */}
-      <Grid min="15rem">
+      <Grid least="panel">
         {[...packs].sort((a, b) => a.order - b.order).map((pack) => (
           <Group
             key={pack.id}

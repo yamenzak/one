@@ -755,6 +755,28 @@ export const BOX = "@container" as const;
  * one word each — measured, not chosen. A second threshold is a second decision
  * per block and the beginning of a breakpoint system inside a container system.
  */
+/**
+ * HOW NARROW A CELL OF A GRID MAY BE, NAMED RATHER THAN TYPED.
+ *
+ * ⚠️ THE THREE ARE WHAT CALLERS ACTUALLY ASKED FOR, ROUNDED TO A SET. Before
+ * this the minimum was a free string and the product held `8rem`, `15rem`,
+ * `20rem` and two defaults — five answers to one question, none of them wrong on
+ * its own and no two of them agreeing. A closed set is what makes a grid of
+ * tiles on one screen the same grid of tiles on the next.
+ *
+ * ⚠️ AND IT IS A MINIMUM, NEVER A COUNT — see `Grid`. "Three columns" needs a
+ * breakpoint for every size it does not fit; a narrowest cell has none and
+ * cannot be wrong on a device nobody tested.
+ */
+export const CELL = {
+  /** A photograph, a swatch, a figure — several across even on a phone. */
+  tile: "8rem",
+  /** A panel of fields, a chart, a barcode: enough for a line of text. */
+  panel: "15rem",
+  /** A card meant to be read — two across a desk, one on a phone. */
+  card: "20rem",
+} as const;
+
 export const ROOM = {
   /** Drawn only once the block's own box is wide. */
   wide: "hidden @2xl:block" as const,
