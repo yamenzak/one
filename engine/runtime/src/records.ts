@@ -416,8 +416,18 @@ export const narrow = (
  * shelves inside this one" is one declaration read from every location; without
  * it the manifest would carry a view per row, which is not a declaration at all.
  */
-const said = (v: Value, here: Here): unknown =>
-  ("literal" in v ? v.literal : here[v.here]);
+const said = (v: Value, here: Here): unknown => {
+  if ("literal" in v) return v.literal;
+  /*
+    ⚠️ `null` RATHER THAN `undefined`, AND IT IS NOT TIDINESS. A detail view runs
+    on a screen whose record has not resolved yet — a fresh address, a back
+    button mid-flight — and D1 refuses to bind `undefined` at all, so the whole
+    screen answers a type error instead of a page. Bound as null the comparison
+    matches nothing, which is the true answer: nothing is inside a shelf nobody
+    has named yet.
+  */
+  return here[v.here] ?? null;
+};
 
 /**
  * A PAGE OF A COLLECTION, AND HOW MANY THERE ARE.

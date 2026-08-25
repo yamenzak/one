@@ -231,6 +231,7 @@ if (what === "guards") {
     ["reconcile", "the check on the money that is not our own arithmetic"],
     ["ai-ops", "which model a workspace picked, and what it will cost them"],
     ["ai-run", "the seam an operation generates through — values in, a metered answer out"],
+    ["screen", "what a declared screen is handed: its record, its views, and the permission every one of them needs"],
     ["search", "what is findable: the ledger a write leaves, and the pass that carries it"],
     ["views", "a declared view, run: narrowed, sorted, bounded, and counted whole"],
     ["search-ops", "the find operation a searchable collection gets, with its boundary already in it"],

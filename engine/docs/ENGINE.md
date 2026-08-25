@@ -498,8 +498,9 @@ env or a binding.
 | `reconcile` | the check on the money that is not our own arithmetic | 6 | — |
 | `ai-ops` | which model a workspace picked, and what it will cost them | 1 | — |
 | `ai-run` | the seam an operation generates through — values in, a metered answer out | 2 | — |
+| `screen` | what a declared screen is handed: its record, its views, and the permission every one of them needs | 2 | 1 |
 | `search` | what is findable: the ledger a write leaves, and the pass that carries it | 17 | — |
-| `views` | a declared view, run: narrowed, sorted, bounded, and counted whole | 3 | 1 |
+| `views` | a declared view, run: narrowed, sorted, bounded, and counted whole | 3 | — |
 | `search-ops` | the find operation a searchable collection gets, with its boundary already in it | 1 | — |
 | `totals-ops` | how many of each thing there are, in one ask instead of one list read per number | 2 | — |
 | `operator` | the deployment looking at itself | 4 | — |
@@ -524,7 +525,7 @@ env or a binding.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 1 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 9 | — |
 
-**467 of them**, 465 reached by something today.
+**469 of them**, 467 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 
@@ -1179,7 +1180,7 @@ and counted two of ten was the same gap it exists to close, one layer down.
 | **35** — A workspace runs its own retention ladder against its own customers, and ours freezes it | `kernel/src/package.ts` | 1 |
 | **35** — A workspace runs its own retention ladder against its own customers, and ours freezes it | `runtime/src/jobs.ts` | 1 |
 | **96** — The renderer: a screen is drawn from what it declares | `kernel/src/surface.ts` | 1 |
-| **96** — The renderer: a screen is drawn from what it declares | `runtime/src/views.ts` | 1 |
+| **96** — The renderer: a screen is drawn from what it declares | `runtime/src/screen.ts` | 1 |
 
 **4 declarations** are built and reached by nothing, each waiting on a
 stage it names in a `DEFER` marker. `scripts/capability.test.mjs` fails on one
@@ -1198,9 +1199,10 @@ that names no stage, so this list cannot grow by forgetting.
 | **58** — An operation's ceiling is in force — calls per minute, per caller, refused rather than declared | `kernel/src/operation.ts` |
 | **86** — A model is given something to hear, and the seconds are counted before they are spent | `kernel/src/ai.ts` |
 | **96** — The renderer: a screen is drawn from what it declares | `kernel/src/surface.ts` |
+| **96** — The renderer: a screen is drawn from what it declares | `runtime/src/screen.ts` |
 | **96** — The renderer: a screen is drawn from what it declares | `runtime/src/views.ts` |
 
-**10 markers**, which is the real count: the table above walks what
+**11 markers**, which is the real count: the table above walks what
 a package EXPORTS, so a deferral on a field inside a declaration is invisible to
 it. `scripts/docs.test.mjs` fails on a marker naming a stage that shipped or one
 a later decision superseded, so neither list can rot into a promise nobody owes.
