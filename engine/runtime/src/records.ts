@@ -14,7 +14,7 @@
  * a handler will one day forget, and the failure is somebody else's records.
  */
 
-import type { CollectionSpec } from "@engine/kernel";
+import type { CollectionSpec, Match, Sort, Value } from "@engine/kernel";
 import { checkAll, checkSome, eraseBy, newId, vaultKeyFor } from "@engine/kernel";
 import { noteScopeGone } from "./search.js";
 import { column, table, type Db } from "./sql.js";
@@ -331,6 +331,17 @@ export interface Asking {
   readonly where?: Readonly<Record<string, unknown>>;
   /** The `next` of the previous page, opaque to the caller. */
   readonly after?: string;
+  /**
+   * ⚠️ WHAT A DECLARED VIEW NARROWS BY, WHICH IS FOUR TESTS AND NOT ONE. `where`
+   * is equality and came first because that is all an operation's caller could
+   * ask for; a `ViewSpec` also says `isnt`, `set` and `unset` — and "the ones
+   * nobody has filed yet" is a view every product in this repository wants and
+   * equality cannot express. There is still no comparison here, deliberately:
+   * the day `gt` arrives the manifest has become a query language (D92).
+   */
+  readonly match?: readonly Match[];
+  /** ⚠️ A DECLARED field, ascending or descending. Never an expression. */
+  readonly sort?: Sort;
 }
 
 export interface Listed {
@@ -365,8 +376,11 @@ export const MOST_ROWS = 200;
  * writes that column into every table and a caller narrowing to one row is
  * asking a legitimate question.
  */
-const narrow = (
+export interface Here { readonly record?: string | undefined; readonly me?: string | undefined }
+
+export const narrow = (
   spec: CollectionSpec, where: Readonly<Record<string, unknown>> | undefined,
+  matches?: readonly Match[], here: Here = {},
 ): { readonly sql: string; readonly bound: readonly unknown[] } => {
   const parts: string[] = [];
   const bound: unknown[] = [];
@@ -376,8 +390,34 @@ const narrow = (
     parts.push(`${column(name)} = ?`);
     bound.push(normalise(value));
   }
+  /*
+    ⚠️ AND `unset` IS BOTH NULL AND EMPTY, WHICH IS NOT FUSSINESS. A text column
+    a person cleared holds `''` and one nothing ever wrote holds NULL; SQL says
+    those are different and a person looking at the screen says they are the
+    same thing — "no supplier". A view that tested only NULL would answer half
+    the rows it is about, and the half it missed would be the ones somebody had
+    actually touched.
+  */
+  for (const one of matches ?? []) {
+    const at = "field" in one ? one.field : "";
+    if (at !== "id" && !(at in spec.fields)) continue;
+    if ("is" in one) { parts.push(`${column(at)} = ?`); bound.push(normalise(said(one.is, here))); }
+    else if ("isnt" in one) { parts.push(`${column(at)} <> ?`); bound.push(normalise(said(one.isnt, here))); }
+    else if ("set" in one) parts.push(`(${column(at)} IS NOT NULL AND ${column(at)} <> '')`);
+    else parts.push(`(${column(at)} IS NULL OR ${column(at)} = '')`);
+  }
   return { sql: parts.map((p) => ` AND ${p}`).join(""), bound };
 };
+
+/**
+ * WHAT A `Value` IS, HERE.
+ *
+ * ⚠️ `here` IS WHAT MAKES A VIEW REUSABLE RATHER THAN ONE PER RECORD. "The
+ * shelves inside this one" is one declaration read from every location; without
+ * it the manifest would carry a view per row, which is not a declaration at all.
+ */
+const said = (v: Value, here: Here): unknown =>
+  ("literal" in v ? v.literal : here[v.here]);
 
 /**
  * A PAGE OF A COLLECTION, AND HOW MANY THERE ARE.
@@ -394,11 +434,11 @@ const narrow = (
  */
 export async function list(
   db: Db, spec: CollectionSpec, scope: string, asking: Asking = {},
-  reaching: Reaching | null = null,
+  reaching: Reaching | null = null, here: Here = {},
 ): Promise<Listed> {
   const erase = eraseBy(spec);
   const want = Math.min(MOST_ROWS, Math.max(1, Math.trunc(asking.limit ?? 50)));
-  const filter = narrow(spec, asking.where);
+  const filter = narrow(spec, asking.where, asking.match, here);
   /* ⚠️ THE COUNT CARRIES IT TOO, which is the half a filter applied to the page
      alone would miss — "12 of 400" over a shelf holding twelve is a number that
      makes somebody go looking for records they will never be shown. */

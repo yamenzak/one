@@ -456,7 +456,50 @@ code that ships — and `weight.test.ts`'s ceiling moved by exactly that, with t
 reason written next to it. Twenty-six bytes is not worth arguing about; being
 made to write it down is the whole mechanism.
 
-### S9 — OneInventory, ported
+### S9 — OneInventory, ported · **in progress, and the plan's numbers were wrong again**
+
+⚠️ **The port is blocked below the surface, not on it.** S2 measured twelve
+screens as declarable by reading the screen FILES — no state, no effects. What it
+did not read is what their containers do, and every one of them joins: `Where`'s
+container calls `linesOf(stock, places, kinds, file)` across three collections
+before it hands a prop. `live.tsx`'s own header says so in as many words — "three
+lists and a lookup is the honest shape while the platform's generated `list`
+answers a whole collection".
+
+⚠️ **And under that, a plainer gap: nothing served `AppSpec.views` at all.**
+Stage 89 made them declarable, stage 96's renderer takes a view's ROWS as input,
+and no code in the repository produced any. A screen could be declared perfectly
+and drawn against nothing — which is not a bug that fails, it is a feature that
+cannot be reached, and `capability.test.mjs` had been naming it by number the
+whole time.
+
+**`runtime/src/views.ts` is that missing middle**, and it is what this stage
+shipped first:
+
+- **Four matches, not one.** `list`'s filter was equality, because that is all an
+  operation's caller could ask for. A `ViewSpec` also says `isnt`, `set` and
+  `unset` — and "the ones nobody has filed yet" is a view every product wants and
+  equality cannot express. Still no comparison, deliberately.
+- **`unset` is NULL *and* empty.** A column somebody cleared holds `''`; one
+  nothing ever wrote holds NULL. SQL says those differ and a person says both are
+  "no supplier" — so a view testing only NULL answers half the rows it is about,
+  and the half it misses are the ones somebody actually touched.
+- **A view sorts and is bounded; it does not page.** `list`'s cursor is
+  `(at, id)` precisely so a second page cannot step over a row that arrived since
+  the first. A view sorting by its own field has no such cursor to hand out.
+- **`here` is what makes one declaration serve every record.** Without a value
+  meaning "the record this screen is about", "the shelves inside this one" would
+  be a view per shelf — a manifest that grows with the data rather than with the
+  product.
+- **The count is not `items.length`.** A block drawing "12" over a view capped at
+  twelve is a screen reporting its own ceiling as a fact about the workspace.
+
+**Still owed before a screen can be ported:** the route that answers a screen's
+views, the browser side that fetches them and draws through `Body`, and the join
+— a read through a declared `ref`, which is what the twelve screens actually
+need. Then the ports, photographed at both widths and both themes.
+
+### S9 — the plan as written
 Every screen is a `body` or a `story`, and nothing is a third thing. On the
 numbers S2 measured, that is **12 screens declared, 11 already the right kind,
 and `live.tsx` largely gone**. Photographed before and after at both widths and

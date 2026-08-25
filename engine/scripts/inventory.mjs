@@ -232,6 +232,7 @@ if (what === "guards") {
     ["ai-ops", "which model a workspace picked, and what it will cost them"],
     ["ai-run", "the seam an operation generates through — values in, a metered answer out"],
     ["search", "what is findable: the ledger a write leaves, and the pass that carries it"],
+    ["views", "a declared view, run: narrowed, sorted, bounded, and counted whole"],
     ["search-ops", "the find operation a searchable collection gets, with its boundary already in it"],
     ["totals-ops", "how many of each thing there are, in one ask instead of one list read per number"],
     ["operator", "the deployment looking at itself"],

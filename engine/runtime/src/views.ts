@@ -1,0 +1,99 @@
+/**
+ * A DECLARED VIEW, RUN.
+ *
+ * ⚠️ `AppSpec.views` WAS DECLARED, REFUSED WHEN WRONG, AND SERVED BY NOTHING.
+ * Stage 89 added the shape, stage 96's renderer takes a view's ROWS as input,
+ * and between the two there was no code that produced any — which is the exact
+ * "built and reached from nowhere" shape `capability.test.mjs` has been naming
+ * since, and the reason a declared screen could not be drawn against a real
+ * workspace no matter how complete the surface was.
+ *
+ * ⚠️ A VIEW SORTS AND IS BOUNDED; IT DOES NOT PAGE, and that falls out of how
+ * paging works rather than from taste. `list`'s cursor is `(at, id)` because
+ * rows are newest-first and new ones arrive at the top — an offset would let the
+ * second page step over a row nobody has seen. A view that sorts by a field of
+ * its own has no such cursor to hand out, so it answers a bounded set and says
+ * how many there are. A screen wanting the four-hundredth row wants `list`.
+ *
+ * ⚠️ AND `here` IS WHAT MAKES ONE DECLARATION SERVE EVERY RECORD. "The shelves
+ * inside this one" is one view read from every location; without a value that
+ * means "the record this screen is about", a manifest would need a view per row,
+ * which is not a declaration.
+ */
+
+import type { AppSpec, CollectionSpec, ViewSpec } from "@engine/kernel";
+import { eraseBy } from "@engine/kernel";
+import { narrow, type Here } from "./records.js";
+import { column, table, type Db } from "./sql.js";
+
+/** ⚠️ The same ceiling a list has. A view is a screen's block, not an export. */
+const MOST = 200;
+
+export interface Viewed {
+  readonly items: readonly Record<string, unknown>[];
+  /**
+   * ⚠️ HOW MANY THERE ARE, WHICH IS NOT `items.length` THE MOMENT A LIMIT BITES.
+   * A block saying "12" over a view capped at 12 is a screen confidently
+   * reporting its own ceiling, and the number a person acts on.
+   */
+  readonly count: number;
+}
+
+/**
+ * ⚠️ THE COLLECTION IS RESOLVED HERE RATHER THAN TRUSTED, even though
+ * `refuseView` has already refused a view over a collection nobody declares. A
+ * runtime that indexes on a name from a manifest it did not itself validate is
+ * one line from a table name it built out of a string.
+ */
+export const collectionFor = (
+  app: AppSpec, view: ViewSpec,
+): CollectionSpec | undefined => app.collections?.find((c) => c.id === view.of);
+
+export async function runView(
+  db: Db, app: AppSpec, view: ViewSpec, scope: string, here: Here = {},
+): Promise<Viewed> {
+  const spec = collectionFor(app, view);
+  if (!spec) return { items: [], count: 0 };
+
+  const erase = eraseBy(spec);
+  const filter = narrow(spec, undefined, view.where, here);
+  const scoped = erase ? `${column(erase.column)} = ?` : "1 = 1";
+  const where = `${scoped}${filter.sql}`;
+  const bound = [...(erase ? [scope] : []), ...filter.bound];
+
+  /* ⚠️ THE DECLARED FIELD OR NOTHING. A sort naming a column that is not on the
+     collection is refused at composition; this is the belt, and it falls back to
+     the same order every list uses rather than to no order at all — an unordered
+     answer is one that comes back differently on two reads of the same data. */
+  const by = view.sort && (view.sort.by === "id" || view.sort.by in spec.fields)
+    ? `${column(view.sort.by)} ${view.sort.dir === "down" ? "DESC" : "ASC"}, id DESC`
+    : "at DESC, id DESC";
+  const want = Math.min(MOST, Math.max(1, Math.trunc(view.limit ?? 50)));
+
+  /* ⚠️ THE COUNT AND THE ROWS TOGETHER, because neither needs the other and a
+     round trip taken in sequence is a hop added to the chain (D36). */
+  const [counted, rows] = await Promise.all([
+    db.prepare(`SELECT COUNT(*) AS n FROM ${table(spec.id)} WHERE ${where}`)
+      .bind(...bound).first<{ n: number }>(),
+    db.prepare(`SELECT * FROM ${table(spec.id)} WHERE ${where} ORDER BY ${by} LIMIT ?`)
+      .bind(...bound, want).all(),
+  ]);
+
+  return { items: rows.results, count: counted?.n ?? rows.results.length };
+}
+
+/**
+ * Every view a screen's body reads, run together.
+ *
+ * ⚠️ DEFER(engine-96) stage:96 — the door that calls this is the one that draws
+ * a declared screen, and nothing declares one yet. The runner is here first on
+ * purpose: a body cannot be written against a view that cannot be fetched, so
+ * the order is the runner, then the route, then the first declaration.
+ */
+export async function runViews(
+  db: Db, app: AppSpec, ids: readonly string[], scope: string, here: Here = {},
+): Promise<Readonly<Record<string, Viewed>>> {
+  const wanted = (app.views ?? []).filter((v) => ids.includes(v.id));
+  const done = await Promise.all(wanted.map((v) => runView(db, app, v, scope, here)));
+  return Object.fromEntries(wanted.map((v, i) => [v.id, done[i]!]));
+}
