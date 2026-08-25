@@ -45,10 +45,10 @@
 
 import * as React from "react";
 import {
-  ActionRow, Await, Bars, Fills, Group, NoteRow, NumberInput, OneOf, PickFile, Row,
+  ActionRow, Await, Bars, Fills, Group, NoteRow, NumberInput, OneOf, Orb, PickFile, Row,
   RowsWaiting, SAYS_KIND, Segmented, Spacer, Story, Words,
   Lookup, Rail, TextInput, ToggleRow, Viewfinder, Written, kindOf,
-  glyphOf, shrunk, useShown, useTelling, type Ask, type Loaded, type Option,
+  glyphOf, shrunk, thingFace, useShown, useTelling, type Ask, type Loaded, type Option,
 } from "@engine/design";
 import { Button } from "@heroui/react";
 import { MOST_BYTES, sayList } from "@engine/kernel";
@@ -1066,14 +1066,14 @@ export function Register({
            Ten questions in, somebody recognises the wrong box before they have
            read a word — and the photograph is also the thing a model's answers
            were read OFF, so it is what the sentence under it is checked against. */
+        /* ⚠️ AND IT IS A `Face`, NOT AN `<img>` THIS SCREEN SIZED ITSELF. The
+           first version wrote its own — a width, an aspect, a radius and a crop
+           picked here — which is four appearance decisions taken on one screen
+           and a fifth thing for the next screen showing a product to disagree
+           with. `thingFace` is the kind for a record that has a photograph; the
+           frame, the crop and the fallback are the library's. */
         lead: photos[0]
-          ? (
-            <img
-              src={photos[0]}
-              alt="The main picture"
-              className="aspect-square w-32 rounded-xl object-cover"
-            />
-          )
+          ? <Orb of={thingFace(photos[0])} size={128} />
           : undefined,
       }}
       does={{

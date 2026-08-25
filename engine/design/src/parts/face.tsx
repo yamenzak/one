@@ -71,7 +71,22 @@ import { useStill } from "../tokens/motion.js";
  * not one of the products in it, and giving it a fixed plate here is what keeps
  * the fallback out of a `if (id === "one")` in whichever screen drew it first.
  */
-export type FaceKind = "person" | "workspace" | "app" | "one";
+/**
+ * ⚠️ `thing` IS THE ONE THAT IS NOT GENERATED, AND IT IS THE ONE MOST RECORDS
+ * ACTUALLY HAVE. The other four are marks the product derives — a hashed planet,
+ * a hashed aura, a declared glyph, the deployment's own. A stock line, a person
+ * in a directory with a portrait, a supplier with a logo: each has a REAL
+ * picture, and with nowhere to put it every one of them came out as a grey
+ * circle with a letter in it while the photograph sat two screens away on the
+ * record's own page.
+ *
+ * ⚠️ A PICTURE OF THE OBJECT BEATS A PICTURE OF THE CATEGORY, WHICH IS WHY THIS
+ * IS A FACE RATHER THAN A SECOND COMPONENT. A list of glyph chips is a list of
+ * KINDS — every glove row wearing the same glove mark, so the mark distinguishes
+ * nothing and the eye goes to the text. A list of photographs is a list of
+ * things, and it is scanned rather than read.
+ */
+export type FaceKind = "person" | "workspace" | "app" | "one" | "thing";
 
 /**
  * ⚠️ THE SIZE PICKS THE MOVEMENT, WHICH IS WHY IT IS A NAME AND NOT A NUMBER.
@@ -247,6 +262,21 @@ export const appFace = (appId: string, mark?: string): FaceOf =>
 /** ⚠️ The deployment itself. Fixed, so it is the same plate on every door. */
 export const ONE_FACE: FaceOf = { kind: "one", seed: "one" };
 
+/**
+ * A RECORD THAT HAS A PHOTOGRAPH — the url IS the seed.
+ *
+ * ⚠️ NOTHING IS HASHED AND NOTHING IS CACHED, which is the difference from every
+ * other face here. The other four bake an SVG from a seed and memoise it because
+ * drawing is expensive; this one is a `src` the browser already caches better
+ * than we could.
+ *
+ * ⚠️ AND IT TAKES THE URL RATHER THAN THE RECORD'S ID BECAUSE THE URL IS WHAT
+ * CHANGES. A face keyed on an id would be stale the moment somebody replaces the
+ * photograph — the mark this returns is the picture, not an identity derived
+ * from one, so there is nothing to keep in step.
+ */
+export const thingFace = (url: string): FaceOf => ({ kind: "thing", seed: url });
+
 export interface FaceOf {
   readonly kind: FaceKind;
   readonly seed: string;
@@ -308,6 +338,19 @@ const SKY: Record<FaceKind, {
   */
   app: { family: "cloth" },
   one: { family: "blobs" },
+  /*
+    ⚠️ `tint` — THE QUIETEST FAMILY THERE IS, AND THAT IS THE POINT RATHER THAN
+    AN OMISSION. Every other entry here answers "what world is this subject",
+    because every other subject is a mark this product DERIVED and the world is
+    what gives it somewhere to be. A `thing` arrives with a real photograph: the
+    picture is the subject, and a generated world behind it is a second image
+    competing with the one somebody took.
+
+    ⚠️ IT IS STILL AN ENTRY RATHER THAN A GAP, because a screen ABOUT one of
+    these still has a ground — the sheet a product's page is laid on. A wash of
+    the brand is a ground that does not draw anything.
+  */
+  thing: { family: "tint" },
 };
 
 /* ⚠️ The theme's two, for the kinds with no picture. Read by CSS, never baked
@@ -448,8 +491,14 @@ export function Orb({ of, size = 280 }: {
 }) {
   const at = React.useRef<HTMLImageElement>(null);
   const still = useStill(at);
+  /* ⚠️ A `thing` IS ALREADY A PICTURE, so the hero is that picture at hero size
+     rather than a world baked from a seed. Everything below — the size, the
+     empty alt, the block — is the same either way, which is the point of
+     answering here instead of in a second component. */
   const src = React.useMemo(
-    () => (of.kind === "workspace" ? bakeWorld(of.seed, !still, size * 2) : null),
+    () => (of.kind === "thing" ? of.seed
+      : of.kind === "workspace" ? bakeWorld(of.seed, !still, size * 2)
+      : null),
     [of.kind, of.seed, still, size],
   );
   if (!src) return null;
@@ -525,10 +574,16 @@ export function Face({ of, name, size = "row", hero }: FaceProps) {
   const seed = of?.seed;
   const glyph = of?.glyph;
   const moving = MOVES[size] && !still;
+  /* ⚠️ A `thing`'S SEED IS ITS URL AND NOTHING IS BAKED — see `thingFace`. It
+     goes through this same variable so a photograph and a generated mark land in
+     the same `Plate.Image`, which is what keeps the fallback, the size, the
+     shrink and the alt one implementation rather than two that agree today. */
   const src = React.useMemo(
-    () => (seed !== undefined && (kind === "person" || kind === "workspace")
-      ? bake(kind, seed, moving, PIXELS[size])
-      : null),
+    () => (seed === undefined ? null
+      : kind === "thing" ? seed
+      : (kind === "person" || kind === "workspace")
+        ? bake(kind, seed, moving, PIXELS[size])
+        : null),
     [kind, seed, moving, size],
   );
 
