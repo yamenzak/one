@@ -185,6 +185,80 @@ export function Timeline({ moments }: { readonly moments: readonly Moment[] }) {
   );
 }
 
+/* ----------------------------------------------------------------- agenda --- */
+
+/**
+ * MOMENTS GROUPED BY THE DAY THEY HAPPENED ON.
+ *
+ * ⚠️ A TRAIL AND A DIARY ARE THE SAME DATA AND NOT THE SAME BLOCK. `Timeline`
+ * answers "what happened to this one thing", in order, with a rail joining the
+ * dots; an agenda answers "what is on the 14th" — and the day is a HEADING
+ * rather than a field, because that is the thing somebody scans for. Every
+ * screen that wanted one wrote the grouping itself, which is a `reduce` per
+ * screen and a different date format per screen.
+ *
+ * ⚠️ THE GROUPING IS THE CALLER'S KEY, NOT A DATE PARSE. A moment's `when` is
+ * already whatever the app decided to say; parsing it back into a date here
+ * would be this component guessing at a format it was handed, and getting it
+ * wrong silently on the one locale nobody tested. `on` is the day, `when` is the
+ * time within it, and both are strings the app already knows how to write.
+ *
+ * ⚠️ AND THE DAY HEADINGS ARE CLOSE TOGETHER ON PURPOSE. The temptation is to
+ * pin one to the top so a long scroll always has a date on screen; the crown is
+ * already fixed to that edge and a second bar under it is the fault the chrome
+ * guard exists to catch. What replaces it is rhythm — a day is `roomy` from the
+ * next and `tight` from its own entries, so the heading is never more than a
+ * few rows away.
+ */
+export function Agenda({ days }: {
+  readonly days: readonly {
+    /** ⚠️ Written how the app writes a day: "Thursday, 14 August". */
+    readonly on: string;
+    /** ⚠️ One line about the day itself — a total, a count. Rarely present. */
+    readonly under?: string;
+    readonly moments: readonly Moment[];
+  }[];
+}) {
+  return (
+    <div className={`flex flex-col ${SPACE.roomy}`}>
+      {days.map((day) => (
+        <section key={day.on} className={`flex flex-col ${SPACE.tight}`}>
+          {/* ⚠️ `group`, WHICH IS A CARD'S RANK — an agenda's day heads the
+              entries under it exactly as a card's label heads its rows, and a
+              screen holding both must not have two answers for one rank.
+
+              ⚠️ AND IT DOES NOT STICK, WHICH THE FIRST DRAFT DID. A day heading
+              pinned to the top of the viewport is a second bar under the crown,
+              which already says where somebody is — two things fixed to one edge
+              is the fault `chrome.test.mjs` refuses, and it refuses it for every
+              component outside `frame/` on purpose. */}
+          <div className={`flex flex-col ${SPACE.hair}`}>
+            <h3 className={TYPE.group}>{day.on}</h3>
+            {day.under ? <p className={TYPE.note}>{day.under}</p> : null}
+          </div>
+          <ol className={`flex flex-col ${SPACE.tight}`}>
+            {day.moments.map((m) => (
+              /* ⚠️ THE TIME IS A COLUMN, NOT A PREFIX. Times set inline wrap
+                 into the sentence and stop lining up, which is the whole reason
+                 anybody looks down an agenda. `tabular-nums` is what keeps the
+                 column a column at two digits and at one. */
+              <li key={m.id} className={`flex ${SPACE.snug}`}>
+                <span className={`${TYPE.note} ${TYPE.figures} w-14 shrink-0 pt-px`}>
+                  {m.when}
+                </span>
+                <span className={`flex min-w-0 flex-col ${SPACE.hair}`}>
+                  <span className={TYPE.label}>{m.label}</span>
+                  {m.under ? <span className={TYPE.note}>{m.under}</span> : null}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </section>
+      ))}
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------- tabs --- */
 
 export interface TabSpec {

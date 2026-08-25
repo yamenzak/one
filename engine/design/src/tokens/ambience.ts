@@ -1295,6 +1295,14 @@ export function ambienceStylesheet(): string {
       really is set on the box, the value really is on the ladder, and the only
       way to see the fault is to measure a rendered mark.
     */
+    /*
+      ⚠️ THE RING THAT SEPARATES TWO OVERLAPPING FACES — see `Faces`. It is the
+      SURFACE's own colour rather than a line, so two plates read as two objects
+      without an edge being drawn anywhere; and it is a shadow rather than a
+      border because a border grows the box and would break the overlap
+      arithmetic the component derives from `FACE_PX`.
+    */
+    `[data-piled="true"] { box-shadow: 0 0 0 2px var(--surface); }`,
     `[style*="--icon"] svg { width: var(--icon); height: var(--icon); }`,
     `[style*="--icon"] svg { stroke-width: 1.75; }`,
   ].join("\n");

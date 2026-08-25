@@ -2929,6 +2929,24 @@
       "fails": "a checklist item nobody can take, passing composition because a nightly sweep does raise the event — the tally counts what people did, so the step sits unticked with nothing anywhere saying why"
     },
     {
+      "id": "a-screen-does-not-rebuild-a-block-the-library-ships",
+      "protects": "D90",
+      "stage": "88",
+      "status": "live",
+      "impl": "scripts/blocks.test.mjs",
+      "proves": "none rebuilding a block the library ships",
+      "fails": "three filter rows at three heights with `All` meaning no-filter on one screen and a real value on the next, two byte formatters that each say `0KB` for a small file, and a facepile whose overlap is a number somebody typed - every one of which passes the restyle check, the contrast floor and the token rules, because the copy is made of the same primitives"
+    },
+    {
+      "id": "the-vocabulary-rule-names-components-that-exist",
+      "protects": "D90",
+      "stage": "88",
+      "status": "live",
+      "impl": "scripts/blocks.test.mjs",
+      "proves": "named component(s) are in the package's index",
+      "fails": "a rule pointing at a component a rename retired, which is a rule nobody can obey and which reports nothing forever"
+    },
+    {
       "id": "every-size-is-a-rung-of-one-ladder",
       "protects": "D89",
       "stage": "88",

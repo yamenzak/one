@@ -23,7 +23,7 @@
 
 import * as React from "react";
 import {
-  Arc, AreaChart, BarChart, ChartPanel, ChartTable, ChartWaiting, ColumnChart,
+  Agenda, Arc, AreaChart, BarChart, ChartPanel, ChartTable, ChartWaiting, ColumnChart,
   CompositionBar, Delta, DivergingChart, DonutChart, DumbbellChart, Gauge, Grid,
   HeatmapChart, Hero, LineChart, Meter, PeriodInput, Reveal, Ring, Rings, Row,
   ScatterChart, Screen, Section, Segmented, Sparkline, Stack, StackedChart, Stat,
@@ -31,7 +31,7 @@ import {
 } from "@engine/design";
 import {
   AGAINST_TARGET, BY_KIND, KIND_BY_WEEK, LENGTH_AGAINST_TIME, MONTH_ON_MONTH,
-  RECENT, WHEN, WRITTEN, type Reading,
+  LATELY, RECENT, WHEN, WRITTEN, type Reading,
 } from "./sample.js";
 
 /** What the top half is counting. Two words each — see `Segmented`. */
@@ -322,6 +322,16 @@ export function Reports({ title, of, again, today, period, onPeriod }: {
               <Sparkline points={WRITTEN.slice(-12)} tone="quiet" />
             </Row>
           </Stack>
+        </Section>
+
+        {/* ⚠️ THE LAST SECTION IS THE ONE WITH NO CHART IN IT, DELIBERATELY. A
+            sheet of aggregates answers "how much" and never "which one" — and
+            the question somebody has after reading a chart is always which one.
+            grouped by day rather than listed flat, because a report is read
+            downwards and a date repeated on forty rows is forty facts nobody
+            asked for. */}
+        <Section label="What happened, day by day">
+          <Agenda days={LATELY} />
         </Section>
       </Stack>
       );

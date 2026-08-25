@@ -925,6 +925,8 @@ its own header, cited by other files, and doing nothing.
 | `a-checklist-is-ticked-by-what-happened` | D12 | three unticked steps for ever, shown to a workspace that finished all three last week — and a screen ticking them instead would leave them undone for anybody who did the same thing from the API or from a second screen |
 | `a-congratulation-is-said-once` | D12 | recognition repeated on every load, which is not recognition but furniture — and then the one that matters is not read either |
 | `a-step-only-the-clock-can-complete-is-refused` | D12 | a checklist item nobody can take, passing composition because a nightly sweep does raise the event — the tally counts what people did, so the step sits unticked with nothing anywhere saying why |
+| `a-screen-does-not-rebuild-a-block-the-library-ships` | D90 | three filter rows at three heights with `All` meaning no-filter on one screen and a real value on the next, two byte formatters that each say `0KB` for a small file, and a facepile whose overlap is a number somebody typed - every one of which passes the restyle check, the contrast floor and the token rules, because the copy is made of the same primitives |
+| `the-vocabulary-rule-names-components-that-exist` | D90 | a rule pointing at a component a rename retired, which is a rule nobody can obey and which reports nothing forever |
 | `every-size-is-a-rung-of-one-ladder` | D89 | ten hand-picked sizes in six mechanisms, each defensible where it was written and none in a relationship with any other - a product where nothing is broken, everything is slightly out of step, and no reviewer can name the fault |
 | `a-rung-actually-reaches-the-page` | D89 | the whole product rendered at one size with every check green - a class built at runtime is emitted nowhere, and a bare `text-[var(--x)]` is emitted as an INK, so the rule that ships is `color: 1.953rem` and every browser discards it in silence |
 | `a-mark-is-on-the-type-ladder-too` | D89 | six published icon sizes reaching none of them - `glyphOf` returns its mark inside a span, so a child combinator matched nothing anywhere and every glyph in the product drew at the library's own 20px while the box around it carried a correct value from a derived ladder |
@@ -1129,6 +1131,7 @@ its own header, cited by other files, and doing nothing.
 | D87 | Two data marks the vocabulary was missing: a position, and a texture | 0 |
 | D88 | Magnitude carries the brand, identity never does | 0 |
 | D89 | One ladder, and a rung has to reach the page | 5 |
+| D90 | A screen composes the vocabulary; it does not re-derive it | 2 |
 <!-- /generated -->
 
 ---

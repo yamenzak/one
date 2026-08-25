@@ -25,10 +25,12 @@
 import * as React from "react";
 import { Button } from "@heroui/react";
 import { PLATFORM_PROBLEMS, type Problem, problem } from "@engine/kernel";
-import { DROP_PAD, SPACE } from "../tokens/metrics.js";
+import { Paperclip } from "lucide-react";
+import { DROP_PAD, ICON, ROW, SPACE } from "../tokens/metrics.js";
 import { TYPE } from "../tokens/type.js";
 import { MOTION } from "../tokens/motion.js";
 import { Trouble } from "./state.js";
+import { Size } from "./said.js";
 
 export interface PickFileProps {
   /**
@@ -359,4 +361,58 @@ export async function shrunk(
     /* ⚠️ See the header — a photograph is never lost to a decoder. */
     return asDataUrl(bytes, type);
   }
+}
+
+/* --------------------------------------------------------------- attached --- */
+
+/**
+ * A FILE THAT IS ALREADY THERE, AS A ROW.
+ *
+ * ⚠️ `PickFile` IS THE DOOR AND THIS IS WHAT COMES THROUGH IT. Every product
+ * that accepts a file then has to list what it has — an attachment, an import, a
+ * photograph, a signed document — and each screen built the row itself: a name,
+ * a size somebody formatted by hand, and a remove control that was sometimes a
+ * cross and sometimes the word "Remove".
+ *
+ * ⚠️ THE SIZE USES `Size`, WHICH IS THE POINT. `Math.round(bytes / 1024) + "KB"`
+ * is the line every one of those screens wrote, and it says `0KB` for anything
+ * under half a kilobyte and `1536KB` for a megabyte and a half. The reader here
+ * already knows the person's own conventions.
+ *
+ * ⚠️ AND THE ACTION IS A NODE. Removing is the common case and it is not the
+ * only one — a file can be replaced, downloaded, or opened — and a
+ * `{ label, onDo }` pair would make the destructive one, which is a `Confirm`,
+ * the one shape the slot could not hold.
+ */
+export function FileRow({ name, bytes, kind, does }: {
+  readonly name: string;
+  readonly bytes?: number;
+  /** ⚠️ What it is in a word — "PDF", "Picture". Absent where the name says it. */
+  readonly kind?: string;
+  readonly does?: React.ReactNode;
+}) {
+  return (
+    <div data-row className={`flex items-center ${ROW.gap} ${ROW.pad} ${ROW.tap}`}>
+      <span
+        aria-hidden="true"
+        className="shrink-0 text-muted"
+        style={{ ["--icon" as string]: `${ICON.row}px` }}
+      >
+        <Paperclip />
+      </span>
+      <span className={`flex min-w-0 grow flex-col ${SPACE.hair}`}>
+        {/* ⚠️ THE NAME TRUNCATES AND THE FACTS DO NOT. A file name is the one
+            string here that is arbitrarily long, and wrapping it pushes the
+            control it belongs to onto a second line. */}
+        <span className={`${TYPE.label} truncate`}>{name}</span>
+        {kind || bytes !== undefined ? (
+          <span className={`${TYPE.note} flex items-center ${SPACE.tight}`}>
+            {kind ? <span>{kind}</span> : null}
+            {bytes === undefined ? null : <Size bytes={bytes} />}
+          </span>
+        ) : null}
+      </span>
+      {does ? <span className="shrink-0">{does}</span> : null}
+    </div>
+  );
 }

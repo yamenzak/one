@@ -13,9 +13,14 @@
 
 import * as React from "react";
 import { TYPE } from "../tokens/type.js";
-import { SPACE } from "../tokens/metrics.js";
+import { ICON, SPACE } from "../tokens/metrics.js";
+
+/* ⚠️ A SCORE'S MARK IS HALF A ROW'S GLYPH — see `Score`. Derived, because a
+   literal here is the second ladder `type.ts` is a whole file about. */
+const MARK_PX = Math.round(ICON.row / 2);
 import { Tally } from "../parts/tally.js";
 import { Sparkline } from "./charts.js";
+import { DATA, QUIET } from "./palette.js";
 import { type Point, compactLike } from "./scale.js";
 import { useFigures, useShown } from "../parts/said.js";
 import { Group } from "../parts/surfaces.js";
@@ -52,6 +57,113 @@ export function Delta({ value, of, upIsGood = true, unit = "" }: {
       <span aria-hidden="true">{up ? "▲" : "▼"}</span>
       {unit}{say.compact(Math.abs(value))}
       <span className="text-muted">{of}</span>
+    </span>
+  );
+}
+
+/* ---------------------------------------------------------------- compare --- */
+
+/**
+ * TWO VALUES AND THE MOVE BETWEEN THEM, WHICH IS A DIFFERENT FACT FROM A DELTA.
+ *
+ * ⚠️ `Delta` IS AN ANNOTATION AND THIS IS THE SUBJECT. A delta rides beside a
+ * figure and says how it changed; a comparison is the whole block — "112 → 118",
+ * a recount, a plan moving from one tier to another, a level before and after a
+ * transfer. Built by hand it comes out as two `Figure`s with an arrow between
+ * them, and the arrow ends up at whatever baseline the two happened to share.
+ *
+ * ⚠️ THE ARROW IS ALIGNED TO THE FIGURES, NOT TO THE BLOCK, and that is the
+ * whole reason this is a component. `items-center` on a row whose members have
+ * a caption under them centres against the CAPTION too, so the mark floats
+ * between the number and its label; `items-baseline` on the numbers with the
+ * captions outside the flex is what puts it on the line the eye reads along.
+ *
+ * ⚠️ AND NEITHER SIDE IS TONED. A move is not good or bad on its own — the same
+ * arrow is a recount going right and a shortfall going wrong — so the tone
+ * belongs to whoever knows which, on the sentence beside it. `Delta` is the one
+ * that colours, because a delta is told what up means.
+ */
+export function Compare({ was, now, wasOf, nowOf, unit = "", suffix = "" }: {
+  readonly was: number | string;
+  readonly now: number | string;
+  /** ⚠️ What each side IS — "counted", "on the shelf". A bare pair is a riddle. */
+  readonly wasOf: string;
+  readonly nowOf: string;
+  readonly unit?: string;
+  readonly suffix?: string;
+}) {
+  const say = useFigures();
+  const said = (v: number | string) =>
+    `${unit}${typeof v === "number" ? say.compact(v) : v}${suffix}`;
+  return (
+    <div className={`flex items-start ${SPACE.snug}`}>
+      <span className={`flex min-w-0 flex-col ${SPACE.hair}`}>
+        <span className={`${TYPE.figure} text-muted`}>{said(was)}</span>
+        <span className={TYPE.note}>{wasOf}</span>
+      </span>
+      {/* ⚠️ THE MARK IS `aria-hidden` AND THE ORDER CARRIES THE MEANING. Read
+          aloud, "112 counted 118 on the shelf" is the same two facts in the same
+          order; an arrow glyph in the middle of it is a character nobody's
+          screen reader has a word for. */}
+      <span className={`${TYPE.figure} text-muted`} aria-hidden="true">→</span>
+      <span className={`flex min-w-0 flex-col ${SPACE.hair}`}>
+        <span className={TYPE.figure}>{said(now)}</span>
+        <span className={TYPE.note}>{nowOf}</span>
+      </span>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ score --- */
+
+/**
+ * A SMALL WHOLE NUMBER OUT OF A SMALL WHOLE NUMBER, DRAWN AS MARKS.
+ *
+ * ⚠️ A BAR IS THE WRONG SHAPE FOR SOMETHING COUNTABLE. `Meter` answers "how full"
+ * — a proportion of something continuous — and at four out of five it draws 80%
+ * of a rectangle, which is a number somebody has to read back off a length. Five
+ * marks with four filled is the same fact with nothing to convert, and it is why
+ * every rating anybody has ever seen is drawn this way.
+ *
+ * ⚠️ AND IT IS READ-ONLY HERE. A settable rating is a CONTROL and belongs with
+ * the forms — it needs a name, a keyboard, a focus ring and a refusal. Half a
+ * product's scores are reported rather than given (a severity, a confidence, a
+ * step of five), and a component that is sometimes pressable is one nobody can
+ * tell is pressable.
+ */
+export function Score({ of, out, label }: {
+  readonly of: number;
+  /** ⚠️ Five or fewer in practice. Past that the marks stop being countable. */
+  readonly out: number;
+  /** ⚠️ What is being scored, because `4 of 5` alone is not a fact. */
+  readonly label: string;
+}) {
+  const filled = Math.max(0, Math.min(out, Math.round(of)));
+  return (
+    /* ⚠️ THE WHOLE THING IS ONE ROLE WITH ONE VALUE, so a reader is told "4 of 5"
+       rather than walked through five images. */
+    <span
+      role="img"
+      aria-label={`${label}: ${filled} of ${out}`}
+      className={`inline-flex items-center ${SPACE.hair}`}
+    >
+      {Array.from({ length: out }, (_, i) => (
+        <span
+          key={i}
+          aria-hidden="true"
+          className="block rounded-full"
+          style={{
+            /* ⚠️ THE MARK IS SIZED FROM THE TYPE LADDER, NOT FROM A NUMBER — it
+               stands in a line of words and has to match the words. */
+            width: `${MARK_PX}px`,
+            height: `${MARK_PX}px`,
+            /* ⚠️ THE PALETTE'S OWN TWO, never a literal — `DATA` is magnitude
+               (the workspace's colour, D88) and `QUIET` is what an unfilled mark
+               is: present, and not the subject. */
+            backgroundColor: i < filled ? DATA : QUIET,
+          }}
+        />
+      ))}
     </span>
   );
 }

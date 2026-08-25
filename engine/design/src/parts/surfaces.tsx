@@ -65,6 +65,21 @@ export interface GroupProps {
    */
   readonly face?: FaceOf;
   /**
+   * ⚠️ A MARK BESIDE THE HEADING, WHERE A `face` WOULD GO AND FOR A DIFFERENT
+   * JOB. A face is WHOSE the card is; an icon is WHAT KIND it is — a warning, a
+   * clock, a shelf — and it is the only element on a card that can carry a tone
+   * at a glance. The two never appear together, because two marks in one column
+   * is a column nobody can read down.
+   */
+  readonly icon?: React.ReactNode;
+  /**
+   * ⚠️ WHAT THE CARD IS ABOUT, AS INK ON ITS MARK AND NOTHING ELSE. A tinted
+   * CARD paints every word inside it and turns one fact into a screen in a
+   * state; `theme.ts` is the long form, and it is why this reaches the glyph and
+   * the chip beside the heading rather than the surface under them.
+   */
+  readonly tone?: Tone;
+  /**
    * One line under the label, for a group whose consequence is not obvious.
    *
    * ⚠️ A NODE, BECAUSE A CARD'S VERDICT IS THE ONE LINE THAT WEARS A TONE. It
@@ -338,8 +353,30 @@ const Media = ({ of }: { readonly of: CardMedia }) => (
   </div>
 );
 
+/**
+ * ⚠️ THE MARK BESIDE A HEADING, AND IT IS `row` SIZED TO MATCH THE `chip` FACE
+ * THAT MAY STAND IN THE SAME COLUMN. A glyph and an avatar at the same x with
+ * different widths is what makes a column of cards read as two lists.
+ *
+ * ⚠️ `neutral` STATES NOTHING, which is the whole of it: the mark takes the
+ * heading's own ink, which is the colour it should be on every card that is not
+ * reporting a state.
+ */
+function GroupMark({ icon, tone }: { readonly icon: React.ReactNode; readonly tone?: Tone }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="shrink-0"
+      style={{ ["--icon" as string]: `${ICON.row}px` }}
+      {...(tone && tone !== "neutral" ? { "data-ink": tone } : {})}
+    >
+      {icon}
+    </span>
+  );
+}
+
 export function Group(
-  { label, under, face, aside, control, media, at, sky, seedling, does, children }: GroupProps,
+  { label, under, face, icon, tone, aside, control, media, at, sky, seedling, does, children }: GroupProps,
 ) {
   /* ⚠️ CALLED BEFORE THE BRANCH, because it is a hook — and its answer is
      discarded when nested, which is correct: a world belongs to the card, and
@@ -364,6 +401,7 @@ export function Group(
       <>
         {label || aside || control ? (
           <div className={`flex flex-wrap items-baseline justify-between ${ROW.gap} ${ROW.pad}`}>
+            {icon ? <GroupMark icon={icon} tone={tone} /> : null}
             <div className={`flex min-w-0 flex-col ${SPACE.hair}`} {...headed("group", under)}>
               {label ? <h3 className={TYPE.group}>{label}</h3> : null}
               {under ? <p className={TYPE.note}>{under}</p> : null}
@@ -419,6 +457,7 @@ export function Group(
           <div className={`flex grow flex-wrap items-center justify-between ${ROW.gap}`}>
             <div className={`flex min-w-0 items-center ${ROW.gap}`}>
               {face && label ? <Face of={face} name={label} size="chip" /> : null}
+              {icon ? <GroupMark icon={icon} tone={tone} /> : null}
               <div className={`flex min-w-0 flex-col ${SPACE.hair}`} {...headed("group", under)}>
                 {label ? <h2 className={TYPE.group}>{label}</h2> : null}
                 {under ? <p className={TYPE.note}>{under}</p> : null}

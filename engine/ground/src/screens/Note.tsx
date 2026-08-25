@@ -19,9 +19,9 @@
 import * as React from "react";
 import { Button, Chip } from "@heroui/react";
 import {
-  Center, Confirm, CopyRow, Dialog, FieldRow, Figure, Group, Hint, Hotkey, Menu,
+  Center, Compare, Confirm, CopyRow, Dialog, FieldRow, FileRow, Figure, Group, Hint, Hotkey, Menu,
   Money,
-  NoteRow, Over, PageTabs, Peek, Prose, Row, Screen, SectionTitle, Stack, Tags,
+  NoteRow, Over, PageTabs, Peek, Prose, Row, Score, Screen, SectionTitle, Stack, Tags,
   Timeline, glyphOf, type Moment,
 } from "@engine/design";
 import { TRAIL, noteName, personName, type Note as OneNote } from "./sample.js";
@@ -162,6 +162,44 @@ export function Note({ title, note, onBack, onPublish, onOpen }: {
                       What it cost is the credits a draft spent, not what anybody
                       was paid.
                     </NoteRow>
+                  </Group>
+
+                  {/* ⚠️ A COMPARISON IS THE SUBJECT OF ITS OWN CARD, not a row
+                      inside the facts. Two figures and the move between them is
+                      one statement, and it reads as one only at the size a
+                      figure is — inside a `FieldRow` it would be a value in a
+                      column of values. */}
+                  <Group label="What the edits did" icon={glyphOf("chart")}>
+                    <NoteRow>
+                      <Compare
+                        was={note.words.first}
+                        now={note.words.now}
+                        wasOf="first draft"
+                        nowOf="now"
+                        suffix=" words"
+                      />
+                    </NoteRow>
+                    <FieldRow
+                      label="How finished it is"
+                      value={<Score of={note.ready} out={5} label="How finished it is" />}
+                    />
+                  </Group>
+
+                  {/* ⚠️ ATTACHMENTS ARE ROWS, NOT A GRID OF TILES. What somebody
+                      does with a file here is open it or remove it, and both are
+                      one control at the end of a line — a tile grid would be
+                      three times the height for a picture nobody looks at. */}
+                  <Group label="What is attached" icon={glyphOf("share")}>
+                    {note.files.map((f) => (
+                      <FileRow
+                        key={f.name}
+                        name={f.name}
+                        bytes={f.bytes}
+                        kind={f.kind}
+                        does={<Button variant="tertiary" size="sm">Remove</Button>}
+                      />
+                    ))}
+                    {note.files.length ? null : <NoteRow>Nothing is attached to this note</NoteRow>}
                   </Group>
 
                   <Group label="Its address">

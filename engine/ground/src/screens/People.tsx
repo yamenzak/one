@@ -21,7 +21,7 @@
 import * as React from "react";
 import { Button, Chip } from "@heroui/react";
 import {
-  Agree, FieldRow, Group, Listing, OneOf, Orb, Screen, Stack, TextInput, Tray,
+  Agree, Faces, FieldRow, Group, Listing, NoteRow, OneOf, Orb, Screen, Stack, TextInput, Tray,
   glyphOf, notice, whoFace, type Loaded,
 } from "@engine/design";
 import type { Person } from "./sample.js";
@@ -60,7 +60,24 @@ export function People({ title, of, again, onInvite, onOpen }: {
           under: "Invite somebody by email — they join by signing in as that address",
         }}
         then={(rows) => (
-          <Listing
+          <Stack space="roomy">
+            {/* ⚠️ THE ROSTER TWICE IS NOT WHAT THIS IS. The list below is who
+                each person is; the pile is HOW MANY, as one object — the fact
+                somebody wants before they read a single name, and the one thing
+                a list of twelve rows cannot say at a glance. */}
+            <Group label="Everybody here" icon={glyphOf("people")}>
+              <NoteRow>
+                <Faces
+                  of={rows.map((p) => ({
+                    id: p.id,
+                    name: p.name,
+                    ...(p.pending ? {} : { face: whoFace(p.id) }),
+                  }))}
+                />
+              </NoteRow>
+            </Group>
+
+            <Listing
             label="People"
             of={{ status: "ready", data: rows }}
             rowKey={(p) => p.id}
@@ -98,7 +115,8 @@ export function People({ title, of, again, onInvite, onOpen }: {
                 by: (a, b) => a.wrote - b.wrote,
               },
             ]}
-          />
+            />
+          </Stack>
         )}
       />
 

@@ -3192,3 +3192,53 @@ correctly.
 icon dimension that is not `pixels(RANK.…)`; a rung class assembled at runtime or
 without its `length:` hint; a second scale left pointing at its own numbers; or a
 column of peer headings where some carry a line and some do not.
+
+## D90 — A screen composes the vocabulary; it does not re-derive it
+
+**The failure this is about is not a wrong colour — it is a screen quietly
+growing its own copy of a component the library already ships.**
+
+Every other guard in this tree asks whether something was drawn correctly. None
+of them can ask whether it should have been drawn at all, because a hand-rolled
+copy is made of the same primitives as the real thing: it uses the tokens, it
+passes the restyle check, it clears the contrast floor. It is a fault only when
+you put it beside the one it duplicates.
+
+**Measured across the two products before the rule existed:** three filter rows
+at three heights and two gaps, with "All" meaning *no filter* on one screen and a
+real value on the next; two byte formatters that each said `0KB` for anything
+under half a kilobyte; and a facepile whose overlap was a number somebody typed,
+so its left edge sat a third of a plate right of every heading above it. Nothing
+reported any of it.
+
+**So the check is a TABLE OF SHAPES, not a list of names.** "Do not write a
+filter row" is advice; `aria-pressed` on a control outside `design/src` is a
+string a script can find. Each entry names the shape, the component that already
+exists, and what the copy costs — because a finding whose fix is not obvious is a
+finding somebody argues with rather than acts on.
+
+**And the table has to reach the package.** Every component it names is checked
+against the package's own generated index, so a rename turns the rule into a
+failure rather than into a rule about nothing.
+
+**The blocks that came with it, and each is a shape screens were assembling by
+hand:** `Banner` (a message that is true until something changes, which is not a
+toast), `Faces` (several people as ONE object, overlapped, with the overflow
+counted rather than drawn), `Filters` + `Found` (narrowing, where nothing chosen
+IS everything and the count disappears when nothing is narrowed), `FileRow`,
+`Compare` (two values and the move between them, which is a different fact from
+a delta), `Score` (a countable number drawn as marks rather than as a length),
+and `Agenda` (moments grouped by a day the caller names, never a date this
+package parsed back out of a string).
+
+**Two of them were argued into a different shape by guards that already
+existed**, which is the mechanism working: `Banner` wanted its own `Card` and the
+card guard sent it to `Group` — where it gained the heading, the inset, the world
+and the foot slot for nothing; and `Filters` wanted a pressable `Chip`, which is
+24px, against a 44px floor a browser sweep enforces. A chip is what a value
+WEARS; a control is what a person HITS.
+
+**Therefore never:** a filter row, a facepile, a byte size, a rating, a
+before-and-after or a standing message written inside a screen. If the shape is
+genuinely new, it is a component in `@engine/design` with its own entry here —
+not a private copy in the one screen that needed it first.

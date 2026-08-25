@@ -38,6 +38,18 @@ export interface Note {
   readonly kind: "idea" | "decision" | "question" | "record";
   readonly happened: string;
   readonly minutes: number;
+  /**
+   * ⚠️ THE FIRST DRAFT'S LENGTH AND THIS ONE'S — see `Compare`. Two numbers
+   * rather than a delta, because what a writer looks at is where it started and
+   * where it is, and a difference alone hides both.
+   */
+  readonly words: { readonly first: number; readonly now: number };
+  /** ⚠️ How finished it is, out of five. A judgement, not a percentage. */
+  readonly ready: number;
+  /** ⚠️ What is attached, with the size in BYTES — `Size` does the reading. */
+  readonly files: readonly {
+    readonly name: string; readonly bytes: number; readonly kind: string;
+  }[];
   /** Minor units — see the manifest. */
   readonly cost: number;
   readonly colour: string;
@@ -54,6 +66,8 @@ export const NOTES: readonly Note[] = [
     body: "Third draft. The first two explained the product; this one asks for one thing and gets out of the way. Cut the feature list entirely — nobody reads a list before they have a reason to.",
     at: "2026-08-14", published: true, pinned: true, kind: "decision",
     happened: "2026-08-14", minutes: 45, cost: 0, colour: "#3f7d58",
+    words: { first: 210, now: 340 }, ready: 4,
+    files: [{ name: "onboarding-v3.pdf", bytes: 384_100, kind: "PDF" }],
     link: "https://example.com/onboarding-v3", ask: "priya@example.com",
     follows: null, by: "p1",
   },
@@ -62,6 +76,11 @@ export const NOTES: readonly Note[] = [
     body: "One page, three tiers, no comparison table. Thursday.",
     at: "2026-08-13", published: true, pinned: false, kind: "record",
     happened: "2026-08-13", minutes: 90, cost: 4200, colour: "#2f5d8a",
+    words: { first: 640, now: 610 }, ready: 5,
+    files: [
+      { name: "trial-funnel.csv", bytes: 12_400, kind: "Spreadsheet" },
+      { name: "what-support-said.pdf", bytes: 918_000, kind: "PDF" },
+    ],
     link: "https://example.com/q3-pricing", ask: "tomas@example.com",
     follows: null, by: "p2",
   },
@@ -70,6 +89,7 @@ export const NOTES: readonly Note[] = [
     body: "Four separate people asked the same question in week two of the trial, which means the trial is not showing them the thing they signed up for. Two of them cancelled before anybody answered.",
     at: "2026-08-11", published: false, pinned: false, kind: "question",
     happened: "2026-08-10", minutes: 25, cost: 0, colour: "#8a5a2f",
+    words: { first: 120, now: 180 }, ready: 3, files: [],
     link: "https://example.com/support/threads", ask: "aisha@example.com",
     follows: "n2", by: "p3",
   },
@@ -78,6 +98,7 @@ export const NOTES: readonly Note[] = [
     body: "Measured, not guessed: 80% of the wall clock is one query that reads the whole table to count it. The rest is fine.",
     at: "2026-08-08", published: true, pinned: false, kind: "record",
     happened: "2026-08-07", minutes: 120, cost: 0, colour: "#4a4a4a",
+    words: { first: 900, now: 1_240 }, ready: 4, files: [],
     link: "https://example.com/import-trace", ask: "tomas@example.com",
     follows: null, by: "p2",
   },
@@ -86,6 +107,7 @@ export const NOTES: readonly Note[] = [
     body: "Keep for the next one. Every good name was taken and every free name was a misspelling of a good one.",
     at: "2026-07-30", published: false, pinned: false, kind: "idea",
     happened: "2026-07-30", minutes: 15, cost: 0, colour: "#6b4a7d",
+    words: { first: 60, now: 60 }, ready: 2, files: [],
     link: "https://example.com/names", ask: "priya@example.com",
     follows: null, by: "p1",
   },
@@ -94,6 +116,7 @@ export const NOTES: readonly Note[] = [
     body: "Two incidents in six weeks, both on a Friday afternoon, both found on Monday morning by a customer rather than by us.",
     at: "2026-07-24", published: true, pinned: true, kind: "decision",
     happened: "2026-07-24", minutes: 30, cost: 0, colour: "#8a2f3f",
+    words: { first: 320, now: 290 }, ready: 3, files: [],
     link: "https://example.com/incidents", ask: "jonas@example.com",
     follows: "n4", by: "p1",
   },
@@ -283,3 +306,38 @@ const PICTURE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 24
 </svg>`;
 
 export const PICTURE = `data:image/svg+xml;utf8,${encodeURIComponent(PICTURE_SVG)}`;
+
+/**
+ * THREE DAYS OF WRITING, GROUPED BY DAY — see `Agenda`.
+ *
+ * ⚠️ THE DAY IS WRITTEN OUT AND THE TIME IS NOT PARSED. `Agenda` groups on the
+ * key it is handed and never reads a date back out of a string, which is what
+ * keeps a locale out of a layout component. The sample says it the way a screen
+ * would.
+ */
+export const LATELY = [
+  {
+    on: "Thursday, 14 August",
+    under: "4 notes · 2 h 10 min",
+    moments: [
+      { id: "l1", when: "09:12", label: "Rewrite the onboarding email", under: "Priya · third draft" },
+      { id: "l2", when: "11:40", label: "Why import is slow", under: "Tomas · published" },
+      { id: "l3", when: "16:05", label: "Names we rejected", under: "Aisha · draft" },
+    ],
+  },
+  {
+    on: "Wednesday, 13 August",
+    under: "2 notes · 1 h 35 min",
+    moments: [
+      { id: "l4", when: "10:02", label: "Stop guessing on pricing", under: "Priya · published" },
+      { id: "l5", when: "15:20", label: "Q3 pricing, one page", under: "Tomas · draft" },
+    ],
+  },
+  {
+    on: "Tuesday, 12 August",
+    under: "1 note · 25 min",
+    moments: [
+      { id: "l6", when: "08:45", label: "What the trial hides", under: "Aisha · published" },
+    ],
+  },
+] as const;

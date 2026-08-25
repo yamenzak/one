@@ -168,12 +168,12 @@ part that is not. Refresh with `node engine/scripts/docs.test.mjs --write`.
 | `tokens/` | colour, type, spacing, motion, the chrome and hem rules | 94 |
 | `scene/` | the ambience engine — families, marks, the world behind a screen | 1 |
 | `frame/` | page, shape, crown, nav, dock, overlays — what wraps a screen | 72 |
-| `parts/` | rows, cards, lists, controls, the four outcomes | 199 |
+| `parts/` | rows, cards, lists, controls, the four outcomes | 208 |
 | `rendered/` | whole surfaces drawn from a kernel declaration | 53 |
-| `chart/` | the data vocabulary — a number as a shape | 41 |
+| `chart/` | the data vocabulary — a number as a shape | 43 |
 | `measure/` | what a screen actually lays out, in a real browser — the harness every app sweeps its own screens with | 1 |
 
-**461 exports.** Every one is reachable as `import { … } from "@engine/design"`;
+**472 exports.** Every one is reachable as `import { … } from "@engine/design"`;
 there is no deep import, and a guard says so.
 
 ### `tokens/`
@@ -208,13 +208,15 @@ there is no deep import, and a guard says so.
 ### `parts/`
 
 - `parts/arrange.tsx` — `Center`, `Cluster`, `Columns`, `Grid`, `Rail`, `Row`, `Spacer`, `Stack`, `Wide`
+- `parts/banner.tsx` — `Banner`, `BannerProps`
 - `parts/bars.tsx` — `Bars`, `Bars`, `barsFor`, `BarsProps`, `checksIn`, `CodeKind`, `kindOf`, `SAYS_KIND`
 - `parts/beside.tsx` — `Hint`, `Pip`
-- `parts/blocks.tsx` — `Branch`, `Crumbs`, `Document`, `Faq`, `Fills`, `Gauge`, `Hotkey`, `Moment`, `PageTabs`, `Reveal`, `Step`, `Steps`, `TabSpec`, `Timeline`, `Tree`, `TreeProps`
+- `parts/blocks.tsx` — `Agenda`, `Branch`, `Crumbs`, `Document`, `Faq`, `Fills`, `Gauge`, `Hotkey`, `Moment`, `PageTabs`, `Reveal`, `Step`, `Steps`, `TabSpec`, `Timeline`, `Tree`, `TreeProps`
 - `parts/bones.tsx` — `blanks`, `useBones`, `Waiting`
 - `parts/credits.tsx` — `Credits`, `CreditsProps`
-- `parts/face.tsx` — `appFace`, `Face`, `FaceKind`, `FaceOf`, `FaceProps`, `FaceSize`, `faceUri`, `ONE_FACE`, `Orb`, `placeFace`, `thingFace`, `whoFace`, `worldFor`
+- `parts/face.tsx` — `appFace`, `Face`, `FaceKind`, `FaceOf`, `FaceProps`, `Faces`, `FaceSize`, `faceUri`, `ONE_FACE`, `Orb`, `placeFace`, `thingFace`, `whoFace`, `worldFor`
 - `parts/feedback.tsx` — `Beep`, `say`, `wakeSound`
+- `parts/filtering.tsx` — `Filter`, `Filters`, `FiltersProps`, `Found`
 - `parts/forms.tsx` — `Agree`, `Choice`, `CodeEntry`, `DateInput`, `Dates`, `Dial`, `LongText`, `Lookup`, `MoneyInput`, `NamedAlready`, `Naming`, `NumberInput`, `NumberInputProps`, `OneOf`, `Option`, `PeriodId`, `PeriodInput`, `PERIODS`, `Picks`, `Said`, `SearchInput`, `SecretInput`, `Segmented`, `spanOf`, `Tags`, `Tail`, `TextInput`, `TextInputProps`, `TimeInput`, `withValue`, `Words`
 - `parts/gated.tsx` — `Allowed`, `sayGate`, `Stopped`, `STOPPED`, `useGate`
 - `parts/heads.tsx` — `Balance`, `distinguishing`, `Figure`, `Prose`, `Section`, `SectionTitle`, `Title`
@@ -222,7 +224,7 @@ there is no deep import, and a guard says so.
 - `parts/logo.tsx` — `Lockup`, `LockupProps`
 - `parts/opening.tsx` — `Opening`, `OpeningProps`
 - `parts/permission.tsx` — `Permission`, `PermissionRow`, `PermissionRowProps`
-- `parts/pick-file.tsx` — `asDataUrl`, `PickFile`, `PickFileProps`, `saysKind`, `shrunk`, `sift`, `takes`
+- `parts/pick-file.tsx` — `asDataUrl`, `FileRow`, `PickFile`, `PickFileProps`, `saysKind`, `shrunk`, `sift`, `takes`
 - `parts/prose.tsx` — `Chunk`, `ChunkKind`, `Markdown`, `MarkdownProps`, `readInline`, `readProse`, `Written`
 - `parts/reading.ts` — `FORGET`, `FrameAt`, `Sifted`, `siftFrame`, `SURE`, `Votes`
 - `parts/recall.tsx` — `Block`, `seedShapes`, `shapeFor`, `ShapeWaiting`, `useRecalledShape`
@@ -251,7 +253,7 @@ there is no deep import, and a guard says so.
 
 - `chart/charts.tsx` — `AreaChart`, `BarChart`, `CHART_MOTION`, `ChartTable`, `ColumnChart`, `Datum`, `DivergingChart`, `DumbbellChart`, `HeatmapChart`, `LineChart`, `SCATTER_MAX`, `ScatterChart`, `Series`, `Sparkline`, `StackedChart`
 - `chart/circles.tsx` — `Arc`, `CompositionBar`, `DonutChart`, `Ring`, `Rings`
-- `chart/figures.tsx` — `ChartPanel`, `Delta`, `Hero`, `Meter`, `Stat`, `StatRow`
+- `chart/figures.tsx` — `ChartPanel`, `Compare`, `Delta`, `Hero`, `Meter`, `Score`, `Stat`, `StatRow`
 - `chart/palette.ts` — `assign`, `AXIS`, `DATA`, `emphasis`, `GRID`, `magnitude`, `polarity`, `pole`, `QUIET`, `SEPARATOR`, `seriesColour`, `seriesOf`, `SLOTS`
 - `chart/scale.ts` — `Point`, `Span`
 

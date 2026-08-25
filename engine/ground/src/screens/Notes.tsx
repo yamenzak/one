@@ -15,11 +15,22 @@
 import * as React from "react";
 import { Chip } from "@heroui/react";
 import {
-  Dated, Listing, Place, Rail, Screen, SectionTitle, Stack, Tally, glyphOf, useShown,
+  Banner, Dated, Filters, Found, Listing, Place, Rail, Screen, SectionTitle, Stack, Tally,
+  glyphOf, useShown,
   type Loaded,
 } from "@engine/design";
 import { sayDate, type Instant } from "@engine/kernel";
 import type { Note } from "./sample.js";
+
+/* ⚠️ THE FOUR KINDS, IN THE ORDER THE MANIFEST DECLARES THEM. A filter row
+   sorted by count re-orders itself as the data changes, which is a row of
+   controls that move under somebody's thumb. */
+const KINDS = [
+  { id: "idea", label: "Ideas" },
+  { id: "decision", label: "Decisions" },
+  { id: "question", label: "Questions" },
+  { id: "record", label: "Records" },
+] as const;
 
 export function Notes({ title, of, again, density = "comfortable", onNew, onOpen }: {
   /** ⚠️ The declared label — see `screens/index.tsx`. */
@@ -46,6 +57,11 @@ export function Notes({ title, of, again, density = "comfortable", onNew, onOpen
      the database's spelling of a day, and this screen had two of them — a card
      foot and a table cell. `present.test.mjs` refuses both now. */
   const shown = useShown();
+  /* ⚠️ THE NARROWING IS THE SCREEN'S STATE AND NOTHING ELSE'S. `Filters` holds
+     none — a control that remembers its own choice is a control the screen
+     cannot restore from an address, and every list in this product is a place
+     somebody can be sent to. */
+  const [kinds, setKinds] = React.useState<readonly string[]>([]);
 
   return (
     <Screen
@@ -65,8 +81,27 @@ export function Notes({ title, of, again, density = "comfortable", onNew, onOpen
       }}
       then={(rows) => {
         const pinned = rows.filter((n) => n.pinned);
+        const drafts = rows.filter((n) => !n.published);
+        const on = new Set(kinds);
+        const rest = rows
+          .filter((n) => !n.pinned)
+          .filter((n) => on.size === 0 || on.has(n.kind));
         return (
           <Stack space="roomy">
+            {/* ⚠️ A STANDING MESSAGE, NOT A TOAST. "Three drafts" is true until
+                somebody publishes them, and a notice that leaves after four
+                seconds is one nobody read. */}
+            {drafts.length ? (
+              <Banner
+                icon={glyphOf("note")}
+                tone="info"
+                state="Waiting"
+                label={`${drafts.length} drafts have not been published`}
+                says="Nobody else can read a draft, and no report counts one"
+                does={{ label: "Show only drafts", onDo: () => { setKinds([]); } }}
+              />
+            ) : null}
+
             {/* ⚠️ PINNED IS A GROUP, NOT A MARKER ON A ROW. A pinned row mixed
                 into the run with a flag on it is a row somebody has to scan for;
                 a block of its own says the same thing with nothing to scan.
@@ -91,9 +126,23 @@ export function Notes({ title, of, again, density = "comfortable", onNew, onOpen
               </Stack>
             ) : null}
 
+            {/* ⚠️ THE FILTERS AND THE COUNT ARE ONE BLOCK ABOVE THE LIST, which
+                is what `snug` says. At the stack's own gap the row of pills
+                floats between the pinned rail and the list and belongs to
+                neither. */}
+            <Stack space="snug">
+              <Filters
+                label="Kind of note"
+                of={KINDS}
+                chosen={kinds}
+                onChoose={setKinds}
+              />
+              <Found shown={rest.length} of={rows.length - pinned.length} what="notes" />
+            </Stack>
+
             <Listing
               label="Notes"
-              of={{ status: "ready", data: rows.filter((n) => !n.pinned) }}
+              of={{ status: "ready", data: rest }}
               rowKey={(n) => n.id}
               onOpen={onOpen}
               says={{ icon: glyphOf("note"), nothing: "Nothing else written" }}

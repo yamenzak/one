@@ -59,6 +59,7 @@ import { Avatar as Plate } from "@heroui/react";
 import MOODS from "@dicebear/styles/moods.json" with { type: "json" };
 import PLANETS from "@dicebear/styles/planets.json" with { type: "json" };
 import { FACE_PX } from "../tokens/metrics.js";
+import { TYPE } from "../tokens/type.js";
 /* ⚠️ The one mark, borrowed — never redrawn here. See `OnePlate`. */
 import { Mark } from "../frame/arrival.js";
 import type { SceneFamily, World } from "../tokens/ambience.js";
@@ -608,5 +609,73 @@ export function Face({ of, name, size = "row", hero }: FaceProps) {
             : (name ?? seed ?? "?").slice(0, 1).toUpperCase()}
       </Plate.Fallback>
     </Plate>
+  );
+}
+
+/* ------------------------------------------------------------------ many --- */
+
+/**
+ * SEVERAL FACES AS ONE OBJECT, WITH WHAT WILL NOT FIT COUNTED.
+ *
+ * ⚠️ A ROW OF FACES IS NOT A LIST OF PEOPLE — it is ONE fact ("these four"), and
+ * spaced apart it reads as four facts. Overlapping them is what makes the group
+ * a single thing the eye takes in at once, and it is why every product that
+ * shows membership anywhere draws it this way.
+ *
+ * ⚠️ THE OVERLAP IS A THIRD OF THE PLATE, DERIVED FROM `FACE_PX`. Written as a
+ * literal it stops matching the day a face changes size, and the symptom is
+ * plates that either touch or gap by two pixels — the kind of wrongness nobody
+ * can name and everybody sees.
+ *
+ * ⚠️ AND THE OVERFLOW IS A COUNT, NEVER MORE PLATES. Six overlapping circles at
+ * 32px is 130 pixels of a 390 phone spent on faces too small to recognise; "+7"
+ * is the same information in a quarter of the room. `most` is the caller's
+ * because the room is theirs.
+ */
+export function Faces({ of, most = 4, size = "chip" }: {
+  /** ⚠️ With their names, because a plate falls back to an initial. */
+  readonly of: readonly { readonly id: string; readonly name: string; readonly face?: FaceOf }[];
+  readonly most?: number;
+  readonly size?: FaceSize;
+}) {
+  const shown = of.slice(0, most);
+  const over = of.length - shown.length;
+  /* ⚠️ A NEGATIVE MARGIN ON EVERY PLATE BUT THE FIRST, so the group's own left
+     edge is where the first plate starts — a uniform inset would make a row of
+     faces sit a third of a plate right of everything above it. */
+  const lap = `${Math.round(FACE_PX[size] / 3)}px`;
+  return (
+    <div className="flex items-center">
+      {shown.map((one, i) => (
+        /* ⚠️ THE RING IS A RULE, NOT A STYLE OBJECT, AND D7 IS WHY. A shadow
+           written here is an edge this component chose, which is the thing a
+           workspace's branding cannot reach — so the separating ring lives in
+           `ambience.ts` beside every other edge in the product and is selected
+           by the attribute below. What stays here is the arithmetic, which is
+           layout rather than paint. */
+        <span
+          key={one.id}
+          data-piled="true"
+          className="rounded-full"
+          style={{
+            marginInlineStart: i === 0 ? 0 : `-${lap}`,
+            zIndex: shown.length - i,
+          }}
+        >
+          <Face of={one.face} name={one.name} size={size} />
+        </span>
+      ))}
+      {over > 0 ? (
+        <span
+          className={`${TYPE.note} ms-2 tabular-nums`}
+          /* ⚠️ WHO, NOT HOW MANY, FOR A READER WHO CANNOT SEE THE PLATES. The
+             visible text is a count because the room is a count's worth; the
+             label is the sentence somebody is actually owed. */
+          aria-label={`and ${over} more`}
+        >
+          +{over}
+        </span>
+      ) : null}
+    </div>
   );
 }
