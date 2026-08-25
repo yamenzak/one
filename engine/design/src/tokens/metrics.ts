@@ -631,7 +631,30 @@ export const CARD_LEAD = "-mx-4 -mt-3" as const;
  * caption that covers the thing it names is worse than no caption. Small enough
  * to read as printed ON the image, tall enough to still take a thumb.
  */
-export const GLASS_PAD = "px-3 py-1.5" as const;
+export const GLASS_PAD = "h-8 px-3" as const;
+
+/**
+ * ⚠️ AND A GLASS PILL SOMEBODY PRESSES IS A TARGET, WHICH IS THE ONE PLACE THE
+ * TWO HEIGHTS DIFFER. `GLASS_PAD` is a caption — a word printed on a picture,
+ * which nothing taps — and this is a control, so it takes the same 44px floor as
+ * the circle beside it. Measured on the first draft: 32, 36 and 44 on one
+ * photograph, none of the three chosen.
+ */
+export const QUICK_PILL = "h-11 px-4" as const;
+
+/**
+ * THE INSET OF A TILE, AND IT IS THE CARD'S.
+ *
+ * ⚠️ IT WAS `p-3` AGAINST THE CARD'S `px-4`, AND TWO INSETS ON ONE PAGE IS THE
+ * thing that reads as unfinished before anybody can say why. Measured: a card
+ * held its label 16px from its edge and the tile beside it held one at 12, so
+ * two grids of words down one screen started at two different x.
+ *
+ * ⚠️ AND IT IS SQUARE, unlike the card's. A card is rows, and a row brings its
+ * own vertical rhythm (`ROW.pad`); a tile is one block of content with a mark
+ * above it, so the air around it is one number.
+ */
+export const TILE_PAD = "p-4" as const;
 
 /**
  * ⚠️ THE HEIGHT OF A CARD'S LEADING PHOTOGRAPH. Tall enough that a room, a

@@ -92,6 +92,7 @@ export function Start({ title, raised, counts, held, onGo }: {
             under="Photographed when the count closed"
             control={
               <SettledSwitch
+                bare
                 value={watching}
                 onSet={async (next) => { setWatching(next); return true; }}
                 says={(on) => (on ? "Watching" : "Not watching")}
@@ -136,6 +137,7 @@ export function Start({ title, raised, counts, held, onGo }: {
                   icon: glyphOf("people"),
                   control: (
                     <SettledSwitch
+                      bare
                       value={sharing}
                       onSet={async (next) => { setSharing(next); return true; }}
                       says={(on) => (on ? "Shared" : "Private")}

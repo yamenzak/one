@@ -91,6 +91,17 @@
 @layer components {
   .button,
   .toggle-button,
+  /*
+    ⚠️ A SWITCH'S PRESSABLE HALF IS ITS `__content`, AND IT WAS MISSING — which
+    is the case the paragraph above predicted and the sweep did not catch,
+    because the list it measures is this one. Measured: 40 × 20, so every switch
+    in the product was a 20px target, and in a tile's corner that is a control
+    somebody misses on a phone and hits the destination under it instead.
+
+    ⚠️ HEIGHT ONLY. The track is 40px wide by design and a square switch is not a
+    switch; what is short is the row it sits in, not the mark.
+  */
+  .switch__content,
   .select__trigger,
   .combo-box__trigger,
   .color-picker__trigger,

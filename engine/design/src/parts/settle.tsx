@@ -33,6 +33,22 @@ export interface SettledProps {
   readonly isDisabled?: boolean;
   /** The word beside it, which is the state rather than the act. */
   readonly says?: (on: boolean) => string;
+  /**
+   * NO VISIBLE WORD — for a switch whose subject is named beside it already.
+   *
+   * ⚠️ IT IS A REAL SHAPE RATHER THAN A CONVENIENCE, AND THE TWO PLACES THAT
+   * NEED IT ARE A CARD'S HEADING AND A TILE'S CORNER. Both are governed by a
+   * heading that already says what the switch is about, so the word is a second
+   * label for one thing — and it is the half that breaks the layout: measured in
+   * a card heading, the switch plus a two-word state came to 110px and left zero
+   * clearance at 390, and in a 157px tile corner the same control ran across the
+   * tile and over its mark.
+   *
+   * ⚠️ AND `says` IS STILL REQUIRED READING — it becomes the accessible name. A
+   * switch with no name is unusable to anybody on a screen reader, so the word
+   * is not dropped, it is moved.
+   */
+  readonly bare?: true;
 }
 
 /**
@@ -63,7 +79,7 @@ const STATE = (on: boolean): string => (on ? "On" : "Off");
  * control is a re-read landing, an operator on another tab, or a rollback — and
  * in every one of those the row is right and the local memory is stale.
  */
-export function SettledSwitch({ value, onSet, isDisabled, says }: SettledProps) {
+export function SettledSwitch({ value, onSet, isDisabled, says, bare }: SettledProps) {
   const [shown, setShown] = React.useState(value);
   const [busy, setBusy] = React.useState(false);
   React.useEffect(() => { setShown(value); }, [value]);
@@ -86,11 +102,17 @@ export function SettledSwitch({ value, onSet, isDisabled, says }: SettledProps) 
   };
 
   return (
-    <Switch isSelected={shown} isDisabled={isDisabled || busy} onChange={(on) => void flip(on)}>
+    <Switch
+      isSelected={shown}
+      isDisabled={isDisabled || busy}
+      onChange={(on) => void flip(on)}
+      /* ⚠️ THE WORD BECOMES THE NAME WHEN IT IS NOT DRAWN — see `bare`. */
+      {...(bare ? { "aria-label": (says ?? STATE)(shown) } : {})}
+    >
       {/* ⚠️ THE CONTROL IS INSIDE THE CONTENT, NOT BESIDE IT — see `STATE`. */}
       <Switch.Content>
         <Knob />
-        {(says ?? STATE)(shown)}
+        {bare ? null : (says ?? STATE)(shown)}
       </Switch.Content>
     </Switch>
   );

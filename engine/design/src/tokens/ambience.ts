@@ -47,6 +47,18 @@ import {
   DENSITY, FAMILIES, render, type Density, type SceneFamily, type Sky,
 } from "../scene/index.js";
 
+/**
+ * HOW ROUND A SURFACE IS, AS THE LIBRARY'S OWN EXPRESSION RATHER THAN A NUMBER.
+ *
+ * ⚠️ THE CARD IS THE ONE THAT DECIDES AND EVERYTHING ELSE FOLLOWS IT. `.card` is
+ * `min(32px, var(--radius-3xl))`; the library's `.button--md` is 36 — so a tile
+ * and the card above it curved differently by four pixels, which is not a
+ * difference anybody can name and is exactly what "no attention to radius" looks
+ * like. Copying the card's expression means the clamp moves once and every
+ * surface follows.
+ */
+const SURFACE_RADIUS = "min(32px, var(--radius-3xl))";
+
 const NOISE = [
   "%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E",
   "%3Cfilter id='n'%3E",
@@ -1216,7 +1228,35 @@ export function ambienceStylesheet(): string {
       intact, and the rule lives here because a component that named a colour
       would be one a workspace's branding never reaches (D7).
     */
-    `[data-tile="true"] { --button-bg: var(--surface); --button-bg-hover: var(--surface-tertiary); }`,
+    /*
+      ⚠️ ONE RADIUS FOR EVERY SURFACE ON THE PAGE, AND IT IS THE CARD'S OWN
+      EXPRESSION RATHER THAN A NUMBER BESIDE IT. `.card` is
+      `min(32px, var(--radius-3xl))`; a `.button--md` is 36, so a grid of tiles
+      sat beside a card at two different curvatures — measured, 36 against 32,
+      which is not a difference anybody can name and is exactly why it reads as
+      carelessness.
+
+      ⚠️ AND IT IS `SURFACE_RADIUS` HERE RATHER THAN A LITERAL, because the card
+      is the one that must not be chased: if the library changes its clamp, one
+      constant moves and the tile follows it.
+    */
+    `[data-tile="true"] {`,
+    `  --button-bg: var(--surface); --button-bg-hover: var(--surface-tertiary);`,
+    `  border-radius: ${SURFACE_RADIUS}; }`,
+    /*
+      ⚠️ A PICTURE THAT LEADS A CARD TAKES THE CARD'S TOP CORNERS. It bleeds to
+      the card's edges (`CARD_LEAD`), and the card does not clip its children —
+      so a square-cornered image sat inside a 32px curve and its two top corners
+      stuck out of it. Measured: `border-radius: 0px` on a 326×176 image inside a
+      326-wide card at 32.
+
+      ⚠️ THE BOTTOM TWO STAY SQUARE, because rows follow. A fully rounded picture
+      with a row under it is a picture floating in a card rather than the card
+      leading with it.
+    */
+    `[data-media="true"] {`,
+    `  border-top-left-radius: ${SURFACE_RADIUS};`,
+    `  border-top-right-radius: ${SURFACE_RADIUS}; }`,
     /*
       ⚠️ THE CHIP A ROW'S MARK SITS IN. It is here rather than on the component
       for the same reason the dot is: a component that named a colour would be

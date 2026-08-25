@@ -33,6 +33,7 @@ import { TYPE } from "../tokens/type.js";
 import {
   CARD_LEAD, CARD_MEDIA, CARD_OTHERS, CARD_ROWS, CONTROL_SHARE, CROWN_SIZE, HEAD_GAP, ICON, INSET,
   GLASS_PAD, LEAD, NUDGE,
+  QUICK_PILL, TILE_PAD,
   QUICK_CIRCLE, ROW, SPACE,
   TILE,
 } from "../tokens/metrics.js";
@@ -222,11 +223,15 @@ export function Glass({ icon, label, only, onDo }: {
   readonly onDo?: () => void;
 }) {
   const round = Boolean(icon) && only === true;
+  /* ⚠️ THE MARK IS A FIXED BOX, NOT A GLYPH LEFT TO SET ITS OWN LINE. Measured:
+     a caption with an icon came out 36px tall beside one without at 32, and they
+     sat two pixels apart vertically — a 20px svg's line box is taller than a
+     20px line of text. `size-5` makes the box the same 20px either way. */
   const mark = icon
     ? (
       <span
         aria-hidden="true"
-        className="flex shrink-0 items-center"
+        className="flex size-5 shrink-0 items-center justify-center"
         style={{ ["--icon" as string]: `${ICON.row}px` }}
       >{icon}</span>
     )
@@ -274,7 +279,12 @@ export function Glass({ icon, label, only, onDo }: {
       data-glass="true"
       /* ⚠️ `ghost` — see the round form above. */
       variant="ghost"
-      className={`shrink-0 ${GLASS_PAD} ${ROW.free}`}
+      /* ⚠️ A CONTROL IS 44px AND A CAPTION IS 32, AND THAT IS THE ONE PLACE THE
+         TWO GLASS HEIGHTS DIFFER. A caption is not a target; a pill somebody
+         presses is, and 44 is the floor this file opens by naming. Two heights
+         with a reason each, rather than the three the first draft had — 32, 36
+         and 44, none of them chosen. */
+      className={`shrink-0 ${QUICK_PILL}`}
       onPress={onDo}
     >
       {mark}
@@ -309,7 +319,11 @@ const Media = ({ of }: { readonly of: CardMedia }) => (
   /* ⚠️ THE PICTURE IS THE CARD'S FULL WIDTH — see `CARD_LEAD`. A photograph
      inset by the card's gutter is a picture in a frame, which is a different
      object from a card that IS the thing it is about. */
-  <div className={`relative ${CARD_LEAD} ${CARD_MEDIA} overflow-hidden`}>
+  /* ⚠️ `data-media` IS WHAT GIVES IT THE CARD'S RADIUS — see `ambienceStylesheet`.
+     A component that names its own would be one a workspace's branding never
+     reaches (D7), and this radius has to track the card's rather than be typed
+     beside it. */
+  <div data-media="true" className={`relative ${CARD_LEAD} ${CARD_MEDIA} overflow-hidden`}>
     <img src={of.src} alt={of.alt} className="size-full object-cover" />
     {of.act
       ? <div className="absolute right-3 top-3 flex">{of.act}</div>
@@ -1375,8 +1389,15 @@ export function TileGrid({ tiles }: { readonly tiles: readonly TileSpec[] }) {
                  their own labels — "Beds", "Staff" and "Rounds" came out 162,
                  156 and 198 wide, in a grid that had already made room for three
                  identical ones. */
+              /* ⚠️ NO `ROW.free` HERE, AND ITS PRESENCE IS WHAT BROKE THE GRID.
+                 `h-auto` and `h-full` are the same property at the same
+                 specificity, so the later rule won and every tile sized to its
+                 own content: measured at 148, 127, 80 and 83 tall inside four
+                 192px cells, which is why half a grid read as boxes and half as
+                 lozenges. A tile is not a row and does not want a row's escape
+                 from the library's fixed height — it wants its cell. */
               className={`size-full flex-col items-start justify-start ${SPACE.tight}`
-                + ` ${ROW.free} ${ROW.wrap} p-3 text-left`}
+                + ` ${ROW.wrap} ${TILE_PAD} text-left`}
               onPress={t.onOpen}
             >
               {/* ⚠️ THE MARK CARRIES THE TILE. A 16px glyph in a 96px square is
