@@ -181,6 +181,33 @@ from — there is no second place it could come from, and a hero whose name is a
 literal has no record behind it at all. The composer refuses that pairing, so the
 press can never reach a screen with no subject.
 
+### A hero has no plate, unless its kind says otherwise
+
+⚠️ **A CARD IS A PLATE LAID ON A GROUND, AND THE HERO IS THE GROUND.** Put on
+one, the loudest words on the screen start a gutter to the right of the crown
+that names the screen — two of the three biggest things on the page at two
+different left edges. That is the same fault as centring a figure, arriving
+through padding instead of through alignment, and it is the harder one to see
+because the padding looks tidy.
+
+⚠️ **AND ON A LIGHT GROUND THE PLATE IS BUYING NOTHING** — a near-white card on a
+near-white page is an edge nobody can see, charging a gutter for it. What
+separates a hero from what follows is RANK and AIR, both of which it already has;
+and the cards below then read as objects ON a ground rather than as the second of
+five identical plates. That is the visual flow a screen either has or does not,
+and it is mostly this one decision.
+
+⚠️ **THE MARK IS A ROW OF ITS OWN, NOT A COLUMN BESIDE THE WORDS.** Beside them a
+40px plate reserves its width for the WHOLE height of the block, so four lines of
+prose each lose fifty pixels to something occupying the top forty — the longest
+text on the screen narrowed most by the smallest thing on it. Above them it costs
+one row, once.
+
+⚠️ **AND THE EYEBROW RIDES ON THAT ROW.** A mark at one end and an affordance at
+the other with nothing between them is two things a screen apart; the eyebrow is
+the one line short enough to sit beside a plate and it says what the row IS, so
+the three become one statement instead of three orphans.
+
 ### Bespoke, and a closed set, at the same time
 
 **The KIND is a closed vocabulary. The CONTENT is the screen's own. Each kind is

@@ -594,7 +594,7 @@ function LeadsOn({ leads }: {
  * are about to walk back into is exactly that, and it is what stops the hero
  * reading as the first of five identical cards.
  */
-export function Resuming({ of, name, said, when, mark, onOpen, at }: {
+export function Resuming({ of, name, said, when, mark, onOpen }: {
   /** ⚠️ What this IS, above the name — "Where you left off". */
   readonly of: string;
   readonly name: string;
@@ -604,61 +604,85 @@ export function Resuming({ of, name, said, when, mark, onOpen, at }: {
   /** ⚠️ A node, not a name — the caller passes `glyphOf(…)`. See `Group.icon`. */
   readonly mark?: React.ReactNode;
   readonly onOpen?: () => void;
-  readonly at?: number;
 }) {
+  /*
+    ⚠️ THE MARK IS A ROW OF ITS OWN, NOT A COLUMN BESIDE THE WORDS. Beside them
+    it reserves its own width for the WHOLE height of the block — a 40px plate
+    costing four lines of prose 52px each — so the longest text on the screen is
+    the most narrowed by the smallest thing on it. Above them it costs one row
+    once. `Stat` was built this way and this was not, which is the tell: two
+    components in one file disagreeing about a rule neither had written down.
+
+    ⚠️ AND THE TWO ENDS OF THAT ROW ARE PINNED TO THE CORNERS, the same shape a
+    tile uses. One grammar for a mark and an affordance is worth more than either
+    arrangement being individually optimal.
+  */
   const inside = (
-    <div className={`flex w-full items-start ${SPACE.snug}`}>
-      {mark
-        ? (
-          <span
-            aria-hidden="true"
-            className="flex shrink-0 items-center justify-center rounded-full bg-current/10"
-            style={{
-              width: `${MARK_PLATE}px`,
-              height: `${MARK_PLATE}px`,
-              ["--icon" as string]: `${ICON.row}px`,
-            }}
-          >
-            {mark}
-          </span>
-        )
-        : null}
-      {/* ⚠️ `min-w-0` OR THE TITLE PUSHES THE CARD SIDEWAYS. A flex child's
-          default `min-width: auto` is its content, so a long name refuses to
-          wrap and takes the row past the gutter — the overflow this repository
-          measures for on every screen. */}
-      <div className={`flex min-w-0 grow flex-col ${SPACE.hair}`}>
-        <span className={TYPE.note}>{of}</span>
+    <div className={`flex w-full flex-col ${SPACE.snug}`}>
+      {/* ⚠️ THE EYEBROW RIDES ON THE MARK'S ROW RATHER THAN ABOVE THE TITLE, and
+          the reason is what the row looks like without it. Full width with a
+          mark at one end and an affordance at the other, it is two things a
+          screen apart with nothing between them — the chevron reads as belonging
+          to nothing. The eyebrow is the one line short enough to sit beside a
+          plate and it says what the row IS, so all three become one statement. */}
+      <div className={`flex w-full items-center ${SPACE.tight}`}>
+        {mark
+          ? (
+            <span
+              aria-hidden="true"
+              className="flex shrink-0 items-center justify-center rounded-full bg-current/10"
+              style={{
+                width: `${MARK_PLATE}px`,
+                height: `${MARK_PLATE}px`,
+                ["--icon" as string]: `${ICON.row}px`,
+              }}
+            >
+              {mark}
+            </span>
+          )
+          : null}
+        <span className={`grow ${TYPE.note}`}>{of}</span>
+        {onOpen
+          ? <span aria-hidden="true" className={`shrink-0 ${TYPE.note}`}>&rsaquo;</span>
+          : null}
+      </div>
+      <div className={`flex w-full min-w-0 flex-col ${SPACE.hair}`}>
         <span className={TYPE.title}>{name}</span>
         {said ? <p className={`${TYPE.body} text-muted line-clamp-2`}>{said}</p> : null}
         {when ? <span className={TYPE.note}>{when}</span> : null}
       </div>
-      {onOpen
-        ? <span aria-hidden="true" className={`shrink-0 self-center ${TYPE.note}`}>&rsaquo;</span>
-        : null}
     </div>
   );
 
-  return (
-    /* ⚠️ `cloth` RATHER THAN `glow`, AND IT IS THE ONE DECISION HERE THAT IS
-       TASTE WITH A REASON. A glow is a light source and reads as a highlight; a
-       cloth is a MATERIAL, which is what a card holding a record wants to be —
-       the thing has weight, it was there before the app was opened, and it will
-       be there after. */
-    <Group at={at ?? 0} sky="cloth">
-      {onOpen
-        ? (
-          <Button
-            variant="ghost"
-            onPress={onOpen}
-            className={`${ROW.press} items-start text-start ${ROW.free} ${ROW.wrap}`}
-          >
-            {inside}
-          </Button>
-        )
-        : inside}
-    </Group>
-  );
+  /*
+    ⚠️ NO CARD, AND THIS IS THE ONE PLACE IN THE PRODUCT WHERE THAT IS THE POINT.
+    A card is a plate laid ON a ground; the hero IS the top of the page, so a
+    plate under it puts the loudest words on the screen 16px to the right of the
+    crown that names the screen — two of the three biggest things on the page
+    starting at two different left edges, which is the fault this file objects to
+    about centring, arriving through padding instead.
+
+    ⚠️ AND THE PLATE WAS BUYING NOTHING. On a light ground it is a near-white
+    card on a near-white page: an edge nobody can see, charging a gutter for it.
+    What separates the hero from what follows is RANK and AIR, both of which it
+    already has — and the cards below then read as objects ON a ground rather
+    than as the second of five identical plates.
+
+    ⚠️ SO THE KIND DECIDES ITS PLATE THE WAY IT DECIDES ITS BLEED — see
+    `HeroSpec`. A figure is a card in the gutter, a subject is the page itself,
+    and a picture would run to the edges. That is what naming a kind is for.
+  */
+  return onOpen
+    ? (
+      <Button
+        variant="ghost"
+        onPress={onOpen}
+        className={`${ROW.press} items-start text-start ${ROW.free} ${ROW.wrap}`}
+      >
+        {inside}
+      </Button>
+    )
+    : inside;
 }
 
 /* ------------------------------------------------------------------ meter --- */
