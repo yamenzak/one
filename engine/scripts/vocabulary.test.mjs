@@ -234,6 +234,17 @@ const WHY = {
   */
   plumbing: ["Spacer", "Await", "ReadingProvider", "Whichever"],
   /*
+    A HERO'S DRAWING — the design half of `HEROES` rather than of `BLOCKS`, and
+    the two registries are separate precisely so a body cannot lead with an
+    ordinary row and cannot place a hero among its blocks.
+
+    ⚠️ SO IT IS EXEMPT FROM THE BLOCK QUESTION AND NOT FROM EVERY QUESTION. The
+    heroes check further down asks the one that matters about these — that the
+    renderer has a branch for the kind — which is the same "declared and drawn by
+    nothing" fault this file exists for, asked of the other registry.
+  */
+  hero: ["Lead"],
+  /*
     ⚠️ A CHART WHOSE DATA A `view` CANNOT DESCRIBE, WHICH IS ELEVEN OF THE
     THIRTEEN. `LineChart` and `BarChart` take a series and a name and are in the
     vocabulary. These take two categorical axes and a measure, or pairs, or
@@ -300,7 +311,7 @@ for (const [why, names] of Object.entries(WHY)) {
     loose++;
     fail(`${at}: ${name} takes no children and is neither a block nor classified.\n`
       + `       Add it to kernel/src/blocks.ts, or say why it is not one `
-      + `(formatter | state | chrome | control | inside | mark | plumbing | unbindable).`);
+      + `(formatter | state | chrome | control | inside | mark | plumbing | hero | unbindable).`);
   }
   if (!loose && !stale) {
     ok(`candidates: ${exported.size} export(s), every childless one placed or classified`);

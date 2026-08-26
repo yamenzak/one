@@ -19,7 +19,7 @@
  */
 
 import * as React from "react";
-import { Shell, ready, whoFace } from "@engine/design";
+import { Screen, Shell, ready, whoFace } from "@engine/design";
 import { Body, type Has } from "@engine/design/body";
 import { ground as GROUND } from "../index.js";
 import { GroundScreen } from "./index.js";
@@ -58,7 +58,25 @@ export function Board({ route }: { readonly route: string }) {
         what this workspace contains, and every comparison between them being
         about the data rather than about the drawing.
       */}
-      {declared ? <Body body={declared} has={SEEN} /> : <GroundScreen route={route} />}
+      {/*
+        ⚠️ AND A DECLARED BODY IS PUT IN A `Screen`, WHICH IS THE FRAME EVERY
+        WRITTEN ONE ALREADY BRINGS. `Body` places blocks and states so — the
+        gutter, the reading width, the crown's collapse and the shape's own
+        skeleton are the frame's, and mounting a body bare leaves every one of
+        them off. Photographed that way both cards ran edge to edge at x=0 while
+        every written screen beside them was inset, and the difference read as a
+        design decision about heroes rather than as a missing wrapper.
+      */}
+      {declared
+        ? (
+          <Screen
+            shape={declared.shape}
+            title={(G.screens ?? []).find((s) => s.route === route)?.label ?? ""}
+          >
+            <Body body={declared} has={{ ...SEEN, named: namedIn(G.screens ?? []) }} />
+          </Screen>
+        )
+        : <GroundScreen route={route} />}
     </Shell>
   );
 }
@@ -85,3 +103,21 @@ const SEEN: Has = {
     "every-person": rows(PEOPLE),
   },
 };
+
+/**
+ * ⚠️ WHAT A SHORTCUT SAYS, OUT OF THE MANIFEST — see `Has.named`. Without it
+ * every `leads` in every declaration resolves to nothing and is DROPPED, which
+ * is correct behaviour (a screen this person may not open has no shortcut) and
+ * indistinguishable in a photograph from a row that was never declared. The
+ * board went one sweep with a hero declaring three ways onward and drawing none.
+ *
+ * ⚠️ AND EVERY SCREEN IS NAMED HERE BECAUSE THE GROUND HOLDS EVERY GRANT. A
+ * deployment answers `undefined` for one behind a permission the person lacks;
+ * a proving ground that did the same would be one where the picture depends on
+ * a grant nobody set.
+ */
+const namedIn = (screens: readonly { id: string; label: string; icon?: string }[]) =>
+  (id: string) => {
+    const one = screens.find((s) => s.id === id);
+    return one ? { label: one.label, ...(one.icon ? { icon: one.icon } : {}) } : undefined;
+  };

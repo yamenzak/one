@@ -12,6 +12,7 @@
  */
 
 import * as React from "react";
+import { Button } from "@heroui/react";
 import { TYPE } from "../tokens/type.js";
 import { ICON, SPACE } from "../tokens/metrics.js";
 
@@ -303,6 +304,136 @@ export function Hero({
         )
         : undefined}
     />
+  );
+}
+
+/* ------------------------------------------------------------------- lead --- */
+
+/**
+ * THE FIGURE A SCREEN OPENS WITH, ON ITS OWN CARD, WITH THE WAYS ONWARD UNDER IT.
+ *
+ * ⚠️ `Hero` IS A COMPOSITION AND THIS IS A REGION, WHICH IS THE WHOLE DIFFERENCE.
+ * `Hero` is a centred stack a screen places wherever it wants one — inside a
+ * card, on a veil, mid-page. This is what a body's `hero` DECLARATION draws: it
+ * supplies its own surface, it is the first thing under the crown, and it is the
+ * one part of a screen allowed to look different from the blocks below it.
+ * Drawing the declaration with `Hero` was the first attempt and it read as a
+ * stat tile somebody had enlarged — correct spacing, no character.
+ *
+ * ⚠️ AND IT IS LEFT-ALIGNED WHERE `Hero` IS CENTRED, DELIBERATELY. A centred
+ * figure is a splash: right for a receipt, a result, a moment. A screen's
+ * standing figure is read on the way past, and everything else on the page —
+ * every card heading, every row, the crown itself — starts at one left edge. A
+ * centred number at the top of a left-aligned page is the one element on it
+ * nobody can line anything up against.
+ *
+ * ⚠️ THE MARK CARRIES NO COLOUR AND ITS GROUND DOES. The same rule as every other
+ * circle in the product (`QuickActions`): a tinted glyph stops reading the moment
+ * the ambience behind it moves, and the tinted ground is what says the figure has
+ * a subject rather than being arithmetic.
+ */
+export function Lead({ eyebrow, mark, value, unit, fresh, leads, at }: {
+  /** ⚠️ What the figure is OF, above it — "Notes in this workspace". */
+  readonly eyebrow?: string;
+  /** ⚠️ A node, not a name — the caller passes `glyphOf(…)`. See `Group.icon`. */
+  readonly mark?: React.ReactNode;
+  readonly value: number | string;
+  /**
+   * ⚠️ BESIDE THE NUMBER AND ON ITS BASELINE, WHICH IS WHY IT IS A SLOT RATHER
+   * THAN PART OF THE STRING. Folded into the value it stops being a number —
+   * nothing can count up to it, and two heroes on two screens sit at different
+   * left edges because one of them has three letters of unit in front.
+   */
+  readonly unit?: string;
+  /** ⚠️ When it was last true, muted, under. A figure with no age is a claim. */
+  readonly fresh?: React.ReactNode;
+  /** ⚠️ Where somebody goes from here — see `HeroSpec.leads`. */
+  readonly leads?: readonly {
+    readonly id: string; readonly label: string;
+    readonly icon?: React.ReactNode; readonly onDo: () => void;
+  }[];
+  /** ⚠️ Its place in the arrival sequence — see `Group.at`. Always first. */
+  readonly at?: number;
+}) {
+  const shown = useShown();
+  return (
+    <Group at={at ?? 0} sky="glow">
+      <div className={`flex flex-col ${SPACE.tight}`}>
+        {mark || eyebrow
+          ? (
+            <div className={`flex items-center ${SPACE.tight}`}>
+              {mark
+                ? (
+                  /* ⚠️ THE CIRCLE IS SIZED FROM THE ICON LADDER, not from a
+                     `size-*` that happens to look right — a plate whose diameter
+                     is a literal is a second scale, and it lands a pixel off
+                     every row glyph beside it on the screen below. */
+                  <span
+                    aria-hidden="true"
+                    className="flex shrink-0 items-center justify-center rounded-full bg-current/10"
+                    style={{
+                      width: `${ICON.row * 2}px`,
+                      height: `${ICON.row * 2}px`,
+                      ["--icon" as string]: `${ICON.row}px`,
+                    }}
+                  >
+                    {mark}
+                  </span>
+                )
+                : null}
+              {eyebrow ? <span className={TYPE.note}>{eyebrow}</span> : null}
+            </div>
+          )
+          : null}
+        <span className={`flex flex-wrap items-baseline ${SPACE.tight}`}>
+          <span className={TYPE.display}>
+            {typeof value === "number"
+              ? <Tally value={value} format={compactLike(shown, value)} />
+              : value}
+          </span>
+          {unit ? <span className={`${TYPE.group} text-muted`}>{unit}</span> : null}
+        </span>
+        {fresh ? <span className={TYPE.note}>{fresh}</span> : null}
+      </div>
+      {leads?.length ? <LeadsOn leads={leads} /> : null}
+    </Group>
+  );
+}
+
+/**
+ * ⚠️ PILLS, NOT THE CIRCLE CLUSTER `QuickActions` DRAWS, and the reason is what
+ * they are. That cluster is a set of VERBS — scan, receive, count — four equal
+ * circles a thumb picks between, and it is centred because nothing in it is more
+ * likely than the rest. These are PLACES, they wear the screen's own words, and a
+ * word is what somebody scans for. Set as circles they would need the label under
+ * each one anyway, which is a pill drawn the long way round.
+ *
+ * ⚠️ AND THEY WRAP RATHER THAN SCROLL. A row that scrolls sideways at the top of
+ * a screen hides its own last item, and nothing on the page says it is there.
+ */
+function LeadsOn({ leads }: {
+  readonly leads: readonly {
+    readonly id: string; readonly label: string;
+    readonly icon?: React.ReactNode; readonly onDo: () => void;
+  }[];
+}) {
+  return (
+    <div className={`flex flex-wrap ${SPACE.tight}`}>
+      {leads.map((one) => (
+        <Button
+          key={one.id}
+          size="sm"
+          /* ⚠️ `tertiary` — the same argument `QuickActions` makes at length:
+             `secondary` overrides the glyph's foreground with the accent, and a
+             tinted mark is one that stops reading when the ground moves. */
+          variant="tertiary"
+          onPress={one.onDo}
+        >
+          {one.icon ? <span aria-hidden="true">{one.icon}</span> : null}
+          {one.label}
+        </Button>
+      ))}
+    </div>
   );
 }
 

@@ -696,12 +696,19 @@ export const isGroup = (p: Placed): p is GroupSpec => "group" in p;
  * cannot point at.
  *
  * ⚠️ IT IS A REGION RATHER THAN WHATEVER IS FIRST IN `blocks`, AND FOUR THINGS
- * FOLLOW FROM NAMING IT. It is FULL BLEED, so it ignores the gutter every other
- * block obeys — a flat list has no way to say that. The crown COLLAPSES INTO IT,
- * so a screen's name rises into the chrome as the hero leaves rather than every
- * author remembering to arrange it. It carries its own AMBIENCE, which no
- * ordinary block does. And a guard can REQUIRE one, so "this screen opens flat"
- * is a test rather than a note somebody writes in a review.
+ * FOLLOW FROM NAMING IT. The KIND DECIDES ITS OWN BLEED — a figure is a card
+ * inside the gutter and a picture runs to the edges of the screen — which is a
+ * decision no entry in a flat list of blocks can make about itself. The crown
+ * COLLAPSES INTO IT, so a screen's name rises into the chrome as the hero leaves
+ * rather than every author remembering to arrange it. It carries its own
+ * AMBIENCE, which no ordinary block does. And a guard can REQUIRE one, so "this
+ * screen opens flat" is a test rather than a note somebody writes in a review.
+ *
+ * ⚠️ AND "IT IS FULL BLEED" IS WHAT THIS SAID, WHICH WAS TRUE OF ONE KIND AND
+ * WRITTEN AS THOUGH IT WERE TRUE OF THE REGION. A blanket rule here would have
+ * made every hero run to the edges — correct for a photograph, wrong for a card,
+ * and the sort of thing that is discovered by drawing the second kind rather
+ * than by reading the first.
  *
  * ⚠️ THE KIND IS A CLOSED SET AND THE CONTENT IS THE SCREEN'S OWN. That is what
  * makes a hero feel made for the screen without making every screen a snowflake
@@ -730,6 +737,22 @@ export interface HeroSpec {
    * says nothing is a screen that looks like it failed to load.
    */
   readonly nothing: { readonly says: string; readonly under?: string };
+  /**
+   * WHERE SOMEBODY GOES FROM HERE — the screens a person most often wants after
+   * reading the figure, as a row of shortcuts under it.
+   *
+   * ⚠️ THIS IS `BlockSpec.leads` IN THE HERO'S REGION, DELIBERATELY THE SAME
+   * MECHANISM. A separate list carrying its own labels and marks would be a
+   * second spelling of words the manifest already holds, and the two drift the
+   * first time a screen is renamed — which is the exact argument `leads` was
+   * given for over a route written by hand.
+   *
+   * ⚠️ AND IT IS WHAT MAKES THE REGION A HERO RATHER THAN A BIG NUMBER. A figure
+   * alone answers "how much" and leaves a person to go and find the thing it is
+   * about; the same figure with three ways onward is the top of the screen doing
+   * the work the rest of it would otherwise have to.
+   */
+  readonly leads?: readonly string[];
 }
 
 /** A screen's body: what it is for, how it is arranged, and what is on it. */
@@ -1550,6 +1573,16 @@ export function refuseSurface(
           at("slot_kind_wrong",
             `${lead}: "${slot}" takes ${spec.takes.join(" or ")}, and is given a ${binding.from.of}`);
         }
+      }
+    }
+    /* ⚠️ THE SAME QUESTION A BLOCK'S SHORTCUTS ARE ASKED, and it has to be asked
+       here too because the hero is not one: the loop below walks `blocksIn`, so
+       a hero leading to a screen that does not exist would draw a shortcut whose
+       press goes nowhere, at the top of the screen, where it is pressed most. */
+    for (const to of body.hero.leads ?? []) {
+      if (!screens.includes(to)) {
+        at("goes_nowhere",
+          `${lead} leads to "${to}", which is not a screen this app declares`);
       }
     }
   }

@@ -42,7 +42,8 @@ import { Num, Size, Unit, When } from "../parts/said.js";
 import { Money } from "../parts/surfaces.js";
 import { Tally } from "../parts/tally.js";
 import { PARTS } from "./parts.js";
-import { Hero } from "../chart/figures.js";
+import { Lead } from "../chart/figures.js";
+import { glyphOf } from "../frame/shell.js";
 
 /* ------------------------------------------------------------ what it has --- */
 
@@ -518,22 +519,54 @@ function Led({ body, has }: BodyProps) {
   if (hero.as === "figure") {
     const value = hero.bind?.["value"] ? drawn(hero.bind["value"], has) : undefined;
     const of = hero.bind?.["of"] ? drawn(hero.bind["of"], has) : undefined;
+    const unit = hero.bind?.["unit"] ? drawn(hero.bind["unit"], has) : undefined;
     const fresh = hero.bind?.["fresh"] ? drawn(hero.bind["fresh"], has) : undefined;
+    const mark = hero.bind?.["mark"] ? drawn(hero.bind["mark"], has) : undefined;
     /* ⚠️ `undefined` AND `null` BOTH MEAN NOT YET, AND ZERO DOES NOT. A workspace
        that has counted nothing has no figure; a workspace that counted and found
        none has a figure and it is 0. Reading them the same way is how an empty
        state comes to cover a real answer. */
     const nothing = value === undefined || value === null;
+    /* ⚠️ THE WAYS ONWARD SURVIVE AN EMPTY WORKSPACE, and that is the decision.
+       They are what somebody presses to MAKE the figure be something — a hero
+       that hides them until there is a number to show is one that withholds the
+       controls precisely when they are the only useful thing on the screen. */
     return (
-      <Hero
-        eyebrow={nothing ? undefined : String(of ?? "")}
+      <Lead
+        {...(nothing ? {} : { eyebrow: String(of ?? "") })}
+        {...(mark ? { mark: glyphOf(String(mark)) } : {})}
         value={nothing ? hero.nothing.says : (value as number | string)}
-        count={!nothing}
-        identifier={nothing ? hero.nothing.under : (fresh as React.ReactNode)}
+        {...(nothing || unit === undefined || unit === null ? {} : { unit: String(unit) })}
+        fresh={nothing ? hero.nothing.under : (fresh as React.ReactNode)}
+        {...(leadsOn(hero.leads, has))}
       />
     );
   }
   return null;
+}
+
+/**
+ * ⚠️ THE SAME RESOLUTION A BLOCK'S SHORTCUTS GET, AND IT IS SHARED RATHER THAN
+ * COPIED — see `BlockSpec.leads`. The declaration names screens; the words and
+ * the mark come from the manifest through `named`, and a screen this person may
+ * not open answers `undefined` and is DROPPED. A shortcut to a refusal is a
+ * promise the product does not keep, and it costs most at the top of a screen.
+ */
+function leadsOn(leads: readonly string[] | undefined, has: Has) {
+  if (!leads?.length) return {};
+  const on = leads
+    .map((to) => {
+      const said = has.named?.(to);
+      if (!said) return null;
+      return {
+        id: to,
+        label: said.label,
+        ...(said.icon ? { icon: glyphOf(said.icon) } : {}),
+        onDo: () => has.onGo?.(to),
+      };
+    })
+    .filter((one) => one !== null);
+  return on.length ? { leads: on } : {};
 }
 
 /**

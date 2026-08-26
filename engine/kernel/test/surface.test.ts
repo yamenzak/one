@@ -1214,4 +1214,28 @@ describe("the hero", () => {
       INDEX, [recent], COLLECTIONS, [],
     ).map((p) => p.why)).toContain("hero_unknown");
   });
+
+  /*
+    ⚠️ THE SHORTCUTS UNDER THE FIGURE ARE CHECKED LIKE A BLOCK'S AND THE CHECK IS
+    A SECOND ONE — see `HeroSpec.leads`. The loop that examines `leads` walks the
+    body's BLOCKS, and the hero is not one, so a hero leading nowhere passed
+    every existing assertion in this file and would have drawn a pill whose press
+    does nothing, at the top of the screen, where it is pressed most.
+  */
+  const leadingTo = (leads: readonly string[], screens: readonly string[]) => refuseSurface(
+    screen({ body: { ...body(), hero: { ...figure, leads } } }),
+    INDEX, [recent], COLLECTIONS, [], screens, HEROES,
+  ).map((p) => p.why);
+
+  it("accepts a hero leading to screens the app declares", () => {
+    expect(leadingTo(["write", "search"], ["write", "search"])).toEqual([]);
+  });
+
+  it("refuses a hero leading to a screen that does not exist", () => {
+    expect(leadingTo(["write", "nowhere"], ["write"])).toContain("goes_nowhere");
+  });
+
+  it("accepts a hero that leads nowhere at all", () => {
+    expect(leading(figure)).toEqual([]);
+  });
 });

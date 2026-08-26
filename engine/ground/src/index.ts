@@ -529,8 +529,19 @@ export const GROUND: AppSpec = defineApp({
           nothing: { says: "Nothing yet", under: "Write one and it will be counted here" },
           bind: {
             value: { from: { of: "count", view: "every-note" } },
-            of: { from: { of: "words", says: "Notes in this workspace" } },
+            /* ⚠️ NOT THE SCREEN'S OWN NAME AGAIN. The frame draws "Notes" a line
+               above this, so an eyebrow reading "Notes in this workspace" is the
+               same word twice in the two loudest ranks on the page — which is
+               how a hero comes to look like a heading with a number under it. */
+            of: { from: { of: "words", says: "Written so far" } },
+            unit: { from: { of: "words", says: "notes" } },
+            fresh: { from: { of: "words", says: "The most recent was on Thursday" } },
+            mark: { from: { of: "words", says: "note" } },
           },
+          /* ⚠️ THREE, AND NONE OF THEM IS THE SCREEN ITSELF. A shortcut back to
+             where somebody already is is the shape a breadcrumb has, and it is
+             the first thing a row of them collects. */
+          leads: ["write", "search", "reports"],
         },
         blocks: [{
           block: "Listing",

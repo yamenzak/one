@@ -392,6 +392,16 @@ export const HEROES: BlockIndex = {
   figure: block("figure", "figure", {
     value: slot("The figure", FIGURE, true),
     of: slot("What it is of", SAID, true),
+    /* ⚠️ AFTER THE NUMBER, NEVER FOLDED INTO IT. "1,200" and "1,200 gloves" are
+       the same fact and only the second is one a person can act on — and a unit
+       concatenated into the value by the app is a string where a figure was, so
+       it stops being counted up on arrival and stops aligning with anything. */
+    unit: slot("What it is measured in", SAID),
     fresh: slot("When it was last true", SAID),
+    /* ⚠️ WHAT KIND OF FIGURE THIS IS, IN ONE MARK — a name from `GLYPH_NAMES`.
+       A number alone is read as arithmetic; the same number beside a mark is
+       read as a subject, and it is the cheapest character a screen can have.
+       `words` only: it is a property of the screen, not of a record. */
+    mark: slot("The mark beside it", ["words"]),
   }),
 };

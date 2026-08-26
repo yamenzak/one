@@ -170,10 +170,10 @@ part that is not. Refresh with `node engine/scripts/docs.test.mjs --write`.
 | `frame/` | page, shape, crown, nav, dock, overlays — what wraps a screen | 72 |
 | `parts/` | rows, cards, lists, controls, the four outcomes | 218 |
 | `rendered/` | whole surfaces drawn from a kernel declaration | 47 |
-| `chart/` | the data vocabulary — a number as a shape | 43 |
+| `chart/` | the data vocabulary — a number as a shape | 44 |
 | `measure/` | what a screen actually lays out, in a real browser — the harness every app sweeps its own screens with | 1 |
 
-**476 exports.** Every one is reachable as `import { … } from "@engine/design"`;
+**477 exports.** Every one is reachable as `import { … } from "@engine/design"`;
 there is no deep import, and a guard says so.
 
 ### `tokens/`
@@ -253,7 +253,7 @@ there is no deep import, and a guard says so.
 
 - `chart/charts.tsx` — `AreaChart`, `BarChart`, `CHART_MOTION`, `ChartTable`, `ColumnChart`, `Datum`, `DivergingChart`, `DumbbellChart`, `HeatmapChart`, `LineChart`, `SCATTER_MAX`, `ScatterChart`, `Series`, `Sparkline`, `StackedChart`
 - `chart/circles.tsx` — `Arc`, `CompositionBar`, `DonutChart`, `Ring`, `Rings`
-- `chart/figures.tsx` — `ChartPanel`, `Compare`, `Delta`, `Hero`, `Meter`, `Score`, `Stat`, `StatRow`
+- `chart/figures.tsx` — `ChartPanel`, `Compare`, `Delta`, `Hero`, `Lead`, `Meter`, `Score`, `Stat`, `StatRow`
 - `chart/palette.ts` — `assign`, `AXIS`, `DATA`, `emphasis`, `GRID`, `magnitude`, `polarity`, `pole`, `QUIET`, `SEPARATOR`, `seriesColour`, `seriesOf`, `SLOTS`
 - `chart/scale.ts` — `Point`, `Span`
 

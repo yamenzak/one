@@ -109,13 +109,46 @@ every other, nothing leads, and a person arriving has to read in order to find
 out what they are looking at.
 
 ⚠️ **IT IS A REGION IN THE DECLARATION, NOT WHATEVER IS FIRST IN THE LIST.**
-Four things follow from naming it that cannot be had otherwise. It is FULL BLEED,
-so it ignores the gutter every other block obeys — a flat list has no way to say
-that. The crown COLLAPSES INTO IT, so the screen's name rises into the chrome as
-the hero leaves, automatically, rather than every author remembering to arrange
-it. It carries its own AMBIENCE, which no ordinary block does. And a guard can
-REQUIRE one, so "this screen opens flat" is a test rather than a note somebody
-writes in a review.
+Four things follow from naming it that cannot be had otherwise. The KIND DECIDES
+ITS OWN BLEED — a figure is a card inside the gutter, a picture runs to the edges
+of the screen — which is a decision no entry in a flat list of blocks can make
+about itself. The crown COLLAPSES INTO IT, so the screen's name rises into the
+chrome as the hero leaves, automatically, rather than every author remembering to
+arrange it. It carries its own AMBIENCE, which no ordinary block does. And a
+guard can REQUIRE one, so "this screen opens flat" is a test rather than a note
+somebody writes in a review.
+
+⚠️ **AND "IT IS FULL BLEED" IS WHAT THIS PARAGRAPH SAID**, which was true of one
+kind and written as though it were true of the region. A blanket rule here would
+have made every hero run to the edges: correct for a photograph, wrong for a
+card — the sort of thing discovered by drawing the second kind rather than by
+reading the first.
+
+### A hero is a figure and the ways onward, not a big number
+
+⚠️ **A FIGURE ALONE ANSWERS "HOW MUCH" AND LEAVES SOMEBODY TO GO AND FIND THE
+THING IT IS ABOUT.** The same figure with three ways onward under it is the top
+of the screen doing work the rest of it would otherwise have to. A hero kind that
+takes no destinations is one every screen will need a row of shortcuts under, and
+that row is then the app's to lay out, per screen, differently each time.
+
+⚠️ **THE DESTINATIONS ARE SCREEN IDS AND NOTHING ELSE.** The words and the mark
+come from the manifest, so a renamed screen renames its shortcut — a label typed
+beside the id is a second spelling of something the manifest already holds, and
+the two drift the first time anybody edits one. One the person may not open is
+DROPPED rather than drawn: a shortcut to a refusal is a promise the product does
+not keep, and it costs most at the top of a screen, where it is pressed most.
+
+⚠️ **AND THEY SURVIVE AN EMPTY WORKSPACE.** They are what somebody presses to
+MAKE the figure be something. A hero that hides its controls until there is a
+number to show withholds them precisely when they are the only useful thing on
+the page.
+
+⚠️ **A UNIT IS A SLOT, NEVER PART OF THE VALUE.** Folded into the string it stops
+being a number: nothing can count up to it, and two screens' heroes sit at
+different left edges because one of them has three letters in front. The same is
+true of the mark — a number alone is read as arithmetic; the same number beside a
+mark is read as a subject.
 
 ### Bespoke, and a closed set, at the same time
 
