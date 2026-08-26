@@ -1,5 +1,5 @@
 /**
- * A FIELD ON WHAT THE ROW POINTS AT, FETCHED IN ONE QUERY PER REFERENCE.
+ * A FIELD ON WHAT THE ROW POINTS AT, FETCHED IN ONE QUERY PER REFERENCE (D93).
  *
  * ⚠️ WITHOUT THIS EVERY DECLARED LIST IS A COLUMN OF IDS. A stock line holds
  * `product` and `location` as references; what a screen wants is the product's

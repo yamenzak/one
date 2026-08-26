@@ -88,7 +88,7 @@ export interface ViewSpec {
    */
   readonly limit?: number;
   /**
-   * HOW MANY ROWS POINT BACK AT EACH OF THESE — "lines on this shelf", "items in
+   * HOW MANY ROWS POINT BACK AT EACH OF THESE (D93) — "lines on this shelf", "items in
    * this run", "products from this supplier".
    *
    * ⚠️ THE COMMONEST THING A READING SCREEN SHOWS THAT A DECLARATION COULD NOT
@@ -345,7 +345,7 @@ export type Layout =
  * already exposes. What happens when it succeeds is the operation's business.
  */
 /**
- * WHERE A VALUE THE PERSON IS NOT ASKED FOR COMES FROM — and there are two.
+ * WHERE A VALUE THE PERSON IS NOT ASKED FOR COMES FROM — and there are two (D93).
  *
  * ⚠️ `record` IS THE THING THE SCREEN IS ABOUT and `today` IS THE DEVICE'S OWN
  * CALENDAR DAY. Both are facts the screen is standing on, and both appear in the
@@ -708,7 +708,7 @@ export const fieldsIn = (body: SurfaceSpec): readonly string[] =>
 /* ------------------------------------------------------------ one hop over --- */
 
 /**
- * A FIELD ON THE ROW, OR A FIELD ON WHAT THE ROW POINTS AT — `"product.name"`.
+ * A FIELD ON THE ROW, OR A FIELD ON WHAT THE ROW POINTS AT — `"product.name"` (D93).
  *
  * ⚠️ WITHOUT THIS EVERY LIST IN EVERY PRODUCT IS A COLUMN OF IDS. A stock row
  * holds `product` and `location` as `ref`s; the screen wants the product's name,

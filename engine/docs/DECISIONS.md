@@ -3362,3 +3362,61 @@ composition; a slot coordinate a block can read, because a block that knows it i
 "in a 2×1" breaks in the first layout that does not use that vocabulary; or a
 group inside a group, which is a tree, and a tree in a declaration is the
 template language this design exists without.
+
+---
+
+## D93 — A screen reaches one hop, counts what points back, and never asks for what it already knows
+
+D92 said the vocabulary a body binds through is closed. Porting OneInventory
+onto it found three things missing from it, and the shape of all three is the
+same: what a reading screen needs is not only its own rows.
+
+**A path may cross one reference, and only one.** `product.name` on a stock
+listing is the ordinary case rather than an exception — twelve of that product's
+reading screens hold a `ref` and want a name, and a declaration that cannot say
+so is a declaration those screens cannot be written in. `product.supplier.name`
+is where a manifest stops being a declaration and starts needing a query planner,
+which is the same line D92 draws at the first comparison operator. The join is
+resolved on the SERVER and written onto the row under the path itself, so the
+renderer reads `row["product.name"]` as a plain key and the browser half of this
+is zero lines.
+
+**A view may count what points back at it.** "Lines on this shelf", "products
+from this supplier", "items in this run" — measured across one product, a per-row
+count appears on five surfaces, and every one of them had built it in a browser
+out of a whole second collection fetched in full. It is on the VIEW rather than
+on the collection because a column would imply a writer and a drift: a counter
+maintained by every operation that adds or removes a row is wrong the first time
+one of them forgets. This is computed on read, beside the rows it belongs to, and
+a view that does not ask does not pay.
+
+**And what the screen is standing on is not a question.** Every write in a real
+product takes the thing it acts on and the day it happened. Drawn from the
+operation's `input` alone, the first form a declared screen opens asks for a row
+id somebody would have to copy out of a URL, and for today's date. A block's act
+may therefore say which of the operation's inputs the screen FILLS, from two
+sources and no third: the record it is about, and the DEVICE'S calendar day —
+because a shelf life is counted where the shelf is, and a server's own calendar
+would call a box expired the evening before it is. An act whose every input is
+filled runs on the press, because a sheet holding one button to confirm a press
+somebody already made is a second press for nothing.
+
+**Every one of these is a query per SCREEN, never per row.** One statement per
+reference and one `GROUP BY` per tally, with the ids collected and deduplicated
+first. Fifty stock lines are two statements, not a hundred — asking per row is
+the same answer at fifty times the price on a warehouse phone, and it is
+invisible in every assertion about the values.
+
+**And a hop is a TOUCH.** A joined column is a field of another collection's row,
+so the permission that governs it is that collection's. `collectionsFor` listed
+the screen's own and its views' and stopped there, which meant a screen declaring
+`location:read` and showing `product.name` handed out catalogue rows to a caller
+holding no `product:read`. A tally is the same leak with the detail removed. The
+permission check and the fetch read one resolution of the paths, because two
+walks of one question is how they come to disagree.
+
+**Therefore never:** a second hop; a count kept as a column; an identity filled
+in by the browser, since a value the caller supplied would be them naming
+somebody else; a form that draws a field the screen supplies; a join or a count
+issued once per row; or a collection reached through a path and left out of the
+permission check that decides whether the screen may be drawn at all.

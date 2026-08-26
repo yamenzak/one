@@ -462,9 +462,24 @@ generated ones) — plus every platform guard in `pnpm engine:gate`.
 
 ## Part III — the screen index
 
-**Twenty screens.** Each is a pure component in `src/screens/`, mounted by a
-container in `src/screens/live.tsx`, and rendered over a sample world by
+**Twenty-one screens, and they are no longer one kind of thing.** Eight are
+`declared` — drawn by the engine from a `body` in `src/index.ts`, with no
+component and no container, which is what those cells say. One is a story. The
+rest are still a pure component in `src/screens/`, mounted by a container in
+`src/screens/live.tsx`, and rendered over a sample world by
 `src/screens/index.tsx`.
+
+⚠️ **A `declared` ROW MEANS THE FILES ARE NOT REACHED, and that is the whole
+reason it says so.** Several of those components are still on disk — the sample
+world draws some of them, and one holds a vocabulary its neighbours import — so a
+row naming a file would send a reader to code the product does not run and
+nothing would look wrong. `screen-index.test.mjs` refuses either half of a
+declared screen's row naming a file, and refuses a written screen's row claiming
+to be declared.
+
+**What is still written, and what each one waits for, is
+`engine/scripts/private-ui.test.mjs`.** It is a list that can only shrink: an
+entry whose screen becomes a declaration fails until it is deleted.
 
 | Route | Name | Nav | Needs | Component | Container |
 |---|---|---|---|---|---|

@@ -114,7 +114,7 @@ const reachesFor = (app: AppSpec, screen: ScreenSpec) => {
 };
 
 /**
- * ⚠️ EVERY COLLECTION THE SCREEN TOUCHES, WHICH IS ITS OWN, ITS VIEWS' AND
+ * ⚠️ EVERY COLLECTION THE SCREEN TOUCHES (D93), WHICH IS ITS OWN, ITS VIEWS' AND
  * EVERYTHING THEY REACH INTO. The subject's collection is in the list because a
  * `detail` screen hands back the record itself, and a record is rows too.
  *

@@ -246,8 +246,13 @@ export const FIELD_NAME = /^[a-z][a-zA-Z0-9_]*$/;
  * byte of it is parsed before the first frame. An array literal costs about six
  * bytes a word in quotes and commas that a space-separated string does not, and
  * `weight.test.ts` is what noticed.
+ *
+ * ⚠️ AND IT IS NOT EXPORTED, for the reason `BONES` was deleted: a name
+ * published out of this module and imported by nothing is a seam somebody will
+ * one day bind to, and what a field may be called is a question
+ * `refuseCollection` already answers for every caller.
  */
-export const RESERVED_FIELD_NAMES: ReadonlySet<string> = new Set((
+const RESERVED_FIELD_NAMES: ReadonlySet<string> = new Set((
   "from to where select order group by on as in and or not null is like between "
   + "join left right inner outer cross using union all distinct having limit "
   + "offset insert into values update set delete create drop alter table index "

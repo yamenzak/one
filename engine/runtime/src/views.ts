@@ -35,12 +35,16 @@ const MOST = 200;
 export type { Viewed };
 
 /**
+ * ⚠️ NOT EXPORTED: it is read once, in the function below. A helper published
+ * out of a module nothing else reads it from is a seam somebody will one day
+ * bind to, and this one is an implementation detail of running a view.
+ *
  * ⚠️ THE COLLECTION IS RESOLVED HERE RATHER THAN TRUSTED, even though
  * `refuseView` has already refused a view over a collection nobody declares. A
  * runtime that indexes on a name from a manifest it did not itself validate is
  * one line from a table name it built out of a string.
  */
-export const collectionFor = (
+const collectionFor = (
   app: AppSpec, view: ViewSpec,
 ): CollectionSpec | undefined => app.collections?.find((c) => c.id === view.of);
 
