@@ -59,7 +59,6 @@ const ok = (m) => console.log(`ok   ${m}`);
  */
 const NOT_YET = new Map([
   ["inventory:home", "figures over the whole workspace beside three counts, which is the reports gap on a smaller screen"],
-  ["inventory:start", "the ladder explained and the questions asked in the first week, which are prose about the product rather than its rows"],
 ]);
 
 const screens = declaredScreens().filter((s) => products().includes(s.app));

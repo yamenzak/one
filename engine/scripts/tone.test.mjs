@@ -102,7 +102,18 @@ for (const file of SOURCES) {
     */
     const problemish = prop === "title"
       && /\bretryable\s*:/.test(src) && /\bstatus\s*:/.test(src);
-    const voice = problemish ? "notice" : VOICE[prop];
+    /*
+      ⚠️ A `says` INSIDE `{ of: "words" }` IS PROSE, NOT AN EMPTY STATE, and the
+      shape says so. A declared body binds a fixed string with `Read`'s `words`
+      source — a heading, a note, a sentence somebody reads — and it happens to
+      use the same key an empty state does. Held to the empty voice, every
+      explanatory line a screen declares was reported as an over-long empty
+      state, which is a rule failing on copy it was never about.
+    */
+    const prose = prop === "says"
+      && new RegExp(`of:\\s*"words"\\s*,\\s*says:\\s*"${text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`)
+        .test(src);
+    const voice = problemish ? "notice" : prose ? "under" : VOICE[prop];
     if (!voice) continue;
     checked++;
     for (const why of refuseCopy(voice, text)) {

@@ -81,9 +81,9 @@ const SURFACES = {
      they do it" are two halves of one answer about one person (D45). A separate
      screen would be a second place to look for somebody's access. */
   reach: { file: "one-space/src/centre/People.tsx", renders: "function AppWhere" },
-  guide: { file: "design/src/rendered/guide.tsx", renders: "export function Guide" },
-  milestones: { file: "design/src/rendered/guide.tsx", renders: "export function Milestones" },
-  help: { file: "design/src/rendered/guide.tsx", renders: "export function Help" },
+  guide: { file: "design/src/parts/guide.tsx", renders: "export function Guide" },
+  milestones: { file: "design/src/parts/guide.tsx", renders: "export function Milestones" },
+  help: { file: "design/src/parts/guide.tsx", renders: "export function Help" },
 
   packs: { file: "design/src/rendered/money.tsx", renders: "export function Wallet" },
   meters: { file: "design/src/rendered/money.tsx", renders: "export function Wallet" },

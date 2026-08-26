@@ -7008,6 +7008,21 @@ const manifest = (): AppSpec => defineApp({
               label: { from: { of: "words", says: "With" } },
               value: { from: { of: "field", field: "holder" } },
             } },
+          /*
+            ⚠️ THE KIT IS REACHED FROM THE THING THAT IS IN IT, AND IT WAS
+            REACHED FROM NOWHERE. A kit's own screen listed its contents and
+            every item's screen said nothing about the kit it was part of — so
+            `/kit` rendered perfectly at an address no control in the product
+            led to. `reached.test.mjs` could not see it while its parser was
+            skipping every screen that had a body.
+          */
+          { block: "NavRow",
+            when: { has: { of: "field", field: "kit" } },
+            goes: { to: "kit", by: "kit" },
+            bind: {
+              label: { from: { of: "words", says: "The kit it is in" } },
+              under: { from: { of: "words", says: "What else is in it, and how it is" } },
+            } },
           { block: "FieldRow",
             when: { has: { of: "field", field: "issued" } },
             bind: {
@@ -7553,7 +7568,106 @@ const manifest = (): AppSpec => defineApp({
        yet; a permanent slot for it is a slot every experienced person carries
        for ever. */
     { id: "start", route: "/start", label: "Getting started", nav: "none", icon: "star",
-      permission: "product:read", sky: "glow" },
+      permission: "product:read", sky: "glow",
+      /*
+        ⚠️ NOTHING HERE RESTATES A STEP. `guide` and `milestones` are declared on
+        this manifest and the engine draws them from it — see `BlockEntry.book`.
+        A second copy of the steps is the one that goes stale, and it goes stale
+        silently: the manifest is what a workspace's progress is measured
+        against, so the copy would be the version nobody's progress ever reaches.
+      */
+      body: {
+        shape: "board",
+        layout: { as: "stack" },
+        blocks: [
+          {
+            group: "Your first three things",
+            of: [{ block: "Guide", bind: {} }],
+          },
+          /*
+            ⚠️ THE ONE DECISION THE PRODUCT CANNOT MAKE FOR ANYBODY, said before
+            the milestones rather than after. Somebody who has not understood the
+            ladder will make every product `counted` and then wonder why the app
+            never warns them about an expiry.
+
+            ⚠️ AND ALL FIVE RUNGS. `assembled` is the one nobody would guess
+            exists and the one that cannot be reached afterwards — the moment
+            identity is created is the moment a thing arrives, so a workspace
+            that read a list of four and chose `itemised` for its kits has no
+            second chance at it.
+          */
+          {
+            group: "How much to track",
+            of: [
+              { block: "StepRow",
+                bind: {
+                  label: { from: { of: "words", says: "Listed" } },
+                  under: { from: { of: "words",
+                    says: "A thing you keep and never count — a ladder, a drill" } },
+                } },
+              { block: "StepRow",
+                bind: {
+                  label: { from: { of: "words", says: "Counted" } },
+                  under: { from: { of: "words",
+                    says: "A number per place, and where most things start" } },
+                } },
+              { block: "StepRow",
+                bind: {
+                  label: { from: { of: "words", says: "Batched" } },
+                  under: { from: { of: "words",
+                    says: "Deliveries kept apart, because one of them expires first" } },
+                } },
+              { block: "StepRow",
+                bind: {
+                  label: { from: { of: "words", says: "Itemised" } },
+                  under: { from: { of: "words",
+                    says: "One object, with a serial and a service date of its own" } },
+                } },
+              { block: "StepRow",
+                bind: {
+                  label: { from: { of: "words", says: "Assembled" } },
+                  under: { from: { of: "words",
+                    says: "A kit of itemised things, checked against its own list" } },
+                } },
+            ],
+          },
+          /* ⚠️ NO HEADING, BECAUSE MOST OF THE TIME THERE IS NOTHING. Milestones
+             draws nothing when nothing has just been reached, and a heading over
+             nothing is a promise the page does not keep. */
+          { group: null, of: [{ block: "Milestones", bind: {} }] },
+          /*
+            ⚠️ THE THREE THINGS SOMEBODY ASKS IN THE FIRST WEEK, and each one is a
+            real refusal or a real rule this product has rather than a
+            reassurance. A FAQ made of "yes, you can!" is marketing copy in the
+            place people go when something has already confused them.
+          */
+          {
+            group: "Asked often",
+            of: [
+              { block: "StepRow",
+                bind: {
+                  label: { from: { of: "words",
+                    says: "Why will it not let me take twelve when there are eight?" } },
+                  under: { from: { of: "words",
+                    says: "One of the two numbers is wrong, and zero destroys the evidence" } },
+                } },
+              { block: "StepRow",
+                bind: {
+                  label: { from: { of: "words", says: "Do I count boxes of gloves, or gloves?" } },
+                  under: { from: { of: "words",
+                    says: "Whichever you issue. Set it once, and every number is in it" } },
+                } },
+              { block: "StepRow",
+                bind: {
+                  label: { from: { of: "words",
+                    says: "What happens if two of us count the same shelf?" } },
+                  under: { from: { of: "words",
+                    says: "The second is told the number moved, and shown what it is now" } },
+                } },
+            ],
+          },
+        ],
+      } },
   ],
 
   problems: {

@@ -29,10 +29,28 @@ import { Body, type Has } from "@engine/design/body";
    browser bundle — so what both ends need is declared once, in the layer both
    are allowed to reach. */
 import {
-  SCREEN_PATH, fillOf, viewsIn, type Fields, type Fill, type ScreenSpec, type Viewed,
+  BLOCKS, SCREEN_PATH, fillOf, isGroup, viewsIn,
+  type Fields, type Fill, type GuideBook, type MilestoneBook, type Raised, type ScreenSpec,
+  type SurfaceSpec, type Viewed,
 } from "@engine/kernel";
 import { api, forget } from "../api.js";
 import { useLoad } from "./data.js";
+
+/**
+ * HOW FAR THIS WORKSPACE HAS GOT — the platform's one answer, for every product.
+ *
+ * ⚠️ THE EVENTS, NEVER THE STEPS. A checklist ticks a step whose `done` event is
+ * in these lists; a screen that decided for itself would leave the step undone
+ * when the same thing is done from the API or from the second screen that also
+ * does it, and then tell somebody to finish what they finished last week.
+ */
+interface Far {
+  readonly counts: Readonly<Record<string, number>>;
+  /** ⚠️ What THIS person has done. Half a checklist is theirs, not the workspace's. */
+  readonly mine: readonly string[];
+  readonly fresh: readonly { readonly id: string }[];
+  readonly said: readonly string[];
+}
 
 /** What the door answers. */
 interface Drawn {
@@ -78,7 +96,17 @@ const spread = (
       : waiting<Viewed>(),
 ]));
 
-export function Declared({ screen, screens, at, go, currency }: {
+/**
+ * ⚠️ WHETHER THIS BODY PLACES A BOOK BLOCK — see `BlockEntry.book`. The read
+ * behind them is the platform's and it costs a round trip, so a screen that
+ * places neither must not pay for one. Read off the declaration rather than
+ * fetched-and-discarded, which is what "the manifest says what it needs" means.
+ */
+const booksIn = (body: SurfaceSpec): boolean =>
+  body.blocks.some((placed) => (isGroup(placed) ? placed.of : [placed])
+    .some((b) => Boolean(BLOCKS[b.block]?.book)));
+
+export function Declared({ screen, screens, at, go, currency, app }: {
   readonly screen: ScreenSpec;
   /**
    * ⚠️ EVERY SCREEN THIS PRODUCT DECLARES, because `goes` names one by ID and an
@@ -96,6 +124,17 @@ export function Declared({ screen, screens, at, go, currency }: {
   readonly at: readonly string[];
   readonly go: (route: string) => void;
   readonly currency?: string | undefined;
+  /**
+   * ⚠️ THE PRODUCT'S OWN BOOKS AND WHAT THIS PERSON HOLDS — see `Has.book` and
+   * `BlockSpec.leads`. Both come from the centre, which already resolved them to
+   * draw the nav; a second request for either would be asking the server what it
+   * has already said.
+   */
+  readonly app: {
+    readonly guide: GuideBook;
+    readonly milestones: MilestoneBook;
+    readonly permissions: readonly string[];
+  };
 }) {
   /*
     ⚠️ WHICH OPERATION IS BEING ASKED ABOUT, and `null` for none. An operation
@@ -222,6 +261,59 @@ export function Declared({ screen, screens, at, go, currency }: {
     go(record ? `${to.replace(/\/$/, "")}/${record}` : to);
   }, [screens, go]);
 
+  /*
+    ⚠️ ASKED ONLY WHERE THE BODY PLACES A CHECKLIST, and `useLoad` is given a
+    null path otherwise — every other screen in the product would otherwise pay a
+    round trip for a block it does not draw.
+
+    ⚠️ AND THE MILESTONE IS MARKED SEEN WITHOUT THE SCREEN WAITING FOR IT. The
+    congratulation is already on the page; what the write buys is that it is not
+    there again tomorrow, so a failure costs a repeat rather than a blank.
+  */
+  const wantsBook = Boolean(body && booksIn(body));
+  const far = useLoad<Far>(wantsBook ? "guide.view" : null, {});
+  const reached = far.of.status === "ready" ? far.of.data : null;
+  const fresh = reached?.fresh ?? [];
+  const marked = React.useRef(new Set<string>());
+  React.useEffect(() => {
+    for (const one of fresh) {
+      if (marked.current.has(one.id)) continue;
+      marked.current.add(one.id);
+      void api.post("guide.seen", { milestone: one.id });
+    }
+  }, [fresh]);
+
+  const holds = React.useMemo(() => new Set(app.permissions), [app.permissions]);
+  const book = React.useMemo(() => ({
+    guide: app.guide,
+    milestones: app.milestones,
+    /* ⚠️ THE EVENTS, NOT THE STEPS, AND BOTH AXES SEPARATELY — a workspace step
+       is anybody's to have done, a person step is only this person's. One merged
+       list opens already complete for somebody invited into a workspace that has
+       been running, which is a welcome congratulating them for a year of work
+       they were not there for. */
+    raised: (reached
+      ? { workspace: Object.keys(reached.counts), person: reached.mine }
+      : null) as Raised | null,
+    counts: reached?.counts ?? {},
+    /* ⚠️ WHILE IT IS LOADING, EVERYTHING IS "ALREADY SAID". `[]` would draw every
+       reached milestone for the length of the round trip and then take them away
+       — a congratulation that flickers, which is worse than one a beat late. */
+    already: reached ? reached.said : Object.keys(app.milestones),
+    held: holds,
+    onGo: go,
+  }), [app.guide, app.milestones, reached, holds, go]);
+
+  /* ⚠️ A SHORTCUT WEARS THE SCREEN'S OWN LABEL AND MARK — see `BlockSpec.leads`.
+     A screen behind a grant this person does not hold answers `undefined`, so the
+     tile is dropped rather than leading to a refusal. */
+  const named = React.useCallback((id: string) => {
+    const one = screens.find((s) => s.id === id);
+    if (!one) return undefined;
+    if (one.permission && !holds.has(one.permission)) return undefined;
+    return { label: one.label, ...(one.icon ? { icon: one.icon } : {}) };
+  }, [screens, holds]);
+
   const has: Has = React.useMemo(() => ({
     ...(got.of.status === "ready" && got.of.data.record
       ? { record: got.of.data.record }
@@ -234,7 +326,9 @@ export function Declared({ screen, screens, at, go, currency }: {
       setPicked((was) => ({ ...was, [id]: value })),
     ...(got.of.status === "ready" ? { picks: got.of.data.picks } : {}),
     ...(currency ? { currency } : {}),
-  }), [got.of, ids, onGo, onDo, currency, picked]);
+    named,
+    ...(wantsBook ? { book } : {}),
+  }), [got.of, ids, onGo, onDo, currency, picked, named, wantsBook, book]);
 
   if (!body) return null;
   return (

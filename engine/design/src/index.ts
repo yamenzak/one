@@ -67,7 +67,7 @@ export * from "./rendered/settings.js";
 export * from "./rendered/policy.js";
 export * from "./frame/shell.js";
 export * from "./rendered/console.js";
-export * from "./rendered/guide.js";
+export * from "./parts/guide.js";
 export * from "./rendered/money.js";
 export * from "./rendered/inbox.js";
 export * from "./rendered/ai.js";

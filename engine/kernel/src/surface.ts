@@ -626,6 +626,20 @@ export interface BlockSpec {
    */
   readonly plots?: PlotSpec;
   /**
+   * THE SCREENS THIS BLOCK IS A ROW OF SHORTCUTS TO — see `BlockEntry.leads`.
+   *
+   * ⚠️ IDS, AND EACH TILE WEARS THE SCREEN'S OWN LABEL AND MARK. A shortcut that
+   * carried its own words is a second name for a place the manifest already
+   * named, and the two say different things the first time one is renamed —
+   * which is a bar item and a tile for the same screen reading as two places.
+   *
+   * ⚠️ AND A SCREEN THIS PERSON MAY NOT OPEN IS DROPPED RATHER THAN DRAWN. The
+   * nav filters itself on the same question; a tile inside a screen has nothing
+   * filtering it, so a shortcut to a refusal is a promise the product does not
+   * keep.
+   */
+  readonly leads?: readonly string[];
+  /**
    * WHAT ITS EMPTINESS MEANS, IN THE APP'S OWN WORDS.
    *
    * ⚠️ REQUIRED OF ANY BLOCK THAT READS A LIST, for the reason `Region.nothing`
@@ -774,6 +788,31 @@ export interface BlockEntry {
    * of quietly-ignored declaration this registry exists to close.
    */
   readonly plots?: "labelled" | "series";
+  /**
+   * THIS BLOCK DRAWS A LIST OF DESTINATIONS — see `BlockSpec.leads`.
+   *
+   * ⚠️ SEVERAL, WHICH IS WHY `goes` COULD NOT SAY IT. A row leads to one place;
+   * a row of shortcuts leads to four, and the whole point of it is that they sit
+   * beside each other. Without this the one block in the registry for that shape
+   * was placeable and drew nothing.
+   */
+  readonly leads?: true;
+  /**
+   * THIS BLOCK IS FED BY THE APP'S OWN BOOK, NOT BY A BINDING.
+   *
+   * ⚠️ THE ONLY SOURCE IN THE VOCABULARY THAT IS NOT A VIEW OR A FIELD, and it
+   * is here because the checklist is already declared — `AppSpec.guide` and
+   * `AppSpec.milestones` are what the events tick. A slot binding them would be
+   * a screen restating steps the manifest holds, which is the copy that goes
+   * stale silently: the manifest is what progress is measured against, so the
+   * restatement is the version nobody's progress ever reaches.
+   *
+   * ⚠️ AND WHAT HAS BEEN DONE IS THE PLATFORM'S, fetched by the surface rather
+   * than declared. An app cannot name a view over another app's tables, and it
+   * should not have to: "how far has this workspace got" is one question with
+   * one answer for every product.
+   */
+  readonly book?: "guide" | "milestones";
 }
 
 export type BlockIndex = Readonly<Record<string, BlockEntry>>;
@@ -791,6 +830,10 @@ export type SurfaceRefusal =
   /* ⚠️ THE THREE A CHART'S AXES CAN GET WRONG — see `PlotSpec`. Every one of
      them draws an empty box under a correct heading. */
   | "plots_on_a_block_that_draws_none" | "plots_missing" | "plots_unlabelled"
+  /* ⚠️ THE TWO A ROW OF SHORTCUTS CAN GET WRONG — see `BlockSpec.leads`. An
+     unknown destination is `goes_nowhere`, which is the same fault one tile at a
+     time and deserves the same name. */
+  | "leads_missing" | "leads_on_a_block_that_takes_none"
   /* ⚠️ THE FOUR A NARROWING CAN GET WRONG — see `PickSpec`. A control drawn over
      rows nothing narrows is the sharpest: it moves, and the screen does not. */
   | "pick_name_taken" | "pick_says_nothing" | "pick_two_ways" | "pick_narrows_nothing"
@@ -1550,6 +1593,29 @@ export function refuseSurface(
           at("shows_field_unknown",
             `${where} plots "${name}", which ${view?.of} does not have`);
         }
+      }
+    }
+
+    /*
+      ⚠️ A ROW OF SHORTCUTS WITH NOTHING IN IT IS A BLOCK THAT DRAWS NOTHING —
+      see `BlockSpec.leads`. It is the same failure as a chart with no axes and
+      it is quieter: the heading above it is right, the region reports ready, and
+      the gap where four tiles should be reads as a screen still loading.
+    */
+    if (entry.leads && !b.leads?.length) {
+      at("leads_missing",
+        `${where} is a row of shortcuts and names no screens — it would draw a gap `
+        + "under a correct heading");
+    }
+    if (!entry.leads && b.leads) {
+      at("leads_on_a_block_that_takes_none",
+        `${where} names screens to lead to and is not a row of shortcuts — `
+        + "nothing would draw them");
+    }
+    for (const to of b.leads ?? []) {
+      if (!screens.includes(to)) {
+        at("goes_nowhere",
+          `${where} leads to "${to}", which is not a screen this app declares`);
       }
     }
 

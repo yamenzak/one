@@ -23,7 +23,7 @@ import { Card, Chip, ProgressBar } from "@heroui/react";
 import { colorFor } from "../tokens/theme.js";
 import { NUDGE, ROW, SPACE } from "../tokens/metrics.js";
 import { TYPE } from "../tokens/type.js";
-import { Group, NavRow, NoteRow } from "../parts/surfaces.js";
+import { Group, NavRow, NoteRow } from "./surfaces.js";
 
 export interface GuideProps {
   readonly book: GuideBook;

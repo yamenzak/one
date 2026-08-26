@@ -80,12 +80,35 @@ for (const [app, manifest] of appManifests()) {
     continue;
   }
 
-  /* ⚠️ ONE ENTRY AT A TIME, because `nav` and `route` are fields of the SAME
-     object and a file-wide match would pair either with the other's neighbour. */
-  const entries = [...block[1].matchAll(/\{[^{}]*route:\s*"([^"]+)"[^{}]*\}/g)];
+  /*
+    ⚠️ ONE ENTRY AT A TIME, because `nav` and `route` are fields of the SAME
+    object and a file-wide match would pair either with the other's neighbour.
+
+    ⚠️ AND THE SPLIT IS BY BRACE BALANCE, NOT BY A REGEX, which is the second
+    time that lesson has been paid for in this directory. `\{[^{}]*route:…\}`
+    matches only an entry with nothing nested inside it — so the day a screen
+    gained a `body`, it stopped being a screen as far as this guard was
+    concerned, silently, one screen at a time. When the last one was ported the
+    corpus went to nought and `guards.test.mjs` is what said so; before that it
+    was a check quietly shrinking under a green tick.
+  */
+  const entries = [];
+  for (let i = 0; i < block[1].length; i++) {
+    if (block[1][i] !== "{") continue;
+    let depth = 0;
+    let end = i;
+    for (let j = i; j < block[1].length; j++) {
+      if (block[1][j] === "{") depth++;
+      else if (block[1][j] === "}") { depth--; if (!depth) { end = j; break; } }
+    }
+    const whole = block[1].slice(i, end + 1);
+    const route = /^\s*\{[^{}]*route:\s*"([^"]+)"/.exec(whole);
+    if (route) entries.push([whole, route[1]]);
+    i = end;
+  }
   const folded = entries
-    .filter((m) => /nav:\s*"none"/.test(m[0]) && !CHROMED.test(m[0]))
-    .map((m) => m[1]);
+    .filter(([whole]) => /nav:\s*"none"/.test(whole) && !CHROMED.test(whole))
+    .map(([, route]) => route);
 
   if (!entries.length) {
     fail(`reached: ${app} declares no screens at all.`);
@@ -139,9 +162,15 @@ for (const [app, manifest] of appManifests()) {
     turns it into an address (`Declared`), which is why a route typed in a
     manifest would be a second spelling of one it already holds.
   */
-  const led = new Set([...block[1].matchAll(/goes:\s*"([^"]+)"/g)].map((m) => m[1]));
-  const idOf = new Map([...block[1].matchAll(/\{[^{}]*id:\s*"([^"]+)"[^{}]*route:\s*"([^"]+)"[^{}]*\}/g)]
-    .map((m) => [m[2], m[1]]));
+  /* ⚠️ BOTH FORMS OF `goes` — see `GoSpec`. The long one names the field that
+     carries the id (`goes: { to: "kit", by: "kit" }`) and reading only the short
+     one reported every row that used it as leading nowhere. */
+  const led = new Set([
+    ...[...block[1].matchAll(/goes:\s*"([^"]+)"/g)].map((m) => m[1]),
+    ...[...block[1].matchAll(/goes:\s*\{[^{}]*to:\s*"([^"]+)"/g)].map((m) => m[1]),
+  ]);
+  const idOf = new Map(entries
+    .map(([whole, route]) => [route, /^\s*\{[^{}]*id:\s*"([^"]+)"/.exec(whole)?.[1] ?? ""]));
 
   const orphans = folded.filter((route) =>
     !TRAVELS(route).test(from) && !led.has(idOf.get(route) ?? ""));

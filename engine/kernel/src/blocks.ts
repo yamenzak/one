@@ -163,8 +163,21 @@ const LISTS: BlockIndex = {
     tiles: slot("The tiles", ["view"], true),
   }),
 
-  /** The two or three things somebody reaches for — see `BlockSpec.does`. */
-  QuickActions: block("QuickActions", "tiles", {}),
+  /**
+   * The three or four screens somebody reaches for — see `BlockSpec.leads`.
+   *
+   * ⚠️ IT TAKES DESTINATIONS, NOT ACTS, AND THE ENTRY SAID NEITHER. This was a
+   * registry entry with no slots and no `leads`, so a screen could place it and
+   * it drew nothing — the "built and reached by nothing" shape one level down
+   * from the one `capability.test.mjs` catches. Every shortcut a real home
+   * screen offers goes somewhere: a spreadsheet, a sheet of labels, the people
+   * it is bought from. The verb is the mark in the circle.
+   *
+   * ⚠️ AND IT DRAWS FOUR AND DROPS A FIFTH WITHOUT A WORD, which is arithmetic
+   * rather than taste — at 80px with a 24px gap five do not fit a phone. Naming
+   * five here is a manifest that quietly loses one.
+   */
+  QuickActions: { ...block("QuickActions", "tiles", {}), leads: true },
 
   /** Where this screen sits, and the way back up. */
   Crumbs: block("Crumbs", "rows", {
@@ -277,6 +290,31 @@ const CHARTS: BlockIndex = {
   }), plots: "labelled" },
 };
 
+/* ------------------------------------------------------------------ books --- */
+
+/**
+ * ⚠️ THE TWO BLOCKS WHOSE SOURCE IS THE APP ITSELF — see `BlockEntry.book`. The
+ * checklist and the milestones are already declared on the manifest, and what
+ * has been DONE is the platform's own read: the same question with the same
+ * answer for every product. A slot binding either would be a screen restating
+ * steps the manifest holds, and the restatement is the copy that goes stale
+ * silently — progress is measured against the manifest, so a second list is the
+ * one nobody's progress ever reaches.
+ *
+ * ⚠️ AND BOTH DRAW NOTHING WHEN THERE IS NOTHING TO SAY. A checklist that stays
+ * after it is complete is a permanent reminder of something already handled, and
+ * a congratulation repeated on every load is furniture rather than recognition.
+ * That is the component's rule, not the declaration's — which is why neither
+ * carries a `nothing`.
+ */
+const BOOKS: BlockIndex = {
+  /** The first few things, ticked by what actually happened. */
+  Guide: { ...block("Guide", "rows", {}), book: "guide" },
+
+  /** What this workspace has reached, said once. */
+  Milestones: { ...block("Milestones", "rows", {}), book: "milestones" },
+};
+
 /* ------------------------------------------------------------------ marks --- */
 
 const MARKS: BlockIndex = {
@@ -304,5 +342,5 @@ const MARKS: BlockIndex = {
 /* ---------------------------------------------------------------- the set --- */
 
 export const BLOCKS: BlockIndex = {
-  ...ROWS, ...LISTS, ...FIGURES, ...CHARTS, ...MARKS,
+  ...ROWS, ...LISTS, ...FIGURES, ...CHARTS, ...BOOKS, ...MARKS,
 };

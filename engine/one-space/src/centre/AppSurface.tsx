@@ -135,6 +135,13 @@ export function AppSurface({ app, route, onGo }: {
             screens={app.screens}
             at={beneath(declared.route, route)}
             go={go}
+            /* ⚠️ THE BOOKS AND THE GRANTS, NOT A SECOND REQUEST FOR EITHER — see
+               `Declared.app`. The centre already resolved both to draw the nav. */
+            app={{
+              guide: app.guide,
+              milestones: app.milestones,
+              permissions: app.permissions,
+            }}
           />
         </React.Suspense>
       </Allowed>

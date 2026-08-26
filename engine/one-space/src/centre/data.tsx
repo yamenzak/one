@@ -227,7 +227,7 @@ export interface InboxView {
  * came back a round trip later — with a long list, scrolled somewhere else. The
  * data stays up while the new answer is on its way.
  */
-export function useLoad<T>(id: string, input?: Record<string, string>): {
+export function useLoad<T>(id: string | null, input?: Record<string, string>): {
   readonly of: Loaded<T>;
   readonly again: () => void;
   /**
@@ -241,7 +241,13 @@ export function useLoad<T>(id: string, input?: Record<string, string>): {
   /* ⚠️ READ SYNCHRONOUSLY, WHICH IS WHAT MAKES A REVISIT INSTANT. Awaiting the
      cache would paint one frame of skeleton over an answer the tab already
      holds, which is the blank navigation this whole mechanism exists to end. */
+  /* ⚠️ `null` IS "NOTHING TO ASK FOR", AND IT WAITS FOR EVER ON PURPOSE. A hook
+     cannot be called conditionally, so a screen that needs an answer only when
+     its declaration asks for one has to say so here — and the honest state for a
+     read nobody made is the one every unanswered read is in. What must never
+     happen is `ready` with nothing in it, which is a confident empty answer. */
   const [of, set] = useState<Loaded<T>>(() => {
+    if (id === null) return waiting();
     const had = known<T>(id, input);
     return had === undefined ? waiting() : ready(had);
   });
@@ -249,6 +255,7 @@ export function useLoad<T>(id: string, input?: Record<string, string>): {
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
+    if (id === null) return;
     let live = true;
     /* ⚠️ ONLY WHERE THERE IS NOTHING TO SHOW. Blanking over an answer we already
        hold is the reload this exists to end. */
@@ -276,7 +283,7 @@ export function useLoad<T>(id: string, input?: Record<string, string>): {
     });
     return () => { live = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, keyOf(id, input), tick]);
+  }, [id, id === null ? "" : keyOf(id, input), tick]);
 
   return { of, again: useCallback(() => setTick((n) => n + 1), []), stale };
 }

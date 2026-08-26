@@ -29,7 +29,8 @@
 
 import * as React from "react";
 import type {
-  Binding, BlockSpec, Format, GroupSpec, Layout, Placed, Presence, Read, SurfaceSpec, Viewed,
+  Binding, BlockSpec, Format, GroupSpec, GuideBook, Layout, MilestoneBook, Placed, Presence, Raised,
+  Read, SurfaceSpec, Viewed,
 } from "@engine/kernel";
 import { BLOCKS, goOf, isGroup, opOf } from "@engine/kernel";
 import { Arranged, spanning } from "../parts/arrange.js";
@@ -100,6 +101,45 @@ export interface Has {
   /** ⚠️ The rows a collection-backed narrowing offers — see `Drawn.picks`. */
   readonly picks?: Readonly<Record<string, readonly { id: string; label: string }[]>> | undefined;
   readonly onPick?: ((id: string, value: string) => void) | undefined;
+  /**
+   * WHAT A SHORTCUT LOOKS LIKE — the screen's own label and mark, by id.
+   *
+   * ⚠️ RESOLVED BY THE CALLER, WHICH IS WHERE THE MANIFEST IS. A declaration
+   * names screens (`BlockSpec.leads`) and never their words; this is the lookup
+   * that turns one into the other, so a renamed screen renames its shortcut and
+   * the bar item and the tile cannot say different things about one place.
+   *
+   * ⚠️ AND `undefined` FOR A SCREEN THIS PERSON MAY NOT OPEN, so the tile is
+   * dropped rather than drawn. A shortcut to a refusal is a promise the product
+   * does not keep — the nav already filters itself on the same question.
+   */
+  readonly named?:
+  ((screen: string) => { readonly label: string; readonly icon?: string } | undefined) | undefined;
+  /**
+   * THE CHECKLIST AND THE MILESTONES — the app's own books, and how far this
+   * workspace has got. See `BlockEntry.book`.
+   *
+   * ⚠️ `raised` IS `null` UNTIL IT IS KNOWN, AND THAT IS NOT "NOTHING DONE".
+   * Both arrive as empty lists from a screen whose answer has not landed, and a
+   * checklist cannot tell them apart — so it draws every step unticked under a
+   * confident "0 of 3 done" on a workspace that may be two thirds finished.
+   */
+  readonly book?: {
+    readonly guide: GuideBook;
+    readonly milestones: MilestoneBook;
+    readonly raised: Raised | null;
+    readonly counts: Readonly<Record<string, number>>;
+    /** ⚠️ Which congratulations have already been said. Repeated is not said. */
+    readonly already: readonly string[];
+    readonly held: ReadonlySet<string>;
+    /**
+     * ⚠️ A ROUTE, NOT A SCREEN ID, WHICH IS WHY IT IS NOT `Has.onGo`. A guide
+     * step's `link` is written in the declaration as an address — it may point
+     * outside the product, at the workspace's own settings — so it is the one
+     * destination in this file that is not a screen this app declares.
+     */
+    readonly onGo: (route: string) => void;
+  } | undefined;
 }
 
 /* ------------------------------------------------------------- the values --- */
@@ -344,6 +384,49 @@ function Placed({ block, has }: { readonly block: BlockSpec; readonly has: Has }
      control; the rest of the list is what a screen offers ELSEWHERE about the
      same thing, which is the shape `ActionRow` and the crown share. Handing all
      of them to one press would run several operations from one tap. */
+  /*
+    ⚠️ A ROW OF SHORTCUTS, EACH WEARING THE SCREEN'S OWN WORDS — see
+    `BlockSpec.leads`. The declaration names screens and nothing else; the label
+    and the mark come from the manifest, so a renamed screen renames its shortcut
+    and the bar item and the tile cannot disagree about one place.
+
+    ⚠️ AND ONE THIS PERSON MAY NOT OPEN IS DROPPED. `named` answers `undefined`
+    for a screen behind a grant they do not hold, which is the same question the
+    nav already asks of itself.
+  */
+  if (block.leads?.length) {
+    props["actions"] = block.leads
+      .map((to) => {
+        const said = has.named?.(to);
+        if (!said) return null;
+        return {
+          id: to,
+          label: said.label,
+          ...(said.icon ? { icon: said.icon } : {}),
+          onDo: () => has.onGo?.(to),
+        };
+      })
+      .filter((one) => one !== null);
+  }
+
+  /*
+    ⚠️ THE CHECKLIST'S SOURCE IS THE APP, NOT A BINDING — see `BlockEntry.book`.
+    Both of these draw nothing when there is nothing to say, which is their own
+    rule: a list that stays after it is complete is a permanent reminder of
+    something already handled.
+  */
+  if (entry.book === "guide" && has.book) {
+    props["book"] = has.book.guide;
+    props["raised"] = has.book.raised;
+    props["held"] = has.book.held;
+    props["onGo"] = has.book.onGo;
+  }
+  if (entry.book === "milestones" && has.book) {
+    props["book"] = has.book.milestones;
+    props["counts"] = has.book.counts;
+    props["already"] = has.book.already;
+  }
+
   const act = block.does?.[0];
   /* ⚠️ EITHER FORM — see `ActSpec`. What the screen fills in travels with the
      act to the door, not to the press, so the id is all this needs. */

@@ -21,6 +21,7 @@ import {
   SeeAll, StepRow, TileGrid,
 } from "../parts/surfaces.js";
 import { Crumbs, Document, Faq, Gauge, Steps, Timeline, Tree } from "../parts/blocks.js";
+import { Guide, Milestones } from "../parts/guide.js";
 import { Listing } from "../parts/listing.js";
 import { Delta, Hero, Meter, Score, Stat } from "../chart/figures.js";
 import { BarChart, LineChart } from "../chart/charts.js";
@@ -41,6 +42,8 @@ export const PARTS: Readonly<Record<string, React.ComponentType<never>>> = {
   FieldRow, AmountRow, NavRow, PersonRow, NoteRow, CopyRow, ActionRow, StepRow, SeeAll,
   /* structures */
   Listing, Tree, Timeline, TileGrid, QuickActions, Crumbs, Faq, Steps,
+  /* books */
+  Guide, Milestones,
   /* figures */
   Hero, Stat, Meter, Delta, Score, Gauge,
   /* charts */

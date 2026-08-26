@@ -39,7 +39,6 @@ import { Home, type Moving, type Needs, type Shelf } from "./Home.js";
 import { Labels, type Labelled, type Subject, type Template } from "./Labels.js";
 /* ⚠️ A JSON COLUMN IS WHATEVER IS IN THE COLUMN — see `packing.ts`. */
 import { readLevels } from "../packing.js";
-import { Start } from "./Start.js";
 /* ⚠️ `Seen` IS TAKEN BY THE SCAN SCREEN, so the import's is renamed at the door.
    Two meanings of one word in one file is a rename waiting to pick the wrong
    one — the same reason `Got` is not called `Answer` above. */
@@ -1187,56 +1186,6 @@ interface Far {
   readonly said: readonly string[];
 }
 
-const START = (api: Door) => function StartHere({ app, go }: Mounted) {
-  /* ⚠️ WHAT THIS PERSON HOLDS COMES WITH THE PRODUCT, NOT FROM A SECOND
-     REQUEST. The centre already resolved it to draw the nav; narrowing `app`
-     here is the seam working as designed — what crosses it is data, and the
-     narrowing is the app's, right where it uses one. */
-  const held = (app as { readonly permissions?: readonly string[] }).permissions ?? [];
-  /* ⚠️ THE WORKSPACE'S OWN WORDS, WHICH IS WHAT A PROFILE IS. Asked rather than
-     mapped here: a container turning `clinic` into a sentence would be a second
-     copy of the vocabulary, drifting from `words.ts` the day a profile is
-     added. */
-  const starts = useAsked<{ words: { said: string } }>(api, "product.start");
-  const far = useAsked<Far>(api, "guide.view");
-  const got = far.of.status === "ready" ? far.of.data : null;
-
-  /* ⚠️ ONE CALL PER MILESTONE, ONCE, AND THE SCREEN DOES NOT WAIT FOR IT. The
-     congratulation is already on the page; what the write buys is that it is not
-     there again tomorrow, so a failure costs a repeat rather than a blank. */
-  const fresh = got?.fresh ?? [];
-  const marked = React.useRef(new Set<string>());
-  React.useEffect(() => {
-    for (const one of fresh) {
-      if (marked.current.has(one.id)) continue;
-      marked.current.add(one.id);
-      void api.post("guide.seen", { milestone: one.id });
-    }
-  }, [fresh]);
-
-  return (
-    <Start
-      title={nameOf("/start")}
-      said={starts.of.status === "ready" ? starts.of.data.words.said : ""}
-      /* ⚠️ THE EVENTS, NOT THE STEPS. `Guide` ticks a step whose `done` is in
-         these lists, so handing it step ids would tick nothing and look correct.
-         ⚠️ AND BOTH AXES SEPARATELY — a workspace step is anybody's to have
-         done, a person step is only this person's. */
-      raised={got ? { workspace: Object.keys(got.counts), person: got.mine } : null}
-      counts={got?.counts ?? {}}
-      /*
-        ⚠️ WHILE IT IS LOADING, EVERYTHING IS "ALREADY SAID". `[]` would draw
-        every reached milestone for the length of the round trip and then take
-        them away — a congratulation that flickers, which is worse than one that
-        arrives a beat late.
-      */
-      already={got ? got.said : Object.keys(INVENTORY.milestones ?? {})}
-      held={new Set(held)}
-      onGo={go}
-    />
-  );
-};
-
 /**
  * WHAT `stock.report` ANSWERS — the operation's shape, not the screen's.
  *
@@ -1636,7 +1585,6 @@ export function mount({ register, api }: Mounting): void {
     ["/ask", ASK(api)],
     ["/labels", LABELS(api)],
     ["/import", IMPORT(api)],
-    ["/start", START(api)],
   ];
   for (const [route, screen] of screens) {
     if (declared.has(route)) register(INVENTORY.id, route, screen);

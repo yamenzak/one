@@ -233,6 +233,12 @@ const WHY = {
     shrinks when the contract learns to describe one of them.
   */
   unbindable: [
+    /* ⚠️ HELP IS SCREEN-SCOPED AND THE BOOK IS NOT ON THE WIRE. `Guide` and
+       `Milestones` beside it are blocks now, fed from `AppSpec`'s own books
+       through `Has.book`; `AppSpec.help` is not carried on the centre's answer,
+       so a declaration placing this would draw an empty page of nothing. It
+       becomes a block the day the book reaches the browser. */
+    "Help",
     "AreaChart", "ColumnChart", "StackedChart", "DivergingChart", "DumbbellChart",
     "HeatmapChart", "ScatterChart", "DonutChart", "CompositionBar", "Sparkline",
     "ChartTable",

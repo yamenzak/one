@@ -168,8 +168,8 @@ part that is not. Refresh with `node engine/scripts/docs.test.mjs --write`.
 | `tokens/` | colour, type, spacing, motion, the chrome and hem rules | 94 |
 | `scene/` | the ambience engine — families, marks, the world behind a screen | 1 |
 | `frame/` | page, shape, crown, nav, dock, overlays — what wraps a screen | 72 |
-| `parts/` | rows, cards, lists, controls, the four outcomes | 212 |
-| `rendered/` | whole surfaces drawn from a kernel declaration | 53 |
+| `parts/` | rows, cards, lists, controls, the four outcomes | 218 |
+| `rendered/` | whole surfaces drawn from a kernel declaration | 47 |
 | `chart/` | the data vocabulary — a number as a shape | 43 |
 | `measure/` | what a screen actually lays out, in a real browser — the harness every app sweeps its own screens with | 1 |
 
@@ -219,6 +219,7 @@ there is no deep import, and a guard says so.
 - `parts/filtering.tsx` — `Filter`, `Filters`, `FiltersProps`, `Found`
 - `parts/forms.tsx` — `Agree`, `Choice`, `CodeEntry`, `DateInput`, `Dates`, `Dial`, `LongText`, `Lookup`, `MoneyInput`, `NamedAlready`, `Naming`, `NumberInput`, `NumberInputProps`, `OneOf`, `Option`, `PeriodId`, `PeriodInput`, `PERIODS`, `Picks`, `Said`, `SearchInput`, `SecretInput`, `Segmented`, `spanOf`, `Tags`, `Tail`, `TextInput`, `TextInputProps`, `TimeInput`, `withValue`, `Words`
 - `parts/gated.tsx` — `Allowed`, `sayGate`, `Stopped`, `STOPPED`, `useGate`
+- `parts/guide.tsx` — `Guide`, `GuideProps`, `Help`, `HelpProps`, `Milestones`, `MilestonesProps`
 - `parts/heads.tsx` — `Balance`, `distinguishing`, `Figure`, `Prose`, `Section`, `SectionTitle`, `Title`
 - `parts/listing.tsx` — `Col`, `Listing`, `ListingProps`, `Paged`
 - `parts/logo.tsx` — `Lockup`, `LockupProps`
@@ -241,7 +242,6 @@ there is no deep import, and a guard says so.
 - `rendered/console.tsx` — `saying`, `Shelf`, `ShelfProps`, `useMoney`
 - `rendered/edit.tsx` — `Edit`, `EditProps`, `EditRow`, `Refusal`, `refuse`, `Shown`
 - `rendered/field.tsx` — `Field`, `FieldProps`
-- `rendered/guide.tsx` — `Guide`, `GuideProps`, `Help`, `HelpProps`, `Milestones`, `MilestonesProps`
 - `rendered/inbox.tsx` — `Inbox`, `InboxProps`, `Note`
 - `rendered/legal.tsx` — `Documents`, `DocumentsProps`, `Ropa`, `SubProcessors`, `WhereItLives`
 - `rendered/money.tsx` — `Bill`, `BillProps`, `JobRun`, `Jobs`, `JobShown`, `JobsProps`, `Storage`, `StorageProps`, `Wallet`, `WalletProps`

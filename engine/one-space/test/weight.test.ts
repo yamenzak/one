@@ -123,11 +123,19 @@ const DIST = join(dirname(fileURLToPath(import.meta.url)), "..", "dist");
    come down with `Declared`, which is lazy — and neither is the narrowing
    control, which is `Segmented` and `Lookup` and was already here. What is here
    is the reading of the declaration: a projection from rows to marks, and one
-   control row above a body. Raw goes to 1,114,200 for the same reason gzip
-   goes to 330,400 — a contract read in the browser is parsed before the first
-   frame, and it does not compress. */
+   control row above a body. Raw goes with it for the same reason — a contract
+   read in the browser is parsed before the first frame, and it does not
+   compress.
+
+   ⚠️ AND AGAIN TO 1,115,200 / 330,700 FOR THE TWO BLOCKS FED BY THE APP ITSELF
+   — `BlockEntry.book`, `BlockSpec.leads`, and the two refusals over them. The
+   checklist and the milestones are already declared on every manifest and were
+   drawn only by a file each product wrote for itself; making them blocks is
+   what let the last two screens stop being files. `Guide` and `Milestones`
+   THEMSELVES are not in this number — they moved from `rendered/` to `parts/`
+   and come down with `Declared`, which is lazy. */
 const CEILING = {
-  js: { raw: 1_114_200, gzip: 330_400 },
+  js: { raw: 1_115_200, gzip: 330_700 },
   css: { raw: 470_000, gzip: 50_000 },
 };
 
