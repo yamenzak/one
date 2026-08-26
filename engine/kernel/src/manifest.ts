@@ -58,7 +58,7 @@ import { refuseSettings } from "./setting.js";
 import { LADDER, refuseLadder } from "./dunning.js";
 import { SURFACES, refuseSurfaces } from "./brand.js";
 import type { SurfaceSpec, ViewSpec } from "./surface.js";
-import { fillOf, fillsIn, refuseSurface, refuseView, unreadViews } from "./surface.js";
+import { fillOf, fillsIn, refuseStory, refuseSurface, refuseView, unreadViews } from "./surface.js";
 import { BLOCKS, HEROES } from "./blocks.js";
 import type { PurposeBook, VaultBook } from "./vault.js";
 import { refuseVault, strayFacts } from "./vault.js";
@@ -217,6 +217,27 @@ export interface StorySpec {
    */
   readonly writes: string;
   /**
+   * AN OPERATION WHOSE OUTPUT ARRIVES AS ANSWERS, BEFORE ANYBODY IS ASKED.
+   *
+   * ⚠️ THIS IS WHAT TURNS A FLOW FROM ASKING INTO CONFIRMING, AND IT IS THE
+   * WHOLE ARGUMENT FOR THE SHAPE. Six photographs of a box come back as a name,
+   * a brand, a unit, a rung, a shelf life and four filing words — twenty fields
+   * that nobody audits across eight screens. Every step whose fields arrive
+   * filled is not asked; it goes to the review as a clause, one press from the
+   * step that corrects it. Reading a paragraph and fixing one word is a job
+   * somebody actually does; confirming twenty fields is one they skip.
+   *
+   * ⚠️ IT SHARES KEYS WITH `writes`'s INPUT, WHICH IS THE JOIN AND IS CHECKED. A
+   * fill whose output names nothing the write takes is an operation that runs,
+   * costs credits and answers into a flow that drops every value — green
+   * everywhere, and the person is asked all eight questions anyway.
+   *
+   * ⚠️ AND IT IS AN OPERATION RATHER THAN A HOOK, so what a flow will ask a model
+   * is a fact about the product: the docs list it, an agent can be told, and the
+   * credits it spends are metered on the same rail as every other run.
+   */
+  readonly fills?: string;
+  /**
    * THE QUESTIONS, IN ORDER, INCLUDING THE ONES THAT ARE OFTEN SKIPPED.
    *
    * ⚠️ DECLARED EVEN WHERE `when` REMOVES THEM AT RUNTIME. This is what the flow
@@ -227,6 +248,39 @@ export interface StorySpec {
   readonly asks: readonly StepSpec[];
 }
 
+/**
+ * HOW A STEP'S ANSWER READS BACK IN THE REVIEW.
+ *
+ * ⚠️ WRITTEN ONCE, ON THE STEP, WHICH IS THE MECHANISM RATHER THAN THE STYLE. The
+ * review is built out of these; written a second time in a summary they would
+ * drift the first time somebody edited one, and a summary that disagrees with
+ * the screen it summarises is worse than none because it is the half people
+ * trust.
+ *
+ * ⚠️ AND IT IS THE PRODUCT'S WORDS, NOT THE ENGINE'S. "Each delivery is kept
+ * apart, so you can expire one or recall one" is a sentence about a thing on a
+ * shelf; the engine has no nouns and could only supply the blank.
+ */
+export type SaysSpec =
+  /**
+   * ONE SENTENCE WITH THE ANSWERS IN BLANKS — `"counted in {unit}"`.
+   *
+   * ⚠️ EVERY `{name}` NAMES A FIELD THIS STEP TAKES, and a blank that names
+   * anything else is refused. Left unchecked it renders as the literal braces in
+   * the middle of a review somebody is reading to decide whether to commit.
+   */
+  | { readonly as: string }
+  /**
+   * ONE SENTENCE PER VALUE OF A CLOSED SET.
+   *
+   * ⚠️ THE STEP MUST TAKE EXACTLY ONE `enum`, AND EVERY VALUE MUST HAVE A
+   * SENTENCE. A missing one is the single most-likely-to-ship gap here: it is
+   * invisible until somebody picks the fifth option, and what they get is a
+   * review with a line silently absent — the fact they chose most deliberately
+   * being the one the summary does not mention.
+   */
+  | { readonly per: Readonly<Record<string, string>> };
+
 export interface StepSpec {
   readonly id: string;
   /**
@@ -236,6 +290,52 @@ export interface StepSpec {
    * needs no training to. The guard refuses a heading.
    */
   readonly ask: string;
+  /** ⚠️ One fact, where one is needed. Never a description of the screen. */
+  readonly under?: string;
+  /**
+   * THE FIELDS THIS STEP ASKS FOR, BY NAME, OUT OF `writes`'s OWN INPUT.
+   *
+   * ⚠️ THIS IS THE FIELD THAT CLOSES THE FLOW, AND ITS ABSENCE IS WHY THE WIZARD
+   * WAS ORPHANED. A step used to name a question and nothing else, so the
+   * controls under it had to be written by hand — which meant a flow was a
+   * declaration plus a React file, the file was what a surface rewrite deletes,
+   * and what survived was a declaration nothing could draw. An operation already
+   * declares its input as `FieldSpec`s: kind, label, whether it is required, the
+   * closed set and the words for it, the bounds, the collection a reference
+   * points at. That is everything a control needs, so the engine draws them.
+   *
+   * ⚠️ THE SAME BARGAIN A BODY MAKES, AND THE SAME ESCAPE. What is not a field is
+   * a `block` — the open set, registered in the design package where every
+   * product can reach it, rather than a file inside one product that no other
+   * can. A camera is not a field; it is also not a reason for every flow to be
+   * hand-written.
+   */
+  readonly takes?: readonly string[];
+  /**
+   * A REGISTERED BLOCK, FOR A STEP THAT IS NOT FIELDS.
+   *
+   * ⚠️ AND A BLOCK MAY ANSWER. A photo strip collects images, runs the story's
+   * `fills`, and hands back a partial set of answers that lands in the flow —
+   * which is how the model's work reaches the review. That is one mechanism, not
+   * two: a step contributes answers whether it drew controls or a block.
+   */
+  readonly block?: string;
+  readonly says?: SaysSpec;
+  /**
+   * ASKED EVEN WHEN THE ANSWER ALREADY ARRIVED.
+   *
+   * ⚠️ FOR THE DECISION SOMEBODY MUST MAKE RATHER THAN CONFIRM. Most fields a
+   * model proposes are facts about the box and are right or wrong on their face
+   * — a name, a brand, a shelf life — and skipping to a review is the whole
+   * point. A few are not facts at all: how closely a thing is tracked decides
+   * whether a delivery can be expired or recalled, and a person accepting it by
+   * not noticing it in a paragraph has not decided anything.
+   *
+   * ⚠️ IT IS OPT-IN BECAUSE THE DEFAULT MUST BE THE CHEAP ONE. A flow where
+   * every step insists on being asked is the form this replaced, wearing a
+   * progress bar.
+   */
+  readonly always?: true;
   /** ⚠️ Named where an answer earlier in the flow can remove this one. */
   readonly when?: string;
 }
@@ -1140,6 +1240,7 @@ export function refuseApp(spec: AppSpec): readonly Refusal[] {
           + "the name of a variable is not a fact about the product");
       }
     }
+    for (const p of refuseStory(s, spec.operations, BLOCKS)) at(p.of, `${p.why}: ${p.detail}`);
   }
 
   for (const id of unreadViews(views, spec.screens.map((s) => s.body))) {

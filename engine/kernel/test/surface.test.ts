@@ -17,7 +17,7 @@ import { describe, expect, it } from "vitest";
 import { collection } from "../src/collection.js";
 import { field } from "../src/field.js";
 import {
-  actsIn, blocksIn, fieldsIn, fillOf, fillsIn, refuseSurface, refuseView, unreadViews,
+  actsIn, blocksIn, fieldsIn, fillOf, fillsIn, refuseStory, refuseSurface, refuseView, unreadViews,
   viewsIn, type ActSpec, type BlockIndex, type SurfaceSpec, type ViewSpec,
 } from "../src/surface.js";
 import { BLOCKS, HEROES } from "../src/blocks.js";
@@ -1391,5 +1391,217 @@ describe("the hero", () => {
 
   it("accepts a hero that leads nowhere at all", () => {
     expect(leading(figure)).toEqual([]);
+  });
+});
+
+/* ------------------------------------------------------------- the flow --- */
+
+/**
+ * A FLOW OF QUESTIONS, REFUSED — and every fault here WALKS.
+ *
+ * ⚠️ SHARPER THAN A BODY'S, BECAUSE A FLOW HOLDS UNSAVED WORK. A body that binds
+ * a missing field draws a blank line and somebody reloads; a step that asks for
+ * a field the write does not take draws a control, accepts an answer, carries it
+ * through the review and drops it at the door — so the failure arrives at the
+ * one press where the cost of being wrong is everything typed so far.
+ *
+ * ⚠️ AND SEVERAL OF THEM ARE ONLY VISIBLE DOWN ONE PATH. A closed set missing a
+ * sentence for its fifth option is correct for four of five people; a blank
+ * naming a field the step does not ask for prints braces in a review only when
+ * that step is reached. None of them is findable by using the flow once.
+ */
+
+const WRITE = {
+  id: "thing.register",
+  input: {
+    name: field.text({ label: "Name", required: true, holds: "none" }),
+    brand: field.text({ label: "Brand", holds: "none" }),
+    unit: field.text({ label: "Counted in", required: true, holds: "none" }),
+    tracking: field.enum({
+      label: "Tracked as", required: true, holds: "none", values: ["listed", "counted", "batched"],
+    }),
+    par: field.number({ label: "Tell me below", holds: "none" }),
+  },
+  output: { thing: field.text({ label: "Thing", holds: "none" }) },
+};
+
+/** ⚠️ A model's answer, and it names keys the write takes — see `story_fills_nothing`. */
+const SEES = {
+  id: "thing.see",
+  input: { shots: field.json({ label: "Pictures", holds: "none" }) },
+  output: {
+    name: field.text({ label: "Name", holds: "none" }),
+    brand: field.text({ label: "Brand", holds: "none" }),
+    unit: field.text({ label: "Counted in", holds: "none" }),
+  },
+};
+
+const OPS = [WRITE, SEES];
+
+const SAID = {
+  listed: "kept as a single running total",
+  counted: "counted, so a number is a number",
+  batched: "kept apart per delivery, so one can be expired",
+} as const;
+
+/** ⚠️ A flow that composes — every case below is one edit away from it. */
+const flow = (over: Record<string, unknown> = {}) => ({
+  id: "add-a-thing",
+  story: {
+    writes: "thing.register",
+    asks: [
+      { id: "named", ask: "What is it?", takes: ["name", "brand"], says: { as: "{name}" } },
+      { id: "counted", ask: "What do you count it in?", takes: ["unit"] },
+      {
+        id: "tracked", ask: "How closely do you follow it?", takes: ["tracking"],
+        always: true, says: { per: SAID },
+      },
+    ],
+    ...over,
+  },
+}) as Parameters<typeof refuseStory>[0];
+
+const told = (s: Parameters<typeof refuseStory>[0]) =>
+  refuseStory(s, OPS, INDEX).map((p) => p.why);
+
+describe("a flow that composes", () => {
+  it("refuses nothing about a story whose steps reach its write", () => {
+    expect(refuseStory(flow(), OPS, INDEX)).toEqual([]);
+  });
+
+  /* ⚠️ A SCREEN THAT IS NOT A FLOW IS NOT THIS FUNCTION'S BUSINESS, and saying so
+     is what lets `refuseApp` call it for every screen without asking first. */
+  it("says nothing about a screen with no story on it", () => {
+    expect(refuseStory({ id: "plain" }, OPS, INDEX)).toEqual([]);
+  });
+
+  /* ⚠️ AN UNKNOWN WRITE IS ALREADY REPORTED ONE LEVEL UP — see the note in
+     `refuseStory`. Reporting every field of it as unknown as well would bury the
+     one line that says what to fix under five that say the same typo again. */
+  it("stops rather than reporting every step against a write it cannot find", () => {
+    expect(told(flow({ writes: "thing.nope" }))).toEqual([]);
+  });
+});
+
+describe("what a step asks for", () => {
+  it("refuses a question with nothing under it", () => {
+    expect(told(flow({
+      asks: [{ id: "named", ask: "What is it?" }],
+    }))).toContain("step_asks_nothing");
+  });
+
+  it("refuses a step that draws controls and a block", () => {
+    expect(told(flow({
+      asks: [{ id: "named", ask: "What is it?", takes: ["name"], block: "Heading" }],
+    }))).toContain("step_asks_two_ways");
+  });
+
+  it("refuses a field the write does not take", () => {
+    expect(told(flow({
+      asks: [{ id: "named", ask: "What is it?", takes: ["name", "colour"] }],
+    }))).toContain("step_takes_unknown");
+  });
+
+  it("refuses a block the registry does not hold", () => {
+    expect(told(flow({
+      asks: [{ id: "shot", ask: "Photograph it?", block: "Nothing" }],
+    }))).toContain("step_block_unknown");
+  });
+
+  it("refuses the same step declared twice", () => {
+    expect(told(flow({
+      asks: [
+        { id: "named", ask: "What is it?", takes: ["name"] },
+        { id: "named", ask: "And again?", takes: ["brand"] },
+      ],
+    }))).toContain("step_id_taken");
+  });
+
+  /* ⚠️ `always` MEANS "ASK THIS EVEN IF IT ARRIVED FILLED", and a block step has
+     no fields to arrive filled — so the word reads as a rule being applied and
+     is applied to nothing. */
+  it("refuses insisting on a step that has no fields to have been filled", () => {
+    expect(told(flow({
+      asks: [{ id: "shot", ask: "Photograph it?", block: "Heading", always: true }],
+    }))).toContain("step_always_without_fields");
+  });
+});
+
+describe("how a step reads back", () => {
+  it("refuses a blank naming a field the step does not ask for", () => {
+    expect(told(flow({
+      asks: [{ id: "named", ask: "What is it?", takes: ["name"], says: { as: "{name} by {brand}" } }],
+    }))).toContain("says_blank_unknown");
+  });
+
+  it("accepts a blank for every field the step asks for", () => {
+    expect(told(flow({
+      asks: [{
+        id: "named", ask: "What is it?", takes: ["name", "brand"],
+        says: { as: "{name} by {brand}" },
+      }],
+    }))).not.toContain("says_blank_unknown");
+  });
+
+  it("refuses a sentence per value where there is no closed set", () => {
+    expect(told(flow({
+      asks: [{ id: "named", ask: "What is it?", takes: ["name"], says: { per: SAID } }],
+    }))).toContain("says_per_not_a_set");
+  });
+
+  /* ⚠️ THE ONE MOST LIKELY TO SHIP. Four of the five options read back correctly
+     and the fifth is silently absent from the review — in the fact somebody
+     chose most deliberately. */
+  it("refuses a closed set with a value that has no sentence", () => {
+    expect(told(flow({
+      asks: [{
+        id: "tracked", ask: "How closely do you follow it?", takes: ["tracking"],
+        always: true, says: { per: { listed: SAID.listed, counted: SAID.counted } },
+      }],
+    }))).toContain("says_per_incomplete");
+  });
+});
+
+describe("what fills the flow before it is walked", () => {
+  it("accepts a fill whose output the write takes", () => {
+    expect(told(flow({ fills: "thing.see" }))).toEqual([]);
+  });
+
+  it("refuses a fill this app does not declare", () => {
+    expect(told(flow({ fills: "thing.dream" }))).toContain("story_fills_unknown");
+  });
+
+  /* ⚠️ IT RUNS, IT IS CHARGED FOR, AND EVERY ANSWER IS DROPPED — green in every
+     suite, because the run succeeded and the flow worked. */
+  it("refuses a fill whose output the write takes none of", () => {
+    const elsewhere = {
+      id: "thing.elsewhere",
+      input: {},
+      output: { weather: field.text({ label: "Weather", holds: "none" }) },
+    };
+    expect(refuseStory(flow({ fills: "thing.elsewhere" }), [...OPS, elsewhere], INDEX)
+      .map((p) => p.why)).toContain("story_fills_nothing");
+  });
+});
+
+describe("a flow that cannot finish", () => {
+  it("refuses a required field no step asks for", () => {
+    expect(told(flow({
+      asks: [{ id: "named", ask: "What is it?", takes: ["name"] }],
+    }))).toContain("story_cannot_finish");
+  });
+
+  /* ⚠️ AND A FILL SATISFIES IT, which is the half that makes the check usable at
+     all: a flow whose model supplies the unit is a flow that finishes, and one
+     demanding a step for every required field would refuse exactly the design
+     this contract exists for. */
+  it("accepts a required field a fill supplies", () => {
+    expect(told(flow({
+      fills: "thing.see",
+      asks: [
+        { id: "named", ask: "What is it?", takes: ["name"] },
+        { id: "tracked", ask: "How closely?", takes: ["tracking"], always: true, says: { per: SAID } },
+      ],
+    }))).not.toContain("story_cannot_finish");
   });
 });

@@ -475,7 +475,7 @@ describe("what would fail on the first request", () => {
   }));
 
   it("accepts a story reaching a write on the grant that write demands", () => {
-    expect(flowing({ story: { writes: stub.id, asks: [{ id: "a", ask: "What is it?" }] } }))
+    expect(flowing({ story: { writes: stub.id, asks: [{ id: "a", ask: "What is it?", takes: ["id"] }] } }))
       .toBe("");
   });
 
@@ -485,7 +485,7 @@ describe("what would fail on the first request", () => {
   it("refuses a story offered on a grant its write does not demand", () => {
     expect(flowing({
       permission: "note:read",
-      story: { writes: stub.id, asks: [{ id: "a", ask: "What is it?" }] },
+      story: { writes: stub.id, asks: [{ id: "a", ask: "What is it?", takes: ["id"] }] },
     })).toContain("story_permission_wrong");
   });
 

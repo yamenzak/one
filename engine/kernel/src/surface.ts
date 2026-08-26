@@ -1910,3 +1910,202 @@ export const unreadViews = (
 };
 
 export const view = (spec: ViewSpec): ViewSpec => spec;
+
+/* ------------------------------------------------------------- the flow --- */
+
+/**
+ * WHAT A DECLARED FLOW CAN GET WRONG.
+ *
+ * ⚠️ SAME STANDARD AS `refuseSurface`: every check here is one that would
+ * otherwise produce a flow that RUNS. A question with no controls under it, a
+ * blank that renders as literal braces in the middle of a review, a closed set
+ * whose fifth option has no sentence — each of them draws, walks and commits,
+ * and each of them is only visible to whoever happens to pick that path.
+ *
+ * ⚠️ AND IT IS HANDED THE OPERATIONS RATHER THAN THEIR IDS, which the surface
+ * check is not. That is the whole reason this is a second function: every rule
+ * below is about the relationship between a step and the INPUT of the write it
+ * is walking toward, and an id cannot answer any of them.
+ */
+export type StoryRefusal =
+  | "step_asks_nothing" | "step_asks_two_ways" | "step_id_taken"
+  | "step_takes_unknown" | "step_block_unknown"
+  | "step_always_without_fields"
+  | "says_blank_unknown" | "says_per_not_a_set" | "says_per_incomplete"
+  | "story_fills_unknown" | "story_fills_nothing"
+  | "story_cannot_finish";
+
+export interface StoryProblem {
+  readonly of: string;
+  readonly why: StoryRefusal;
+  readonly detail: string;
+}
+
+/** ⚠️ The blanks in a `says.as`, in declaration order. */
+const blanksIn = (said: string): readonly string[] =>
+  [...said.matchAll(/\{(\w+)\}/g)].map((m) => m[1] as string);
+
+export function refuseStory(
+  screen: {
+    readonly id: string;
+    readonly story?: {
+      readonly writes: string;
+      readonly fills?: string;
+      readonly asks: readonly {
+        readonly id: string; readonly ask: string;
+        readonly takes?: readonly string[]; readonly block?: string;
+        readonly says?: { readonly as?: string; readonly per?: Readonly<Record<string, string>> };
+        readonly always?: true; readonly when?: string;
+      }[];
+    };
+  },
+  operations: readonly { readonly id: string; readonly input: Fields; readonly output: Fields }[],
+  blocks: BlockIndex,
+): readonly StoryProblem[] {
+  const told = screen.story;
+  if (!told) return [];
+
+  const out: StoryProblem[] = [];
+  const at = (why: StoryRefusal, detail: string) =>
+    out.push({ of: `screen ${screen.id}`, why, detail });
+
+  /* ⚠️ ABSENT IS NOT AN ERROR HERE — `story_write_unknown` in `refuseApp` has
+     already said so, and a second complaint about the same typo is noise. What
+     it means for this function is that every rule below has nothing to check
+     against, so it stops rather than reporting each field as unknown. */
+  const write = operations.find((o) => o.id === told.writes);
+  if (!write) return out;
+
+  /* --- the fill --------------------------------------------------------- */
+
+  if (told.fills) {
+    const fills = operations.find((o) => o.id === told.fills);
+    if (!fills) {
+      at("story_fills_unknown",
+        `is filled by "${told.fills}", which this app does not declare — nothing would `
+        + "arrive and every step would be asked, which is the flow this one exists to replace");
+    } else {
+      /* ⚠️ THE JOIN IS THE SHARED KEYS AND NOTHING ELSE CHECKS IT. An operation
+         that runs, spends credits and answers into a flow that drops every value
+         is green in every suite: the run succeeded, the flow worked, and the
+         person was asked all eight questions anyway. */
+      const lands = Object.keys(fills.output).filter((k) => k in write.input);
+      if (!lands.length) {
+        at("story_fills_nothing",
+          `is filled by ${fills.id}, whose output names nothing ${write.id} takes — `
+          + "it would run, be charged for, and every answer would be dropped");
+      }
+    }
+  }
+
+  /* --- the steps -------------------------------------------------------- */
+
+  const seen = new Set<string>();
+  /** ⚠️ Everything the flow can put into the write, however it got there. */
+  const reached = new Set<string>(
+    told.fills
+      ? Object.keys(operations.find((o) => o.id === told.fills)?.output ?? {})
+        .filter((k) => k in write.input)
+      : [],
+  );
+
+  for (const step of told.asks) {
+    const of = `step "${step.id}"`;
+
+    if (seen.has(step.id)) {
+      at("step_id_taken",
+        `${of} is declared twice — the flow addresses a step by its id, so the second `
+        + "is unreachable and the review's press lands on the first");
+    }
+    seen.add(step.id);
+
+    const takes = step.takes ?? [];
+
+    if (!takes.length && !step.block) {
+      at("step_asks_nothing",
+        `${of} names neither fields nor a block — it draws a question with nothing under `
+        + "it, and Next carries somebody past it having answered nothing");
+    }
+    /*
+      ⚠️ BOTH IS REFUSED RATHER THAN COMPOSED, and the reason is who owns the
+      answer. A block may ANSWER — that is what makes the camera work — so a step
+      drawing controls AND a block has two writers for one step's values and no
+      stated order between them. A step that genuinely needs both is a block whose
+      own slots take the fields.
+    */
+    if (takes.length && step.block) {
+      at("step_asks_two_ways",
+        `${of} names fields and a block — both may write this step's answers, and `
+        + "nothing says which wins; give the block the fields it needs as slots");
+    }
+
+    for (const name of takes) {
+      if (!(name in write.input)) {
+        at("step_takes_unknown",
+          `${of} asks for "${name}", which ${write.id} does not take — the control would `
+          + "draw, somebody would fill it in, and the door would drop the value");
+      }
+      reached.add(name);
+    }
+
+    if (step.block && !blocks[step.block]) {
+      at("step_block_unknown",
+        `${of} names the block "${step.block}", which the registry does not hold — `
+        + "the step would draw its question over nothing");
+    }
+
+    /* ⚠️ ON A BLOCK STEP IT IS A WORD WITH NO MEANING. "Ask this even when it
+       arrived filled" is a statement about fields, and a block step has none —
+       so it reads as a rule being applied and is applied to nothing. */
+    if (step.always && !takes.length) {
+      at("step_always_without_fields",
+        `${of} insists on being asked and takes no fields — there is nothing that `
+        + "could have arrived filled, so the rule reads as applying and applies to nothing");
+    }
+
+    /* --- what it says --------------------------------------------------- */
+
+    const says = step.says;
+    if (says?.as !== undefined) {
+      for (const blank of blanksIn(says.as)) {
+        if (!takes.includes(blank)) {
+          at("says_blank_unknown",
+            `${of} reads back "{${blank}}", which it does not ask for — the review would `
+            + "print the braces, in the sentence somebody reads before committing");
+        }
+      }
+    }
+    if (says?.per !== undefined) {
+      const only = takes.length === 1 ? write.input[takes[0] as string] : undefined;
+      if (!only || only.kind !== "enum" || !only.values?.length) {
+        at("says_per_not_a_set",
+          `${of} reads back a sentence per value and does not ask for exactly one closed `
+          + "set — there is nothing for the values to be values of");
+      } else {
+        for (const value of only.values) {
+          if (!(value in says.per)) {
+            at("says_per_incomplete",
+              `${of} has no sentence for "${value}" — somebody choosing it reaches a review `
+              + "with the fact they chose most deliberately silently missing from it");
+          }
+        }
+      }
+    }
+  }
+
+  /*
+    ⚠️ AND THE WHOLE FLOW HAS TO BE ABLE TO FINISH, WHICH IS THE ONE CHECK HERE
+    THAT IS ABOUT THE FLOW RATHER THAN A STEP. A write's required input that no
+    step asks for and no fill supplies is a flow somebody walks to the end and is
+    refused by — with the refusal naming a field that was never on any screen, so
+    there is nowhere to go and fix it.
+  */
+  for (const [name, spec] of Object.entries(write.input)) {
+    if (!spec.required || reached.has(name)) continue;
+    at("story_cannot_finish",
+      `${write.id} requires "${name}" and no step asks for it — every walk of this flow `
+      + "ends in a refusal naming a field that was never on a screen");
+  }
+
+  return out;
+}
