@@ -237,7 +237,10 @@ const WHY = {
     "TextInput", "SecretInput", "LongText", "SearchInput", "NumberInput", "MoneyInput",
     "Dial", "Choice", "Lookup", "Agree", "Picks", "OneOf", "Segmented", "Tags", "Words",
     "DateInput", "TimeInput", "CodeEntry", "PeriodInput", "Colour", "DayPicker", "DayField",
-    "Ranged", "PickFile", "FileRow", "Viewfinder", "SettledSwitch", "Filters", "Found",
+    /* ⚠️ `PickFile` IS THE DOOR AND `Attach` IS THE ROOM BEHIND IT — a queue of
+       files a person is putting somewhere, held before they are sent. Unsaved,
+       handed back, and a story's business. */
+    "Ranged", "PickFile", "Attach", "FileRow", "Viewfinder", "SettledSwitch", "Filters", "Found",
     "ToggleRow", "PermissionRow", "Paged", "PlainTable", "Written",
   ],
   /*
@@ -249,6 +252,13 @@ const WHY = {
     "OfferRow", "Credits", "Banner", "Figure", "Balance", "LabelText", "Diamond",
     "Hotkey", "Compare", "Rings", "Ring", "Arc", "StatRow", "ChartPanel",
     "Agenda", "PageTabs", "ListingTable", "Tail",
+    /* ⚠️ ONE FILE INSIDE THE QUEUE, drawn by `Attach` rather than placed beside
+       it — see `AttachedRow`. A body that could place one would be a body
+       placing a row out of a control's list. */
+    "AttachedRow",
+    /* ⚠️ AND THE BAR IT WEARS. Work being done TO somebody, so unlike the flow's
+       own progress it announces itself and carries its value — see `Sending`. */
+    "Sending",
   ],
   /*
     A DRAWN MARK. `marks.tsx` is the bespoke half of the icon set — a shape with

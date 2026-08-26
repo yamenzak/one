@@ -3782,3 +3782,91 @@ product; a step that names a question and not what it asks for; a value a model
 may write that is decided in a component rather than in the manifest; a condition
 interpolated into prose without being put into words; or a guard left pointing at
 a subject the work deleted.
+
+---
+
+## D101 — A string with two jobs is two strings, and a recap is read rather than scanned
+
+`StepSpec.under` is the line beneath a question. The recap's connective is
+`SaysSpec.per.lead`, or nothing at all — an `as` sentence carries its own
+("counted in {unit}"). The recap wears `TYPE.lead` and capitalises only its first
+character. An unanswered blank stays a blank inside its sentence.
+
+**Why.** The review said "…, Counted in **tin**". `under` was "Counted in" and
+the sentence was "{unit}", so the connective was a heading's capital dropped into
+the middle of a paragraph — and the app could not fix it, because the same string
+was also the line under the question, where the capital is correct. **A string
+serving two jobs is decided by whichever caller was written second.**
+
+**The `as` variant needed no lead at all,** which is what made the split cheap:
+the connective belongs in the sentence, where the app already controls every
+word. Only `per` needs one, because its five sentences would otherwise each
+repeat it.
+
+**And the fix has a cost that was invisible until it shipped.** With the
+connective outside, an unanswered blank could withhold the clause and `lead` kept
+it legible — "Low below ……". Inside, withholding takes the words with it and
+leaves a bare "……" floating between two commas: an omission nobody can name. So
+the blank stays in the sentence and carries `waiting`, which is what styles it as
+unfinished. **Moving a value into a template moves its failure case too.**
+
+**The rank was the other half.** The recap wore `title` — the page's own rank,
+bold, `text-balance`. Thirty words set that way is a headline that happens to be
+long, competing with the screen's actual title one element above it; and
+`text-balance` is capped by every engine past about four lines, so it had already
+stopped applying. `lead` is a rank between a heading and body, a weight under a
+heading's, and `text-pretty`.
+
+**Therefore never:** one string used both as a label and as a clause inside a
+sentence; a connective in two places; a value moved into a template without its
+unanswered case moving with it; or a paragraph set at a heading's rank because it
+is the most important thing on the screen.
+
+---
+
+## D102 — A file has five states and a picker knows one of them
+
+`Attach` holds a queue of `Attached`, each at `held | sending | settling | done |
+refused`, with a bar, per-file refusals, retry, stop, an aggregate ceiling and
+paste. `PickFile` stays the door. The design package still sends nothing.
+
+**Why.** `PickFile` answers one question well — may this file in — and its whole
+account of what happens next is `busy?: boolean`, which draws "Uploading…" on a
+button. Every screen that needed more wrote the rest itself and no two matched:
+one drew a spinner and no percentage; one a bar that hit 100% and sat there
+through a server round trip; one reported a failure by REMOVING the row, which
+reads as success. None offered a retry, because a retry needs the bytes and the
+bytes had been handed to a fetch and dropped.
+
+**`settling` is the state every one of them left out.** Between the last byte
+leaving and the server answering there are seconds on a real connection, and a
+determinate bar has nothing left to say in that gap. Sat at 100% it reads as a
+hang, which is the moment somebody presses the button again.
+
+**The control at the end of the row is decided by the state**, and a single
+always-present "Remove" is wrong in exactly the two states that are not about
+removing: somebody whose upload failed presses it and loses the file, and
+somebody mid-upload presses it expecting to stop.
+
+**The queue is the caller's and the reading is ours.** Decoding, rotating,
+downscaling and refusing are pure browser work with no network in them, so they
+happen once, here. Sending needs a door, a session and an operation, and a design
+package that fetched anything could only ever be used one way.
+
+**And the aggregate ceiling is the one `PickFile` structurally cannot enforce.**
+It judges one file against `most` and cannot see the five already held, so six
+four-megabyte photographs each pass a four-megabyte check and arrive as
+twenty-four at a door that refuses eight. The per-file cap had been tightened to
+compensate, which refused every photograph a modern phone takes — the cap was
+never the problem.
+
+**`shrunk` was the proof that this was the missing half.** It handles the EXIF
+rotation a canvas ignores and the 4000-pixel edge nothing downstream can use; it
+was exported, tested, and called by NOTHING, while a manifest one directory over
+said "the screen shrinks each one before it asks". A portrait photograph arrived
+sideways, at full size, and a model reading a label was silently worse at it.
+
+**Therefore never:** an upload whose only state is a boolean; a failure reported
+by removing the thing that failed; a retry that is a picker; a per-file limit
+standing in for a limit on the total; or bytes discarded at the moment they are
+sent.

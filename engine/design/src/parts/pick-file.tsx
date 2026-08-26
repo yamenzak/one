@@ -70,7 +70,7 @@ export interface PickFileProps {
   /** ⚠️ Bytes, already read. A caller should never be handed a `File`: two
       screens would then each write their own reader, and one would forget the
       error event. */
-  readonly onPick: (bytes: ArrayBuffer, file: File) => void;
+  readonly onPick: (bytes: ArrayBuffer, file: File) => void | Promise<void>;
   /** Offered only when there is something to remove. */
   readonly onClear?: () => void;
 }
@@ -176,7 +176,13 @@ export function PickFile({
        lib and not against the one the app is built with, which is a difference
        that only appears at build time. */
     const { taking, why: bad } = sift(Array.from(picked ?? []), accept, most, atOnce);
-    for (const file of taking) onPick(await file.arrayBuffer(), file);
+    /* ⚠️ AWAITED, AND IN ORDER, BECAUSE A HANDLER MAY BE ASYNC. Downscaling a
+       photograph is a decode and a canvas write, and six of them started at once
+       finish in whatever order the machine decides — so a caller appending on
+       resolution gets six pictures in a scrambled order, which on a set that is
+       front / back / label is the one thing about them that matters. Awaiting
+       each makes the order the order they were chosen in. */
+    for (const file of taking) await onPick(await file.arrayBuffer(), file);
     setWhy(bad);
   };
 

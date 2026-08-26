@@ -49,12 +49,17 @@ const STORY: StorySpec = {
     { id: "shot", ask: "Can you photograph it?", block: "Shots" },
     {
       id: "named", ask: "What is it?", under: "Called",
-      takes: ["name", "brand"], says: { as: "{name}" },
+      takes: ["name", "brand"], says: { as: "called {name}" },
     },
-    { id: "counted", ask: "What do you count it in?", takes: ["unit"], says: { as: "counted in {unit}" } },
+    /* ⚠️ IT DECLARES BOTH, WHICH IS THE POINT — the sub-line under the question
+       and the sentence in the recap read the same and are two different jobs. */
+    {
+      id: "counted", ask: "What do you count it in?", under: "Counted in",
+      takes: ["unit"], says: { as: "counted in {unit}" },
+    },
     {
       id: "tracked", ask: "How closely do you follow it?", takes: ["tracking"],
-      always: true, says: { per: SAID },
+      always: true, says: { lead: "tracked so that it is", per: SAID },
     },
     {
       id: "par", ask: "Tell you when it drops below?", takes: ["par"],
@@ -187,13 +192,76 @@ describe("the review is built out of what the steps say", () => {
   });
 
   /*
-    ⚠️ AN UNANSWERED BLANK MAKES THE WHOLE CLAUSE ABSENT, and that is the point
-    rather than tidiness. "counted in ……" reads as an answer somebody gave; the
-    recap's job is to make an omission visible AS one, which `Story` draws its own
-    way when the clause is null.
+    ⚠️ THE CONNECTIVE COMES FROM THE SENTENCE, NEVER FROM THE STEP'S `under`.
+    Borrowed, a step declaring `under: "Counted in"` beside `says: { as: "{unit}" }`
+    recapped as "…, Counted in tin" — a heading's capital in the middle of a
+    paragraph, and words the app could not choose because the same string was
+    also the line under the question. `as` carries its own.
   */
-  it("withholds a clause whose blank has no answer", () => {
-    expect(drawn("review", { name: "Casting resin, clear" })).not.toContain("counted in");
+  it("never borrows the step's own sub-line as a clause lead", () => {
+    const out = drawn("review", REVIEWED);
+    expect(out).toContain("counted in tin");
+    /* ⚠️ READ OFF A CLAUSE THAT IS NOT THE FIRST, because the first one's capital
+       is the SENTENCE'S and is correct. `under` is "Counted in" and the sentence
+       is "counted in {unit}", so borrowed the recap reads "Counted in counted in
+       tin" — which a `toContain` on the sentence still passes. The absent capital
+       mid-paragraph is the whole assertion. */
+    expect(out).not.toContain("Counted in");
+  });
+
+  /* ⚠️ EXCEPT ON `per`, WHERE FIVE SENTENCES WOULD OTHERWISE EACH REPEAT IT. */
+  it("puts a per-value clause behind its own lead", () => {
+    expect(drawn("review", REVIEWED)).toContain("tracked so that it is");
+  });
+
+  /*
+    ⚠️ AND THE SENTENCE IS A SENTENCE, NOT A HEADLINE. `title` is the page's own
+    rank — thirty words at it, bold and balanced, is a paragraph competing with
+    the screen's actual title one element above it.
+  */
+  it("sets the recap to be read rather than scanned", () => {
+    expect(drawn("review", REVIEWED)).not.toContain("rank-page");
+  });
+
+  /*
+    ⚠️ THE SENTENCE STARTS WITH A CAPITAL AND NOTHING ELSE DOES, and this was
+    `::first-letter` until a photograph showed it doing nothing. The rule was
+    correct, present in the built stylesheet, and inert: the first character sits
+    inside a `Link`, which is not `display: inline`, and the pseudo-element skips
+    a non-inline first child. A declaration that applies to nothing is the exact
+    failure this repository is a catalogue of, and only the screen caught it.
+  */
+  it("capitalises the sentence and leaves every clause after it alone", () => {
+    const out = drawn("review", REVIEWED);
+    expect(out).toContain("Called Casting resin, clear");
+    expect(out).toContain("counted in tin");
+    expect(out).not.toContain("Counted in tin");
+  });
+
+  /*
+    ⚠️ AN UNANSWERED BLANK STAYS A BLANK IN ITS OWN SENTENCE, and this test used
+    to assert the opposite. Withholding the whole clause was right while the
+    connective lived OUTSIDE it — `lead: "Low below"` survived and the recap read
+    "Low below ……". With the connective inside the sentence, which is what stops
+    it being a second place the same words live, withholding takes the words with
+    it and leaves a bare "……" floating between two commas: an omission nobody can
+    name. The omission is still visible AS one; it now says what is missing.
+  */
+  it("keeps the sentence of a clause whose blank has no answer", () => {
+    const out = drawn("review", { name: "Casting resin, clear" });
+    expect(out).toContain("counted in");
+    expect(out).toContain("……");
+  });
+
+  /* ⚠️ AND IT IS STYLED AS UNFINISHED, because a sentence somebody has not
+     completed must not read like a fact they supplied. */
+  it("marks an unfilled blank as waiting rather than as an answer", () => {
+    /* ⚠️ AND A FULLY ANSWERED ONE IS NOT, which is the half that makes this an
+       assertion rather than a spelling check: the attribute is on every clause,
+       so only the pair says the flag reached the right one. */
+    expect(drawn("review", { name: "Casting resin, clear" }))
+      .toContain('data-blank="waiting"');
+    expect(drawn("review", REVIEWED)).not.toContain('data-blank="waiting"');
   });
 
   /* ⚠️ AND A STEP THAT SAYS NOTHING IS STILL IN THE REVIEW — as a row, with its

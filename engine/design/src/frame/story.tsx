@@ -124,7 +124,25 @@ export interface Ask {
    * make a sentence and wrong for a list of barcodes, so the review is the
    * paragraph followed by rows for everything that is not in it.
    */
-  readonly part?: { readonly lead: string; readonly said: string | null };
+  readonly part?: {
+    /**
+     * ⚠️ THE CONNECTIVE, AND IT IS OPTIONAL BECAUSE MOST CLAUSES CARRY THEIR
+     * OWN. "counted in {unit}" is one string the app writes whole; a lead beside
+     * it produced "Counted in **tin**" out of `lead: "Counted in"` and
+     * `said: "tin"`, which is the same words twice with a heading's capital in
+     * the middle of a sentence.
+     */
+    readonly lead?: string;
+    readonly said: string | null;
+    /**
+     * ⚠️ THE SENTENCE IS THERE AND A BLANK IN IT IS NOT — which is a different
+     * thing from having no clause at all. "low below ……" reads as a fact
+     * somebody has not supplied; the bare "……" it replaced was an orphan in the
+     * middle of a paragraph, because the connective had moved inside the
+     * sentence and went missing with the answer.
+     */
+    readonly waiting?: boolean;
+  };
   /** ⚠️ Skipped where false. A step that does not apply is not a step. */
   readonly when?: boolean;
   /**
@@ -273,6 +291,14 @@ export const REVIEW = "review";
  * wrong with a half-filled record. An unanswered step reads as its own question
  * with "Nothing set" under it, and is pressable like every other line.
  */
+/**
+ * ⚠️ THE SENTENCE'S OWN FIRST CAPITAL, AND NOTHING ELSE — see the paragraph
+ * below. Applied to whichever fragment comes first: the leading clause's
+ * connective where it has one, and its answer where it does not.
+ */
+const opening = (text: string, first: boolean): string =>
+  first ? text.charAt(0).toUpperCase() + text.slice(1) : text;
+
 function Review({ shown, onGo, lead }: {
   /* ⚠️ EVERYTHING THAT APPLIES, SETTLED OR NOT — not the walk. A step whose
      answer arrived is out of the questions and into HERE; reading the walk
@@ -296,11 +322,29 @@ function Review({ shown, onGo, lead }: {
       */}
       {prose.length
         ? (
-          <p className={`${TYPE.title} text-pretty`}>
+          /*
+            ⚠️ `lead`, NOT `title`. The recap is one sentence built out of clauses
+            the app wrote to sit INSIDE one, so the only capital that belongs to
+            it is the one at the front.
+
+            ⚠️ AND THAT CAPITAL IS APPLIED IN CODE BECAUSE `::first-letter` DOES
+            NOT REACH IT. The rule is exactly right and it was in the stylesheet
+            and it did nothing: the sentence's first character is inside a `Link`,
+            which is not `display: inline`, and the pseudo-element skips a
+            non-inline first child. It is the failure this repository is a
+            catalogue of — a correct-looking declaration that silently applies to
+            nothing — and it survived a rebuild, a photograph and a reading of the
+            generated CSS before the screen gave it away.
+
+            ⚠️ AND IT IS NOT A GUESS ABOUT PROPER NOUNS. It is the first character
+            of a sentence, which is the one position where the answer is the same
+            for every word in every language this ships in.
+          */
+          <p className={TYPE.lead}>
             {prose.map((one, at) => (
               <React.Fragment key={one.id}>
                 {at ? ", " : null}
-                {one.part?.lead}{" "}
+                {one.part?.lead ? <>{opening(one.part.lead, !at)}{" "}</> : null}
                 {/* ⚠️ A LINK RATHER THAN A BUTTON, and the difference is not the
                     guard — it is the reading. A word inside a sentence that
                     takes you somewhere IS a link; a button in a paragraph is a
@@ -312,9 +356,9 @@ function Review({ shown, onGo, lead }: {
                      back. */
                   className={"underline decoration-[var(--brand)] decoration-2 underline-offset-4 "
                     + "data-[blank=waiting]:text-muted data-[blank=waiting]:decoration-[var(--line)]"}
-                  data-blank={one.part?.said ? "said" : "waiting"}
+                  data-blank={one.part?.waiting || !one.part?.said ? "waiting" : "said"}
                 >
-                  {one.part?.said ?? "……"}
+                  {opening(one.part?.said ?? "……", !at && !one.part?.lead)}
                 </Link>
               </React.Fragment>
             ))}

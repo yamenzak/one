@@ -1178,6 +1178,8 @@ its own header, cited by other files, and doing nothing.
 | D98 | A block takes the whole row or one cell, and a count of cells was a request the browser could not refuse | 0 |
 | D99 | The dark ground is a room with the lights down, and a crush is a share of whatever is under it | 0 |
 | D100 | A step names what it asks for, so a flow is a declaration and not a file | 4 |
+| D101 | A string with two jobs is two strings, and a recap is read rather than scanned | 0 |
+| D102 | A file has five states and a picker knows one of them | 0 |
 <!-- /generated -->
 
 ---

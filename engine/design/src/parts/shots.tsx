@@ -22,7 +22,7 @@
 
 import * as React from "react";
 import { Button } from "@heroui/react";
-import { PickFile, asDataUrl } from "./pick-file.js";
+import { PickFile, shrunk } from "./pick-file.js";
 import { Stack } from "./arrange.js";
 import { Nothing } from "./state.js";
 import { glyphOf } from "../frame/shell.js";
@@ -136,8 +136,19 @@ export function Shots({ held, onSet, busy }: ShotsProps) {
             label={held.length ? "Add another" : "Take a picture"}
             atOnce={left}
             {...(busy ? { busy } : {})}
-            onPick={(bytes, file) => {
-              const next = [...latest.current, asDataUrl(bytes, file.type)]
+            /* ⚠️ SHRUNK, WHICH IS WHAT THE MANIFEST ALREADY CLAIMED HAPPENED.
+               `product.see` refuses a batch over eight megabytes and its comment
+               says "the screen shrinks each one before it asks" — and `shrunk`
+               was exported, tested and called by NOTHING, so a phone's 4000-pixel
+               photograph went whole and a portrait one went SIDEWAYS, because a
+               canvas ignores the EXIF rotation tag unless asked. The per-file cap
+               was tightened to compensate, which refused every photograph a
+               modern phone takes; the cap was never the problem.
+
+               ⚠️ AND IT IS AWAITED, SO SIX ARRIVE IN THE ORDER THEY WERE CHOSEN.
+               See `PickFile.onPick`. */
+            onPick={async (bytes, file) => {
+              const next = [...latest.current, await shrunk(bytes, file.type)]
                 .slice(0, MOST_SHOTS);
               latest.current = next;
               onSet(next);

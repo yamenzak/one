@@ -330,6 +330,24 @@ export const TYPE = {
    * it, and a card would appear to start with one of its own rows.
    */
   group: `font-mark ${at("block")} font-semibold tracking-[-0.01em] text-balance text-foreground`,
+  /**
+   * ONE SENTENCE A SCREEN IS ABOUT — the recap of a flow, the line that carries
+   * a decision. Set to be READ, which is what separates it from a heading.
+   *
+   * ⚠️ IT EXISTS BECAUSE THE RECAP WAS WEARING `title`, AND THAT IS THE PAGE'S
+   * OWN RANK. Thirty words at 31px bold with `text-balance` is not a sentence,
+   * it is a headline that happens to be long: every line breaks to an even
+   * width rather than to a reading rhythm, and the whole paragraph competes
+   * with the screen's actual title one element above it. A recap is neither a
+   * heading nor body — a rank between them, a weight under a heading's, and
+   * `text-pretty`, is what makes it the one thing on the screen to read.
+   *
+   * ⚠️ AND `text-balance` IS THE WRONG PROPERTY HERE RATHER THAN A SMALLER DOSE
+   * OF THE RIGHT ONE. It is for a heading of two or three lines; past about
+   * four it is capped by every engine and silently does nothing, so a long
+   * recap was paying for a hint that had already stopped applying.
+   */
+  lead: `font-mark ${at("block")} font-medium tracking-[-0.01em] text-pretty text-foreground`,
   /** Prose. `text-pretty` is what stops a two-line paragraph orphaning a word. */
   body: `${at("base")} text-pretty text-foreground`,
   /** Names a control or a value. Not a heading — it labels something beside it. */

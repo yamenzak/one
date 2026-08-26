@@ -6758,10 +6758,14 @@ const manifest = (): AppSpec => defineApp({
             block: "Shots" },
           { id: "named", ask: "What is it?",
             under: "Called", takes: ["name", "brand"],
-            says: { as: "{name}" } },
+            /* ⚠️ THE CONNECTIVE IS IN THE SENTENCE — see `SaysSpec`. Left to the
+               step's `under`, the recap read "…, Called Casting resin, clear":
+               a heading's capital mid-paragraph, and a word the app could not
+               choose because it was also the line under the question. */
+            says: { as: "called {name}" } },
           { id: "counted", ask: "What do you count it in?",
             under: "Counted in",
-            takes: ["unit"], says: { as: "{unit}" } },
+            takes: ["unit"], says: { as: "counted in {unit}" } },
           /*
             ⚠️ ASKED EVEN WHEN THE MODEL ANSWERED IT, AND IT IS THE ONLY STEP
             HERE THAT IS. The rung decides whether a delivery can be expired or
@@ -6773,7 +6777,7 @@ const manifest = (): AppSpec => defineApp({
           { id: "tracked", ask: "How closely do you follow it?",
             under: "Tracked so that it is",
             takes: ["tracking"], always: true,
-            says: { per: {
+            says: { lead: "tracked so that it is", per: {
               listed: "never counted, just kept somewhere",
               counted: "counted, so a number is a number",
               batched: "kept apart per delivery, so one can be expired or recalled",
@@ -6790,7 +6794,7 @@ const manifest = (): AppSpec => defineApp({
           { id: "par", ask: "Tell you when it runs low?",
             under: "Low below", takes: ["par"],
             when: { field: "tracking", isnt: { literal: "listed" } },
-            says: { as: "{par}" } },
+            says: { as: "low below {par}" } },
         ],
       } },
   ],

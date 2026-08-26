@@ -132,22 +132,28 @@ const said = (value: unknown, spec: Fields[string] | undefined): string | null =
 };
 
 /**
- * ⚠️ THE BLANKS FILLED, AND AN UNANSWERED ONE MAKES THE WHOLE CLAUSE ABSENT. A
- * sentence with a hole in it — "counted in ……" — is a review line that reads as
- * an answer somebody gave, and the recap's job is to make an omission visible AS
- * an omission. `Story` already draws the unanswered case; what it needs from here
- * is `null` rather than a half-written sentence.
+ * ⚠️ THE BLANKS FILLED, AND AN UNANSWERED ONE STAYS A BLANK IN THE SENTENCE.
+ * This used to answer `null` for the whole clause, which was right while the
+ * connective lived OUTSIDE it: `lead: "Low below"` survived and the review read
+ * "Low below ……". With the connective inside the sentence — which is what stops
+ * it being a second place the same words live — returning null takes the words
+ * with it, and the recap shows a bare "……" floating between two commas.
+ *
+ * ⚠️ SO THE OMISSION IS STILL VISIBLE AS ONE, and now it says what is missing.
+ * `waiting` is what carries the styling, because a sentence somebody has not
+ * finished must not read like a fact they supplied.
  */
+const BLANK = "……";
 const fill = (
   as: string, takes: Fields, held: Answers,
-): string | null => {
-  let missing = false;
-  const out = as.replace(/\{(\w+)\}/g, (_, name: string) => {
+): { readonly text: string; readonly waiting: boolean } => {
+  let waiting = false;
+  const text = as.replace(/\{(\w+)\}/g, (_, name: string) => {
     const word = said(held[name], takes[name]);
-    if (word === null) missing = true;
-    return word ?? "";
+    if (word === null) { waiting = true; return BLANK; }
+    return word;
   });
-  return missing ? null : out;
+  return { text, waiting };
 };
 
 /**
@@ -161,14 +167,18 @@ const fill = (
  */
 const clauseOf = (
   says: SaysSpec | undefined, takes: readonly string[], fields: Fields, held: Answers,
-): string | null => {
-  if (!says) return null;
+): { readonly text: string | null; readonly waiting: boolean } => {
+  if (!says) return { text: null, waiting: false };
   if ("per" in says) {
+    /* ⚠️ A CLOSED SET HAS NO BLANK TO LEAVE — it is answered or it is not, and
+       an unanswered one has no sentence at all because the app wrote one per
+       VALUE. Its lead is what keeps it legible in the paragraph. */
     const only = takes[0];
     const value = only === undefined ? undefined : held[only];
-    return value === undefined || value === null || value === ""
+    const chosen = value === undefined || value === null || value === ""
       ? null
       : says.per[String(value)] ?? null;
+    return { text: chosen, waiting: chosen === null };
   }
   return fill(says.as, fields, held);
 };
@@ -294,7 +304,7 @@ export function Create({
     const clause = entry && !step.says
       ? (() => {
         const n = heldCount(answers, held);
-        return n === 0 ? null : entry.said.replace("{n}", String(n));
+        return { text: n === 0 ? null : entry.said.replace("{n}", String(n)), waiting: n === 0 };
       })()
       : clauseOf(step.says, names, takes, held);
     const short = shortOf([...names, ...answers], takes, held, refused);
@@ -306,7 +316,7 @@ export function Create({
       ...(step.under ? { under: step.under } : {}),
       when: stepApplies(step.when, held),
       ...(asked.has(step.id) || opened.has(step.id) ? {} : { settled: true }),
-      says: clause,
+      says: clause.text,
       ...(short ? { short } : {}),
       /*
         ⚠️ A CLAUSE IN THE PARAGRAPH ONLY WHERE THE STEP SAYS ONE, and a row
@@ -314,8 +324,27 @@ export function Create({
         sentence about a thing and wrong for a list of barcodes, so the review is
         a paragraph followed by rows for everything not in it.
       */
+      /*
+        ⚠️ THE LEAD IS THE `says`'S OWN, NEVER THE STEP'S `under`. They read as
+        the same string and they are two different jobs: `under` is the line
+        beneath the question, where a capital is correct, and a lead lands
+        mid-sentence, where it is not. Borrowed, a step declaring
+        `under: "Counted in"` and `says: { as: "{unit}" }` recapped as
+        "…, Counted in tin" — the connective twice over if the app had written
+        it into the sentence, and a heading's capital in the middle either way.
+        `as` carries its own connective; only `per` needs one, because its five
+        sentences would otherwise each repeat it.
+      */
       ...(step.says
-        ? { part: { lead: step.under ?? step.ask, said: clause } }
+        ? {
+          part: {
+            ...(step.says && "per" in step.says && step.says.lead
+              ? { lead: step.says.lead }
+              : {}),
+            said: clause.text,
+            ...(clause.waiting ? { waiting: true } : {}),
+          },
+        }
         : {}),
       children: Block
         ? (

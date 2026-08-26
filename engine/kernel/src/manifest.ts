@@ -307,7 +307,27 @@ export type SaysSpec =
    * review with a line silently absent — the fact they chose most deliberately
    * being the one the summary does not mention.
    */
-  | { readonly per: Readonly<Record<string, string>> };
+  | {
+    readonly per: Readonly<Record<string, string>>;
+    /**
+     * THE CONNECTIVE IN FRONT OF WHICHEVER SENTENCE APPLIES — "tracked so that
+     * it is".
+     *
+     * ⚠️ HERE RATHER THAN REPEATED IN EVERY `per` SENTENCE, which is what the
+     * five values would otherwise each have to carry. It exists only on this
+     * variant because `as` is one sentence the app writes whole, connective
+     * included — "counted in {unit}" — and a lead beside it would be a second
+     * place the same words could live.
+     *
+     * ⚠️ AND IT IS PROSE-CASED, BECAUSE IT LANDS MID-SENTENCE. The recap is one
+     * paragraph and the leads are its joins; the FRAME capitalises the first
+     * character of the whole sentence and nothing else, so a lead written as a
+     * heading reads as one — "…, Tracked so that it is…". `under` was doing this
+     * job and could not: it is the line under the question, where a capital is
+     * correct, and one string cannot be both.
+     */
+    readonly lead?: string;
+  };
 
 export interface StepSpec {
   readonly id: string;

@@ -71,10 +71,25 @@ describe("six chosen at once are six kept", () => {
   const source = readFileSync(
     new URL("../src/parts/shots.tsx", import.meta.url), "utf8",
   );
-  const handler = /onPick=\{\(([\s\S]*?)\n\s*\}\}/.exec(source)?.[1] ?? "";
+  const handler = /onPick=\{(?:async\s*)?\(([\s\S]*?)\n\s*\}\}/.exec(source)?.[1] ?? "";
 
   it("has a handler to read at all", () => {
-    expect(handler).toContain("asDataUrl");
+    expect(handler).toContain("shrunk");
+  });
+
+  /* ⚠️ SHRUNK RATHER THAN RAW — the manifest already claimed this happened and
+     nothing did it. A phone's photograph went whole, and a portrait one went
+     SIDEWAYS, because a canvas ignores the EXIF rotation tag unless asked. */
+  it("downscales on the way in rather than sending the sensor's pixels", () => {
+    expect(handler).not.toContain("asDataUrl");
+  });
+
+  /* ⚠️ AND AWAITS IT, SO SIX ARRIVE IN THE ORDER THEY WERE CHOSEN. Six decodes
+     started at once finish in whatever order the machine decides, and on a set
+     that is front / back / label the order is the one thing about them that
+     matters. */
+  it("waits for each picture, so the order is the order they were chosen", () => {
+    expect(handler).toContain("await");
   });
 
   it("appends to the latest list rather than the render's", () => {

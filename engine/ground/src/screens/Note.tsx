@@ -19,12 +19,38 @@
 import * as React from "react";
 import { Button, Chip } from "@heroui/react";
 import {
-  Center, Compare, Confirm, CopyRow, Dialog, FieldRow, FileRow, Figure, Group, Hint, Hotkey, Menu,
-  Money,
+  Attach, Center, Compare, Confirm, CopyRow, Dialog, FieldRow, FileRow, Figure, Group, Hint, Hotkey,
+  Menu, Money,
   NoteRow, Over, PageTabs, Peek, Prose, Row, Score, Screen, SectionTitle, Stack, Tags,
-  Timeline, glyphOf, type Moment,
+  Timeline, glyphOf, type Attached, type Moment,
 } from "@engine/design";
+import { PLATFORM_PROBLEMS, problem } from "@engine/kernel";
 import { TRAIL, noteName, personName, type Note as OneNote } from "./sample.js";
+
+/**
+ * ⚠️ ONE FILE PER STATE, WHICH IS WHAT MAKES THIS A PROVING GROUND RATHER THAN A
+ * DEMO. Four of the five are unreachable on a happy path — a board that seeded
+ * only `done` would draw an uploader that has never failed, never been stopped
+ * and never waited on a server, and none of those pictures would exist to look
+ * at until somebody hit one in production.
+ */
+const QUEUE: readonly Attached[] = [
+  { id: "q1", name: "spec-sheet.pdf", bytes: 184_000, type: "application/pdf",
+    of: new ArrayBuffer(0), at: "done" },
+  { id: "q2", name: "IMG_0042.jpg", bytes: 2_300_000, type: "image/jpeg",
+    of: new ArrayBuffer(0), at: "sending", along: 0.62 },
+  { id: "q3", name: "IMG_0043.jpg", bytes: 1_900_000, type: "image/jpeg",
+    of: new ArrayBuffer(0), at: "settling" },
+  { id: "q4", name: "notes.txt", bytes: 1_200, type: "text/plain",
+    of: new ArrayBuffer(0), at: "held" },
+  { id: "q5", name: "scan-back.png", bytes: 5_100_000, type: "image/png",
+    of: new ArrayBuffer(0), at: "refused",
+    /* ⚠️ THE REAL REFUSAL, BUILT THE REAL WAY. A board writing its own object
+       photographs a sentence the catalogue does not contain, in a tone nothing
+       else in the product uses — which is a picture of a failure that cannot
+       happen. */
+    why: problem(PLATFORM_PROBLEMS, "platform.too_large", { size: 4_980, most: 4_096 }) },
+];
 
 /** ⚠️ Sentence case from an id, because the wire value is not a word. */
 const KIND: Readonly<Record<OneNote["kind"], string>> = {
@@ -200,6 +226,36 @@ export function Note({ title, note, onBack, onPublish, onOpen }: {
                       />
                     ))}
                     {note.files.length ? null : <NoteRow>Nothing is attached to this note</NoteRow>}
+                  </Group>
+
+                  {/*
+                    ⚠️ THE QUEUE IS A DIFFERENT THING FROM THE LIST ABOVE IT, and
+                    the board draws both because a screen has both: what is
+                    already stored, and what is on its way there. `FileRow` is
+                    the first; `Attach` is the second, and it is the one with
+                    five states nobody can see by looking at a happy path.
+
+                    ⚠️ AND EVERY ONE OF THE FIVE IS HERE ON PURPOSE. A ground
+                    that showed only `done` would photograph an uploader that
+                    has never failed, never been stopped and never sat in the
+                    gap between the last byte and the answer — which is where
+                    every upload somebody notices actually goes wrong.
+                  */}
+                  <Group label="Add more" icon={glyphOf("add")}>
+                    <Attach
+                      held={QUEUE}
+                      onAdd={() => undefined}
+                      onRemove={() => undefined}
+                      onRetry={() => undefined}
+                      onStop={() => undefined}
+                      accept={["image/*", "application/pdf"]}
+                      most={4 * 1024 * 1024}
+                      mostTogether={8 * 1024 * 1024}
+                      mostFiles={6}
+                      says="Up to 6, 8 MB between them"
+                      under="Pictures and PDFs"
+                      label="Choose files"
+                    />
                   </Group>
 
                   <Group label="Its address">

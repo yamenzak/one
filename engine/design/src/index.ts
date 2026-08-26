@@ -22,6 +22,7 @@ export * from "./parts/surfaces.js";
 export * from "./parts/bars.js";
 export * from "./parts/feedback.js";
 export * from "./parts/pick-file.js";
+export * from "./parts/attach.js";
 /*
   ⚠️ LABELS ARE A SUBPATH AND NOT PART OF THE ENTRY: `@engine/design/labels`.
   A QR encoder is about four kilobytes of Reed-Solomon and mask arithmetic that
