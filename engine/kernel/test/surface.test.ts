@@ -17,7 +17,8 @@ import { describe, expect, it } from "vitest";
 import { collection } from "../src/collection.js";
 import { field } from "../src/field.js";
 import {
-  actsIn, blocksIn, fieldsIn, fillOf, fillsIn, refuseStory, refuseSurface, refuseView, unreadViews,
+  actsIn, askedOf, blocksIn, fieldsIn, fillOf, fillsIn, refuseStory, refuseSurface, refuseView,
+  stepApplies, unreadViews,
   viewsIn, type ActSpec, type BlockIndex, type SurfaceSpec, type ViewSpec,
 } from "../src/surface.js";
 import { BLOCKS, HEROES } from "../src/blocks.js";
@@ -1438,6 +1439,18 @@ const SEES = {
 
 const OPS = [WRITE, SEES];
 
+/**
+ * ⚠️ A STAND-IN FOR THE ASKING REGISTRY, AND IT IS NOT THE BODY'S — see `ASKS`.
+ * A body block is FED bindings and draws; a step's block is HANDED what the flow
+ * holds and answers back. Checked against the wrong one a step naming `Listing`
+ * composes, and the flow hands a camera's contract to a table.
+ */
+const ASKING = {
+  Shots: { id: "Shots", bones: "tiles", answers: ["shots"] },
+  /* ⚠️ The same block writing somewhere the write does not take. */
+  Weather: { id: "Weather", bones: "text", answers: ["weather"] },
+} as const;
+
 const SAID = {
   listed: "kept as a single running total",
   counted: "counted, so a number is a number",
@@ -1462,17 +1475,17 @@ const flow = (over: Record<string, unknown> = {}) => ({
 }) as Parameters<typeof refuseStory>[0];
 
 const told = (s: Parameters<typeof refuseStory>[0]) =>
-  refuseStory(s, OPS, INDEX).map((p) => p.why);
+  refuseStory(s, OPS, ASKING).map((p) => p.why);
 
 describe("a flow that composes", () => {
   it("refuses nothing about a story whose steps reach its write", () => {
-    expect(refuseStory(flow(), OPS, INDEX)).toEqual([]);
+    expect(refuseStory(flow(), OPS, ASKING)).toEqual([]);
   });
 
   /* ⚠️ A SCREEN THAT IS NOT A FLOW IS NOT THIS FUNCTION'S BUSINESS, and saying so
      is what lets `refuseApp` call it for every screen without asking first. */
   it("says nothing about a screen with no story on it", () => {
-    expect(refuseStory({ id: "plain" }, OPS, INDEX)).toEqual([]);
+    expect(refuseStory({ id: "plain" }, OPS, ASKING)).toEqual([]);
   });
 
   /* ⚠️ AN UNKNOWN WRITE IS ALREADY REPORTED ONE LEVEL UP — see the note in
@@ -1506,6 +1519,33 @@ describe("what a step asks for", () => {
     expect(told(flow({
       asks: [{ id: "shot", ask: "Photograph it?", block: "Nothing" }],
     }))).toContain("step_block_unknown");
+  });
+
+  /* ⚠️ WORSE THAN A FIELD DROPPED, BECAUSE THE WORK WAS DONE. A photograph
+     taken, carried through the review, and discarded at the door with nothing on
+     any screen saying so. */
+  it("refuses a block that answers where the write does not take", () => {
+    expect(told(flow({
+      asks: [
+        ...flow().story!.asks,
+        { id: "sky", ask: "What is the weather?", block: "Weather" },
+      ],
+    }))).toContain("step_takes_unknown");
+  });
+
+  /* ⚠️ AND WHAT A BLOCK ANSWERS COUNTS TOWARD FINISHING, exactly as a `takes`
+     does — otherwise a flow whose camera supplies the name is refused for not
+     asking for it. */
+  it("counts what a block answers toward the write being reachable", () => {
+    const shot = {
+      id: "thing.shoot",
+      input: { shots: field.json({ label: "Pictures", holds: "none" }) },
+      output: { shots: field.json({ label: "Pictures", holds: "none" }) },
+    };
+    expect(refuseStory(
+      { id: "s", story: { writes: "thing.shoot", asks: [{ id: "shot", ask: "Photograph it?", block: "Shots" }] } },
+      [shot], ASKING,
+    ).map((p) => p.why)).toEqual([]);
   });
 
   it("refuses the same step declared twice", () => {
@@ -1579,8 +1619,98 @@ describe("what fills the flow before it is walked", () => {
       input: {},
       output: { weather: field.text({ label: "Weather", holds: "none" }) },
     };
-    expect(refuseStory(flow({ fills: "thing.elsewhere" }), [...OPS, elsewhere], INDEX)
+    expect(refuseStory(flow({ fills: "thing.elsewhere" }), [...OPS, elsewhere], ASKING)
       .map((p) => p.why)).toContain("story_fills_nothing");
+  });
+});
+
+describe("when a step applies", () => {
+  it("refuses a condition on a field the write does not take", () => {
+    expect(told(flow({
+      asks: [
+        ...flow().story!.asks,
+        { id: "extra", ask: "How many?", takes: ["par"], when: { field: "colour", set: true } },
+      ],
+    }))).toContain("when_field_unknown");
+  });
+
+  /* ⚠️ A FLOW IS ANSWERS ON THE WAY TO MAKING SOMETHING, so there is no record. */
+  it("refuses a condition reaching for a record", () => {
+    expect(told(flow({
+      asks: [
+        ...flow().story!.asks,
+        { id: "extra", ask: "How many?", takes: ["par"], when: { field: "brand", is: { here: "record" } } },
+      ],
+    }))).toContain("when_reaches_a_record");
+  });
+
+  const when = (m: Parameters<typeof stepApplies>[0], held: Record<string, unknown>) =>
+    stepApplies(m, held);
+
+  it("applies where nothing is declared", () => {
+    expect(when(undefined, {})).toBe(true);
+  });
+
+  it("reads set and unset", () => {
+    expect(when({ field: "brand", set: true }, { brand: "Ansell" })).toBe(true);
+    expect(when({ field: "brand", set: true }, {})).toBe(false);
+    expect(when({ field: "brand", unset: true }, {})).toBe(true);
+  });
+
+  /* ⚠️ EVERY CONTROL CLEARS TO `""`, so a step conditioned on `set` would stay
+     live over a box somebody emptied — which is the state they emptied it to. */
+  it("counts an emptied box as unset", () => {
+    expect(when({ field: "brand", set: true }, { brand: "" })).toBe(false);
+  });
+
+  it("reads is and isnt against a literal", () => {
+    expect(when({ field: "tracking", is: { literal: "batched" } }, { tracking: "batched" })).toBe(true);
+    expect(when({ field: "tracking", is: { literal: "batched" } }, { tracking: "counted" })).toBe(false);
+    expect(when({ field: "tracking", isnt: { literal: "batched" } }, { tracking: "counted" })).toBe(true);
+  });
+});
+
+describe("which steps somebody is actually asked", () => {
+  const STEPS = [
+    { id: "named", takes: ["name", "brand"] },
+    { id: "counted", takes: ["unit"] },
+    { id: "tracked", takes: ["tracking"], always: true as const },
+    { id: "shot" },
+    { id: "par", takes: ["par"], when: { field: "tracking", is: { literal: "batched" } } },
+  ];
+  const ids = (held: Record<string, unknown>, filled: string[]) =>
+    askedOf(STEPS, held, new Set(filled)).map((s) => s.id);
+
+  it("asks everything that applies when nothing has arrived", () => {
+    expect(ids({ tracking: "batched" }, [])).toEqual(["named", "counted", "tracked", "shot", "par"]);
+  });
+
+  /* ⚠️ NOT ASKED AND IN THE REVIEW — the whole point of a fill. */
+  it("drops a step whose fields all arrived", () => {
+    expect(ids({ tracking: "batched" }, ["unit"])).not.toContain("counted");
+  });
+
+  /* ⚠️ EVERY FIELD, NOT ANY: the brand would otherwise be unanswerable except
+     through the review. */
+  it("keeps a step where only some of its fields arrived", () => {
+    expect(ids({ tracking: "batched" }, ["name"])).toContain("named");
+  });
+
+  /* ⚠️ THE DECISION SOMEBODY MAKES RATHER THAN CONFIRMS. */
+  it("asks an insistent step even when it arrived filled", () => {
+    expect(ids({ tracking: "batched" }, ["tracking"])).toContain("tracked");
+  });
+
+  /* ⚠️ A BLOCK STEP IS NEVER FILLED — skipping it would remove the step that was
+     going to produce what fills the rest. */
+  it("keeps a block step whatever arrived", () => {
+    expect(ids({ tracking: "batched" }, ["name", "brand", "unit", "tracking", "par"]))
+      .toContain("shot");
+  });
+
+  /* ⚠️ AND INSISTENCE DOES NOT SURVIVE NOT APPLYING. */
+  it("drops a step that does not apply, however it arrived", () => {
+    expect(ids({ tracking: "counted" }, [])).not.toContain("par");
   });
 });
 

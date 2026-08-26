@@ -57,9 +57,9 @@ import type { AreaBook, SettingBook } from "./setting.js";
 import { refuseSettings } from "./setting.js";
 import { LADDER, refuseLadder } from "./dunning.js";
 import { SURFACES, refuseSurfaces } from "./brand.js";
-import type { SurfaceSpec, ViewSpec } from "./surface.js";
+import type { Match, SurfaceSpec, ViewSpec } from "./surface.js";
 import { fillOf, fillsIn, refuseStory, refuseSurface, refuseView, unreadViews } from "./surface.js";
-import { BLOCKS, HEROES } from "./blocks.js";
+import { ASKS, BLOCKS, HEROES } from "./blocks.js";
 import type { PurposeBook, VaultBook } from "./vault.js";
 import { refuseVault, strayFacts } from "./vault.js";
 import type { AppId, Tone } from "./primitives.js";
@@ -336,8 +336,25 @@ export interface StepSpec {
    * progress bar.
    */
   readonly always?: true;
-  /** ⚠️ Named where an answer earlier in the flow can remove this one. */
-  readonly when?: string;
+  /**
+   * WHEN THIS STEP APPLIES AT ALL — against an answer earlier in the flow.
+   *
+   * ⚠️ IT IS `Match`, WHICH IS THE VOCABULARY A VIEW ALREADY NARROWS WITH.
+   * Equality and presence, no `gt`, no `lt`, none of them coming — and the reason
+   * is the same one at both ends: the first comparison operator is what makes a
+   * manifest a language and the second is free. What differs is the SUBJECT: a
+   * view's `field` is a column of a collection, and here it is a field of the
+   * write's own input. Same shape, checked against a different set of names.
+   *
+   * ⚠️ IT WAS A BARE STRING AND THAT COULD NOT BE INTERPRETED. Whatever the
+   * string meant, the screen that read it was the app's — which is exactly the
+   * hand-written file this contract exists to remove, moved into one field.
+   *
+   * ⚠️ A STEP THAT DOES NOT APPLY IS SKIPPED, NEVER DISABLED — out of the flow,
+   * out of the count, out of the progress and out of the review. A greyed step is
+   * a question somebody has to work out they are not being asked.
+   */
+  readonly when?: Match;
 }
 
 /** A place somebody works — a loop, not a flow. */
@@ -1240,7 +1257,7 @@ export function refuseApp(spec: AppSpec): readonly Refusal[] {
           + "the name of a variable is not a fact about the product");
       }
     }
-    for (const p of refuseStory(s, spec.operations, BLOCKS)) at(p.of, `${p.why}: ${p.detail}`);
+    for (const p of refuseStory(s, spec.operations, ASKS)) at(p.of, `${p.why}: ${p.detail}`);
   }
 
   for (const id of unreadViews(views, spec.screens.map((s) => s.body))) {

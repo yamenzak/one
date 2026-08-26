@@ -473,3 +473,65 @@ export const HEROES: BlockIndex = {
     mark: glyph("The mark beside it"),
   }),
 };
+
+/* ------------------------------------------------------------- the asks --- */
+
+/**
+ * THE BLOCKS A STEP MAY BE, WHICH ARE NOT THE BLOCKS A BODY MAY HOLD.
+ *
+ * ⚠️ A SECOND REGISTRY BECAUSE THEY ARE A DIFFERENT KIND OF COMPONENT, and the
+ * first draft of this checked a step's block against `BLOCKS` — which typechecks,
+ * composes, and hands a camera the props of a table. A body block is FED: it
+ * takes bindings, reads a view or a field, and draws. A step's block is ASKED: it
+ * is handed what the flow holds and hands answers back. Nothing about the two
+ * prop shapes overlaps, so one registry covering both would be a registry whose
+ * entries mean two different things depending on where the id appears.
+ *
+ * ⚠️ AND IT DECLARES WHAT IT ANSWERS, WHICH IS THE CHECK WORTH HAVING. A block
+ * writing a field the operation does not take is exactly `step_takes_unknown`
+ * from the other end — the person does the work, the value is carried through the
+ * review, and the door drops it. Declared here, the kernel refuses it at
+ * composition instead.
+ *
+ * ⚠️ THE SET IS DELIBERATELY SMALL AND WILL STAY SO. What belongs here is what a
+ * FIELD cannot be: a camera, a viewfinder, a packing ladder. Anything expressible
+ * as a `FieldSpec` is a `takes`, and a registry that accepted both would be the
+ * escape hatch this whole contract exists to close.
+ */
+export interface AskEntry {
+  readonly id: string;
+  /** ⚠️ What its absence looks like while its code arrives — see `Bones`. */
+  readonly bones: Bones;
+  /**
+   * THE WRITE'S OWN INPUT NAMES IT MAY ANSWER.
+   *
+   * ⚠️ ITS OWN, NOT THE FLOW'S FILL. A photo strip collects `shots`; what the
+   * MODEL then makes of them is the story's `fills`, and those names are checked
+   * against the write separately. Conflating the two would make a block's
+   * declaration depend on which app mounted it.
+   */
+  readonly answers: readonly string[];
+}
+
+export type AskIndex = Readonly<Record<string, AskEntry>>;
+
+const asking = (id: string, bones: Bones, answers: readonly string[]): AskEntry =>
+  ({ id, bones, answers });
+
+/**
+ * ⚠️ ONE ENTRY, AND THAT IS THE HONEST STATE OF IT. The photo strip is the block
+ * the create flow was designed around — it is what makes a flow confirm rather
+ * than ask — and a registry seeded with five speculative entries would be five
+ * claims no screen has made good. They arrive as products need them.
+ */
+export const ASKS: AskIndex = {
+  /**
+   * PHOTOGRAPHS OF THE THING, AND THE ONE STEP THAT CHANGES THE REST OF THE FLOW.
+   *
+   * ⚠️ IT ANSWERS `shots` AND NOTHING ELSE. What comes back from the model lands
+   * through the story's `fills`, which is a declared operation with a declared
+   * output — so what a model may write into a record is a fact in the manifest
+   * rather than a decision inside a component.
+   */
+  Shots: asking("Shots", "tiles", ["shots"]),
+};

@@ -1932,6 +1932,7 @@ export type StoryRefusal =
   | "step_takes_unknown" | "step_block_unknown"
   | "step_always_without_fields"
   | "says_blank_unknown" | "says_per_not_a_set" | "says_per_incomplete"
+  | "when_field_unknown" | "when_reaches_a_record"
   | "story_fills_unknown" | "story_fills_nothing"
   | "story_cannot_finish";
 
@@ -1955,12 +1956,19 @@ export function refuseStory(
         readonly id: string; readonly ask: string;
         readonly takes?: readonly string[]; readonly block?: string;
         readonly says?: { readonly as?: string; readonly per?: Readonly<Record<string, string>> };
-        readonly always?: true; readonly when?: string;
+        readonly always?: true; readonly when?: Match;
       }[];
     };
   },
   operations: readonly { readonly id: string; readonly input: Fields; readonly output: Fields }[],
-  blocks: BlockIndex,
+  /**
+   * ⚠️ THE ASKING REGISTRY, NOT THE BODY'S — see `ASKS`. A body block is FED
+   * bindings and draws; a step's block is HANDED what the flow holds and answers
+   * back, and nothing about the two prop shapes overlaps. Checked against the
+   * wrong one, a step naming `Listing` composes and the flow hands a camera's
+   * contract to a table.
+   */
+  asks: Readonly<Record<string, { readonly answers: readonly string[] }>>,
 ): readonly StoryProblem[] {
   const told = screen.story;
   if (!told) return [];
@@ -2048,10 +2056,27 @@ export function refuseStory(
       reached.add(name);
     }
 
-    if (step.block && !blocks[step.block]) {
+    const asking = step.block ? asks[step.block] : undefined;
+    if (step.block && !asking) {
       at("step_block_unknown",
-        `${of} names the block "${step.block}", which the registry does not hold — `
+        `${of} names the block "${step.block}", which the asking registry does not hold — `
         + "the step would draw its question over nothing");
+    }
+    /*
+      ⚠️ AND WHAT IT ANSWERS HAS TO REACH THE WRITE, which is `step_takes_unknown`
+      from the other end and is worse: a block writing a field the operation does
+      not take is work somebody DID — a photograph taken, a ladder built — carried
+      through the review and dropped at the door, with nothing on any screen
+      saying so.
+    */
+    for (const name of asking?.answers ?? []) {
+      if (!(name in write.input)) {
+        at("step_takes_unknown",
+          `${of} draws "${step.block}", which answers "${name}" — ${write.id} does not take `
+          + "it, so the work would be done, reviewed, and dropped at the door");
+        continue;
+      }
+      reached.add(name);
     }
 
     /* ⚠️ ON A BLOCK STEP IT IS A WORD WITH NO MEANING. "Ask this even when it
@@ -2061,6 +2086,31 @@ export function refuseStory(
       at("step_always_without_fields",
         `${of} insists on being asked and takes no fields — there is nothing that `
         + "could have arrived filled, so the rule reads as applying and applies to nothing");
+    }
+
+    /* --- when it applies ------------------------------------------------ */
+
+    /*
+      ⚠️ A `when` THAT NAMES NOTHING IS A STEP THAT IS ALWAYS THERE OR NEVER,
+      AND WHICH ONE DEPENDS ON THE READER. Against an answer that cannot exist,
+      `set` is false for ever and `unset` is true for ever — so the same typo
+      either removes a question from every walk of the flow or makes a
+      conditional one unconditional, and both draw perfectly.
+    */
+    if (step.when && !(step.when.field in write.input)) {
+      at("when_field_unknown",
+        `${of} applies when "${step.when.field}" — ${write.id} takes no such input, so `
+        + "the condition is decided by a value that can never arrive");
+    }
+    /* ⚠️ AND A FLOW HAS NO RECORD AND NO ROW TO BE SOMEBODY'S — see `Value`. A
+       story is unsaved answers on the way to making a thing; `here` reaches for a
+       subject that does not exist yet, and reads as a condition being evaluated. */
+    const against = step.when && "is" in step.when ? step.when.is
+      : step.when && "isnt" in step.when ? step.when.isnt : undefined;
+    if (against && "here" in against) {
+      at("when_reaches_a_record",
+        `${of} applies against "${against.here}" — a flow is answers on the way to `
+        + "making something, so there is no record for it to be a value of");
     }
 
     /* --- what it says --------------------------------------------------- */
@@ -2109,3 +2159,74 @@ export function refuseStory(
 
   return out;
 }
+
+/**
+ * WHETHER A STEP APPLIES, GIVEN WHAT HAS BEEN ANSWERED SO FAR.
+ *
+ * ⚠️ HERE RATHER THAN IN THE RENDERER, BECAUSE BOTH ENDS ASK IT AND THEY MUST
+ * AGREE. The browser decides which questions to draw; the guard decides whether a
+ * required field is reachable. Two implementations of "does this step apply" is
+ * how a flow comes to skip a step the checker counted on — and the failure is a
+ * refusal at the last press naming a field nobody was asked for.
+ *
+ * ⚠️ NO CONDITION MEANS IT APPLIES, which is the only sane default: a step whose
+ * `when` was left off is a question the author wanted asked.
+ *
+ * ⚠️ AND `here` IS FALSE RATHER THAN THROWN. `when_reaches_a_record` refuses it
+ * at composition, so arriving here means a manifest that never composed; a step
+ * that quietly does not apply is a better end than a white screen.
+ */
+export const stepApplies = (
+  when: Match | undefined,
+  held: Readonly<Record<string, unknown>>,
+): boolean => {
+  if (!when) return true;
+  const value = held[when.field];
+  /* ⚠️ AN EMPTY STRING IS UNSET, and that is not a shortcut. Every control in
+     the field renderer clears to `""` rather than to `undefined`, so a step
+     conditioned on `set` would stay live over a box somebody emptied — which is
+     the state they emptied it to leave. */
+  const there = value !== undefined && value !== null && value !== "";
+  if ("set" in when) return there;
+  if ("unset" in when) return !there;
+  const want = "is" in when ? when.is : when.isnt;
+  if ("here" in want) return false;
+  const same = value === want.literal;
+  return "is" in when ? same : !same;
+};
+
+/**
+ * THE STEPS SOMEBODY IS ACTUALLY ASKED, IN ORDER.
+ *
+ * ⚠️ TWO REASONS A STEP IS NOT ASKED AND THEY ARE DIFFERENT. `when` says it does
+ * not APPLY — it is out of the flow, out of the count, out of the review. Filled
+ * says it does apply and the answer already ARRIVED, so it is out of the
+ * questions and INTO the review, where a press on its clause opens it. Collapsing
+ * the two would either hide what a model wrote from the person confirming it, or
+ * put a question in front of them about something that does not apply.
+ *
+ * ⚠️ AND `always` OVERRIDES ONLY THE SECOND. A step that does not apply is not
+ * asked however insistent its declaration — `always` is about confirming versus
+ * deciding, and a decision that does not arise is not a decision.
+ */
+export const askedOf = <S extends {
+  readonly id: string; readonly takes?: readonly string[];
+  readonly always?: true; readonly when?: Match;
+}>(
+  steps: readonly S[],
+  held: Readonly<Record<string, unknown>>,
+  filled: ReadonlySet<string>,
+): readonly S[] => steps.filter((step) => {
+  if (!stepApplies(step.when, held)) return false;
+  if (step.always) return true;
+  const takes = step.takes ?? [];
+  /* ⚠️ A BLOCK STEP IS NEVER FILLED, because what fills a flow is an operation's
+     output and a block is how somebody DOES something — photographs a box, builds
+     a ladder. Skipping it because a name arrived would remove the step that was
+     going to produce the photographs. */
+  if (!takes.length) return true;
+  /* ⚠️ EVERY FIELD, NOT ANY. A step asking a name and a brand where only the
+     name arrived still has a question to ask, and dropping it would leave the
+     brand unanswerable except through the review. */
+  return !takes.every((name) => filled.has(name));
+});
