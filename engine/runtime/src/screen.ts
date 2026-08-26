@@ -28,7 +28,7 @@ import {
 } from "@engine/kernel";
 import { joinRows } from "./joined.js";
 import { readOne } from "./records.js";
-import { runViews, type Viewed } from "./views.js";
+import { runViews, type Ask, type Viewed } from "./views.js";
 import { type Db } from "./sql.js";
 
 /* ⚠️ `SCREEN_PATH` IS THE KERNEL'S — see its header. The browser speaks it too,
@@ -159,6 +159,15 @@ export async function drawnFor(
   holds: (permission: string) => boolean,
   record: string | null = null,
   me: string | null = null,
+  /**
+   * ⚠️ THE DEVICE'S CALENDAR DAY, SENT RATHER THAN TAKEN — see `Here`. Absent, an
+   * asked view that fills it simply does not send it, and the operation refuses
+   * for want of a required input. That is the right failure: a worker guessing
+   * the day would answer confidently and wrongly for half the planet.
+   */
+  today: string | null = null,
+  /** ⚠️ How an asked view is answered, supplied by the door — see `Ask`. */
+  ask?: Ask,
 ): Promise<Drawn | Refused> {
   /*
     ⚠️ `permissionFor`, NOT `spec.permission`. A collection declares a PREFIX —
@@ -176,7 +185,9 @@ export async function drawnFor(
   }
 
   const reads = screen.body ? viewsIn(screen.body) : [];
-  const here = { record: record ?? undefined, me: me ?? undefined };
+  const here = {
+    record: record ?? undefined, me: me ?? undefined, today: today ?? undefined,
+  };
 
   const of = (app.collections ?? []).find((c) => c.id === screen.of);
   const { subject: mine, byView: reaching } = reachesFor(app, screen);
@@ -194,7 +205,7 @@ export async function drawnFor(
       const [joined] = await joinRows(db, [one], mine, app.collections ?? [], scope);
       return joined ?? one;
     })(),
-    runViews(db, app, reads, scope, here, reaching),
+    runViews(db, app, reads, scope, here, reaching, ask),
   ]);
 
   /* ⚠️ ONLY WHAT THE BODY NAMES, and an id the app does not declare is dropped

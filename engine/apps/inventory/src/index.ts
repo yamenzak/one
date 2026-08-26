@@ -6013,6 +6013,25 @@ const manifest = (): AppSpec => defineApp({
     */
     { id: "moves-for-item", of: "ledger", where: [{ field: "against", is: { here: "record" } }],
       limit: 50 },
+    /*
+      ⚠️ THE TWO VIEWS IN THIS PRODUCT THAT ARE ARITHMETIC RATHER THAN A FILTER —
+      see `AskedSpec`. "What runs out" is four expiry clocks composed against a
+      threshold the workspace sets, and a `Match` is equality and presence: there
+      is no `where` that could say it, and inventing one would put a comparison
+      operator in every manifest in the deployment.
+
+      ⚠️ AND THE THRESHOLD IS THE REASON IT MUST STAY THE OPERATION'S. It is a
+      `tenant:manage` setting, so a browser sorting this list would have to read
+      a value the person holding the phone may not see — and would then either
+      hard-code thirty days or show everybody the same wrong list.
+    */
+    { id: "running-out", of: "batch",
+      asked: { operation: "batch.due", take: "items", fills: { today: "today" } } },
+    /* ⚠️ ITS OWN THRESHOLD, NOT THE EXPIRY ONE — see `unit.due`. Two lists,
+       because a shelf life and an annual inspection are answered on different
+       notice and nobody clears them in the same trip. */
+    { id: "service-due", of: "unit",
+      asked: { operation: "unit.due", take: "items", fills: { today: "today" } } },
   ],
 
   /*
@@ -6659,7 +6678,66 @@ const manifest = (): AppSpec => defineApp({
        the note that raised it, never from a menu. It is the same records under
        one question, and a destination beside Stock would be Stock twice. */
     { id: "due", route: "/due", label: "Running out", nav: "none", icon: "alert",
-      permission: "stock:read" },
+      permission: "stock:read",
+      body: {
+        shape: "list",
+        layout: { as: "stack" },
+        blocks: [
+          {
+            group: "Stock",
+            of: [{
+              block: "Listing",
+              /* ⚠️ THE LOT, BECAUSE THAT IS WHAT A RECALL NAMES AND WHAT SOMEBODY
+                 READS OFF THE BOX. Two deliveries of one product are two rows
+                 here and the product's name alone cannot tell them apart. */
+              shows: [
+                { field: "name", label: "What it is" },
+                { field: "lot", label: "Lot" },
+                { field: "standing", label: "Standing" },
+                { field: "on", label: "Runs out" },
+                /* ⚠️ WHICH CLOCK WON, which is surprising often enough to matter:
+                   a box printed 2028 that was opened last month is out next
+                   week, and a date with no reason beside it is a date nobody
+                   trusts. */
+                { field: "by", label: "Which clock" },
+              ],
+              nothing: {
+                says: "Nothing is running out",
+                under: "Deliveries appear here as their dates come round",
+              },
+              /* ⚠️ THE PRODUCT, NEVER THE DELIVERY — see `GoSpec`. A row here is
+                 one lot and there is no screen for one; the product's is where
+                 its deliveries are listed. */
+              goes: { to: "product", by: "product" },
+              bind: {
+                label: { from: { of: "words", says: "Stock" } },
+                of: { from: { of: "view", view: "running-out" } },
+              },
+            }],
+          },
+          {
+            group: "Servicing",
+            of: [{
+              block: "Listing",
+              shows: [
+                { field: "name", label: "What it is" },
+                { field: "serial", label: "Serial" },
+                { field: "standing", label: "Standing" },
+                { field: "on", label: "Due" },
+              ],
+              nothing: {
+                says: "Nothing is due for a service",
+                under: "Give an item a service date and it appears here",
+              },
+              goes: "unit",
+              bind: {
+                label: { from: { of: "words", says: "Servicing" } },
+                of: { from: { of: "view", view: "service-due" } },
+              },
+            }],
+          },
+        ],
+      } },
     /*
       ⚠️ SECONDARY, AND IT IS A DESTINATION RATHER THAN A BUTTON ON FOUR OTHER
       SCREENS. Labelling is a session — somebody stands at a printer with a roll

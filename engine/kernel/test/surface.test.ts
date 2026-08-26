@@ -816,3 +816,150 @@ describe("an act says what the screen already knows", () => {
     expect(why(offering([{ op: "note.publish", fills: { note: "record" } }]))).toEqual([]);
   });
 });
+
+/* ------------------------------------------------------------- the valve --- */
+
+/**
+ * ⚠️ THE ONE ESCAPE FROM A CLOSED VOCABULARY, AND WHAT KEEPS IT FROM BEING A
+ * HOLE. `Match` is equality and presence, so a screen whose subject is
+ * arithmetic could not be declared at all — but the answer is never to grow the
+ * query grammar an operator at a time. It is to push the arithmetic DOWN into a
+ * declared operation, where it is typed, gated, audited and readable by an
+ * agent, and let the view name it.
+ *
+ * ⚠️ EVERY TEST BELOW IS A SCREEN THAT WOULD DRAW. A view that also declares a
+ * `where` shows every row and says it shows five; a `first` off a field the
+ * collection has not got draws an empty figure over a workspace with plenty.
+ */
+describe("a view answered by an operation", () => {
+  const asked: ViewSpec = {
+    id: "running-out", of: "note",
+    asked: { operation: "note.due", take: "items", fills: { today: "today" } },
+  };
+
+  it("accepts one that names an operation and nothing else", () => {
+    expect(refuseView(asked, COLLECTIONS)).toEqual([]);
+  });
+
+  /* ⚠️ THE FOUR CLAUSES BESIDE IT ARE THE FAILURE, one at a time — each is an
+     instruction to a query builder that never runs. */
+  for (const [what, over] of [
+    ["where", { where: [{ field: "pinned", is: { literal: true } }] }],
+    ["sort", { sort: { by: "at", dir: "down" } }],
+    ["limit", { limit: 5 }],
+    ["tally", { tally: [{ as: "n", of: "note", by: "author" }] }],
+  ] as const) {
+    it(`refuses one that also declares a ${what}`, () => {
+      expect(refuseView({ ...asked, ...over } as ViewSpec, COLLECTIONS).map((p) => p.why))
+        .toEqual(["asked_and_queried"]);
+    });
+  }
+
+  /* ⚠️ AND THE COLUMNS GO UNCHECKED, WHICH IS STATED RATHER THAN HIDDEN. The row
+     shape is the handler's; checking `name` against `note` would refuse the very
+     thing the valve exists for. */
+  it("does not check a column against the collection the rows are about", () => {
+    expect(why(screen({
+      of: undefined,
+      body: body({
+        blocks: [{
+          block: "Listing",
+          shows: [{ field: "nowhere", label: "Nothing" }],
+          nothing: { says: "None" },
+          bind: { rows: { from: { of: "view", view: "running-out" } } },
+        }],
+      }),
+    }), [asked])).toEqual([]);
+  });
+});
+
+/**
+ * ⚠️ THE FIGURE OFF A VIEW'S FIRST ROW — how an aggregate reaches a `Stat`
+ * without a second kind of fetch. It is a projection of something the screen
+ * already has: same request, same permission, same outcome.
+ */
+describe("a figure taken off the first row", () => {
+  /* ⚠️ A BLOCK WHOSE SLOT TAKES A FIGURE, because the stand-in `Heading` takes a
+     field or a word — the refusals here are about the SOURCE resolving, not
+     about which slots accept it. */
+  const FIGURES: BlockIndex = {
+    ...INDEX,
+    Stat: {
+      id: "Stat", bones: "figure",
+      takes: { value: { label: "The figure", takes: ["field", "count", "first"], required: true } },
+    },
+  };
+
+  const one = (view: string, field: string): SurfaceSpec => body({
+    blocks: [{ block: "Stat", bind: { value: { from: { of: "first", view, field } } } }],
+  });
+
+  const asks = (s: SurfaceSpec, views: readonly ViewSpec[] = [recent]) =>
+    refuseSurface(screen({ body: s }), FIGURES, views, COLLECTIONS, []).map((p) => p.why);
+
+  it("counts as reading the view, so the door fetches it", () => {
+    expect(viewsIn(one("recent-notes", "words"))).toEqual(["recent-notes"]);
+  });
+
+  it("accepts a field the view's collection has", () => {
+    expect(asks(one("recent-notes", "words"))).toEqual([]);
+  });
+
+  it("refuses one it has not", () => {
+    expect(asks(one("recent-notes", "nowhere"))).toEqual(["view_field_unknown"]);
+  });
+
+  /* ⚠️ A TALLY IS A COLUMN ON THE ROW TOO — the same exemption `shows` gets, and
+     for the same reason: it is what the view promised to put there. */
+  it("accepts a tally the view declares", () => {
+    const counted: ViewSpec = {
+      ...recent, tally: [{ as: "mentions", of: "note", by: "author" }],
+    };
+    expect(asks(one("recent-notes", "mentions"), [counted])).toEqual([]);
+  });
+
+  /* ⚠️ AND AN ASKED VIEW IS EXEMPT, for the reason its columns are — the row
+     shape is a handler's answer and nothing writes it down. */
+  it("does not check a field off an asked view", () => {
+    const asked: ViewSpec = {
+      id: "recent-notes", of: "note", asked: { operation: "note.due", take: "items" },
+    };
+    expect(asks(one("recent-notes", "nowhere"), [asked])).toEqual([]);
+  });
+});
+
+/**
+ * ⚠️ WHICH FIELD CARRIES THE ADDRESS — `id` is the default and it is wrong often
+ * enough to need saying. A row on "what runs out" is a delivery, and there is no
+ * screen for one.
+ */
+describe("where a row leads", () => {
+  const leading = (goes: unknown): SurfaceSpec => body({
+    blocks: [{
+      block: "Listing",
+      goes: goes as never,
+      nothing: { says: "None" },
+      bind: { rows: { from: { of: "view", view: "recent-notes" } } },
+    }],
+  });
+
+  const asks = (goes: unknown) => refuseSurface(
+    screen({ body: leading(goes) }), INDEX, [recent], COLLECTIONS, [], ["one-note"],
+  ).map((p) => p.why);
+
+  it("still accepts the bare screen id", () => {
+    expect(asks("one-note")).toEqual([]);
+  });
+
+  it("refuses a long form naming a screen this app does not declare", () => {
+    expect(asks({ to: "nowhere", by: "author" })).toEqual(["goes_nowhere"]);
+  });
+
+  it("accepts a long form addressed by a field the rows carry", () => {
+    expect(asks({ to: "one-note", by: "author" })).toEqual([]);
+  });
+
+  it("refuses one addressed by a field they do not", () => {
+    expect(asks({ to: "one-note", by: "nowhere" })).toEqual(["shows_field_unknown"]);
+  });
+});

@@ -420,7 +420,7 @@ and a manifest that does not compose refuses to boot.
 | `access` | permissions, roles, and what an app may never claim | 15 | — |
 | `reach` | how far one person works inside a workspace — where, as against what (D45) | 4 | — |
 | `gate` | the eight gates, in the order that decides which sentence somebody reads first | 3 | — |
-| `surface` | a screen declared — its shape, its blocks, and the closed vocabulary they bind through | 20 | — |
+| `surface` | a screen declared — its shape, its blocks, and the closed vocabulary they bind through | 21 | — |
 | `blocks` | which blocks a screen may name at all | 1 | — |
 | `manifest` | the whole app, and the composition that refuses a broken one | 13 | — |
 | `entitlement` | what a plan includes, and the allowance algebra over it | 17 | — |
@@ -444,7 +444,7 @@ and a manifest that does not compose refuses to boot.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**310 of them**, 309 reached by something today.
+**311 of them**, 310 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -1169,6 +1169,7 @@ its own header, cited by other files, and doing nothing.
 | D91 | A night is deep and lit, and the ladder's numbers are the ones that ship | 2 |
 | D92 | A screen is a body or a story, and what a body binds through is closed | 17 |
 | D93 | A screen reaches one hop, counts what points back, and never asks for what it already knows | 0 |
+| D94 | A view may be answered by a declared operation, and that is the only escape from the closed vocabulary | 0 |
 <!-- /generated -->
 
 ---

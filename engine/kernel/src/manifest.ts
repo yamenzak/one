@@ -859,6 +859,38 @@ export function refuseApp(spec: AppSpec): readonly Refusal[] {
   const views = spec.views ?? [];
   for (const v of views) {
     for (const p of refuseView(v, spec.collections)) at(p.of, `${p.why}: ${p.detail}`);
+    /*
+      ⚠️ THE THREE HALVES OF AN ASKED VIEW THAT NEED THE OPERATION ITSELF — see
+      `AskedSpec`. Checked here for the same reason a `fills` is: `refuseView` is
+      handed collections and nothing else, and the whole point of these is what an
+      operation DECLARES.
+
+      ⚠️ THE `read` ONE IS THE SHARP ONE. A body is drawn on arrival, so a write
+      here fires on every navigation, on every re-read after an act, and twice in
+      a browser that mounts a tree twice — an idempotency key would not save it,
+      because each is a different request.
+    */
+    const asked = v.asked;
+    if (!asked) continue;
+    const op = spec.operations.find((o) => o.id === asked.operation);
+    if (!op) {
+      at(`view ${v.id}`,
+        `asked_operation_unknown: is answered by "${asked.operation}", which this app `
+        + "does not declare — a generated verb cannot answer a view, because what it "
+        + "hands back is composed by the runtime rather than written down");
+      continue;
+    }
+    if (op.kind !== "read") {
+      at(`view ${v.id}`,
+        `asked_not_a_read: is answered by ${op.id}, which is a ${op.kind} — a body is drawn `
+        + "on arrival, so this would run every time somebody opened the screen");
+    }
+    if (!(asked.take in (op.output ?? {}))) {
+      at(`view ${v.id}`,
+        `asked_take_unknown: takes "${asked.take}" off ${op.id}, which answers `
+        + `${Object.keys(op.output ?? {}).join(", ") || "nothing"} — the view would be empty `
+        + "and the screen would say the workspace is");
+    }
   }
   /*
     ⚠️ THE GENERATED ONES COUNT, AND LEAVING THEM OUT REFUSED THE ORDINARY CASE.

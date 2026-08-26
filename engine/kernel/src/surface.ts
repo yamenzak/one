@@ -107,6 +107,49 @@ export interface ViewSpec {
    * join beside it, and for the same reason.
    */
   readonly tally?: readonly TallySpec[];
+  /**
+   * ANSWERED BY ONE OF THE APP'S OWN READ OPERATIONS INSTEAD OF BY A QUERY.
+   *
+   * ⚠️ THIS IS THE ESCAPE VALVE D92 NAMED, AND IT PUSHES DOWN RATHER THAN OUT. A
+   * `Match` is equality and presence and will never be more, deliberately — so a
+   * screen whose subject is ARITHMETIC could not be declared at all. "What runs
+   * out" is four expiry clocks resolved against a threshold the workspace sets;
+   * "how much left the shelves this month" is a sum over a period. Neither is a
+   * filter and neither should be: they are the product's own logic, and the
+   * product already has a place to put logic that is typed, gated, audited and
+   * readable by an agent — a declared operation.
+   *
+   * ⚠️ AND IT REUSES THE WHOLE PIPE RATHER THAN OPENING A SECOND ONE. What comes
+   * back is a `Viewed` like any other view's, so `Listing` binds it unchanged,
+   * `count` counts it, `first` reads a figure off it, and `collectionsFor` still
+   * asks for `of`'s read permission before any of it runs. A block-level valve
+   * would have been a second kind of source every renderer, guard and document
+   * had to learn.
+   *
+   * ⚠️ IT MUST BE A `read`, AND THAT IS CHECKED. A body is drawn on arrival, so a
+   * write here would fire on every navigation, on every re-read after an act, and
+   * twice in a browser that mounts a tree twice.
+   *
+   * ⚠️ THE ROW SHAPE IS THE OPERATION'S AND IS NOT CHECKED — the honest limit of
+   * this. `output` says the answer carries `items`; what is inside them is a
+   * handler's business, so a `shows` column or a `first` field over an asked view
+   * is unverified and draws blank when it is wrong. `of` still names the
+   * collection the rows are ABOUT, because that is what the permission is of.
+   */
+  readonly asked?: AskedSpec;
+}
+
+/** ⚠️ Which read operation answers a view, and which of its fields is the rows. */
+export interface AskedSpec {
+  readonly operation: string;
+  /**
+   * ⚠️ WHICH OUTPUT FIELD HOLDS THE ROWS, because an operation answers a RECORD
+   * and a view is a list. Checked against the operation's declared `output`,
+   * which is the one half of the shape that IS written down.
+   */
+  readonly take: string;
+  /** ⚠️ What the screen supplies rather than asks for — see `Fill`. */
+  readonly fills?: Readonly<Record<string, Fill>>;
 }
 
 /**
@@ -202,7 +245,26 @@ export type Read =
   | { readonly of: "subject" }
   | { readonly of: "view"; readonly view: string }
   | { readonly of: "count"; readonly view: string }
-  | { readonly of: "words"; readonly says: string };
+  | { readonly of: "words"; readonly says: string }
+  /**
+   * A FIELD OFF THE FIRST ROW A VIEW ANSWERS — the figure, not the list.
+   *
+   * ⚠️ THIS IS HOW AN AGGREGATE REACHES A `Stat` WITHOUT A SECOND KIND OF FETCH.
+   * A view that answers one row of totals is still a view: same request, same
+   * permission, same outcome. Reading `items[0].onHand` off it is a projection of
+   * something the screen already has, and the alternative — a scalar source with
+   * its own runner — would be a second thing to fetch, wait for and draw a
+   * skeleton over.
+   *
+   * ⚠️ AND IT IS NOT ONLY FOR AGGREGATES. `sort` plus `limit: 1` over an ordinary
+   * collection is "the latest count", "the biggest line", "who touched it last" —
+   * facts every product's home screen wants and none of them could say.
+   *
+   * ⚠️ AN EMPTY VIEW READS AS NOTHING, WHICH IS THE TRUTHFUL ANSWER. A workspace
+   * with no movements has no latest movement; drawing a zero there would be the
+   * renderer inventing a fact, which is the failure `Region.nothing` exists about.
+   */
+  | { readonly of: "first"; readonly view: string; readonly field: string };
 
 /**
  * HOW A VALUE IS SAID — the closed set of components that already draw numbers.
@@ -381,6 +443,28 @@ export interface ActSpec {
 /** ⚠️ One reading of the two forms, so no caller writes the ternary twice. */
 export const opOf = (one: string | ActSpec): string => (typeof one === "string" ? one : one.op);
 
+/**
+ * WHERE A ROW LEADS, AND WHICH OF ITS FIELDS IS THE ADDRESS.
+ *
+ * ⚠️ `id` IS THE DEFAULT AND IT IS WRONG OFTEN ENOUGH TO NEED SAYING. A row on
+ * "what runs out" is a DELIVERY, and there is no screen for one — what somebody
+ * wants is the product it is of, which the row carries in another column. With
+ * only `id` the choice was between opening the wrong record and not linking the
+ * row at all, and the second is the "row that leads nowhere" this exists about.
+ *
+ * ⚠️ AND IT IS A FIELD RATHER THAN A PATH, so the same check applies as
+ * everywhere else: a name that is not on the rows is a refusal at composition,
+ * not a press that does nothing.
+ */
+export interface GoSpec {
+  readonly to: string;
+  readonly by?: string;
+}
+
+/** ⚠️ One reading of the two forms — the twin of `opOf`, for the same reason. */
+export const goOf = (one: string | GoSpec): GoSpec =>
+  (typeof one === "string" ? { to: one } : one);
+
 export interface BlockSpec {
   /** ⚠️ A registered component — see `BlockEntry`. */
   readonly block: string;
@@ -395,8 +479,12 @@ export interface BlockSpec {
    * is what half the rows in a product do. A route typed here would be a second
    * spelling of an address the manifest already holds, and the two would drift
    * the first time a screen moved.
+   *
+   * ⚠️ THE LONG FORM SAYS WHICH FIELD CARRIES THE ID — see `GoSpec`. Same two
+   * forms as `does`, and for the same reason: the short one is the common case
+   * and stays legal.
    */
-  readonly goes?: string;
+  readonly goes?: string | GoSpec;
   /**
    * WHICH FIELDS OF A LIST BECOME ITS COLUMNS.
    *
@@ -561,6 +649,11 @@ export type SurfaceRefusal =
   | "tally_not_a_ref" | "tally_points_elsewhere"
   | ReachRefusal
   | "split_without_an_aside" | "aside_without_a_split"
+  /* ⚠️ THE FOUR AN ASKED VIEW CAN GET WRONG — see `AskedSpec`. Three of them are
+     checked where an operation's declaration is in scope, which is `refuseApp`
+     and not here: this function is handed ids alone. */
+  | "asked_and_queried" | "asked_operation_unknown" | "asked_not_a_read"
+  | "asked_take_unknown"
   | "operation_unknown" | "nothing_on_it";
 
 export interface SurfaceProblem {
@@ -621,7 +714,8 @@ export const blocksIn = (
     : [{ block: placed, under: null }]));
 
 export const viewsIn = (body: SurfaceSpec): readonly string[] =>
-  readsIn(body).flatMap((r) => (r.of === "view" || r.of === "count" ? [r.view] : []));
+  readsIn(body).flatMap((r) => (
+    r.of === "view" || r.of === "count" || r.of === "first" ? [r.view] : []));
 
 /**
  * EVERY OPERATION A BODY OFFERS — what `does` names, across every block.
@@ -812,6 +906,31 @@ export function refuseView(
   const held = collections.find((c) => c.id === spec.of);
   if (!held) {
     at("view_collection_unknown", `reads "${spec.of}", which this app does not declare`);
+    return out;
+  }
+
+  /*
+    ⚠️ AN ASKED VIEW IS ANSWERED BY A HANDLER, SO EVERY CLAUSE BESIDE IT IS A RULE
+    NOTHING APPLIES. `where`, `sort`, `limit` and `tally` are instructions to the
+    query builder, and there is no query — so they are declared, typechecked, and
+    silently do nothing. That is the worst of the three possible behaviours: a
+    view that says it shows the top five and shows everything reads as a handler
+    bug rather than as a clause in the wrong place.
+
+    ⚠️ AND THE FIX IS NEVER TO HONOUR THEM HERE. Filtering the operation's answer
+    after the fact would be the engine second-guessing logic the product declared
+    on purpose — and a `limit` applied to rows already fetched is a ceiling that
+    costs everything it was meant to save.
+  */
+  if (spec.asked) {
+    const spare = (["where", "sort", "limit", "tally"] as const)
+      .filter((k) => spec[k] !== undefined);
+    if (spare.length) {
+      at("asked_and_queried",
+        `is answered by ${spec.asked.operation} and also declares ${spare.join(", ")} — `
+        + "nothing applies them to a handler's answer, so they would be a rule that "
+        + "reads as honoured and is not");
+    }
     return out;
   }
 
@@ -1031,6 +1150,27 @@ export function refuseSurface(
     if (!byId.has(name)) at("view_unknown", `reads the view "${name}", which this app does not declare`);
   }
 
+  /*
+    ⚠️ A FIGURE OFF A VIEW'S FIRST ROW IS STILL A COLUMN, AND A WRONG ONE DRAWS A
+    DASH. `Stat` bound to a field the collection does not have is not an error at
+    any layer — the row comes back, the key is absent, and the block draws its
+    empty state — so the screen reports "no figure yet" about a workspace with
+    plenty. Same class as `shows_field_unknown`, one block over.
+
+    ⚠️ AN ASKED VIEW IS EXEMPT AND THAT IS THE HONEST LIMIT — see `AskedSpec`.
+    The rows come from a handler, so the only thing anybody could check them
+    against is a shape nothing writes down.
+  */
+  for (const r of readsIn(body)) {
+    if (r.of !== "first") continue;
+    const view = byId.get(r.view);
+    if (!view || view.asked) continue;
+    const held = collections.find((c) => c.id === view.of)?.fields;
+    if (!held || r.field in held || talliedIn(view).includes(r.field)) continue;
+    at("view_field_unknown",
+      `takes "${r.field}" off the first row of "${r.view}", which ${view.of} does not have`);
+  }
+
   /* --- the blocks ------------------------------------------------------- */
 
   /*
@@ -1087,8 +1227,31 @@ export function refuseSurface(
       makes this checkable at all: a route typed here would be a second spelling
       of an address, and the two drift the first time a screen moves.
     */
-    if (b.goes !== undefined && !screens.includes(b.goes)) {
-      at("goes_nowhere", `${where} leads to "${b.goes}", which is not a screen this app declares`);
+    if (b.goes !== undefined) {
+      const go = goOf(b.goes);
+      if (!screens.includes(go.to)) {
+        at("goes_nowhere", `${where} leads to "${go.to}", which is not a screen this app declares`);
+      }
+      /*
+        ⚠️ AND THE ADDRESS HAS TO BE ON THE ROWS — see `GoSpec`. A field that is
+        not there resolves to nothing, and the row then opens the destination
+        with no record, which draws its not-found. Checked against the view this
+        block reads, which is where the rows come from; a block with no view
+        reads the screen's own subject and is checked against that.
+      */
+      if (go.by) {
+        const reads = Object.values(b.bind ?? {}).map((x) => x.from).find((r) => r.of === "view");
+        const view = reads?.of === "view" ? views.find((v) => v.id === reads.view) : undefined;
+        /* ⚠️ AN ASKED VIEW IS EXEMPT, for the reason its columns are — the row
+           shape is a handler's and nothing writes it down. */
+        const held = view
+          ? (view.asked ? null : collections.find((c) => c.id === view.of)?.fields)
+          : subject;
+        if (held && !(go.by in held)) {
+          at("shows_field_unknown",
+            `${where} leads to "${go.to}" by "${go.by}", which ${view?.of ?? screen.of} does not have`);
+        }
+      }
     }
 
     /*
@@ -1117,7 +1280,12 @@ export function refuseSurface(
       if (!view) {
         at("shows_without_a_list",
           `${where} names columns and binds no view, so there are no rows for them to be columns of`);
-      } else {
+      } else if (!view.asked) {
+        /* ⚠️ AN ASKED VIEW'S COLUMNS GO UNCHECKED, AND IT IS THE HONEST LIMIT OF
+           THIS — see `AskedSpec`. The rows are a handler's answer; the only
+           thing anybody could check them against is a shape nothing writes
+           down, and refusing every column would make the escape valve unusable
+           for the exact screens it exists for. */
         const held = collections.find((c) => c.id === view.of)?.fields;
         /* ⚠️ A TALLY IS A COLUMN TOO, AND IT IS NOT A FIELD. `talliedIn` is what
            the view promises to put on each row beyond the collection's own — so

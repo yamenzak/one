@@ -48,6 +48,24 @@ const collectionFor = (
   app: AppSpec, view: ViewSpec,
 ): CollectionSpec | undefined => app.collections?.find((c) => c.id === view.of);
 
+/**
+ * RUNNING ONE OF THE APP'S OWN READ OPERATIONS, HANDED IN — see `AskedSpec`.
+ *
+ * ⚠️ A SEAM RATHER THAN A CALL, AND THE REASON IS D12. `performOperation` needs
+ * the wiring, the tenancy, the identity and the composed app — everything the
+ * HTTP door assembled before it got here — so importing it would put this module
+ * on the far side of the runtime and hand a view runner the power to run
+ * anything. The door supplies a closure over the request it is already inside,
+ * so the permission, the entitlement, the flag and the audit row are the ones
+ * every other caller gets.
+ *
+ * ⚠️ AND `null` IS A REFUSAL, NOT AN OUTAGE. The operation may be gated, and a
+ * caller who may not run it sees the view's own empty state — which is what a
+ * region withheld already looks like everywhere else on the surface.
+ */
+export type Ask =
+  (operation: string, input: Record<string, unknown>) => Promise<Record<string, unknown> | null>;
+
 export async function runView(
   db: Db, app: AppSpec, view: ViewSpec, scope: string, here: Here = {},
   /* ⚠️ THE PATHS THE BODY ASKED FOR, PASSED IN RATHER THAN DERIVED. A view does
@@ -56,9 +74,38 @@ export async function runView(
      Deriving it here would join every reference on every read, for every screen,
      including the ones drawing nothing but a count. */
   reaches: readonly Reach[] = [],
+  ask?: Ask,
 ): Promise<Viewed> {
   const spec = collectionFor(app, view);
   if (!spec) return { items: [], count: 0 };
+
+  /*
+    ⚠️ AN ASKED VIEW STOPS HERE, BEFORE A SINGLE CLAUSE IS BUILT. `refuseView`
+    refuses one that also declares `where`, `sort`, `limit` or `tally`, so there
+    is nothing below this line that could apply to it — and reaching the query
+    builder with a view that has no query is how a handler's answer would come
+    back silently replaced by a table scan.
+  */
+  if (view.asked) {
+    if (!ask) return { items: [], count: 0 };
+    const input: Record<string, unknown> = {};
+    for (const [name, from] of Object.entries(view.asked.fills ?? {})) {
+      /* ⚠️ A FILL WITH NOTHING BEHIND IT IS LEFT OUT RATHER THAN SENT EMPTY — the
+         same rule the browser follows for an act. An empty string in a required
+         field is a refusal that says the field is missing when the truth is that
+         the screen has not resolved. */
+      const value = from === "record" ? here.record : here.today;
+      if (value !== undefined) input[name] = value;
+    }
+    const said = await ask(view.asked.operation, input);
+    const rows = said?.[view.asked.take];
+    /* ⚠️ NOT A LIST IS NOT AN ERROR HERE, IT IS AN EMPTY VIEW. The row shape is
+       the operation's and nothing checks it (see `AskedSpec`), so this is the one
+       place a mismatch surfaces — and a region drawing its empty state is a far
+       better answer than a renderer handed a number where it expects rows. */
+    if (!Array.isArray(rows)) return { items: [], count: 0 };
+    return { items: rows as readonly Record<string, unknown>[], count: rows.length };
+  }
 
   const erase = eraseBy(spec);
   const filter = narrow(spec, undefined, view.where, here);
@@ -108,9 +155,10 @@ export async function runViews(
   db: Db, app: AppSpec, ids: readonly string[], scope: string, here: Here = {},
   /** ⚠️ By view id, because a body's paths are per block and a block reads one view. */
   reaches: Readonly<Record<string, readonly Reach[]>> = {},
+  ask?: Ask,
 ): Promise<Readonly<Record<string, Viewed>>> {
   const wanted = (app.views ?? []).filter((v) => ids.includes(v.id));
   const done = await Promise.all(
-    wanted.map((v) => runView(db, app, v, scope, here, reaches[v.id] ?? [])));
+    wanted.map((v) => runView(db, app, v, scope, here, reaches[v.id] ?? [], ask)));
   return Object.fromEntries(wanted.map((v, i) => [v.id, done[i]!]));
 }

@@ -179,3 +179,79 @@ describe("a screen's views are run together", () => {
     expect(held).toEqual({ items: [], count: 0 });
   });
 });
+
+/**
+ * A VIEW ANSWERED BY THE APP'S OWN OPERATION — see `AskedSpec`.
+ *
+ * ⚠️ THE POINT IS THAT NOTHING ELSE CHANGES. What comes back is a `Viewed` like
+ * any other view's, so the renderer, the count, the permission check and the
+ * screen door are all the ones that were already there. A second kind of source
+ * would have been a second thing every one of them had to learn.
+ */
+describe("a view answered by an operation", () => {
+  const asked = (over: Record<string, unknown> = {}) => ({
+    id: "running-out", of: "shelf",
+    asked: { operation: "shelf.due", take: "items", fills: { today: "today" }, ...over },
+  } as never);
+
+  it("answers with the operation's rows, and no query runs", async () => {
+    const seen: Record<string, unknown>[] = [];
+    const got = await runView(
+      shard(), APP, asked(), TENANT, { today: "2026-08-25" }, [],
+      async (operation, input) => {
+        seen.push({ operation, ...input });
+        return { items: [{ id: "z", name: "From the handler" }] };
+      },
+    );
+    expect(got).toEqual({ items: [{ id: "z", name: "From the handler" }], count: 1 });
+    /* ⚠️ AND THE DEVICE'S OWN DAY REACHED IT. A shelf life is counted where the
+       shelf is; the worker has no way to know what day it is where somebody is
+       standing, so the fill travels with the request. */
+    expect(seen).toEqual([{ operation: "shelf.due", today: "2026-08-25" }]);
+  });
+
+  /* ⚠️ A FILL WITH NOTHING BEHIND IT IS LEFT OUT RATHER THAN SENT EMPTY. An
+     empty string in a required field is a refusal that says the field is
+     missing when the truth is that the screen has not resolved. */
+  it("leaves out a fill the screen could not supply", async () => {
+    let sent: Record<string, unknown> | null = null;
+    await runView(shard(), APP, asked({ fills: { at: "record" } }), TENANT, {}, [],
+      async (_op, input) => { sent = input; return { items: [] }; });
+    expect(sent).toEqual({});
+  });
+
+  /* ⚠️ A REFUSAL IS AN EMPTY VIEW, NOT AN OUTAGE. The operation has its own
+     permission and entitlement; a caller who fails one sees the block's own
+     empty state, which is what every other withheld region already looks like. */
+  it("answers empty when the operation refuses", async () => {
+    expect(await runView(shard(), APP, asked(), TENANT, {}, [], async () => null))
+      .toEqual({ items: [], count: 0 });
+  });
+
+  /* ⚠️ AND SO IS AN ANSWER THAT IS NOT A LIST. The row shape is the operation's
+     and nothing checks it, so this is the one place a mismatch surfaces — and a
+     region drawing its empty state beats a renderer handed a number. */
+  it("answers empty when the field it takes is not rows", async () => {
+    expect(await runView(shard(), APP, asked(), TENANT, {}, [],
+      async () => ({ items: 7 } as never))).toEqual({ items: [], count: 0 });
+  });
+
+  /* ⚠️ AND WITH NO RUNNER AT ALL — a caller that never wired the seam gets an
+     empty view rather than a thrown request. Every other view on the screen
+     still answers, which is the shape `Region` is built for. */
+  it("answers empty when nothing was handed a way to ask", async () => {
+    expect(await runView(shard(), APP, asked(), TENANT, {}))
+      .toEqual({ items: [], count: 0 });
+  });
+
+  it("runs beside the query views in one pass", async () => {
+    const got = await runViews(
+      shard(),
+      withViews([{ id: "all", of: "shelf" }, asked()] as never),
+      ["all", "running-out"], TENANT, {}, {},
+      async () => ({ items: [{ id: "z" }] }),
+    );
+    expect(got["all"]?.count).toBe(3);
+    expect(got["running-out"]?.count).toBe(1);
+  });
+});

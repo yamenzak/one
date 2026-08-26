@@ -31,7 +31,7 @@ import * as React from "react";
 import type {
   Binding, BlockSpec, Format, GroupSpec, Layout, Placed, Presence, Read, SurfaceSpec, Viewed,
 } from "@engine/kernel";
-import { BLOCKS, isGroup, opOf } from "@engine/kernel";
+import { BLOCKS, goOf, isGroup, opOf } from "@engine/kernel";
 import { Arranged, spanning } from "../parts/arrange.js";
 import { Group } from "../parts/surfaces.js";
 import { Region, ready, type Loaded } from "../parts/state.js";
@@ -136,6 +136,10 @@ const valueOf = (read: Read, has: Has): unknown => {
     case "subject": return has.record;
     case "view": return rowsOf(has, read.view);
     case "count": return countOf(has, read.view);
+    /* ⚠️ A PROJECTION OF SOMETHING ALREADY FETCHED — see `Read`. An empty view
+       reads as nothing, and the block draws its own empty state rather than a
+       zero the workspace never earned. */
+    case "first": return rowsOf(has, read.view)?.[0]?.[read.field];
   }
 };
 
@@ -282,14 +286,18 @@ function Placed({ block, has }: { readonly block: BlockSpec; readonly has: Has }
     nowhere" fault `goes` exists to prevent, one seam further along.
   */
   if (block.goes && has.onGo) {
+    /* ⚠️ THE FIELD THE DECLARATION NAMED, OR `id` — see `GoSpec`. A row about a
+       delivery leads to the product it is of, and the id for that is in another
+       column. */
+    const go = goOf(block.goes);
     props["onOpen"] = (row?: Readonly<Record<string, unknown>>) => {
       /* ⚠️ THE ROW IF THERE IS ONE, THE SCREEN'S OWN SUBJECT OTHERWISE. A list
          row leads to the thing the row is about; a row on a detail screen leads
          to another view of the record already open, and both are "the record
          this control is about". */
       const of = row && typeof row === "object" ? row : has.record;
-      const id = of ? String(of["id"] ?? "") : "";
-      has.onGo?.(block.goes as string, id || undefined);
+      const id = of ? String(of[go.by ?? "id"] ?? "") : "";
+      has.onGo?.(go.to, id || undefined);
     };
   }
   /* ⚠️ `does` IS A LIST AND THE FIRST IS THE ROW'S OWN ACT. A row draws one

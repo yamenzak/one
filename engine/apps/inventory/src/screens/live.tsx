@@ -37,7 +37,6 @@ import type { Movement } from "./Thing.js";
 import { Scan, type Guess, type Seen } from "./Scan.js";
 import { Stock } from "./Stock.js";
 import { Home, type Moving, type Needs, type Shelf } from "./Home.js";
-import { Due, type Dated } from "./Due.js";
 import { Labels, type Labelled, type Subject, type Template } from "./Labels.js";
 import { Reports, type Reported, type Span } from "./Reports.js";
 import { Move } from "./Move.js";
@@ -312,13 +311,6 @@ const num = (v: unknown): number => (typeof v === "number" ? v : Number(v ?? 0))
 const TRACKING: readonly Tracking[] = ["listed", "counted", "batched", "itemised", "assembled"];
 const trackingOf = (v: unknown): Tracking =>
   TRACKING.includes(v as Tracking) ? (v as Tracking) : "counted";
-
-/* ⚠️ NARROWED RATHER THAN CAST, LIKE EVERY OTHER ANSWER CROSSING THIS SEAM. An
-   unrecognised standing draws as `fine`, which is the honest reading of a value
-   this build does not know — inventing a warning would put an alarm on a screen
-   over a string nobody can explain. */
-const standingIn = (v: unknown): Dated["standing"] =>
-  v === "gone" || v === "soon" ? v : "fine";
 
 /**
  * ⚠️ A PLACE'S LINE COUNT IS DERIVED, INCLUDING WHAT IS BELOW IT. A tree row
@@ -1113,77 +1105,6 @@ const ASK = (api: Door) => function AskHere() {
   );
 };
 
-
-
-
-
-
-/**
- * RUNNING OUT — where every note the nightly sweep sends lands.
- *
- * ⚠️ THE ARITHMETIC IS THE OPERATIONS', NOT THIS FILE'S, and both of them are
- * asked. How many days counts as "soon" is a `tenant:manage` setting a person on
- * the floor cannot read, so a container working it out here would hard-code a
- * number or show everybody the same wrong list — and it would have to do it
- * twice, because an expiry and a service interval are different settings.
- *
- * ⚠️ AND THE TWO ASKS ARE THE SAME TWO THE JOB MAKES. `batch.due` with no
- * product is the whole workspace, which is exactly what a note about the whole
- * workspace has to be able to show.
- */
-const DUE = (api: Door) => function DueHere({ go }: Mounted) {
-  const today = dayHere();
-  const dated = useAsked<{ items: readonly Row[] }>(api, "batch.due",{ today });
-  const serviced = useAsked<{ items: readonly Row[] }>(api, "unit.due",{ today });
-
-  const rows: Loaded<readonly Dated[]> = dated.of.status === "ready"
-    ? ready(dated.of.data.items.map((row): Dated => ({
-      id: text(row.id),
-      product: text(row.product),
-      name: text(row.name),
-      /* ⚠️ THE LOT, BECAUSE THAT IS WHAT A RECALL NAMES AND WHAT SOMEBODY READS
-         OFF THE BOX. Two deliveries of one product are two rows here and the
-         product's name alone cannot tell them apart. */
-      which: text(row.lot) ? `Lot ${text(row.lot)}` : "",
-      on: text(row.on),
-      standing: standingIn(row.standing),
-      days: num(row.days),
-      by: text(row.by),
-    })))
-    : dated.of;
-
-  const services: readonly Dated[] = serviced.of.status === "ready"
-    ? serviced.of.data.items.map((row): Dated => ({
-      id: text(row.id),
-      product: text(row.product),
-      name: text(row.name),
-      which: text(row.serial) ? `Serial ${text(row.serial)}` : text(row.code),
-      on: text(row.on),
-      standing: standingIn(row.standing),
-      days: num(row.days),
-      /* ⚠️ EMPTY, BECAUSE A SERVICE HAS ONE CLOCK. The three-way "which clock
-         won" is what an expiry needs; saying "printed on it" over an inspection
-         date would be a sentence that is simply not true. */
-      by: "",
-    }))
-    : [];
-
-  return (
-    <Due
-      title={nameOf("/due")}
-      of={rows}
-      services={services}
-      again={() => { dated.again(); serviced.again(); }}
-      /* ⚠️ THE PRODUCT, NEVER THE BATCH. A row here is one delivery and there
-         is no screen for one; the product's is where its deliveries are listed,
-         and `THING` resolves a product id as well as a line id for exactly
-         this. */
-      onOpen={(row) => go(`/thing/${row.product}`)}
-      onItem={(row) => go(`/item/${row.id}`)}
-    />
-  );
-};
-
 /**
  * REPORTS — one ask, because a figure screen is one screen.
  *
@@ -1894,7 +1815,6 @@ export function mount({ register, api }: Mounting): void {
     ["/move", MOVE(api)],
     ["/count", COUNT(api)],
     ["/ask", ASK(api)],
-    ["/due", DUE(api)],
     ["/labels", LABELS(api)],
     ["/reports", REPORTS(api)],
     ["/import", IMPORT(api)],

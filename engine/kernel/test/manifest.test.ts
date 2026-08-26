@@ -357,6 +357,47 @@ describe("what would fail on the first request", () => {
     expect(whyOf(app({ screens: [acting] as never }))).toContain("fill_without_a_subject");
   });
 
+  /*
+    ⚠️ THE THREE HALVES OF AN ASKED VIEW THAT NEED THE OPERATION ITSELF — see
+    `AskedSpec`. Each produces a screen that draws: a view that answers nothing,
+    a list that is empty over a workspace that is not, or — the sharp one — a
+    WRITE that fires every time somebody opens the page.
+  */
+  const asking = (asked: Record<string, unknown>) => app({
+    views: [{ id: "asked-notes", of: "note", asked } as never],
+    screens: [{
+      id: "one", route: "/one", label: "One", permission: "note:read",
+      body: {
+        shape: "list", layout: { as: "stack" },
+        blocks: [{
+          block: "Listing",
+          nothing: { says: "None" },
+          bind: {
+            label: { from: { of: "words", says: "Notes" } },
+            of: { from: { of: "view", view: "asked-notes" } },
+          },
+        }],
+      },
+    }] as never,
+  });
+
+  it("refuses a view answered by an operation this app does not declare", () => {
+    expect(whyOf(asking({ operation: "note.imagined", take: "items" })))
+      .toContain("asked_operation_unknown");
+  });
+
+  /* ⚠️ THE SHARPEST OF THE THREE. A body is drawn on arrival, so a write here
+     runs on every navigation, on every re-read after an act, and twice in a
+     browser that mounts a tree twice. */
+  it("refuses one answered by a write", () => {
+    expect(whyOf(asking({ operation: stub.id, take: "id" }))).toContain("asked_not_a_read");
+  });
+
+  it("refuses one taking a field the operation does not answer with", () => {
+    expect(whyOf(asking({ operation: stub.id, take: "imagined" })))
+      .toContain("asked_take_unknown");
+  });
+
   it("refuses a failure code no catalogue has", () => {
     const broken = app({ operations: [{ ...stub, fails: ["app.imagined"] } as AnyOperation] });
     expect(whyOf(broken)).toContain("which no catalogue has");

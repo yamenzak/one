@@ -855,11 +855,44 @@ export function serve(wiring: Wiring): (request: Request) => Promise<Response> {
           return asProblem(problem(PLATFORM_PROBLEMS, "platform.maintenance"));
         }
         const held = new Set(permissions);
+        /*
+          ⚠️ AN ASKED VIEW GOES THROUGH THE ONE OPERATION PATH (D12) — see `Ask`.
+          Composing the app here rather than inside `drawnFor` is what keeps the
+          runtime's read layer free of the wiring, the tenancy and the identity:
+          the door already holds all three, so it hands down a closure over the
+          request it is inside rather than the power to reach any of them.
+
+          ⚠️ AND A REFUSAL IS `null`, NOT A THROW. The operation has its own
+          permission, entitlement and flag; a caller who fails one of them gets
+          the view's empty state, which is what every other withheld region on
+          the surface already looks like.
+        */
+        /* ⚠️ COMPOSED ONLY IF SOMETHING ASKS. Most screens are pure query, and
+           composing an app to serve a body that never calls this would charge
+           every screen in the product for a feature two of them use. */
+        let composed: Composed | null = null;
+        const ask = async (
+          operation: string, input: Record<string, unknown>,
+        ): Promise<Record<string, unknown> | null> => {
+          composed ??= compose(app);
+          const op = composed.byId.get(operation);
+          if (!op || op.kind !== "read") return null;
+          const outcome = await performOperation(
+            wiring, located, who, { composed, op }, input, null, now,
+            { origin: url.origin, slug: door.kind === "tenant" ? door.slug : null },
+            caring, switching,
+          );
+          return outcome.kind === "ok" && outcome.answer && typeof outcome.answer === "object"
+            ? outcome.answer as Record<string, unknown>
+            : null;
+        };
         const drawn = await drawnFor(
           located.db, app, screen, located.tenantId,
           (need: string) => held.has(need),
           url.searchParams.get("record"),
           who.accountId,
+          url.searchParams.get("today"),
+          ask,
         );
         if ("needs" in drawn) {
           return asProblem(problem(PLATFORM_PROBLEMS, "platform.forbidden"));

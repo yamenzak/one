@@ -87,9 +87,18 @@ const DIST = join(dirname(fileURLToPath(import.meta.url)), "..", "dist");
    to type the id of the thing they opened: every write in a real product takes
    its subject and the day, and both are facts the screen is standing on. The
    FORM is still not in this number — `Doing` is reached through `Declared`,
-   which is lazy — so what is here is the reading of the declaration alone. */
+   which is lazy — so what is here is the reading of the declaration alone.
+
+   ⚠️ AND 1,672 FOR THE ESCAPE VALVE — `AskedSpec`, the `first` read, `GoSpec`
+   and `goOf`, plus the four refusals `refuseView` gained. It is the same trade
+   as the hop and the tally, and it is the one that closes the last class of
+   screen a declaration could not express: a view is a query with no operator, so
+   a screen whose subject is ARITHMETIC — what runs out, what a period totalled —
+   had nowhere to come from. The arithmetic itself is not in this number and
+   never will be: it is a declared operation, running on the worker, behind the
+   same permission and audit row as every other. */
 const CEILING = {
-  js: { raw: 1_107_150, gzip: 330_000 },
+  js: { raw: 1_108_900, gzip: 330_000 },
   css: { raw: 470_000, gzip: 50_000 },
 };
 

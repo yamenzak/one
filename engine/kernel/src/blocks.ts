@@ -37,7 +37,17 @@ const slot = (
 /** A value off the record the screen is about, or a fixed word. */
 const SAID = ["field", "words"] as const;
 /** A value, a count, or a fixed word — anything that renders as one figure. */
-const TOLD = ["field", "count", "words"] as const;
+const TOLD = ["field", "count", "words", "first"] as const;
+
+/**
+ * A NUMBER, HOWEVER IT WAS ARRIVED AT — see `Read`.
+ *
+ * ⚠️ `first` IS IN HERE AND IT IS THE ONE THAT MAKES A HOME SCREEN POSSIBLE. A
+ * figure block took a field off the screen's own record or a count of a view, so
+ * a total — of anything, over anything — could not be put on a screen at all.
+ * The row it reads off is a view's first, which is where an aggregate answers.
+ */
+const FIGURE = ["field", "count", "first"] as const;
 
 /**
  * ⚠️ EVERY ENTRY NAMES ITS SKELETON AND THE TYPE IS WHAT INSISTS. The frame
@@ -172,21 +182,21 @@ const LISTS: BlockIndex = {
 const FIGURES: BlockIndex = {
   /** One number is the point of the screen. */
   Hero: block("Hero", "hero", {
-    value: slot("The figure", ["field", "count"], true),
+    value: slot("The figure", FIGURE, true),
     eyebrow: slot("What it counts", SAID),
     under: slot("What that means", SAID),
   }),
 
   /** A number among several. */
   Stat: block("Stat", "figure", {
-    value: slot("The figure", ["field", "count"], true),
+    value: slot("The figure", FIGURE, true),
     label: slot("What it counts", SAID, true),
   }),
 
   /** How far along something is. */
   Meter: block("Meter", "figure", {
-    value: slot("How much", ["field", "count"], true),
-    limit: slot("Out of how much", ["field", "count"], true),
+    value: slot("How much", FIGURE, true),
+    limit: slot("Out of how much", FIGURE, true),
     label: slot("What it measures", SAID, true),
   }),
 
@@ -199,20 +209,20 @@ const FIGURES: BlockIndex = {
    * month" — because a signed number on its own is not a fact.
    */
   Delta: block("Delta", "figure", {
-    value: slot("How far it moved", ["field", "count"], true),
+    value: slot("How far it moved", FIGURE, true),
     of: slot("Against what", ["words"], true),
   }),
 
   /** A number out of a possible best. */
   Score: block("Score", "figure", {
-    of: slot("The score", ["field", "count"], true),
-    out: slot("Out of", ["field", "count"], true),
+    of: slot("The score", FIGURE, true),
+    out: slot("Out of", FIGURE, true),
     label: slot("What it scores", SAID, true),
   }),
 
   /** A dial. */
   Gauge: block("Gauge", "figure", {
-    value: slot("Where the needle sits", ["field", "count"], true),
+    value: slot("Where the needle sits", FIGURE, true),
     label: slot("What it measures", SAID),
     note: slot("The line under it", SAID),
   }),

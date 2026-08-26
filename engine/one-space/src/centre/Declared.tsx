@@ -101,9 +101,14 @@ export function Declared({ screen, screens, at, go, currency }: {
   */
   const [asking, setAsking] = React.useState<string | null>(null);
   const record = at[0];
+  /* ⚠️ SENT WITH EVERY SCREEN, NOT ONLY THE ONES THAT ASK. Which views a body
+     reads is the manifest's business and the browser does not open it to find
+     out; one extra query parameter is cheaper than a second round trip on the
+     screens where it turns out to matter, and the value is a constant string per
+     day, so it changes nothing about caching within one. */
   const got = useLoad<Drawn>(
     `${SCREEN_PATH}/${screen.id}`,
-    record ? { record } : undefined,
+    { today: today(), ...(record ? { record } : {}) },
   );
 
   /* ⚠️ FROM THE BODY, NOT FROM THE ANSWER. Reading the ids off `views` would

@@ -3420,3 +3420,57 @@ in by the browser, since a value the caller supplied would be them naming
 somebody else; a form that draws a field the screen supplies; a join or a count
 issued once per row; or a collection reached through a path and left out of the
 permission check that decides whether the screen may be drawn at all.
+
+---
+
+## D94 — A view may be answered by a declared operation, and that is the only escape from the closed vocabulary
+
+D92 says a body binds through a closed vocabulary and that a view carries no
+operator. Both hold. What porting the last twelve OneInventory screens found is
+that a whole class of screen is not a filter at all: its subject is ARITHMETIC.
+"What runs out" is four expiry clocks composed against a threshold the workspace
+sets; "how much left the shelves this month" is a sum over a period. Neither is a
+`Match` and neither should become one — the first comparison operator in a
+manifest is the one that makes it a language, and the second is free.
+
+**So the valve pushes DOWN rather than out.** A view may name one of the app's
+own READ operations instead of a `where`. The product already has a place to put
+logic that is typed, gated, audited and readable by an agent, and it is a
+declared operation; the alternative was a query grammar growing a clause per
+screen until nobody could say what a view was.
+
+**And it reuses the pipe rather than opening a second one.** What comes back is a
+`Viewed` like any other view's, so `Listing` binds it unchanged, `count` counts
+it, the screen door fetches it in the same round trip, and `collectionsFor` still
+demands the read permission of the collection the rows are ABOUT before any of it
+runs. It goes through `performOperation` — D12's one path — so its own
+permission, entitlement, flag and audit row are the ones every other caller gets.
+A block-level escape hatch would have been a second kind of source that the
+renderer, every guard and every document had to learn.
+
+**The row shape is the operation's and is NOT checked.** That is the honest
+limit, stated here rather than discovered: `output` says the answer carries
+`items`; what is inside them is a handler's business, so a `shows` column or a
+`first` field over an asked view is unverified and draws blank when it is wrong.
+What IS checked is everything a declaration can be held to — the operation
+exists, it is a `read`, `take` names a field it answers with, and no `where`,
+`sort`, `limit` or `tally` sits beside it pretending to apply.
+
+**A `read`, never a write, and it is refused rather than remembered.** A body is
+drawn on arrival, so a write here fires on every navigation, on every re-read
+after an act, and twice in a browser that mounts a tree twice. An idempotency key
+would not save it: each is a different request.
+
+**Two smaller things came with it, and both are about a figure or a row that had
+nowhere to come from.** `first` takes a named field off a view's first row —
+which is how an aggregate reaches a `Stat` without a second fetch, and equally
+how `sort` plus `limit: 1` says "the latest count" over an ordinary collection.
+And `goes` may name which field carries the address: `id` was the default and is
+wrong whenever a row is about one thing and leads to another, which left the
+choice between opening the wrong record and not linking the row at all.
+
+**Therefore never:** a comparison operator in a `Match`; an asked view answered
+by a write, or by an operation whose answer the manifest cannot name; a clause
+beside `asked` that nothing applies; a runner for screen-time operations separate
+from the one every other door uses; or the browser computing what a view could
+not say.

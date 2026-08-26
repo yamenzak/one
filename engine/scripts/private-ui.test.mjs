@@ -60,7 +60,6 @@ const NOT_YET = new Map([
   ["inventory:move", "a form whose questions depend on the product's packing ladder, which the operation resolves and the rows do not carry"],
   ["inventory:labels", "a printer sheet: a layout somebody arranges and sends to paper, with no rows on the screen to declare"],
   ["inventory:import", "a file somebody chooses, a column mapping they agree with, and a preview of what would land"],
-  ["inventory:due", "a standing computed against the workspace's own threshold — a view answers rows, and this screen's subject is arithmetic over them"],
   ["inventory:reports", "totals over a period a person picks, which is an aggregate the view grammar has no clause for"],
   ["inventory:stock", "a location tree that narrows the list to everything at or below a place — a filter no `Match` can say"],
   ["inventory:home", "figures over the whole workspace beside three counts, which is the reports gap on a smaller screen"],

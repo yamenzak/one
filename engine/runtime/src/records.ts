@@ -376,7 +376,22 @@ export const MOST_ROWS = 200;
  * writes that column into every table and a caller narrowing to one row is
  * asking a legitimate question.
  */
-export interface Here { readonly record?: string | undefined; readonly me?: string | undefined }
+/**
+ * WHAT THE SCREEN ALREADY KNOWS — the record it is about, who is reading, and
+ * what day it is where they are standing.
+ *
+ * ⚠️ `today` IS THE DEVICE'S AND IT ARRIVES WITH THE REQUEST — see `Fill`. A
+ * shelf life is counted where the shelf is: the worker has no way to know what
+ * day it is where somebody is, and its own calendar would call a box expired the
+ * evening before it is, or current for hours after it is not. Nothing narrows on
+ * it; it is here because an asked view FILLS it, and `Fill`'s two values are
+ * exactly these two.
+ */
+export interface Here {
+  readonly record?: string | undefined;
+  readonly me?: string | undefined;
+  readonly today?: string | undefined;
+}
 
 export const narrow = (
   spec: CollectionSpec, where: Readonly<Record<string, unknown>> | undefined,
