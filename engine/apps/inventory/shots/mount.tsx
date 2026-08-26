@@ -19,8 +19,13 @@ import { createRoot } from "react-dom/client";
 import { InventoryGround } from "../src/screens/ground.js";
 
 declare global {
-  interface Window { __ROUTE?: string }
+  interface Window { __ROUTE?: string; __SKY?: string }
 }
 
+/* ⚠️ THE WORLD ARRIVES THE SAME WAY THE ROUTE DOES, and for the same reason: one
+   bundle, many pictures. A sky is inline custom properties rather than a
+   stylesheet, so the only way to compare families is to hand the board a
+   different one — see `InventoryGround.sky`. Absent, every screen wears what it
+   declares, which is what every other sweep photographs. */
 createRoot(document.getElementById("root") as HTMLElement)
-  .render(<InventoryGround route={window.__ROUTE ?? "/"} />);
+  .render(<InventoryGround route={window.__ROUTE ?? "/"} {...(window.__SKY ? { sky: window.__SKY } : {})} />);

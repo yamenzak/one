@@ -159,6 +159,19 @@ export interface Live {
   readonly code: string;
   /** ⚠️ What to show, read by the mount file off `window`. */
   readonly route: string;
+  /**
+   * DRAW EVERY SCREEN UNDER THIS WORLD INSTEAD OF THE ONE IT DECLARES.
+   *
+   * ⚠️ HERE BECAUSE A SKY IS REACT STATE AND A GROUND IS CSS. A ladder is
+   * compared by appending `--tier-*` after the shipped stylesheet — same
+   * specificity, later wins — but a world is built from the manifest and set as
+   * inline custom properties on the element, so no stylesheet can reach it and
+   * the only seam is the one the mount file already has for the route.
+   *
+   * ⚠️ AND IT IS FOR CHOOSING ONE. A screen names its own world; this is how a
+   * board draws nine of them without nine commits.
+   */
+  readonly sky?: string;
 }
 
 export const isLive = (what: ReactNode | Live): what is Live =>
@@ -237,7 +250,8 @@ const pageMounting = (live: Live, css: string, theme: "dark" | "light"): string 
   + `<style>${css}</style>`
   + `<style>html,body{margin:0;padding:0}</style>`
   + `</head><body><div id="root"></div>`
-  + `<script>window.__ROUTE=${JSON.stringify(live.route)}</script>`
+  + `<script>window.__ROUTE=${JSON.stringify(live.route)};`
+  + `window.__SKY=${JSON.stringify(live.sky ?? "")}</script>`
   + `<script>${live.code}</script></body></html>`;
 
 /**

@@ -38,17 +38,32 @@ const EVERYTHING = new Set([
  */
 const SOLD = ["processes", "jobs", "imports"];
 
-export function InventoryGround({ route, onGo }: {
+export function InventoryGround({ route, onGo, sky }: {
   readonly route: string;
   /** ⚠️ Absent on the ground, where there is no router to go anywhere with. */
   readonly onGo?: (route: string) => void;
+  /**
+   * DRAW EVERY SCREEN UNDER THIS WORLD INSTEAD OF THE ONE IT DECLARES.
+   *
+   * ⚠️ FOR CHOOSING ONE, AND FOR NOTHING ELSE. A sky is React state built from
+   * the manifest and set as inline custom properties, so it cannot be swapped by
+   * appending a stylesheet the way a ground ladder can — and comparing nine
+   * families by editing the manifest nine times is nine commits to answer a
+   * question that is answered by looking.
+   *
+   * ⚠️ THE BOARD IS WHERE IT BELONGS. A fixture exists to draw the product under
+   * conditions the product does not choose for itself; the deployment reads the
+   * declaration and has no way to reach this.
+   */
+  readonly sky?: string;
 }) {
   const go = onGo ?? (() => undefined);
   /* ⚠️ Asked for rather than imported as a value — the manifest is a thunk so a
      cold isolate does not build and re-check it before anything wants it. */
   const INVENTORY = inventory();
-  const screens = (INVENTORY.screens ?? []).filter(
-    (s) => !s.features?.length || s.features.some((f) => SOLD.includes(f)));
+  const screens = (INVENTORY.screens ?? [])
+    .filter((s) => !s.features?.length || s.features.some((f) => SOLD.includes(f)))
+    .map((s) => (sky ? { ...s, sky } : s));
 
   const here = screens.find((s) => s.route === route);
 

@@ -1,5 +1,6 @@
 /**
- * ONE SCREEN, THE SAME SCREEN, UNDER EVERY GROUND WE ARE CHOOSING BETWEEN.
+ * ONE SCREEN, THE SAME SCREEN, UNDER EVERY GROUND AND EVERY WORLD WE ARE
+ * CHOOSING BETWEEN.
  *
  * ⚠️ A PALETTE IS ARGUED ABOUT IN WORDS AND DECIDED IN PIXELS. "Too dark" and
  * "not enough contrast" are both true of a ladder that measures evenly in oklch,
@@ -13,6 +14,17 @@
  * stylesheet — same specificity, later wins — so comparing nine grounds costs
  * nine screenshots rather than nine commits, and whichever is chosen is written
  * into `tokens/ground.ts` afterwards as the only copy of it.
+ *
+ * ⚠️ A WORLD IS NOT OVERRIDDEN THE SAME WAY, AND THAT IS WHY THERE ARE TWO
+ * SWEEPS. A ground ladder is custom properties in a stylesheet, so a later block
+ * at the same specificity wins; a sky is React state built from the manifest and
+ * written onto the element as inline properties, which no stylesheet can reach.
+ * The seam is `Live.sky` — the same channel the route already travels down —
+ * and the board takes it as a prop.
+ *
+ * ⚠️ THE SKIES ARE SWEPT ON ONE GROUND, ON PURPOSE. Comparing nine worlds on
+ * nine ladders answers neither question: every difference has two causes and the
+ * eye attributes it to whichever it was looking for.
  *
  * ⚠️ IN THE `shots` LANE RATHER THAN THE GATE. It photographs; it asks nothing
  * that has a pass or a fail, and a deploy is not waiting to know what a palette
@@ -85,6 +97,31 @@ describe("looks", () => {
     it(k.id, async () => {
       await shoot(browser, { code, route: "/" }, `${css}\n${over(k)}`, TALL, k.theme,
         join(OUT, `${k.id}.png`));
+      expect(1).toBe(1);
+    }, 90_000);
+  }
+});
+
+/**
+ * ⚠️ THE WORLDS A SCREEN MAY NAME, WHICH IS NOT EVERY FAMILY — see `SKIES`.
+ * `space` and `aura` read their two colours out of a generated PICTURE and there
+ * is no picture behind a screen, so naming one draws a world with no marks in
+ * it. Photographing them would be photographing the absence.
+ *
+ * ⚠️ AND `plain` IS IN THE SWEEP BECAUSE IT IS THE DEFAULT AND THE CONTROL. What
+ * is being asked is whether a world earns its place on this screen at all, and
+ * that question has no answer without the picture of it not being there.
+ */
+const WORLDS = ["plain", "glow", "cloth", "etch", "loops", "blobs", "tint", "neon"] as const;
+
+/** ⚠️ ONE LADDER UNDER ALL OF THEM — see the header. */
+const UNDER = LOOKS.find((k) => k.id === "d3-lifted")!;
+
+describe("worlds", () => {
+  for (const sky of WORLDS) {
+    it(sky, async () => {
+      await shoot(browser, { code, route: "/", sky }, `${css}\n${over(UNDER)}`, TALL, "dark",
+        join(OUT, `sky-${sky}.png`));
       expect(1).toBe(1);
     }, 90_000);
   }
