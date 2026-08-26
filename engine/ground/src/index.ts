@@ -578,7 +578,86 @@ export const GROUND: AppSpec = defineApp({
     /* ⚠️ `cloth` — a premium dark ground for a screen somebody stays on. Reading
        a note is the only thing in this app that is not scanning. */
     { id: "note", route: "/note", label: "A note", nav: "none", icon: "note",
-      permission: "note:read", sky: "cloth" },
+      permission: "note:read", sky: "cloth", of: "note",
+      /*
+        ⚠️ THE SECOND BODY IN THIS REPOSITORY THAT IS THE GROUND'S, and it is
+        here for the reason the first one was: a framework claim is asserted
+        against the fixture before a product depends on it. What it asserts is
+        `Markdown` — prose a workspace WROTE, drawn by the design system rather
+        than by whatever markup somebody pasted — which was a registry entry no
+        manifest had ever named, so the renderer had never been asked to place
+        it and the pairing of its slot to its prop was a claim nothing had made
+        good. A note's body is the shape that block exists for.
+
+        ⚠️ AND THE WRITTEN SCREEN STAYS, which is not residue here. `Note.tsx` is
+        the board's specimen for a dozen components no declaration reaches — the
+        dialog, the confirmation, the presentation, the tabs — and the board is
+        where the design system is photographed. What the declaration replaces is
+        the LIVE path, exactly as `Notes.tsx` was replaced and kept.
+      */
+      body: {
+        shape: "detail",
+        layout: { as: "stack" },
+        blocks: [
+          { block: "Markdown",
+            bind: { of: { from: { of: "field", field: "body" } } } },
+          {
+            group: "This note",
+            of: [
+              { block: "FieldRow",
+                bind: {
+                  label: { from: { of: "words", says: "Kind" } },
+                  value: { from: { of: "field", field: "kind" } },
+                } },
+              { block: "FieldRow",
+                when: { has: { of: "field", field: "happened" } },
+                bind: {
+                  label: { from: { of: "words", says: "Happened on" } },
+                  value: { from: { of: "field", field: "happened" } },
+                } },
+              { block: "FieldRow",
+                when: { has: { of: "field", field: "minutes" } },
+                bind: {
+                  label: { from: { of: "words", says: "Time it took" } },
+                  value: { from: { of: "field", field: "minutes" } },
+                } },
+              /* ⚠️ MINOR UNITS, AND THE FORMATTER IS WHAT KNOWS. A screen
+                 formatting its own money is a screen that rounds differently
+                 from the bill — see `Money`. */
+              { block: "FieldRow",
+                when: { has: { of: "field", field: "cost" } },
+                bind: {
+                  label: { from: { of: "words", says: "What it cost" } },
+                  value: { from: { of: "field", field: "cost" }, as: "money" },
+                } },
+              /* ⚠️ THE CREDITS A DRAFT SPENT, said where somebody would
+                 otherwise read the row above as somebody's fee. */
+              { block: "NoteRow",
+                when: { has: { of: "field", field: "cost" } },
+                bind: {
+                  children: { from: { of: "words",
+                    says: "What it cost is credits a draft spent, not a fee" } },
+                } },
+            ],
+          },
+          /* ⚠️ A NOTE POINTS AT THE NOTE IT CAME OUT OF, and that is a reference
+             to its own collection — the one hop this vocabulary reaches without
+             a second table existing at all. */
+          { block: "NavRow",
+            when: { has: { of: "field", field: "follows" } },
+            goes: { to: "note", by: "follows" },
+            bind: {
+              label: { from: { of: "words", says: "It follows" } },
+              under: { from: { of: "field", field: "follows.title" } },
+            } },
+          { block: "CopyRow",
+            when: { has: { of: "field", field: "link" } },
+            bind: {
+              label: { from: { of: "words", says: "Link" } },
+              value: { from: { of: "field", field: "link" } },
+            } },
+        ],
+      } },
     { id: "write", route: "/write", label: "Write a note", nav: "none", icon: "note",
       permission: "note:write" },
     /* ⚠️ THE APP'S OWN GUIDE, MILESTONES AND HELP HAVE TO LAND SOMEWHERE. All

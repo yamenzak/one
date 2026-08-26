@@ -233,12 +233,30 @@ const WHY = {
     shrinks when the contract learns to describe one of them.
   */
   unbindable: [
+    /* ⚠️ FIVE SHAPES A ROW IS NOT, AND THE SIXTH IS A FLOW'S OWN. A branch, a
+       moment, a tile, a crumb and a question are each a projection FROM rows —
+       which column is the label, which is the parent, which is the answer — and
+       the renderer performs exactly two of those (`shows` and `plots`). Each was
+       registered with a `view` slot and would have been handed the rows: a
+       declaration that composes, passes every check, and draws nothing. Same
+       argument as the eleven charts below, applied late. `Steps` is separate
+       only in that the story frame already draws it around a `StorySpec`, so a
+       body placing one would be a second progress bar over the same walk. */
+    "Tree", "Timeline", "TileGrid", "Crumbs", "Faq", "Steps",
     /* ⚠️ HELP IS SCREEN-SCOPED AND THE BOOK IS NOT ON THE WIRE. `Guide` and
        `Milestones` beside it are blocks now, fed from `AppSpec`'s own books
        through `Has.book`; `AppSpec.help` is not carried on the centre's answer,
        so a declaration placing this would draw an empty page of nothing. It
        becomes a block the day the book reaches the browser. */
     "Help",
+    /* ⚠️ A FACE IS A KIND AND A SEED, AND A BINDING CARRIES NEITHER. The kind is
+       what picks the world the plate is drawn in — an aura for somebody, a
+       planet for a workspace, the photograph itself for a thing — and a
+       declaration can hand over a field's value and nothing more. It was a block
+       until the day something asked what it would draw. `PersonRow` takes the
+       face as a prop of its own; a screen that needs a bare one draws it in a
+       session. See the comment where it was, in kernel/src/blocks.ts. */
+    "Face",
     "AreaChart", "ColumnChart", "StackedChart", "DivergingChart", "DumbbellChart",
     "HeatmapChart", "ScatterChart", "DonutChart", "CompositionBar", "Sparkline",
     "ChartTable",

@@ -148,20 +148,28 @@ const LISTS: BlockIndex = {
     label: slot("What this list is", ["words"], true),
   }),
 
-  /** What is inside what. */
-  Tree: block("Tree", "rows", {
-    nodes: slot("The branches", ["view"], true),
-  }),
+  /*
+    ⚠️ SIX ENTRIES WERE HERE AND THE SAME MISTAKE HAD BEEN MADE TWICE. `Tree`,
+    `Timeline`, `TileGrid`, `Crumbs`, `Faq` and `Steps` each declared a `view`
+    slot — and the renderer projects a view into a component's shape in exactly
+    two places, `shows` and `plots`. Everything else is handed the ROWS. So a
+    declaration naming `Tree` composed, passed every check in this repository,
+    and drew nothing: `nodes.filter((n) => n.of === here)` over rows that carry
+    no `of` finds none, on a screen that reports ready.
 
-  /** What happened, in order. */
-  Timeline: block("Timeline", "rows", {
-    moments: slot("The moments", ["view"], true),
-  }),
+    ⚠️ THAT IS WORD FOR WORD THE ELEVEN CHARTS, and the note above CHARTS is what
+    should have caught it: those were removed for taking `series`, or `data` and
+    `subject`, or `rows`/`columns`/`values` while the entry claimed one API. A
+    branch, a moment, a tile, a crumb and a question are five more shapes a row
+    is not — and being in `LISTS` rather than in `CHARTS` is the only reason the
+    same argument was not applied to them on the same afternoon.
 
-  /** Destinations or measures as tiles. */
-  TileGrid: block("TileGrid", "tiles", {
-    tiles: slot("The tiles", ["view"], true),
-  }),
+    ⚠️ THEY ARE NOT DELETED, THEY ARE NOT IN THE VOCABULARY — the charts' own
+    treatment. Each is still exported and a hand-written screen may draw any of
+    them; what none of them is, is bindable. `scripts/placed.test.mjs` is what
+    stops a seventh joining them, and each comes back with the projection that
+    says what it takes, designed against the screen that wants it.
+  */
 
   /**
    * The three or four screens somebody reaches for — see `BlockSpec.leads`.
@@ -178,22 +186,6 @@ const LISTS: BlockIndex = {
    * five here is a manifest that quietly loses one.
    */
   QuickActions: { ...block("QuickActions", "tiles", {}), leads: true },
-
-  /** Where this screen sits, and the way back up. */
-  Crumbs: block("Crumbs", "rows", {
-    trail: slot("The trail", ["view"], true),
-  }),
-
-  /** Questions and their answers. */
-  Faq: block("Faq", "rows", {
-    items: slot("The questions", ["view"], true),
-  }),
-
-  /** Where a flow has got to. */
-  Steps: block("Steps", "rows", {
-    steps: slot("The steps", ["view"], true),
-    at: slot("Which one", ["field"], true),
-  }),
 };
 
 /* ---------------------------------------------------------------- figures --- */
@@ -323,10 +315,23 @@ const MARKS: BlockIndex = {
     of: slot("The code", ["field"], true),
   }),
 
-  /** Whose or what's — never a picture. */
-  Face: block("Face", "figure", {
-    of: slot("Who or what", ["subject", "field"], true),
-  }),
+  /*
+    ⚠️ `Face` WAS HERE AND COULD NOT BE FILLED FROM A DECLARATION, WHICH IS THE
+    ELEVEN CHARTS ONE MORE TIME. The component takes a `FaceOf` — a KIND and a
+    seed — and the kind is what decides the world it is drawn in: a person is an
+    aura you stand inside, a workspace is a planet seen from outside, a thing is
+    the photograph itself. A binding carries a field's value and nothing else, so
+    a body naming this handed a string to a prop that wanted a pair, composed,
+    passed every check in the tree, and drew a plate with nothing on it.
+
+    ⚠️ AND A DEFAULT KIND WOULD HAVE BEEN WORSE THAN THE GAP. Choosing one here
+    means every declared face is drawn in one world, silently, including the ones
+    that are somebody's — so the failure stops being an empty plate and becomes a
+    confident wrong picture. The kind is a fact only the caller knows, `PersonRow`
+    takes the face as its own prop, and a screen that needs one draws it in a
+    session. What is missing before this comes back is a way for a declaration to
+    SAY which kind it means.
+  */
 
   /** Prose a workspace wrote, wearing the design system. */
   Markdown: block("Markdown", "text", {

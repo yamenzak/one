@@ -1277,6 +1277,7 @@ Some of this is guarded and some is judgement:
 - `copied` — a copy is the same database only when every table says so.
 - `descend` — a settings page is a declared destination, a level lists its pages rather than stacking them, and an authority is a screen rather than a tab.
 - `doors` — a screen the account door renders decides for itself which door it is on, in its own file.
+- `drawn` — every block a screen may declare is drawn by one, so a vocabulary cannot grow entries nothing composes.
 - `edit` — outside a form, a generic surface shows a value and a way to change it, never the control itself.
 - `face` — one resolver draws every face, and a seed is an identity rather than a label.
 - `fixture` — the test ground is never mounted, never sold and never loaded by a browser.
