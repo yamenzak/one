@@ -4050,6 +4050,16 @@
       "fails": "a guard that narrows in silence as screens are ported - a `.tsx` question asked of a `body:` that cannot contain a className, a bare fetch or a catch that answers a failure with a fact, so the check goes unanswered rather than red and the corpus shrinks one screen at a time behind an unchanged `ok`; plus a refusal claimed as the replacement that the kernel does not emit or that no test asserts, and a bare `unrepresentable` with no clause saying what the grammar has no room for"
     },
     {
+      "id": "every-product-screen-is-declared-or-says-what-it-waits-for",
+      "protects": "D92",
+      "stage": "98",
+      "status": "live",
+      "impl": "scripts/private-ui.test.mjs",
+      "becomes": "reads: it is the one guard whose subject is which screens are declarations",
+      "proves": "every product screen is declared or says what it waits for",
+      "fails": "a product growing a hand-written screen on an afternoon nobody reviewed - every other check in this directory reads a .tsx and reports ok over it, so the arc loses ground behind a green run; plus an exemption that outlives its reason, either because the screen it names became a declaration and the entry stayed, or because it names a screen no product declares and covers nothing at all"
+    },
+    {
       "id": "the-reader-can-still-see-the-screens-it-counts",
       "protects": "D92",
       "stage": "95",
