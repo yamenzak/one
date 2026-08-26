@@ -44,8 +44,18 @@ const read = (p) => readFileSync(join(ENGINE, p), "utf8");
   and submitted once — and an operation's declared input is exactly that, which
   is why it is a tray with a Save rather than a row with a control in it. The
   list can still only grow on purpose, in a diff, with the argument attached.
+
+  ⚠️ `create.tsx` IS THAT CASE MORE SHARPLY THAN THE TRAY IS, and the argument is
+  what the rule is actually about. Every failure it names needs a LIST: a column
+  of live inputs where nothing says which is dirty, a stray tap editing a setting
+  somebody was scrolling past, each control carrying its own pending state. A
+  flow's step is the opposite shape — the screen IS one question, there is
+  nothing to scroll past it, and the dock holds exactly one way forward, which is
+  the same "one button that commits" the tray is allowed for. A story drawn as
+  rows-with-an-edit would be a wizard whose questions have to be opened one sheet
+  at a time to answer.
 */
-const ALLOWED = new Set(["field.tsx", "edit.tsx", "doing.tsx"]);
+const ALLOWED = new Set(["field.tsx", "edit.tsx", "doing.tsx", "create.tsx"]);
 
 const RENDERED = "design/src/rendered";
 const strays = readdirSync(join(ENGINE, RENDERED))
