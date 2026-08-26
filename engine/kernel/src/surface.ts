@@ -1934,6 +1934,7 @@ export type StoryRefusal =
   | "says_blank_unknown" | "says_per_not_a_set" | "says_per_incomplete"
   | "when_field_unknown" | "when_reaches_a_record"
   | "story_fills_unknown" | "story_fills_nothing"
+  | "fills_takes_unknown" | "fills_given_unknown" | "fills_given_unanswered"
   | "story_cannot_finish";
 
 export interface StoryProblem {
@@ -1951,7 +1952,10 @@ export function refuseStory(
     readonly id: string;
     readonly story?: {
       readonly writes: string;
-      readonly fills?: string;
+      readonly fills?: {
+        readonly by: string;
+        readonly with: Readonly<Record<string, string>>;
+      };
       readonly asks: readonly {
         readonly id: string; readonly ask: string;
         readonly takes?: readonly string[]; readonly block?: string;
@@ -1986,22 +1990,39 @@ export function refuseStory(
 
   /* --- the fill --------------------------------------------------------- */
 
-  if (told.fills) {
-    const fills = operations.find((o) => o.id === told.fills);
-    if (!fills) {
-      at("story_fills_unknown",
-        `is filled by "${told.fills}", which this app does not declare — nothing would `
-        + "arrive and every step would be asked, which is the flow this one exists to replace");
-    } else {
-      /* ⚠️ THE JOIN IS THE SHARED KEYS AND NOTHING ELSE CHECKS IT. An operation
-         that runs, spends credits and answers into a flow that drops every value
-         is green in every suite: the run succeeded, the flow worked, and the
-         person was asked all eight questions anyway. */
-      const lands = Object.keys(fills.output).filter((k) => k in write.input);
-      if (!lands.length) {
-        at("story_fills_nothing",
-          `is filled by ${fills.id}, whose output names nothing ${write.id} takes — `
-          + "it would run, be charged for, and every answer would be dropped");
+  const fills = told.fills ? operations.find((o) => o.id === told.fills?.by) : undefined;
+  if (told.fills && !fills) {
+    at("story_fills_unknown",
+      `is filled by "${told.fills.by}", which this app does not declare — nothing would `
+      + "arrive and every step would be asked, which is the flow this one exists to replace");
+  }
+  if (fills) {
+    /* ⚠️ THE JOIN IS THE SHARED KEYS AND NOTHING ELSE CHECKS IT. An operation
+       that runs, spends credits and answers into a flow that drops every value
+       is green in every suite: the run succeeded, the flow worked, and the
+       person was asked all eight questions anyway. */
+    const lands = Object.keys(fills.output).filter((k) => k in write.input);
+    if (!lands.length) {
+      at("story_fills_nothing",
+        `is filled by ${fills.id}, whose output names nothing ${write.id} takes — `
+        + "it would run, be charged for, and every answer would be dropped");
+    }
+    for (const [wants, from] of Object.entries(told.fills?.with ?? {})) {
+      /* ⚠️ AN INPUT THE FILL DOES NOT DECLARE IS DROPPED AT ITS OWN DOOR, so the
+         model is asked its question with the thing it was supposed to look at
+         missing — and answers anyway, plausibly, about nothing. */
+      if (!(wants in fills.input)) {
+        at("fills_takes_unknown",
+          `hands ${fills.id} a "${wants}", which it does not take — the value would be `
+          + "dropped at its door and the run would go ahead without it");
+      }
+      /* ⚠️ AND THE OTHER END IS THE WRITE'S OWN INPUT, because that is the only
+         set of names the flow ever holds. A source outside it is a value that
+         cannot exist, so the fill is handed nothing under a correct-looking key. */
+      if (!(from in write.input)) {
+        at("fills_given_unknown",
+          `hands ${fills.id} its "${wants}" from "${from}", which ${write.id} does not `
+          + "take — the flow never holds a value by that name, so nothing is sent");
       }
     }
   }
@@ -2011,11 +2032,10 @@ export function refuseStory(
   const seen = new Set<string>();
   /** ⚠️ Everything the flow can put into the write, however it got there. */
   const reached = new Set<string>(
-    told.fills
-      ? Object.keys(operations.find((o) => o.id === told.fills)?.output ?? {})
-        .filter((k) => k in write.input)
-      : [],
+    fills ? Object.keys(fills.output).filter((k) => k in write.input) : [],
   );
+  /** ⚠️ What a person or a block actually PUTS THERE — see `fills_given_unanswered`. */
+  const answered = new Set<string>();
 
   for (const step of told.asks) {
     const of = `step "${step.id}"`;
@@ -2054,6 +2074,7 @@ export function refuseStory(
           + "draw, somebody would fill it in, and the door would drop the value");
       }
       reached.add(name);
+      answered.add(name);
     }
 
     const asking = step.block ? asks[step.block] : undefined;
@@ -2077,6 +2098,7 @@ export function refuseStory(
         continue;
       }
       reached.add(name);
+      answered.add(name);
     }
 
     /* ⚠️ ON A BLOCK STEP IT IS A WORD WITH NO MEANING. "Ask this even when it
@@ -2141,6 +2163,24 @@ export function refuseStory(
         }
       }
     }
+  }
+
+  /*
+    ⚠️ AND WHAT THE FILL IS HANDED HAS TO BE SOMETHING SOMEBODY PUTS THERE. A
+    source no step asks for and no block answers is a key that is never set — so
+    the run happens, is charged for, and the model is asked to identify a product
+    from an empty list of photographs. It answers; models always do.
+
+    ⚠️ CHECKED AGAINST `answered` RATHER THAN `reached`, and the difference is the
+    fill itself. `reached` includes what the fill WRITES, so a source that the
+    fill also happens to output would satisfy a check against it — which is a
+    fill fed by its own answer, i.e. by nothing, on the first and only run.
+  */
+  for (const [wants, from] of Object.entries(told.fills?.with ?? {})) {
+    if (!fills || !(from in write.input) || answered.has(from)) continue;
+    at("fills_given_unanswered",
+      `hands ${fills.id} its "${wants}" from "${from}", which no step asks for and no `
+      + "block answers — the run would be charged for and given nothing");
   }
 
   /*

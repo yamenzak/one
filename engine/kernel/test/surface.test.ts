@@ -1422,6 +1422,7 @@ const WRITE = {
       label: "Tracked as", required: true, holds: "none", values: ["listed", "counted", "batched"],
     }),
     par: field.number({ label: "Tell me below", holds: "none" }),
+    shots: field.json({ label: "Pictures", holds: "none" }),
   },
   output: { thing: field.text({ label: "Thing", holds: "none" }) },
 };
@@ -1469,6 +1470,10 @@ const flow = (over: Record<string, unknown> = {}) => ({
         id: "tracked", ask: "How closely do you follow it?", takes: ["tracking"],
         always: true, says: { per: SAID },
       },
+      /* ⚠️ THE STEP THAT ANSWERS WHAT THE FILL IS HANDED — see
+         `fills_given_unanswered`. Without it the flow pays for a vision run over
+         an empty list of photographs. */
+      { id: "shot", ask: "Can you photograph it?", block: "Shots" },
     ],
     ...over,
   },
@@ -1604,11 +1609,69 @@ describe("how a step reads back", () => {
 
 describe("what fills the flow before it is walked", () => {
   it("accepts a fill whose output the write takes", () => {
-    expect(told(flow({ fills: "thing.see" }))).toEqual([]);
+    expect(told(flow({ fills: { by: "thing.see", with: { shots: "shots" } } }))).toEqual([]);
   });
 
   it("refuses a fill this app does not declare", () => {
-    expect(told(flow({ fills: "thing.dream" }))).toContain("story_fills_unknown");
+    expect(told(flow({ fills: { by: "thing.dream", with: {} } }))).toContain("story_fills_unknown");
+  });
+
+  it("refuses handing a fill an input it does not take", () => {
+    expect(told(flow({ fills: { by: "thing.see", with: { pictures: "shots" } } })))
+      .toContain("fills_takes_unknown");
+  });
+
+  /* ⚠️ THE FLOW ONLY EVER HOLDS THE WRITE'S OWN INPUT NAMES, so a source outside
+     that set is a value that cannot exist — the fill is handed nothing under a
+     correct-looking key. */
+  it("refuses a source the write does not take", () => {
+    expect(told(flow({ fills: { by: "thing.see", with: { shots: "camera" } } })))
+      .toContain("fills_given_unknown");
+  });
+
+  /*
+    ⚠️ THE ONE THAT COSTS MONEY. A source no step asks for and no block answers
+    is never set, so the run happens, is charged for, and the model is asked to
+    identify a product from an empty list of photographs. It answers; models
+    always do.
+  */
+  it("refuses a source no step asks for and no block answers", () => {
+    expect(told(flow({
+      fills: { by: "thing.see", with: { shots: "shots" } },
+      asks: [
+        { id: "named", ask: "What is it?", takes: ["name"] },
+        { id: "counted", ask: "In what?", takes: ["unit"] },
+        { id: "tracked", ask: "How closely?", takes: ["tracking"], always: true, says: { per: SAID } },
+      ],
+    }))).toContain("fills_given_unanswered");
+  });
+
+  /*
+    ⚠️ CHECKED AGAINST WHAT IS ANSWERED RATHER THAN WHAT IS REACHED, and the
+    difference is the fill itself: a source the fill also OUTPUTS would satisfy a
+    laxer check, which is a fill fed by its own answer — i.e. by nothing, on the
+    first and only run.
+  */
+  it("does not let a fill's own output count as the thing it is handed", () => {
+    const loops = {
+      id: "thing.loop",
+      input: { name: field.text({ label: "Name", holds: "none" }) },
+      output: { name: field.text({ label: "Name", holds: "none" }) },
+    };
+    expect(refuseStory(
+      {
+        id: "s",
+        story: {
+          writes: "thing.register",
+          fills: { by: "thing.loop", with: { name: "name" } },
+          asks: [
+            { id: "counted", ask: "In what?", takes: ["unit"] },
+            { id: "tracked", ask: "How?", takes: ["tracking"], always: true, says: { per: SAID } },
+          ],
+        },
+      },
+      [...OPS, loops], ASKING,
+    ).map((p) => p.why)).toContain("fills_given_unanswered");
   });
 
   /* ⚠️ IT RUNS, IT IS CHARGED FOR, AND EVERY ANSWER IS DROPPED — green in every
@@ -1619,7 +1682,7 @@ describe("what fills the flow before it is walked", () => {
       input: {},
       output: { weather: field.text({ label: "Weather", holds: "none" }) },
     };
-    expect(refuseStory(flow({ fills: "thing.elsewhere" }), [...OPS, elsewhere], ASKING)
+    expect(refuseStory(flow({ fills: { by: "thing.elsewhere", with: {} } }), [...OPS, elsewhere], ASKING)
       .map((p) => p.why)).toContain("story_fills_nothing");
   });
 });
@@ -1727,7 +1790,7 @@ describe("a flow that cannot finish", () => {
      this contract exists for. */
   it("accepts a required field a fill supplies", () => {
     expect(told(flow({
-      fills: "thing.see",
+      fills: { by: "thing.see", with: { shots: "shots" } },
       asks: [
         { id: "named", ask: "What is it?", takes: ["name"] },
         { id: "tracked", ask: "How closely?", takes: ["tracking"], always: true, says: { per: SAID } },

@@ -29,10 +29,11 @@
 
 import * as React from "react";
 import type { Fields, Match, SaysSpec, StepSpec, StorySpec } from "@engine/kernel";
-import { askedOf } from "@engine/kernel";
+import { ASKS, askedOf } from "@engine/kernel";
 import { Story, type Ask } from "../frame/story.js";
 import type { Act } from "../frame/screen.js";
 import { Field } from "./field.js";
+import { ASKING } from "./asking.js";
 import { Stack } from "../parts/arrange.js";
 
 /** What has been answered, by the write's own input names. */
@@ -86,15 +87,30 @@ export interface CreateProps {
   /** ⚠️ What a `ref` may be, by field name — see `Field.choices`. */
   readonly choices?: Readonly<Record<string, readonly { readonly id: string; readonly label: string }[]>>;
   /**
-   * THE COMPONENTS FOR THE BLOCK STEPS, BY BLOCK ID.
+   * THE COMPONENTS FOR THE BLOCK STEPS, BY BLOCK ID — and it defaults to the
+   * registry, so a product mounts none of them by hand.
    *
-   * ⚠️ RESOLVED BY THE CALLER RATHER THAN IMPORTED HERE, and the reason is
-   * weight. A camera and a viewfinder are the heaviest things in the product; an
-   * import of every registered asking block in this module would put all of them
-   * in the graph of every screen that can draw a flow, which is the fault
-   * `field.tsx` already names about a calendar and a colour picker.
+   * ⚠️ THE REGISTRY'S ENTRIES ARE LAZY, WHICH IS WHY THIS CAN DEFAULT AT ALL.
+   * A camera and a viewfinder are the heaviest things in the product; imported
+   * eagerly here they would be in the module graph of every screen that can draw
+   * a flow, which is the fault `field.tsx` names about a calendar and a colour
+   * picker. `ASKING` holds `React.lazy` wrappers, so naming one costs a chunk
+   * only where a step draws it.
+   *
+   * ⚠️ AND OVERRIDING IT IS FOR A TEST, NOT FOR A PRODUCT. A product supplying
+   * its own component for a registered id is a block whose declaration and whose
+   * drawing have stopped being the same thing.
    */
   readonly blocks?: Readonly<Record<string, React.ComponentType<{ readonly asking: Asking }>>>;
+  /**
+   * A FILL IS RUNNING — see `StorySpec.fills`.
+   *
+   * ⚠️ THE GAP BETWEEN THE LAST PHOTOGRAPH AND THE MODEL'S ANSWER IS SECONDS,
+   * and a flow that goes quiet through it is a screen somebody presses again.
+   * The dock is held, so the second press cannot skip past a step that is about
+   * to stop applying.
+   */
+  readonly filling?: boolean;
   /** ⚠️ What the review leads with — a picture is the fastest check available. */
   readonly lead?: React.ReactNode;
   readonly note?: React.ReactNode;
@@ -204,7 +220,7 @@ const emptyFor = (kind: Fields[string]["kind"]): unknown => {
 
 export function Create({
   story, takes, at, onGo, title, does, leave, held, onSet,
-  filled, refused = {}, choices = {}, blocks = {}, lead, note,
+  filled, refused = {}, choices = {}, blocks = ASKING, filling, lead, note,
 }: CreateProps) {
   const arrived = filled ?? new Set<string>();
 
@@ -222,9 +238,15 @@ export function Create({
   );
 
   const asks: readonly Ask[] = story.asks.map((step: StepSpec) => {
+    /* ⚠️ WHAT THE STEP PUTS INTO THE WRITE, HOWEVER IT DOES IT. A block ANSWERS
+       — that is what makes it a step rather than decoration — so a refusal about
+       the pictures belongs to the step that took them. Read off `takes` alone,
+       a block step had no fields, so the door's complaint about its answer
+       appeared nowhere at all and the dock simply refused. */
+    const answers = step.block ? ASKS[step.block]?.answers ?? [] : [];
     const names = step.takes ?? [];
     const clause = clauseOf(step.says, names, takes, held);
-    const short = shortOf(names, takes, held, refused);
+    const short = shortOf([...names, ...answers], takes, held, refused);
     const Block = step.block ? blocks[step.block] : undefined;
 
     return {
@@ -291,7 +313,9 @@ export function Create({
       at={at}
       onGo={onGo}
       title={title}
-      does={does}
+      /* ⚠️ HELD WHILE A FILL RUNS — see `filling`. Next during the run would
+         carry somebody past the very steps the answers are about to remove. */
+      does={filling ? { ...does, disabled: true } : does}
       {...(leave ? { leave } : {})}
       {...(note ? { note } : {})}
       review={lead ? { lead } : true}

@@ -236,7 +236,7 @@ export interface StorySpec {
    * is a fact about the product: the docs list it, an agent can be told, and the
    * credits it spends are metered on the same rail as every other run.
    */
-  readonly fills?: string;
+  readonly fills?: FillsSpec;
   /**
    * THE QUESTIONS, IN ORDER, INCLUDING THE ONES THAT ARE OFTEN SKIPPED.
    *
@@ -246,6 +246,34 @@ export interface StorySpec {
    * describe a flow nobody ever walks.
    */
   readonly asks: readonly StepSpec[];
+}
+
+/**
+ * WHAT RUNS BEFORE ANYBODY IS ASKED, AND WHAT IT IS HANDED.
+ *
+ * ⚠️ THE `with` IS THE HALF THAT LOOKS OPTIONAL AND IS NOT. Two operations that
+ * were written independently name the same thing differently — the reader takes
+ * `images` and the write keeps `shots` — and without a stated mapping the code
+ * that bridges them is a line inside one product's screen, which is exactly the
+ * hand-written file this whole contract removes.
+ *
+ * ⚠️ AND IT MAKES BOTH DIRECTIONS FACTS. What a model is GIVEN is `with`; what it
+ * may WRITE is its own output intersected with the write's input. Both are in the
+ * manifest, so "what does this flow send to an AI" is a question with an answer
+ * that does not require reading a component.
+ */
+export interface FillsSpec {
+  /** The operation. Its credits meter on the same rail as every other run. */
+  readonly by: string;
+  /**
+   * WHAT IT IS HANDED — its own input name, and the write's input that supplies it.
+   *
+   * ⚠️ THE WRITE'S NAME ON THE RIGHT, WHICH IS THE WAY ROUND THAT CHECKS. Every
+   * value here has to be a field some step or block ANSWERS, or the fill runs on
+   * nothing: an empty photograph list sent to a vision model is a charge for a
+   * question about no pictures, answered with plausible nothing.
+   */
+  readonly with: Readonly<Record<string, string>>;
 }
 
 /**

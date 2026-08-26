@@ -228,6 +228,12 @@ const WHY = {
     these are the components a story's own code reaches for.
   */
   control: [
+    /* ⚠️ THE PHOTOGRAPHS A FLOW IS ASKED FOR — see `ASKS`. It is a block, but of
+       the ASKING registry rather than the body one: it holds an answer nobody has
+       saved and hands it back, which is a story's business and never a body's.
+       Registered as a body block it would be handed bindings and draw a camera
+       over them. */
+    "Shots",
     "TextInput", "SecretInput", "LongText", "SearchInput", "NumberInput", "MoneyInput",
     "Dial", "Choice", "Lookup", "Agree", "Picks", "OneOf", "Segmented", "Tags", "Words",
     "DateInput", "TimeInput", "CodeEntry", "PeriodInput", "Colour", "DayPicker", "DayField",

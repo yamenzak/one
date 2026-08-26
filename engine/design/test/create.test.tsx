@@ -44,7 +44,7 @@ const SAID = {
 
 const STORY: StorySpec = {
   writes: "thing.register",
-  fills: "thing.see",
+  fills: { by: "thing.see", with: { images: "shots" } },
   asks: [
     { id: "shot", ask: "Can you photograph it?", block: "Shots" },
     {
