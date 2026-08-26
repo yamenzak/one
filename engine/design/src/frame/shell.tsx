@@ -604,6 +604,14 @@ export function Shell(props: ShellProps) {
             name: crown.personEmail ?? "You",
             face: crown.personFace,
             onOpen: onOpenSpace,
+            /* ⚠️ THE WORKSPACE OVER THE PRODUCT — see `CrownProps.who`. Both
+               facts change what every number on the screen means, and neither is
+               anywhere else on a root: the door says which workspace and nobody
+               reads a door, the brand says it in colour and colour is not a
+               name. It draws only where the middle is otherwise empty, which is
+               the same condition that makes a screen a root. */
+            label: crown.tenantName,
+            under: crown.appName,
           },
           ...(search ? { find: { label: `Search ${crown.appName}`, onOpen: () => onGo(search.route) } } : {}),
           also: [

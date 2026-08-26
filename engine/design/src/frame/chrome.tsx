@@ -89,16 +89,28 @@ export function Docked({ width = "read", children }: {
 }
 
 /**
- * THE NAV — five destinations maximum (D10), and only where you are says its
- * name.
+ * THE NAV — five destinations maximum (D10), drawn as marks, none of them named.
  *
- * ⚠️ FIVE ICON-AND-LABEL COLUMNS DO NOT FIT A PHONE, AND THAT WAS THE OLD BAR.
- * Equal columns mean every label is squeezed to a fifth of the screen, so a
- * two-word destination truncates and a five-item nav is five abbreviations. The
- * bar that works is COMPACT: every destination is its icon, and the ONE somebody
- * is on expands to say so. Four glyphs and one named item fit at any width, and
- * the label that is showing is the only one anybody needs — a person does not
- * read the nav to find out where they are not.
+ * ⚠️ NO WORDS AT ALL, AND THE BAR IS THE SAME SHAPE ON EVERY SCREEN. Two answers
+ * came before this one and each was better than the last. Equal icon-and-label
+ * columns squeeze every name to a fifth of the screen, so a five-item nav is
+ * five abbreviations. Then only the item you were ON opened its name — which
+ * fits at any width and reads well, and has one fault nothing about the
+ * animation could reach: the bar RE-LAID ITSELF on every move. The other items
+ * shuffled sideways to make room, and how wide each one sat depended on how long
+ * the name of the screen you happened to be on is. The furniture at the foot of
+ * the product changed shape as you walked around it.
+ *
+ * ⚠️ SO ONLY THE INK MOVES NOW, and the shapes never do. That is what makes this
+ * read as one object rather than as a row of things being rearranged, and it is
+ * the half of "a switch is one movement, not two resizes" that animating the
+ * switch could not fix — there was still something to resize.
+ *
+ * ⚠️ AND A MARK ALONE ONLY ANSWERS "WHERE AM I" WHILE THERE ARE FEW OF THEM.
+ * Three or four distinct glyphs are recognised without reading; six are a puzzle,
+ * and the person is left pressing one to find out. `PRIMARY_MAX` is the ceiling
+ * that keeps this honest, and an app choosing the ceiling rather than three is
+ * choosing a bar that is harder to read.
  *
  * ⚠️ IT IS A PLATE, AND IT IS THE ONE OBJECT IN THE PRODUCT THAT NEVER GOES
  * AWAY. There was no surface here at all for a while, and the reason was sound:
@@ -115,20 +127,19 @@ export function Docked({ width = "read", children }: {
  * around a glyph is an edge, which D7 refuses; on a plate it is a hole in a
  * surface.
  *
- * ⚠️ AND WHERE YOU ARE IS STILL INK PLUS A LIGHT, not a second surface. A pill
- * inside the plate would be a plate on a plate — the shape this design spent a
- * pass removing — so the active destination keeps the brand-lit glyph and the
- * one open word, now read against the dock's own ink rather than the page's.
+ * ⚠️ AND WHERE YOU ARE IS INK PLUS A LIGHT, not a second surface. A pill inside
+ * the plate would be a plate on a plate — the shape this design spent a pass
+ * removing — so the active destination is the brand-lit glyph, read against the
+ * dock's own ink rather than the page's, and nothing else.
  *
- * ⚠️ THE EXPANSION IS THE TRAVEL, WHICH REPLACES A PILL THAT SLID. There was one
+ * ⚠️ THE LIGHT TRAVELS, WHICH IS WHAT A PILL THAT SLID WAS FOR. There was one
  * absolutely-positioned pill stepping by `index × 100%` of an equal column, and
- * the argument for it was that a single element MOVING says two destinations are
- * on one shelf while four backgrounds switching on and off do not. That argument
- * still holds and this is a better answer to it: nothing jumps, because the word
- * grows out of one item while the one before it closes — the motion is
- * continuous and it IS the label. It also needs no measuring, no ref and no
- * resize observer, which the equal-column pill only avoided by forcing every
- * item to the same width in the first place.
+ * its argument was right: a single element MOVING says two destinations are on
+ * one shelf, while four backgrounds switching on and off do not. What carries
+ * that now is the ink and the brand light crossing between fixed marks — the
+ * same continuity, with no element to measure, no ref and no resize observer.
+ * The pill only avoided those by forcing every item to one width, which is what
+ * this does anyway and for a better reason.
  *
  * ⚠️ IT DOES NOT LEAVE, AND THAT IS THE SAME DECISION THE CROWN MAKES. The bar
  * used to translate out while somebody scrolled down and come back on the way
@@ -139,10 +150,12 @@ export function Docked({ width = "read", children }: {
  * moves. The hem is what handles content arriving at a control, at both ends,
  * so a bar that also hides is a second answer to a question already answered.
  *
- * ⚠️ AND THE LABEL GOES TO ZERO WIDTH, NEVER TO `display: none`. A nav that
- * removed its labels from the accessibility tree would be five unnamed buttons
- * to anybody using a screen reader — the one group for whom the icon carries
- * nothing at all.
+ * ⚠️ AND EVERY DESTINATION KEEPS ITS NAME WHERE A SCREEN READER FINDS IT. A nav
+ * of marks with no text is five unnamed buttons to the one group for whom an
+ * icon carries nothing at all. The word is `sr-only` — out of the picture, in
+ * the tree — rather than held at zero width, which is what it was: a span at
+ * `max-width: 0` is still laid out and still measured, so the old shape paid for
+ * the label twice and drew it once.
  *
  * ⚠️ THE KERNEL REFUSES A SIXTH ITEM, and this slices too: a deployment
  * rendering a manifest it did not compose must not draw one either.
@@ -313,9 +326,24 @@ export function Island({ items, here, onGo, act, only }: {
                  no destination is lost. Which matters because the nav clips: a
                  row that overflowed would not wrap or scroll, it would silently
                  drop whatever fell off the right edge. */
+              /*
+                ⚠️ EVERY ITEM THE SAME WIDTH, ALWAYS, AND ONLY THE INK MOVES. The
+                one you are on used to open a word beside its glyph — so the bar
+                re-laid itself on every move, the other items shuffled sideways
+                to make room, and how wide each one was depended on how long the
+                name of the screen you happened to be on is. The switch was
+                already animated as one movement rather than two resizes; what
+                was never fixed is that there was anything to resize.
+
+                ⚠️ AND A GLYPH ALONE ONLY ANSWERS "WHERE AM I" AT THREE OR FOUR,
+                which is why this is not a change a bar of six could make. The
+                marks have to be distinguishable at a glance without reading, and
+                the more of them there are the less true that is. The ceiling
+                above is what keeps that honest.
+              */
               className={`flex-row items-center justify-center ${SPACE.tight} ${ROW.free} `
-                + (open ? `shrink-0 ${ISLAND_HERE}` : `shrink-0 ${ISLAND_ITEM}`)
-                + (open ? "" : ` grow basis-0 min-w-0 ${ISLAND_ITEM_MAX}`)}
+                + `grow basis-0 min-w-0 shrink-0 ${ISLAND_ITEM_MAX} `
+                + (open ? ISLAND_HERE : ISLAND_ITEM)}
               onPress={() => onGo(item.route)}
             >
               {/* ⚠️ NO HINT HERE, AND THAT IS THE ONE DELIBERATE OMISSION. The
@@ -334,51 +362,18 @@ export function Island({ items, here, onGo, act, only }: {
                 </span>
               </Pip>
               {/*
-                ⚠️ WIDTH, NOT DISPLAY — see the header. `max-width` from zero is
-                what makes the pill GROW rather than appear, and it keeps the
-                word in the accessibility tree while it is closed.
+                ⚠️ THE WORD IS STILL HERE AND IT IS NOT DRAWN. A bar of glyphs
+                with no text is unusable with a screen reader and unlabelled to
+                every automated check, so the name stays in the accessibility
+                tree at every moment — it is the PICTURE of it that is gone, not
+                the word.
 
-                ⚠️ `10rem` IS A CEILING, NOT A WIDTH. A max-width transition needs
-                a number to travel to and `auto` is not one; the span is still
-                sized by its text, so the ceiling only has to clear the longest
-                destination anybody would write.
+                ⚠️ AND IT IS NOT A ZERO-WIDTH SPAN. A word held at `max-width: 0`
+                still takes part in layout and still has to be measured, which is
+                what the growing label was made of. A screen reader reaches this
+                one and a sighted reader never does, which is what was wanted.
               */}
-              {/*
-                ⚠️ THE OPEN LABEL IS NOT `note`, AND THAT IS THE ONE COLOUR BUG
-                THIS SHAPE INVITES. `note` is `text-muted` — correct for a
-                caption and wrong for the only word in the nav, because a class
-                on the span beats the `color` the `data-here` fill sets on the
-                button, so the destination somebody IS on read dimmer than the
-                icons around it. The word that is showing is the whole point of
-                the bar; it takes full ink.
-              */}
-              {/*
-                ⚠️ THE ELLIPSIS BELONGS TO THE OPEN LABEL AND TO NOTHING ELSE. A
-                closed item is a word held at zero width on purpose, and an
-                ellipsis on it says the layout ran out of room for something
-                somebody was meant to read — which is what the geometry sweep
-                looks for, and it found four of them in every bar in the product.
-                The trim is for a destination whose name is longer than the pill;
-                a name that is not showing has not been trimmed.
-              */}
-              <span
-                className={`${TYPE.note} ${isHere ? "text-foreground" : ""}`
-                  + ` overflow-hidden whitespace-nowrap leading-none${open ? " text-ellipsis" : ""}`}
-                /* ⚠️ TWO INTENTS, NOT ONE — see `MOTION.unfold` / `MOTION.fold`.
-                   The word that is leaving is quicker than the word arriving, so
-                   the room is free before anything moves into it; at one
-                   duration the four closed glyphs visibly shuffle for the whole
-                   transition. And `reveal`, which this used, names `max-height`
-                   while the bar animates `max-width` — so the width had never
-                   been transitioned at all and only the fade was moving. */
-                style={{
-                  maxWidth: open ? "10rem" : 0,
-                  opacity: open ? 1 : 0,
-                  transition: open ? MOTION.unfold : MOTION.fold,
-                }}
-              >
-                {item.label}
-              </span>
+              <span className="sr-only">{item.label}</span>
             </Button>
           );
         })}

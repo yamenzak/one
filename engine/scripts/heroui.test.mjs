@@ -681,29 +681,26 @@ if (!uneven) ok(`peers: ${EQUALS.length} group(s) of equals share their width`);
       else is exactly the bar naming what it did not highlight.
     */
     const marks = /data-here=\{isHere/.test(body);
-    const named = /maxWidth:\s*(\w+)/.exec(body)?.[1] ?? "";
-    /* ⚠️ A PLAIN ASSIGNMENT IS THE STRONGEST FORM OF THE INVARIANT, and this
-       accepted only the weaker one. `const open = isHere && …` is admitted
-       because a narrowing of `isHere` can never be true where `isHere` is
-       false; `const open = isHere` is that with nothing narrowing it, and it
-       failed. A guard that refuses the exact thing it is asking for is one
-       somebody edits the CODE to satisfy, which is the wrong direction. */
-    const names = named === "isHere"
-      || new RegExp(`const ${named}\\s*=\\s*isHere\\s*(?:&&|;)`).test(body);
-    /* ⚠️ `overflow-hidden` IS NOT `hidden`, and the first version of this could
-       not tell them apart — `\b` matches after a dash, so the utility that makes
-       the label narrow read as the utility that removes it. The closed label is
-       BUILT from `overflow-hidden`, so the guard failed on the correct code.
+    /*
+      ⚠️ AND THERE IS NO DRAWN LABEL AT ALL NOW, WHICH IS THE STRONGEST FORM OF
+      THE SAME INVARIANT. This asked whether the word's condition was `isHere` or
+      a narrowing of it — the right question while the bar named the destination
+      somebody was on, because a condition that can be true where `isHere` is
+      false is a bar that highlights one thing and names another. The bar stopped
+      naming anything: every item is its mark, always, and only the ink moves.
+      A word that is never drawn cannot disagree with a fill.
 
-       ⚠️ AND NEITHER IS `md:hidden`, which is the same mistake one character
-       along. The nav hides itself above the breakpoint where the sidebar takes
-       over — a statement about the whole BAR at one width, not about a label at
-       any width — and `:` is neither a word character nor a dash, so the
-       original lookbehind let it through. It happened to sit on its own line, so
-       `[^\n]*` was all that stood between this guard and a false failure on
-       correct code, one reformat away. A variant prefix is excluded by name. */
-    const gone =
-      /(?:className=[^\n]*(?<![\w:-])hidden(?![\w-])|display:\s*["']?none)/.test(body);
+      ⚠️ SO WHAT IS CHECKED IS THAT IT STAYS THAT WAY, and the failure it now
+      catches is the opposite one — a label creeping back in and taking the bar's
+      geometry with it. `maxWidth` on a nav item is what the growing word was made
+      of; a span held at zero width is still laid out and still measured, so its
+      return is a return of the resize, not merely of the text.
+    */
+    const grows = /maxWidth:/.test(body);
+    /* ⚠️ THE NAME IS OUT OF THE PICTURE AND IN THE TREE. `sr-only` is the one
+       spelling that does both; `display: none` and a bare `hidden` take it out of
+       both, which is the failure. */
+    const gone = !/className="sr-only"/.test(body);
     /* ⚠️ AND IT MUST NOT MOVE AT ALL. This used to REQUIRE a transform: the bar
        left downwards while somebody scrolled, and animating that by height would
        have been layout work on every frame. The travel is gone — the crown never
@@ -715,16 +712,19 @@ if (!uneven) ok(`peers: ${EQUALS.length} group(s) of equals share their width`);
        that just changed size. */
     const moves = /transform:\s*[^\n]*\b(?:away|translate)/.test(body);
 
-    if (!marks || !names) {
-      fail(`design/src/frame/chrome.tsx: the nav's fill and its label are not one condition (D7).\n` +
-           `       fill from \`isHere\`: ${marks}; label from \`${named}\`, which is ` +
-           `neither \`isHere\` nor derived from it.\n` +
-           `       A condition that can be true where \`isHere\` is false is a bar that\n` +
-           `       highlights one destination and names another.`);
+    if (!marks) {
+      fail(`design/src/frame/chrome.tsx: the nav does not light where you are from \`isHere\` (D7).\n` +
+           `       That is the one thing the bar says, and a fill driven by anything else is\n` +
+           `       a bar that can highlight a destination somebody is not on.`);
+    } else if (grows) {
+      fail(`design/src/frame/chrome.tsx: a nav item sizes itself by \`maxWidth\` again.\n` +
+           `       That is what the growing label was made of, so the bar re-lays itself on\n` +
+           `       every move and how wide each item sits depends on the name of the screen\n` +
+           `       somebody happens to be on. Every item is its mark; only the ink moves.`);
     } else if (gone) {
-      fail(`design/src/frame/chrome.tsx: a closed label is removed rather than narrowed.\n` +
-           `       \`display: none\` takes it out of the accessibility tree, which is five\n` +
-           `       unnamed buttons to the one group the icon carries nothing for.`);
+      fail(`design/src/frame/chrome.tsx: the nav's names are not in the accessibility tree.\n` +
+           `       A bar of marks with no text is five unnamed buttons to the one group an\n` +
+           `       icon carries nothing for. \`sr-only\`, never \`display: none\`.`);
     } else if (moves) {
       fail(`design/src/frame/chrome.tsx: the nav moves itself.\n` +
            `       A transformed sticky bar still counts toward the document's scrollable\n` +
