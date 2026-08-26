@@ -242,7 +242,13 @@ export function Stat({
   */
   const inside = (
     <>
-      <div className="flex items-start justify-between">
+      {/* ⚠️ `w-full`, AND IT IS NOT DECORATION. This row spreads its two ends with
+          `justify-between`, and the tile's outer element is `flex-col
+          items-start` — under which a child sizes to its CONTENT, so there is no
+          spare width to spread and the affordance lands tucked against the mark
+          instead of at the far corner. It regressed exactly that way the moment
+          the tile became a button, and the picture is where it showed. */}
+      <div className="flex w-full items-start justify-between">
         {mark
           ? (
             /* ⚠️ THE TINT IS ON THE GROUND AND THE GLYPH STAYS NEUTRAL unless the
@@ -269,7 +275,7 @@ export function Stat({
             one is the one a thumb misses. */}
         {onOpen ? <span aria-hidden="true" className={`shrink-0 ${TYPE.note}`}>↗</span> : null}
       </div>
-      <div className={`flex flex-col ${SPACE.hair}`}>
+      <div className={`flex w-full flex-col ${SPACE.hair}`}>
         <span className={`flex flex-wrap items-baseline ${SPACE.tight}`}>
           {/* ⚠️ `proportional-nums` HERE AND TABULAR IN A COLUMN. Tabular gives
               every digit a zero's width, which is exactly right stacked and
@@ -310,7 +316,29 @@ export function Stat({
       <Button
         variant="ghost"
         onPress={onOpen}
-        className={`flex-col items-start text-start ${ROW.free} ${ROW.wrap} ${ROW.flush} ${SPACE.snug}`}
+        /*
+          ⚠️ `ROW.press` IS THE WIDTH, AND `w-full` IS NOT. The button ships its
+          own width; the two are the same property at the same specificity, so
+          the one emitted later wins and that is the utility. Written as
+          `w-full` the tile sized to its CONTENT, and the affordance landed
+          tucked against the mark on the three tiles with short labels and out
+          at the corner on the one with a long label — a layout that depends on
+          how many letters a word has, which nobody can see is wrong until they
+          photograph four of them side by side.
+
+          ⚠️ AND THE SECOND ATTEMPT WAS `w-[100%]`, WHICH IS A CLASS THAT EXISTS
+          IN NO STYLESHEET. Tailwind emits only what it has seen and the browser
+          lane measures the CSS THAT SHIPS, so a utility written today is inert
+          until the deployment's own build has run. That is `spanning`'s note one
+          file over, and it cost a photograph that looked identical to the one
+          before it. `ROW.press` is a token the product already uses, so it is
+          emitted, and it wins for the reason its own comment states.
+
+          ⚠️ IT ALSO MAKES THE WHOLE CARD THE TARGET, which is what was wanted
+          anyway: the pull and the padding cancel, so the press reaches the
+          card's edges rather than stopping at its text.
+        */
+        className={`${ROW.press} flex-col items-start text-start ${ROW.free} ${ROW.wrap} ${SPACE.snug}`}
       >
         {inside}
       </Button>
