@@ -93,6 +93,47 @@ export const LINES: readonly Line[] = [
 ];
 
 /**
+ * THE CATALOGUE ROWS THEMSELVES — what the products ARE, beside where they sit.
+ *
+ * ⚠️ WRITTEN OUT RATHER THAN DERIVED FROM `LINES`, WHICH IS THE POINT. A product
+ * exists whether or not it is on a shelf, and half of what a product page shows
+ * — how it is tracked, what it is packed in, how to store it — is not on a stock
+ * line at all. Building the catalogue by mapping over the lines produced a
+ * fixture where every product was on a shelf and none of them had a shelf life,
+ * which is a workspace this product does not have.
+ *
+ * ⚠️ AND ONE OF THEM CARRIES PROSE. Storage and handling are absent on most
+ * products and are the two facts that matter most on the few that have them —
+ * the solvent is the row that proves a screen drawing them looks right, and
+ * every other row proves it looks right without.
+ */
+export interface Thing {
+  readonly id: string;
+  readonly name: string;
+  readonly brand?: string;
+  readonly unit: string;
+  readonly tracking: Tracking;
+  readonly par?: number;
+  readonly storage?: string;
+  readonly handling?: string;
+}
+
+export const THINGS: readonly Thing[] = [
+  { id: "t-glove", name: "Nitrile gloves, blue", brand: "Ansell", unit: "glove",
+    tracking: "batched", par: 400 },
+  { id: "t-resin", name: "Casting resin, clear", brand: "Smooth-On", unit: "tin",
+    tracking: "batched", par: 6,
+    storage: "Keep below 25 °C, away from direct sun. Once opened, use within 28 days.",
+    handling: "Wear gloves and eye protection. Mix in a ventilated space." },
+  { id: "t-screw", name: "Screws, M4 × 20", unit: "box", tracking: "counted", par: 20 },
+  { id: "t-wrench", name: "Torque wrench", brand: "Norbar", unit: "item", tracking: "itemised" },
+  { id: "t-paper", name: "A4 paper", unit: "ream", tracking: "counted", par: 5 },
+  { id: "t-ladder", name: "Step ladder, 2.4 m", brand: "Zarges", unit: "item", tracking: "listed" },
+  { id: "t-tie", name: "Cable ties, 200 mm", brand: "HellermannTyton", unit: "bag",
+    tracking: "counted", par: 4 },
+];
+
+/**
  * A SHELF SOMEBODY IS PART WAY THROUGH COUNTING.
  *
  * ⚠️ OPEN SESSIONS ONLY, WHICH IS THE STATE THE PRODUCT SHOWS. A closed count is

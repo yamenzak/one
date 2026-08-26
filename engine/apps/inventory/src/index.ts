@@ -6222,6 +6222,14 @@ const manifest = (): AppSpec => defineApp({
        second answer to the same question. */
     { id: "counting", of: "count", where: [{ field: "closed", unset: true }] },
     { id: "catalogue", of: "product", limit: 50 },
+    /*
+      ⚠️ NARROWED TO THE RECORD THE SCREEN IS ABOUT — see `Value.here`. A product
+      page's whole subject is where the thing actually is, and that is the same
+      `stock` read as the home's with one term added. A second view listing every
+      line and a screen filtering it in the browser would be the same query twice
+      with the phone doing the half the database is for.
+    */
+    { id: "lines-of-this", of: "stock", where: [{ field: "product", is: { here: "record" } }] },
     { id: "every-place", of: "location", limit: 50 },
   ],
 
@@ -6393,6 +6401,11 @@ const manifest = (): AppSpec => defineApp({
               { field: "location.name", label: "Where" },
               { field: "quantity", label: "How many" },
             ],
+            /* ⚠️ BY `product`, NOT BY `id` — see `GoSpec`. A row here is a LINE,
+               and the thing somebody pressing it is asking about is the product
+               on the shelf rather than the line's own identity. The default
+               would open a record that does not exist. */
+            goes: { to: "product", by: "product" },
             nothing: {
               says: "Nothing on the shelves",
               under: "Receive a delivery and its lines will be here",
@@ -6434,6 +6447,7 @@ const manifest = (): AppSpec => defineApp({
                glance this column exists for. */
             { field: "seen", label: "Last seen", as: "when" },
           ],
+          goes: { to: "product", by: "product" },
           nothing: {
             says: "Nothing has run out",
             under: "Every shelf with a line on it has something on it",
@@ -6459,6 +6473,9 @@ const manifest = (): AppSpec => defineApp({
                catalogue where "97" means nothing. */
             { field: "unit", label: "Counted in" },
           ],
+          /* ⚠️ THE SHORT FORM, BECAUSE A CATALOGUE ROW IS THE PRODUCT. `id` is
+             the address, which is what `goes` reads when nothing says otherwise. */
+          goes: "product",
           nothing: {
             says: "Nothing in the catalogue",
             under: "Register the first product and it will be here",
@@ -6468,6 +6485,142 @@ const manifest = (): AppSpec => defineApp({
             of: { from: { of: "view", view: "catalogue" } },
           },
         }],
+      } },
+    /*
+      ⚠️ WHAT EVERY ROW IN THIS PRODUCT OPENS, AND UNTIL NOW THEY OPENED NOTHING.
+      Four lists shipped with no destination on any of them — a screen somebody
+      presses and nothing happens is not a missing feature, it is a list that
+      lies about being a list. The thing all four are about is the PRODUCT: a
+      catalogue row is one, a shelf line is one on a shelf, and a line that ran
+      out is one that is not.
+
+      ⚠️ AND IT LEADS WITH WHERE THE THING ACTUALLY IS. Somebody opening a
+      product is standing in front of a box asking a question about the world
+      rather than about the record — how many, and where else. So the figure is
+      the count of places it is kept and the list under it is the quantities,
+      and the catalogue facts sit below both because they are what you read
+      second.
+
+      ⚠️ NO WORLD, DELIBERATELY. AMBIENCE's rule is that what earns one is a
+      screen somebody ARRIVES at; this is one they were SENT to, from a row they
+      pressed, and painting it would make the ambience a texture rather than a
+      place. The home is somewhere and this is the product.
+    */
+    { id: "product", route: "/product", label: "Product", nav: "none", icon: "tag",
+      permission: "product:read", of: "product",
+      body: {
+        shape: "detail",
+        layout: { as: "stack" },
+        hero: {
+          as: "figure",
+          nothing: { says: "Not on any shelf", under: "Receive some and it will be here" },
+          bind: {
+            value: { from: { of: "count", view: "lines-of-this" } },
+            /*
+              ⚠️ WHERE rather than HOW MANY, and the difference is stated because
+              it is the one thing this figure could be misread as. How many there
+              are is a sum across the lines below; a view answers how many ROWS
+              it has and will never sum a column, so a screen claiming a total
+              here would be a number nothing computed. The finding that comes
+              with it: this product has no operation that answers a product's
+              balance, and it wants one.
+
+              ⚠️ AND NO `unit`, BECAUSE A STATIC ONE CANNOT AGREE WITH THE NUMBER.
+              It read "1 places" the first time it was photographed — a
+              declaration holds a constant and English does not, so the noun goes
+              in the eyebrow where it is a heading rather than a plural.
+            */
+            of: { from: { of: "words", says: "Shelves it is on" } },
+            mark: { from: { of: "words", says: "box" } },
+          },
+        },
+        blocks: [
+          {
+            block: "Listing",
+            /* ⚠️ THE PRODUCT'S OWN COLUMN IS GONE, because the screen is about
+               it. A list repeating its subject on every row is a column of one
+               value with the useful ones pushed off a phone. */
+            /*
+              ⚠️ THE NUMBER IS LAST, AND ON A PHONE THAT IS WHAT PUTS IT ON THE
+              RIGHT. `Listing` folds its first three columns into a row's name,
+              its second line and its end — so a quantity in the middle slot is
+              set as a caption under the shelf name, in the smallest type on the
+              screen, which is the one figure somebody opened this to read. Same
+              order reads correctly as columns on a desk: what, when, how many.
+            */
+            shows: [
+              { field: "location.name", label: "Where" },
+              { field: "seen", label: "Last seen", as: "when" },
+              { field: "quantity", label: "How many" },
+            ],
+            nothing: {
+              says: "Not on any shelf",
+              under: "Receive some and the shelves will be here",
+            },
+            bind: {
+              label: { from: { of: "words", says: "On the shelves" } },
+              of: { from: { of: "view", view: "lines-of-this" } },
+            },
+          },
+          {
+            group: "What it is",
+            of: [
+              { block: "FieldRow",
+                when: { has: { of: "field", field: "brand" } },
+                bind: {
+                  label: { from: { of: "words", says: "Brand" } },
+                  value: { from: { of: "field", field: "brand" } },
+                } },
+              /* ⚠️ THE UNIT IS THE ONE FACT EVERY NUMBER ABOVE IS IN, so it is
+                 read here rather than inferred from the column heading. */
+              { block: "FieldRow",
+                bind: {
+                  label: { from: { of: "words", says: "Counted in" } },
+                  value: { from: { of: "field", field: "unit" } },
+                } },
+              { block: "FieldRow",
+                bind: {
+                  label: { from: { of: "words", says: "Tracked as" } },
+                  value: { from: { of: "field", field: "tracking" } },
+                } },
+              /* ⚠️ WHEN TO SAY SOMETHING, NOT WHEN TO REFUSE — see `product.par`.
+                 Absent for most products, which is why it is drawn only when it
+                 is there rather than as an empty row saying nothing. */
+              { block: "FieldRow",
+                when: { has: { of: "field", field: "par" } },
+                bind: {
+                  label: { from: { of: "words", says: "Tell me below" } },
+                  value: { from: { of: "field", field: "par" } },
+                } },
+            ],
+          },
+          /*
+            ⚠️ HOW TO STORE IT AND HOW TO HANDLE IT ARE PROSE, and prose a
+            workspace wrote is drawn by the design system rather than by whatever
+            markup somebody pasted. They are absent on most products and are the
+            two facts that matter most on the few that have them — a solvent, a
+            vaccine — so each is drawn only when it is there.
+
+            ⚠️ AND EACH IS UNDER ITS OWN HEADING, WHICH IS NOT DECORATION. Set
+            bare they photographed as two paragraphs of instructions running
+            together with nothing saying which was which — "keep it below 25 °C"
+            and "wear gloves" are a storage rule and a safety rule, and reading
+            the second as the first is the class of mistake this product exists
+            to prevent.
+          */
+          {
+            group: "How to store it",
+            when: { has: { of: "field", field: "storage" } },
+            of: [{ block: "Markdown",
+              bind: { of: { from: { of: "field", field: "storage" } } } }],
+          },
+          {
+            group: "How to handle it",
+            when: { has: { of: "field", field: "handling" } },
+            of: [{ block: "Markdown",
+              bind: { of: { from: { of: "field", field: "handling" } } } }],
+          },
+        ],
       } },
     { id: "places", route: "/places", label: "Places", nav: "primary", icon: "workspace",
       permission: "location:read",

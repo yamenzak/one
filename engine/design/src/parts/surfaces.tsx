@@ -1145,7 +1145,12 @@ export function FieldRow({ label, value, under, onEdit }: {
  */
 export function PersonRow({ name, under, when, unread, aside, goes, face, pick, onOpen }: {
   readonly name: string;
-  readonly under?: string;
+  /* ⚠️ A NODE, BECAUSE THE SECOND LINE IS A VALUE LIKE THE END. Typed as a
+     string it could carry a formatted date only by having somebody format it
+     into one first — so a declared list drew a raw ISO timestamp under a shelf
+     name while the same field, in the same list, at desk width, read
+     "August 19". Everything a caller already passes is still a string. */
+  readonly under?: React.ReactNode;
   readonly when?: string;
   readonly unread?: number;
   /**

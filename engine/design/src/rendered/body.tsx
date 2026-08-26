@@ -414,7 +414,7 @@ function Placed({ block, has }: { readonly block: BlockSpec; readonly has: Has }
        declaration, two answers, and only the one nobody works on was right. */
     props["asRow"] = (row: Readonly<Record<string, unknown>>) => ({
       name: String(row[first!.field] ?? ""),
-      ...(second ? { under: String(row[second.field] ?? "") } : {}),
+      ...(second ? { under: DRAWN[second.as ?? "plain"](row[second.field], has) } : {}),
       ...(third ? { aside: DRAWN[third.as ?? "plain"](row[third.field], has) } : {}),
     });
   }

@@ -22,7 +22,7 @@ import { Screen, Shell, ready, whoFace } from "@engine/design";
 import { Body, type Has } from "@engine/design/body";
 import { inventory } from "../index.js";
 import { INVENTORY_SESSIONS, INVENTORY_SURFACES } from "./index.js";
-import { COUNTS, LINES, PLACES } from "./sample.js";
+import { COUNTS, LINES, PLACES, THINGS } from "./sample.js";
 
 /** ⚠️ Every permission a screen names, so none of them is undrawable here. */
 const EVERYTHING = new Set([
@@ -107,7 +107,24 @@ export function InventoryGround({ route, onGo }: {
         : here?.body
           ? (
             <Screen shape={here.body.shape} title={here.label}>
-              <Body body={here.body} has={{ ...SEEN, named: namedIn(screens) }} />
+              {/*
+                ⚠️ A DETAIL SCREEN IS ABOUT A RECORD AND A BOARD HAS NO ADDRESS
+                BAR, so it opens the first one. Without it `has.record` is
+                undefined, every `field` binding resolves to nothing and the
+                screen draws as a column of blank rows under correct headings —
+                a picture of a state the product never shows, measured and
+                photographed as though it were the screen. The deployment gets
+                the record from the URL (`Declared.tsx`); this is the one thing
+                a fixture has to answer for itself.
+              */}
+              <Body
+                body={here.body}
+                has={{
+                  ...SEEN,
+                  ...(here.of ? { record: firstOf(here.of) } : {}),
+                  named: namedIn(screens),
+                }}
+              />
             </Screen>
           )
           : null}
@@ -138,11 +155,41 @@ const rows = (of: readonly Readonly<Record<string, unknown>>[]) =>
 
 const SHELF = LINES.map((one) => ({
   id: one.id,
+  /* ⚠️ THE REFERENCE ITSELF, BESIDE THE NAME READ THROUGH IT. A row leads to the
+     PRODUCT it is of (`goes: { by: "product" }`), so the id has to travel with
+     the row — a list showing only the joined name is one whose rows can be read
+     and not opened. */
+  product: one.product,
   "product.name": one.name,
   "location.name": one.whereName,
   quantity: one.quantity,
   seen: one.seen,
 }));
+
+const CATALOGUE = THINGS.map((one) => ({
+  id: one.id,
+  name: one.name,
+  brand: one.brand ?? "",
+  unit: one.unit,
+  tracking: one.tracking,
+  ...(one.par === undefined ? {} : { par: one.par }),
+  ...(one.storage ? { storage: one.storage } : {}),
+  ...(one.handling ? { handling: one.handling } : {}),
+}));
+
+/**
+ * ⚠️ THE RECORD A DETAIL SCREEN OPENS ON, AND IT IS THE ONE WITH THE MOST TO
+ * DRAW. A board has no address bar, so it picks; picking the first alphabetically
+ * or the first written down would photograph whichever row happened to be
+ * shortest. The solvent carries a brand, a par level, two shelves and both
+ * pieces of prose, so the picture shows the screen at its fullest — and the
+ * emptier rows are the ones a `when` is there for.
+ */
+const FIRST = CATALOGUE.find((one) => one.storage) ?? CATALOGUE[0]!;
+
+/** ⚠️ What the board opens for a screen that is ABOUT something — see `Screen.of`. */
+const firstOf = (collection: string): Readonly<Record<string, unknown>> | undefined =>
+  collection === "product" ? FIRST : undefined;
 
 const SEEN: Has = {
   /*
@@ -155,9 +202,12 @@ const SEEN: Has = {
   views: {
     "shelf-lines": rows(SHELF),
     "run-out": rows(SHELF.filter((one) => one.quantity === 0)),
-    "catalogue": rows(LINES.map((one) => ({
-      id: one.product, name: one.name, brand: one.brand ?? "", unit: one.unit,
-    }))),
+    "catalogue": rows(CATALOGUE),
+    /* ⚠️ NARROWED TO THE RECORD, EXACTLY AS THE DECLARATION SAYS — see
+       `Value.here`. A board answering this with every line would draw a product
+       page reporting shelves the thing is not on, which is the one fault a
+       narrowed view exists to prevent and the hardest to notice in a picture. */
+    "lines-of-this": rows(SHELF.filter((one) => one.product === FIRST.id)),
     "every-place": rows(PLACES.map((one) => ({
       id: one.id,
       name: one.name,

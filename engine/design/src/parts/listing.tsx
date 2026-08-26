@@ -104,7 +104,12 @@ export interface ListingProps<T> {
    */
   readonly asRow?: (row: T) => {
     readonly name: string;
-    readonly under?: string;
+    /* ⚠️ A NODE, BECAUSE A ROW'S SECOND LINE IS A VALUE LIKE ITS END. Typed as a
+       string it could hold a formatted date only by having somebody format it
+       into one — so a declared list drew `2026-08-19T16:40:00.000Z` under a
+       shelf name while the same field, in the same list, at desk width, read
+       "August 19". `Row` has taken a node here since it was written. */
+    readonly under?: React.ReactNode;
     readonly aside?: React.ReactNode;
     /** ⚠️ WHO OR WHAT, NOT A PICTURE — `whoFace`/`placeFace`/`appFace`. */
     readonly face?: FaceOf;

@@ -467,7 +467,7 @@ generated ones) — plus every platform guard in `pnpm engine:gate`.
 
 ## Part III — the screen index
 
-**Five, and every one of them is drawn by the engine from the declaration.** The
+**Six, and every one of them is drawn by the engine from the declaration.** The
 surface was emptied whole on 2026-08-26 and is being rebuilt one screen at a
 time, each designed from what somebody standing in front of it is trying to do
 rather than ported from what stood there before.
@@ -481,6 +481,7 @@ follows and the shape every screen is drawn to.
 | `/products` | Products | primary | `product:read` | `declared` | `declared` |
 | `/places` | Places | primary | `location:read` | `declared` | `declared` |
 | `/counts` | Being counted | — | `stock:read` | `declared` | `declared` |
+| `/product` | Product | — | `product:read` | `declared` | `declared` |
 
 ⚠️ **`declared` IN BOTH FILE COLUMNS IS THE ANSWER, NOT A GAP.** A declared body
 has no component and no container — the renderer draws it from `src/index.ts`, and a
@@ -495,6 +496,23 @@ reference app's home leads with the record somebody walked away from instead,
 because a notebook's total is a question asked once; the hero region takes a
 KIND so both are one contract. Under it are four tiles, each a `count` over the
 view its own list draws, so a figure and the rows behind it cannot disagree.
+
+**Every row opens the product it is about.** A catalogue row IS one; a shelf line
+is one on a shelf, so it leads `by: "product"` rather than by its own id. The
+product page leads with WHERE the thing is — the shelves it is on, and the
+quantities under that — because somebody opening it is standing in front of a box
+asking a question about the world rather than about the record.
+
+⚠️ **AND ITS TITLE STILL READS "Product" RATHER THAN THE PRODUCT'S NAME.** The
+frame is handed the SCREEN's label, which on a detail screen is the one word on
+the page that is not about the thing somebody opened — and it is the live path as
+well as the fixture (`AppSurface.tsx`, the `Section` around a declared body).
+Nothing new needs declaring: a collection already says which field names a row
+(`CollectionSpec.names`). What is missing is a channel — the browser holds this
+app's SCREENS and not its collections, so the name has to come back with the
+record from the door that already resolved both. It is a contract change to what
+a screen read answers with, which is why it is written down here rather than
+half-done.
 
 ⚠️ **THE ENGINE UNDERNEATH IS UNTOUCHED, WHICH IS WHY THIS IS A SHORT SECTION
 RATHER THAN A SHORT PRODUCT.** Part I is what this product does and Part II is
