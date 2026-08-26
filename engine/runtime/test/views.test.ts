@@ -244,6 +244,46 @@ describe("a view answered by an operation", () => {
       .toEqual({ items: [], count: 0 });
   });
 
+  /*
+    ⚠️ HOW MANY THERE ARE, WHERE THE HANDLER SAID — see `AskedSpec.total`. A
+    bounded answer with no count reads as the whole answer, which is the one
+    thing a list in an inventory product must never say.
+  */
+  it("counts by the field the view names, not by the page it was handed", async () => {
+    expect(await runView(
+      shard(), APP, asked({ total: "total" }), TENANT, {}, [],
+      async () => ({ items: [{ id: "a" }, { id: "b" }], total: 4310 }),
+    )).toEqual({ items: [{ id: "a" }, { id: "b" }], count: 4310 });
+  });
+
+  it("falls back to the page's own length where no field is named", async () => {
+    expect((await runView(
+      shard(), APP, asked(), TENANT, {}, [],
+      async () => ({ items: [{ id: "a" }, { id: "b" }], total: 4310 }),
+    )).count).toBe(2);
+  });
+
+  /* ⚠️ AND A NARROWING REACHES THE INPUT — see `PickSpec`. Held in the browser it
+     would move a control and leave the rows exactly where they were. */
+  it("sends what somebody narrowed the screen to", async () => {
+    let sent: Record<string, unknown> | null = null;
+    await runView(
+      shard(), APP, asked({ fills: { where: { picked: "where" } } }), TENANT,
+      { picked: { where: "loc_1" } }, [],
+      async (_op, input) => { sent = input; return { items: [] }; },
+    );
+    expect(sent).toEqual({ where: "loc_1" });
+  });
+
+  it("leaves the narrowing out while nobody has chosen one", async () => {
+    let sent: Record<string, unknown> | null = null;
+    await runView(
+      shard(), APP, asked({ fills: { where: { picked: "where" } } }), TENANT, {}, [],
+      async (_op, input) => { sent = input; return { items: [] }; },
+    );
+    expect(sent).toEqual({});
+  });
+
   it("runs beside the query views in one pass", async () => {
     const got = await runViews(
       shard(),

@@ -3575,3 +3575,66 @@ generous. A flow exists to reach one write and ends there; a session does not.
 declare; a story offered on a grant its write does not demand; a session that
 keeps something and will not say what it is; or a third kind invented for a
 screen that is really one of these three.
+
+## D97 — A screen may be narrowed, may draw marks, and may place the app's own book
+
+**A reading screen does three things a binding could not say, and each of them
+was one of the last five hand-written screens.** It is narrowed to a period or a
+place somebody chooses. It draws figures as marks rather than as rows. And it
+places the checklist the manifest already declares. Every one of those was
+missing from the vocabulary and present in the product, which is why the port
+stalled with five files left.
+
+**A narrowing is one control per body, and it reaches exactly one place.** A
+`pick` is fed into the `fills` of an asked view and can do nothing else — it is
+not state a block binds, not a value an act is given, and not a condition a
+`when` branches on, because each of those would make a body a program, which is
+the line D92 draws. Held in the browser it would move a control and leave the
+figures under it exactly where they were, so changing it is a refetch; and it is
+not in the address, because narrowing a list is a filter rather than a
+destination and a back gesture that undid a filter one step at a time before it
+left the screen would be worse than no history at all.
+
+**One per body, not one per block.** Two narrowings of one screen disagreeing
+about what is being looked at is the shape a filter panel exists to avoid — and
+on the report screen it would have been five panels each with a period of its
+own, which is five readings of five periods that all look like one report.
+
+**A chart's data is not recoverable from a view's rows, and `blocks.ts` was
+right to refuse to guess.** It dropped eleven charts for exactly this reason: a
+heatmap needs two categorical axes, a dumbbell needs pairs, and a declaration
+naming one and binding `series` would have passed every check in the repository
+and drawn an empty box. `plots` says which column is the measure and which one
+names each mark, and the ENTRY says which of the two shapes a block takes — a
+line draws a run of points and no x labels at all, so requiring a name there
+would be a field declared and read by nothing.
+
+**Two blocks are fed by the app rather than by a binding, and that is not an
+escape hatch.** The checklist and the milestones are already declared on every
+manifest and are what a workspace's events tick. A slot binding them would be a
+screen restating steps the manifest holds, and the restatement is the copy that
+goes stale silently: progress is measured against the manifest, so the second
+list is the one nobody's progress ever reaches. What has been DONE is the
+platform's own read — one question with one answer for every product — and an
+app cannot declare a view over another app's tables.
+
+**And a row of shortcuts names screens, never words.** A tile carrying its own
+label is a second name for a place the manifest already named, and the two say
+different things the first time one is renamed — a bar item and a tile for one
+screen reading as two places. Each tile wears the screen's own label and mark,
+and a screen this person may not open is dropped rather than led to.
+
+**The platform's own reads are named in the kernel for the same reason
+`SCREEN_PATH` is.** Both ends speak them and no manifest holds them, so a body
+asking for `totals.read` was refused as naming an operation that does not
+exist — which pushed the one screen that wanted a total back into asking three
+lists for one row each. The fields are named rather than waived: a `take` the
+answer does not carry is still a refusal, because an unchecked one is a blank
+region on a page in production.
+
+**Therefore never:** a narrowing no view fills from, or a fill naming no
+narrowing; a `plots` on a block that draws no marks, or a chart with no `plots`;
+a bar chart whose marks have no names; a row of shortcuts naming nothing, or
+naming a screen the app does not declare; a second copy of a guide's steps
+anywhere; or a platform read added to `SHARED_READS` without its answer's fields
+beside it.

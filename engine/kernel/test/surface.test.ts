@@ -987,3 +987,171 @@ describe("what the screen fills in", () => {
     expect(fillOf({ says: 1 })).toEqual({ of: "says", says: 1 });
   });
 });
+
+/* -------------------------------------------------------------- narrowing --- */
+
+/**
+ * ⚠️ THE CONTROL THAT NARROWS NOTHING IS THE SHARP ONE — see `PickSpec`. It
+ * moves, and the screen does not: a period somebody chose, a list that did not
+ * change, and nothing anywhere reporting a disagreement.
+ */
+describe("what a screen can be narrowed to", () => {
+  const asked: ViewSpec = {
+    id: "over-a-period",
+    of: "note",
+    asked: {
+      operation: "note.report", take: "rows", fills: { span: { picked: "span" } },
+    },
+  };
+  const SPAN = { id: "span", label: "Over", options: [{ value: "week", label: "7 days" }] };
+
+  const narrowed = (picks: unknown, views: readonly ViewSpec[] = [asked, recent]) => refuseSurface(
+    screen({
+      body: body({
+        picks: picks as never,
+        blocks: [{
+          block: "Listing",
+          nothing: { says: "None" },
+          bind: { rows: { from: { of: "view", view: views[0]!.id } } },
+        }],
+      }),
+    }),
+    INDEX, views, COLLECTIONS, ["note.report"],
+  ).map((p) => p.why);
+
+  it("accepts a pick a view actually fills from", () => {
+    expect(narrowed([SPAN])).toEqual([]);
+  });
+
+  /* ⚠️ THE ONE THIS EXISTS FOR. A control over rows nothing narrows is a screen
+     that answers a gesture by doing nothing. */
+  it("refuses a pick no view fills from", () => {
+    expect(narrowed([{ ...SPAN, id: "unused" }])).toContain("pick_narrows_nothing");
+  });
+
+  /* ⚠️ ONE WAY OR THE OTHER, AND NEITHER IS ALSO WRONG — a control with nothing
+     to pick is a label, and one with both has nothing deciding what it draws. */
+  it("refuses a pick that offers no options and no collection", () => {
+    expect(narrowed([{ id: "span", label: "Over" }])).toContain("pick_two_ways");
+  });
+
+  it("refuses a pick that is both a written set and a collection", () => {
+    expect(narrowed([{ ...SPAN, of: "note" }])).toContain("pick_two_ways");
+  });
+
+  /* ⚠️ AND AN UNLABELLED ONE, which on a screen full of figures is a control
+     nobody can say what changed. */
+  it("refuses a pick under no words", () => {
+    expect(narrowed([{ ...SPAN, label: " " }])).toContain("pick_says_nothing");
+  });
+
+  it("refuses two picks with one name", () => {
+    expect(narrowed([SPAN, SPAN])).toContain("pick_name_taken");
+  });
+
+  it("reads a narrowing as a source of its own", () => {
+    expect(fillOf({ picked: "span" })).toEqual({ of: "picked", picked: "span" });
+  });
+});
+
+/* ------------------------------------------------------------------ marks --- */
+
+/**
+ * ⚠️ A CHART WITH NO AXES DRAWS AN EMPTY BOX UNDER A CORRECT HEADING — see
+ * `PlotSpec`. The view is fetched, the region reports ready, the label is right
+ * and the figure is blank, so it reads as a workspace with no data in it.
+ */
+describe("what a chart plots", () => {
+  const CHARTED: BlockIndex = {
+    ...INDEX,
+    Run: {
+      id: "Run", bones: "chart", plots: "series",
+      takes: { series: { label: "What is plotted", takes: ["view"], required: true } },
+    },
+    Bars: {
+      id: "Bars", bones: "chart", plots: "labelled",
+      takes: { data: { label: "What is compared", takes: ["view"], required: true } },
+    },
+  };
+
+  const drawn = (block: string, plots: unknown, slot = "series") => refuseSurface(
+    screen({
+      body: body({
+        blocks: [{
+          block, ...(plots === undefined ? {} : { plots: plots as never }),
+          nothing: { says: "None" },
+          bind: { [slot]: { from: { of: "view", view: "recent-notes" } } },
+        }],
+      }),
+    }),
+    CHARTED, [recent], COLLECTIONS, [],
+  ).map((p) => p.why);
+
+  it("accepts a run of points with a measure and no names", () => {
+    expect(drawn("Run", { of: "words" })).toEqual([]);
+  });
+
+  it("refuses a chart that does not say what its axes are", () => {
+    expect(drawn("Run", undefined)).toContain("plots_missing");
+  });
+
+  it("refuses a mark per row whose marks have no names", () => {
+    expect(drawn("Bars", { of: "words" }, "data")).toContain("plots_unlabelled");
+  });
+
+  it("accepts one that names them", () => {
+    expect(drawn("Bars", { along: "title", of: "words" }, "data")).toEqual([]);
+  });
+
+  it("refuses a measure the rows do not carry", () => {
+    expect(drawn("Run", { of: "nowhere" })).toContain("shows_field_unknown");
+  });
+
+  /* ⚠️ AND ON A BLOCK THAT DRAWS NO MARKS AT ALL, which is a projection nothing
+     applies — the class of quietly-ignored declaration the registry closes. */
+  it("refuses axes on something that is not a chart", () => {
+    expect(drawn("Listing", { of: "words" }, "rows"))
+      .toContain("plots_on_a_block_that_draws_none");
+  });
+});
+
+/* ------------------------------------------------------------- shortcuts --- */
+
+/**
+ * ⚠️ A ROW OF SHORTCUTS WITH NOTHING IN IT IS A GAP UNDER A CORRECT HEADING —
+ * see `BlockSpec.leads`. Same failure as a chart with no axes, and quieter.
+ */
+describe("a row of shortcuts", () => {
+  const SHORT: BlockIndex = {
+    ...INDEX,
+    Quick: { id: "Quick", bones: "tiles", leads: true, takes: {} },
+  };
+
+  const led = (block: string, leads: unknown) => refuseSurface(
+    screen({
+      body: body({
+        blocks: [{
+          block, ...(leads === undefined ? {} : { leads: leads as never }),
+          ...(block === "Quick" ? {} : { bind: { says: { from: { of: "words", says: "x" } } } }),
+        }],
+      }),
+    }),
+    SHORT, [recent], COLLECTIONS, [], ["one-note"],
+  ).map((p) => p.why);
+
+  it("accepts screens this app declares", () => {
+    expect(led("Quick", ["one-note"])).toEqual([]);
+  });
+
+  it("refuses a row of shortcuts that names none", () => {
+    expect(led("Quick", undefined)).toContain("leads_missing");
+  });
+
+  it("refuses a destination this app does not declare", () => {
+    expect(led("Quick", ["nowhere"])).toContain("goes_nowhere");
+  });
+
+  it("refuses shortcuts on a block that draws none", () => {
+    expect(led("Heading", ["one-note"])).toContain("leads_on_a_block_that_takes_none");
+  });
+});

@@ -1172,6 +1172,7 @@ its own header, cited by other files, and doing nothing.
 | D94 | A view may be answered by a declared operation, and that is the only escape from the closed vocabulary | 0 |
 | D95 | A reference is a question about which row, and a form has to be able to ask it | 0 |
 | D96 | A screen is read, walked or worked in, and a flow's declaration is checked | 0 |
+| D97 | A screen may be narrowed, may draw marks, and may place the app's own book | 0 |
 <!-- /generated -->
 
 ---
