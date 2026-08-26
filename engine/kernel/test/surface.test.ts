@@ -20,7 +20,7 @@ import {
   CELLS_MOST, actsIn, blocksIn, fieldsIn, fillOf, fillsIn, refuseSurface, refuseView, unreadViews,
   viewsIn, type ActSpec, type BlockIndex, type SurfaceSpec, type ViewSpec,
 } from "../src/surface.js";
-import { BLOCKS } from "../src/blocks.js";
+import { BLOCKS, HEROES } from "../src/blocks.js";
 
 /* ------------------------------------------------------------------ world --- */
 
@@ -1153,5 +1153,65 @@ describe("a row of shortcuts", () => {
 
   it("refuses shortcuts on a block that draws none", () => {
     expect(led("Heading", ["one-note"])).toContain("leads_on_a_block_that_takes_none");
+  });
+});
+
+/* ------------------------------------------------------------------ hero --- */
+
+/**
+ * ⚠️ THE REGION EVERY SCREEN LEADS WITH, AND THE ONE THING IT MUST NOT BE IS
+ * SILENT. A hero naming a kind nothing registers has to refuse at compose time —
+ * the alternative is a screen that mounts with its whole top third missing, and
+ * a blank region reads as a slow network rather than as a mistake.
+ */
+describe("the hero", () => {
+  const leading = (hero: unknown) => refuseSurface(
+    screen({ body: { ...body(), hero } }),
+    INDEX, [recent], COLLECTIONS, [], [], HEROES,
+  ).map((p) => p.why);
+
+  const figure = {
+    as: "figure",
+    nothing: { says: "Nothing counted yet" },
+    bind: {
+      value: { from: { of: "count", view: "recent" } },
+      of: { from: { of: "words", says: "Notes" } },
+    },
+  };
+
+  it("accepts one whose kind is registered and whose slots are filled", () => {
+    expect(leading(figure)).toEqual([]);
+  });
+
+  it("refuses a kind nothing registers", () => {
+    expect(leading({ ...figure, as: "dial" })).toContain("hero_unknown");
+  });
+
+  it("refuses a hero missing a slot it cannot draw without", () => {
+    const { value: _drop, ...rest } = figure.bind;
+    expect(leading({ ...figure, bind: rest })).toContain("slot_missing");
+  });
+
+  it("refuses a slot the kind does not take", () => {
+    expect(leading({ ...figure, bind: { ...figure.bind, rows: { from: { of: "view", view: "recent" } } } }))
+      .toContain("slot_unknown");
+  });
+
+  it("refuses a source the slot cannot be given", () => {
+    expect(leading({ ...figure, bind: { ...figure.bind, of: { from: { of: "view", view: "recent" } } } }))
+      .toContain("slot_kind_wrong");
+  });
+
+  /*
+    ⚠️ AND A CALLER THAT FORGETS THE REGISTRY GETS A REFUSAL RATHER THAN A PASS.
+    An optional index that skipped its check when absent would mean every hero in
+    every product going unexamined the day somebody adds a call site — which is
+    the exact shape of silence this file exists to refuse.
+  */
+  it("refuses every hero when it is given no registry at all", () => {
+    expect(refuseSurface(
+      screen({ body: { ...body(), hero: figure } }),
+      INDEX, [recent], COLLECTIONS, [],
+    ).map((p) => p.why)).toContain("hero_unknown");
   });
 });

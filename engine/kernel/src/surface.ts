@@ -686,10 +686,58 @@ export type Placed = BlockSpec | GroupSpec;
 
 export const isGroup = (p: Placed): p is GroupSpec => "group" in p;
 
+/**
+ * THE ONE PLACE A SCREEN EARNS REAL DESIGN, AND EVERY SCREEN HAS EXACTLY ONE.
+ *
+ * ⚠️ A SCREEN WITHOUT ONE OPENS FLAT. Every block is peer to every other, so
+ * nothing leads and a person arriving has to READ in order to find out what they
+ * are looking at. That is not a failure anybody reports — it is a screen that
+ * feels assembled rather than designed, which is a thing people notice and
+ * cannot point at.
+ *
+ * ⚠️ IT IS A REGION RATHER THAN WHATEVER IS FIRST IN `blocks`, AND FOUR THINGS
+ * FOLLOW FROM NAMING IT. It is FULL BLEED, so it ignores the gutter every other
+ * block obeys — a flat list has no way to say that. The crown COLLAPSES INTO IT,
+ * so a screen's name rises into the chrome as the hero leaves rather than every
+ * author remembering to arrange it. It carries its own AMBIENCE, which no
+ * ordinary block does. And a guard can REQUIRE one, so "this screen opens flat"
+ * is a test rather than a note somebody writes in a review.
+ *
+ * ⚠️ THE KIND IS A CLOSED SET AND THE CONTENT IS THE SCREEN'S OWN. That is what
+ * makes a hero feel made for the screen without making every screen a snowflake
+ * — the same trick a face uses, where a person gets one world and a workspace
+ * gets another rather than every plate being a letter in a circle.
+ *
+ * ⚠️ AND A KIND IS REGISTERED WHEN A SCREEN ASKS FOR IT, NEVER BEFORE. The
+ * temptation is to sit down and name the six beautiful things a hero could be;
+ * that is exactly how thirteen charts and six list shapes came to be registered
+ * in this engine, by listing what the design package could export rather than by
+ * counting what a product draws. Eleven of the charts, then all six of the
+ * lists, were removed once somebody asked what a declaration naming one would
+ * actually render. A hero kind with no screen behind it is the same mistake in a
+ * bigger box.
+ */
+export interface HeroSpec {
+  /** Which kind — a key of `HEROES`. */
+  readonly as: string;
+  readonly bind?: Readonly<Record<string, Binding>>;
+  /**
+   * ⚠️ WHAT IT SAYS BEFORE ANYTHING HAS HAPPENED, and it is required for a
+   * reason no ordinary block's is. A hero is the first thing on a new
+   * workspace's first screen, so its empty state IS the product's first
+   * impression — and it has to read as *nothing has happened yet*, never as
+   * broken. A block further down that says nothing is a quiet row; a hero that
+   * says nothing is a screen that looks like it failed to load.
+   */
+  readonly nothing: { readonly says: string; readonly under?: string };
+}
+
 /** A screen's body: what it is for, how it is arranged, and what is on it. */
 export interface SurfaceSpec {
   readonly shape: ScreenShape;
   readonly layout: Layout;
+  /** ⚠️ The one place this screen earns real design — see `HeroSpec`. */
+  readonly hero?: HeroSpec;
   readonly blocks: readonly Placed[];
   /**
    * ⚠️ WHAT SOMEBODY CAN NARROW THIS SCREEN TO — see `PickSpec`. Above the
@@ -821,7 +869,7 @@ export type BlockIndex = Readonly<Record<string, BlockEntry>>;
 
 export type SurfaceRefusal =
   | "not_a_name" | "view_unknown" | "view_collection_unknown" | "view_field_unknown"
-  | "block_unknown" | "slot_unknown" | "slot_missing" | "slot_kind_wrong"
+  | "block_unknown" | "hero_unknown" | "slot_unknown" | "slot_missing" | "slot_kind_wrong"
   | "field_unknown" | "field_without_a_subject" | "format_wrong"
   | "dispatch_not_closed" | "dispatch_unreachable" | "two_kinds_of_screen"
   | "goes_nowhere"
@@ -1204,6 +1252,14 @@ export function refuseSurface(
   collections: readonly CollectionSpec[],
   operations: readonly string[],
   screens: readonly string[] = [],
+  /*
+    ⚠️ EMPTY REFUSES EVERY HERO, WHICH IS WHY THIS MAY DEFAULT AT ALL. A caller
+    that forgets it does not get heroes UNCHECKED — it gets `hero_unknown` on
+    every screen that declares one, loudly, on the first compose. An optional
+    index that skipped its check instead would be the silent-hole shape this
+    whole file is built to refuse.
+  */
+  heroes: BlockIndex = {},
 ): readonly SurfaceProblem[] {
   const body = screen.body;
   if (!body) return [];
@@ -1455,6 +1511,45 @@ export function refuseSurface(
       if (b.span) {
         at("span_without_a_grid",
           `${b.block} asks for room inside ${said}, whose blocks stack — the span belongs on the group`);
+      }
+    }
+  }
+
+  /*
+    ⚠️ THE HERO IS CHECKED LIKE A BLOCK BECAUSE IT IS BOUND LIKE ONE — the same
+    slots, the same sources, the same refusals — and it is checked SEPARATELY
+    because it is not one. It reads from its own registry, so a body cannot lead
+    with an ordinary row by accident, and an ordinary block cannot be placed in
+    the region that bleeds past the gutter.
+  */
+  if (body.hero) {
+    const lead = `screen ${screen.id} · hero`;
+    const kind = heroes[body.hero.as];
+    if (!kind) {
+      at("hero_unknown",
+        `${lead}: "${body.hero.as}" is not a kind of hero — `
+        + `there ${Object.keys(heroes).length === 1 ? "is" : "are"} `
+        + `${Object.keys(heroes).join(", ") || "none registered"}`);
+    } else {
+      const held = body.hero.bind ?? {};
+      for (const [slot, spec] of Object.entries(kind.takes)) {
+        if (spec.required && !(slot in held)) {
+          at("slot_missing",
+            `${lead} does not bind "${slot}" (${spec.label}), which it cannot draw without`);
+        }
+      }
+      for (const [slot, binding] of Object.entries(held)) {
+        const spec = kind.takes[slot];
+        if (!spec) {
+          at("slot_unknown",
+            `${lead} binds "${slot}", which it does not take — `
+            + `it takes ${Object.keys(kind.takes).join(", ")}`);
+          continue;
+        }
+        if (!spec.takes.includes(binding.from.of)) {
+          at("slot_kind_wrong",
+            `${lead}: "${slot}" takes ${spec.takes.join(" or ")}, and is given a ${binding.from.of}`);
+        }
       }
     }
   }

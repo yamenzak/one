@@ -59,7 +59,7 @@ import { LADDER, refuseLadder } from "./dunning.js";
 import { SURFACES, refuseSurfaces } from "./brand.js";
 import type { SurfaceSpec, ViewSpec } from "./surface.js";
 import { fillOf, fillsIn, refuseSurface, refuseView, unreadViews } from "./surface.js";
-import { BLOCKS } from "./blocks.js";
+import { BLOCKS, HEROES } from "./blocks.js";
 import type { PurposeBook, VaultBook } from "./vault.js";
 import { refuseVault, strayFacts } from "./vault.js";
 import type { AppId, Tone } from "./primitives.js";
@@ -1020,7 +1020,7 @@ export function refuseApp(spec: AppSpec): readonly Refusal[] {
   ];
   const screenIds = spec.screens.map((s) => s.id);
   for (const s of spec.screens) {
-    for (const p of refuseSurface(s, BLOCKS, views, spec.collections, ops, screenIds)) {
+    for (const p of refuseSurface(s, BLOCKS, views, spec.collections, ops, screenIds, HEROES)) {
       at(p.of, `${p.why}: ${p.detail}`);
     }
     /*

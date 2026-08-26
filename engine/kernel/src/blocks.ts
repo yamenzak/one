@@ -349,3 +349,43 @@ const MARKS: BlockIndex = {
 export const BLOCKS: BlockIndex = {
   ...ROWS, ...LISTS, ...FIGURES, ...CHARTS, ...BOOKS, ...MARKS,
 };
+
+/* ------------------------------------------------------------------ heroes --- */
+
+/**
+ * WHAT A SCREEN CAN LEAD WITH — see `HeroSpec`.
+ *
+ * ⚠️ A SEPARATE REGISTRY, BECAUSE A HERO IS NOT A BLOCK THAT HAPPENS TO BE
+ * FIRST. It bleeds past the gutter every block obeys, the crown collapses into
+ * it, and it carries its own ambience — none of which an entry in `BLOCKS` can
+ * say about itself. Keeping them in one index would mean every block silently
+ * gaining three properties it has no answer for, and the first screen to place a
+ * row in the hero slot would find out by looking.
+ *
+ * ⚠️ ONE ENTRY, AND THE COUNT IS THE POINT. Six were sketched — a figure, a
+ * title, a picture, a dial, a viewfinder, a field — and five of them are absent
+ * because no screen has asked yet. That restraint is the whole lesson of this
+ * file: thirteen charts and six list shapes were registered by listing what the
+ * design package could export, and seventeen of the nineteen were removed once
+ * somebody asked what a declaration naming one would draw. A vocabulary grows
+ * one screen at a time or it grows wrong.
+ */
+export const HEROES: BlockIndex = {
+  /**
+   * A NUMBER THAT MATTERS, WHAT IT IS OF, AND WHEN IT WAS LAST TRUE.
+   *
+   * ⚠️ `fresh` IS THE SLOT THAT MAKES THIS HONEST AND IT IS THE ONE A DASHBOARD
+   * LEAVES OUT. A figure with no age is a figure a person cannot decide about:
+   * a count from four seconds ago and a count from last Tuesday look identical,
+   * and the second one is the reason somebody walks to a shelf to check. It is
+   * not required, because a figure computed at read time genuinely has no age —
+   * but a screen reading a stored total and omitting it is showing a number
+   * without saying whether to believe it.
+   */
+  figure: block("figure", "figure", {
+    value: slot("The figure", FIGURE, true),
+    of: slot("What it is of", SAID, true),
+    fresh: slot("When it was last true", SAID),
+    trend: slot("How it has moved", ["view"], false, true),
+  }),
+};
