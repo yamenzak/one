@@ -997,9 +997,9 @@ describe("changing what a product is counted in", () => {
   understanding of the thing being made. An agent given only the field names is
   guessing at exactly the reasoning the flow already encodes.
 
-  ⚠️ AND IT IS THE MANIFEST'S OWN DECLARATION, checked against the screen that
-  draws it by `scripts/story.test.mjs` — so this cannot become a second
-  description that drifts from the one people actually see.
+  ⚠️ AND IT IS THE MANIFEST'S OWN DECLARATION — the one thing `Create` draws — so
+  this cannot become a second description that drifts from the one people
+  actually see.
 */
 describe("a flow reaches the agent door", () => {
   const tools = async (): Promise<readonly { name: string; description: string }[]> => {
@@ -1018,12 +1018,17 @@ describe("a flow reaches the agent door", () => {
     const found = (await tools()).find((tool) => tool.name === "product.register");
     expect(found, "product.register is not on the agent door").toBeTruthy();
     const said = found?.description ?? "";
-    expect(said).toContain("What is one of them?");
-    expect(said).toContain("How much do you need to know about each one?");
-    /* ⚠️ INCLUDING WHAT REMOVES A QUESTION. Half the flow disappears on one
-       answer, and an agent that does not know which half will ask for fields
-       nobody would ever be asked for. */
-    expect(said).toContain("only when anything is counted");
+    expect(said).toContain("What is it?");
+    expect(said).toContain("How closely do you follow it?");
+    /* ⚠️ INCLUDING WHAT REMOVES A QUESTION. A step disappears on one earlier
+       answer, and an agent that does not know which will ask for a field nobody
+       would ever be asked for. */
+    expect(said).toContain("only when tracking is not listed");
+    /* ⚠️ AND THE CONDITION IS IN WORDS — see `saidWhen`. A `Match` is an object;
+       interpolated raw it is `[object Object]`, which is not a degraded sentence
+       but a wrong one, because the agent then reads a conditional question as an
+       unconditional one. It typechecks, because everything interpolates. */
+    expect(said).not.toContain("[object Object]");
   });
 
   /* ⚠️ AND AN OPERATION WITH NO FLOW IS UNCHANGED — the summary alone. A

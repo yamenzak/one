@@ -127,6 +127,19 @@ export interface Ask {
   readonly part?: { readonly lead: string; readonly said: string | null };
   /** ⚠️ Skipped where false. A step that does not apply is not a step. */
   readonly when?: boolean;
+  /**
+   * ITS ANSWER ARRIVED RATHER THAN BEING ASKED — see `StorySpec.fills`.
+   *
+   * ⚠️ NOT THE SAME AS `when: false`, AND THE DIFFERENCE IS THE WHOLE REASON A
+   * FLOW CAN CONFIRM RATHER THAN ASK. A step that does not APPLY leaves the flow
+   * entirely — out of the walk, out of the count, out of the review. A settled
+   * one is out of the QUESTIONS and INTO the review, where its clause is what
+   * somebody checks and a press on it opens the step to change.
+   *
+   * ⚠️ COLLAPSED ONTO `when`, THE REVIEW SHOWS NOTHING A MODEL ANSWERED — which
+   * is every clause on the one screen the whole arrangement exists for.
+   */
+  readonly settled?: boolean;
   readonly children: React.ReactNode;
 }
 
@@ -260,12 +273,15 @@ export const REVIEW = "review";
  * wrong with a half-filled record. An unanswered step reads as its own question
  * with "Nothing set" under it, and is pressable like every other line.
  */
-function Review({ live, onGo, lead }: {
-  readonly live: readonly Ask[];
+function Review({ shown, onGo, lead }: {
+  /* ⚠️ EVERYTHING THAT APPLIES, SETTLED OR NOT — not the walk. A step whose
+     answer arrived is out of the questions and into HERE; reading the walk
+     instead shows a review with every model-filled clause missing. */
+  readonly shown: readonly Ask[];
   readonly onGo: (id: string) => void;
   readonly lead?: React.ReactNode;
 }) {
-  const steps = live.filter((one) => one.id !== REVIEW);
+  const steps = shown.filter((one) => one.id !== REVIEW);
   const prose = steps.filter((one) => one.part);
   const rows = steps.filter((one) => !one.part);
   return (
@@ -332,6 +348,13 @@ function Review({ live, onGo, lead }: {
 export interface Walk {
   /** ⚠️ The flow, skipped steps removed. Every index below is against THIS. */
   readonly live: readonly Ask[];
+  /**
+   * ⚠️ EVERY STEP THAT APPLIES, SETTLED ONES INCLUDED — what the review shows
+   * and what a debt is searched in. `live` is what somebody WALKS; this is what
+   * the flow is ABOUT, and a settled step belongs to the second and not the
+   * first.
+   */
+  readonly applies: readonly Ask[];
   readonly at: number;
   readonly here: Ask | undefined;
   readonly last: boolean;
@@ -355,7 +378,11 @@ export interface Walk {
 export function walk(asks: readonly Ask[], on: string): Walk {
   /* ⚠️ THE LIVE LIST IS THE FLOW, so a skipped step cannot be reached by
      arithmetic — not by Next, not by Back, not by the dots. */
-  const live = asks.filter((one) => one.when !== false);
+  const applies = asks.filter((one) => one.when !== false);
+  /* ⚠️ AND THE WALK IS WHAT IS LEFT TO ASK. A settled step is not a screen
+     anybody is taken to, so it is out of the count and out of Next — but it is
+     still part of the record, which is why the two lists are not one. */
+  const live = applies.filter((one) => !one.settled);
   const found = live.findIndex((one) => one.id === on);
   /* ⚠️ A STEP THAT SKIPPED ITSELF WHILE SOMEBODY STOOD ON IT LANDS THEM AT THE
      START RATHER THAN NOWHERE. It should not happen — `when` is decided by an
@@ -368,7 +395,10 @@ export function walk(asks: readonly Ask[], on: string): Walk {
   /* ⚠️ THE LAST STEP ANSWERS FOR THE WHOLE FLOW, because it holds the button
      that writes. A step somebody pressed past is still a missing name — and the
      sentence cannot appear where the fix is, so it TAKES them there instead. */
-  const owing = live.find((one) => one.short);
+  /* ⚠️ SEARCHED ACROSS EVERYTHING THAT APPLIES, because a required field a fill
+     left empty is a debt on a step nobody was asked — and read off the walk it
+     would be a write refused with no sentence anywhere saying why. */
+  const owing = applies.find((one) => one.short);
   /* ⚠️ THIS STEP'S OWN COMES FIRST, AND THE WAY-THERE MUST FOLLOW THE SAME
      BRANCH. Taken from `owing` regardless, the last step's own refusal would be
      drawn as a row that navigates to a DIFFERENT step — the sentence describing
@@ -386,6 +416,7 @@ export function walk(asks: readonly Ask[], on: string): Walk {
 
   return {
     live,
+    applies,
     at,
     here,
     last,
@@ -414,7 +445,7 @@ export function Story({
       children: null,
     },
   ];
-  const { live, at: i, here, last, short, owed: owedElsewhere } = walk(whole, at);
+  const { live, applies, at: i, here, last, short, owed: owedElsewhere } = walk(whole, at);
 
   /* ⚠️ A STEP IS A MOVE, SO IT TRAVELS. The same engine that carries one screen
      to the next carries one question to the next, which is what stops a flow
@@ -430,7 +461,19 @@ export function Story({
      pressing a line of the story looked like the screen glitching, while Next
      and Back beside it travelled. A named step is an index here like any other,
      and travelling is what says which way the flow just moved. */
-  const jump = (id: string) => { go(live.findIndex((one) => one.id === id)); };
+  /* ⚠️ FOUND IN WHAT APPLIES, NOT IN THE WALK. A settled step is in the review
+     and not in `live`, so an index taken there is -1 — which `go` clamps to the
+     first step, and the press that was meant to open the name sends somebody
+     back to the beginning. */
+  const jump = (id: string) => {
+    const to = live.findIndex((one) => one.id === id);
+    if (to >= 0) { go(to); return; }
+    if (!applies.some((one) => one.id === id)) return;
+    /* ⚠️ BACKWARD, BECAUSE THE REVIEW IS LAST and every settled step is before
+       it. The caller un-settles what was opened, so the step is in the walk by
+       the time it draws. */
+    travel("back", () => { onGo(id); });
+  };
 
   /*
     ⚠️ FORWARD PUSHES AN ENTRY; GOING BACK IS WHAT CONSUMES ONE. Pushing on a
@@ -528,7 +571,7 @@ export function Story({
         */}
         <Section label={here.ask}>
           {here.id === REVIEW
-            ? <Review live={live} onGo={jump} lead={said.lead} />
+            ? <Review shown={applies} onGo={jump} lead={said.lead} />
             : here.children}
         </Section>
 

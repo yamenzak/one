@@ -19,7 +19,7 @@ import { createRoot } from "react-dom/client";
 import { InventoryGround } from "../src/screens/ground.js";
 
 declare global {
-  interface Window { __ROUTE?: string; __SKY?: string }
+  interface Window { __ROUTE?: string; __SKY?: string; __STEP?: string }
 }
 
 /* ⚠️ THE WORLD ARRIVES THE SAME WAY THE ROUTE DOES, and for the same reason: one
@@ -28,4 +28,8 @@ declare global {
    different one — see `InventoryGround.sky`. Absent, every screen wears what it
    declares, which is what every other sweep photographs. */
 createRoot(document.getElementById("root") as HTMLElement)
-  .render(<InventoryGround route={window.__ROUTE ?? "/"} {...(window.__SKY ? { sky: window.__SKY } : {})} />);
+  .render(<InventoryGround
+    route={window.__ROUTE ?? "/"}
+    {...(window.__SKY ? { sky: window.__SKY } : {})}
+    {...(window.__STEP ? { step: window.__STEP } : {})}
+  />);

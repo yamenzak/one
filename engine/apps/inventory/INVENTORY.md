@@ -519,6 +519,14 @@ people do; confirming twenty fields is one they skip. `tracking` is the one step
 that is asked either way: the rung decides whether a delivery can be expired or
 recalled and it is `settled`, so a model may propose it and a person picks it.
 
+**The review is a paragraph and then rows, and the photographs are a row.** A
+step that `says` something joins one sentence; everything else is a row whose
+label is its answer and whose sub-line is the question, because somebody scanning
+a review is hunting for the ANSWER that is wrong. The camera step has no sentence
+to make — a picture is not read back as words — so its row counts what it holds
+(`{n} taken`, from `ASKS`). Without that count the row said "Nothing set" over six
+photographs, on the one screen whose whole job is to show an omission.
+
 ⚠️ **ELEVEN OF THE TWENTY-ONE ARE NOT ASKED HERE AT ALL, deliberately.** Barcodes,
 suppliers, the packing ladder, a reorder rule and the two shelf lives are facts
 somebody adds when they have them, and the product page already draws every one.

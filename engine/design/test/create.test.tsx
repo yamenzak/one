@@ -201,6 +201,50 @@ describe("the review is built out of what the steps say", () => {
   it("keeps a step with no sentence as its own row", () => {
     expect(drawn("review", REVIEWED)).toContain("Can you photograph it?");
   });
+
+  /*
+    ⚠️ A BLOCK COUNTS, AND THE DEFAULT IT REPLACES WAS A LIE. A row with no clause
+    reads "Nothing set" under its question, so six photographs and none looked
+    identical on the one screen whose whole job is to show an omission. The count
+    is the block's own — a `says` of `"{shots}"` would print a data URI.
+  */
+  /*
+    ⚠️ READ AS A PAIR, BECAUSE THE ROW TURNS OVER — see `Review`. The ANSWER is
+    the label and the question is under it, which is the way round somebody scans
+    a review; with no answer there is nothing to recognise the row by but the
+    question, so the two swap. Asserting one half alone would pass on the swap.
+  */
+  const rows = (html: string) =>
+    [...html.matchAll(/>([^<>]+)<\/span><span [^>]*text-muted[^>]*>([^<>]+)<\/span>/g)]
+      .map(([, label, under]) => [label, under] as const);
+  const about = (html: string, ask: string) =>
+    rows(html).find(([label, under]) => label === ask || under === ask);
+
+  const ASK = "Can you photograph it?";
+
+  it("says how many answers a block is holding", () => {
+    const out = drawn("review", { ...REVIEWED, shots: ["a.jpg", "b.jpg"] });
+    expect(about(out, ASK)).toEqual(["2 taken", ASK]);
+  });
+
+  it("still says nothing is set for a block nobody answered", () => {
+    expect(about(drawn("review", REVIEWED), ASK)).toEqual([ASK, "Nothing set"]);
+  });
+
+  /*
+    ⚠️ A STEP WHOSE ANSWER ARRIVED IS OUT OF THE QUESTIONS AND INTO HERE, and
+    that is the whole reason a flow can confirm rather than ask. Collapsed onto
+    "does not apply" — one boolean for two facts — the review showed nothing a
+    model had answered: every clause missing, on the single screen the entire
+    arrangement exists for, while the progress and the walk both looked right.
+  */
+  it("shows the clause of a step whose answer arrived", () => {
+    const out = drawn("review", REVIEWED, {
+      filled: new Set(["name", "brand", "unit"]),
+    });
+    expect(out).toContain("Casting resin, clear");
+    expect(out).toContain("counted in tin");
+  });
 });
 
 describe("what the flow will not let past", () => {

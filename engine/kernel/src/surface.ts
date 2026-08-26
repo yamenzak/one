@@ -2236,6 +2236,31 @@ export const stepApplies = (
 };
 
 /**
+ * A CONDITION IN WORDS, FOR A READER RATHER THAN A RUNTIME.
+ *
+ * ⚠️ IT EXISTS BECAUSE A `Match` IS AN OBJECT AND SOMETHING PRINTS IT. The agent
+ * door appends a flow's questions to the tool's description so a model is told
+ * the reasoning the screen already encodes — and a condition interpolated raw is
+ * `[object Object]`, which is not a degraded sentence but a wrong one: the agent
+ * reads it as a question that is always asked, and the guard the flow expresses
+ * is gone from its account of itself. It typechecks, because everything
+ * interpolates.
+ *
+ * ⚠️ AND `here` SAYS WHAT IT POINTS AT RATHER THAN GUESSING AT A VALUE. A step
+ * may not reach a record — `when_reaches_a_record` refuses it — so this only ever
+ * has to be honest about a manifest that never composed.
+ */
+export const saidWhen = (when: Match): string => {
+  if ("set" in when) return `${when.field} is set`;
+  if ("unset" in when) return `${when.field} is not set`;
+  const want = "is" in when ? when.is : when.isnt;
+  const said = "here" in want
+    ? (want.here === "me" ? "you" : "this record")
+    : String(want.literal);
+  return `${when.field} is ${"is" in when ? "" : "not "}${said}`;
+};
+
+/**
  * THE STEPS SOMEBODY IS ACTUALLY ASKED, IN ORDER.
  *
  * ⚠️ TWO REASONS A STEP IS NOT ASKED AND THEY ARE DIFFERENT. `when` says it does

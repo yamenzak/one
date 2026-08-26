@@ -172,6 +172,16 @@ export interface Live {
    * board draws nine of them without nine commits.
    */
   readonly sky?: string;
+  /**
+   * OPEN A DECLARED FLOW AT THIS STEP INSTEAD OF ITS FIRST.
+   *
+   * ⚠️ HERE FOR THE SAME REASON `sky` IS: it is REACT STATE, so no stylesheet and
+   * no URL reaches it. A flow's route is one address for every step — that is
+   * what stops a step being bookmarked into an empty form — so a sweep walking
+   * routes photographs the first question and nothing else, and the review is the
+   * screen a flow exists to arrive at.
+   */
+  readonly step?: string;
 }
 
 export const isLive = (what: ReactNode | Live): what is Live =>
@@ -251,7 +261,8 @@ const pageMounting = (live: Live, css: string, theme: "dark" | "light"): string 
   + `<style>html,body{margin:0;padding:0}</style>`
   + `</head><body><div id="root"></div>`
   + `<script>window.__ROUTE=${JSON.stringify(live.route)};`
-  + `window.__SKY=${JSON.stringify(live.sky ?? "")}</script>`
+  + `window.__SKY=${JSON.stringify(live.sky ?? "")};`
+  + `window.__STEP=${JSON.stringify(live.step ?? "")}</script>`
   + `<script>${live.code}</script></body></html>`;
 
 /**

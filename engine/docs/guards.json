@@ -3587,21 +3587,21 @@
     },
     {
       "id": "a-step-asks-rather-than-heads",
-      "protects": "D80",
+      "protects": "D100",
       "stage": "87",
       "status": "live",
       "impl": "scripts/story.test.mjs",
-      "proves": "every step asks a question",
+      "proves": "every declared step asks a question",
       "fails": "a flow that reads as a form again — a heading names the area of the record being written and leaves the person to work out what is wanted of them, which is the difference between a screen anybody can answer and one that needs an induction"
     },
     {
       "id": "every-step-carries-its-clause",
-      "protects": "D80",
+      "protects": "D100",
       "stage": "87",
       "status": "live",
       "impl": "scripts/story.test.mjs",
-      "proves": "every declared step carries the clause its answer makes",
-      "fails": "a step that vanishes from the recap without a trace: the screen draws, Next works, and the one answer somebody most wanted to check is the one they can never see again or get back to"
+      "proves": "every step with fields carries its clause",
+      "fails": "a review row reading \"Nothing set\" over an answer somebody gave — a step joins the recap's paragraph only where it says something, so one with fields and no clause reports what was entered as an omission, on the one screen whose whole job is to show one"
     },
     {
       "id": "the-docks-pair-belongs-to-the-flow",
@@ -3613,22 +3613,22 @@
       "fails": "a Back button over none of the wiring it implies — no recap, no per-step refusal, and no answer to the phone's own back gesture, which is the one that loses five screens of typing"
     },
     {
-      "id": "a-declared-flow-is-the-flow-its-screen-draws",
-      "protects": "D81",
+      "id": "every-asking-block-is-declared-and-drawn",
+      "protects": "D100",
       "stage": "87",
       "status": "live",
       "impl": "scripts/story.test.mjs",
-      "proves": "every flow in a manifest is the flow its screen draws",
-      "fails": "a manifest describing a product that does not exist — the declared questions are what the docs print and what an agent is handed before it starts a flow, and drifted from the screen they promise a page nobody built; it also catches a flow whose `writes` names an operation the app never declared, which is ten questions ending in a 404"
+      "proves": "every asking block is declared and drawn",
+      "fails": "a step drawing its question with no control at all — the kernel refuses a step naming an unregistered block and then draws nothing, so it cannot ask whether the registered one has a component, and a missing one resolves to `undefined` and falls through to the fields branch, which for a block step is empty"
     },
     {
-      "id": "a-step-names-its-id-above-its-question",
-      "protects": "D81",
+      "id": "the-declared-flow-has-one-renderer",
+      "protects": "D100",
       "stage": "87",
       "status": "live",
       "impl": "scripts/story.test.mjs",
-      "proves": "does not name its id",
-      "fails": "a step the guard cannot name, so the manifest comparison silently reads the wrong id — a step whose controls declare their own options puts three of them between one question and the next, which is how the barcode step came to be called `loose`"
+      "proves": "the declared flow has exactly one renderer",
+      "fails": "a hand-written wizard growing back beside the declared one — a file inside one product holding that product's questions, controls and clauses, which is what left the flow orphaned last time and what a surface rewrite deletes"
     },
     {
       "id": "a-destructive-statement-never-reaches-a-live-database",

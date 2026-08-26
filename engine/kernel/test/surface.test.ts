@@ -18,7 +18,7 @@ import { collection } from "../src/collection.js";
 import { field } from "../src/field.js";
 import {
   actsIn, askedOf, blocksIn, fieldsIn, fillOf, fillsIn, refuseStory, refuseSurface, refuseView,
-  stepApplies, unreadViews,
+  saidWhen, stepApplies, unreadViews,
   viewsIn, type ActSpec, type BlockIndex, type SurfaceSpec, type ViewSpec,
 } from "../src/surface.js";
 import { BLOCKS, HEROES } from "../src/blocks.js";
@@ -1730,6 +1730,43 @@ describe("when a step applies", () => {
     expect(when({ field: "tracking", is: { literal: "batched" } }, { tracking: "batched" })).toBe(true);
     expect(when({ field: "tracking", is: { literal: "batched" } }, { tracking: "counted" })).toBe(false);
     expect(when({ field: "tracking", isnt: { literal: "batched" } }, { tracking: "counted" })).toBe(true);
+  });
+});
+
+/**
+ * ⚠️ A CONDITION IS PRINTED, AND AN OBJECT INTERPOLATES WITHOUT COMPLAINT. The
+ * agent door appends a flow's questions to the tool's description; a `Match` put
+ * in raw is `[object Object]`, which is not a degraded sentence but a wrong one —
+ * the model reads a conditional question as unconditional and the guard the flow
+ * expresses is missing from its own account of itself.
+ */
+describe("a condition in words", () => {
+  it("says presence either way", () => {
+    expect(saidWhen({ field: "brand", set: true })).toBe("brand is set");
+    expect(saidWhen({ field: "brand", unset: true })).toBe("brand is not set");
+  });
+
+  it("says a literal either way", () => {
+    expect(saidWhen({ field: "tracking", is: { literal: "batched" } }))
+      .toBe("tracking is batched");
+    expect(saidWhen({ field: "tracking", isnt: { literal: "listed" } }))
+      .toBe("tracking is not listed");
+  });
+
+  /* ⚠️ A STEP MAY NOT REACH A RECORD — `when_reaches_a_record` refuses it — so
+     this only has to be honest about a manifest that never composed. */
+  it("names what a pointer points at rather than guessing a value", () => {
+    expect(saidWhen({ field: "owner", is: { here: "me" } })).toBe("owner is you");
+    expect(saidWhen({ field: "of", is: { here: "record" } })).toBe("of is this record");
+  });
+
+  it("never prints an object", () => {
+    for (const m of [
+      { field: "a", set: true },
+      { field: "a", unset: true },
+      { field: "a", is: { literal: 3 } },
+      { field: "a", isnt: { here: "me" } },
+    ] as const) expect(saidWhen(m)).not.toContain("object");
   });
 });
 

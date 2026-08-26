@@ -25,7 +25,7 @@
  */
 
 import type { Door, McpTool, Problem } from "@engine/kernel";
-import { PLATFORM_PROBLEMS, PUBLIC, isTool, problem, toolFor } from "@engine/kernel";
+import { PLATFORM_PROBLEMS, PUBLIC, isTool, problem, saidWhen, toolFor } from "@engine/kernel";
 import { compose, surfaceOfComposed, type Composed, type Resolved } from "./compose.js";
 import { NOBODY, performOperation, type Located, type Who, type Wiring } from "./serve.js";
 
@@ -169,8 +169,8 @@ async function listTools(wiring: Wiring, located: Located, who: Who): Promise<re
  * exactly the reasoning the flow already encodes.
  *
  * ⚠️ IT IS THE SAME DECLARATION THE SCREEN IS BUILT FROM, which is what stops it
- * becoming a second description that drifts: `story` in the manifest, checked
- * against the screen that draws it by `scripts/story.test.mjs`.
+ * becoming a second description that drifts: `story` in the manifest, and the
+ * one thing `Create` draws.
  *
  * ⚠️ AND IT IS APPENDED RATHER THAN REPLACING THE SUMMARY. The summary says what
  * the operation DOES; this says what a person is walked through to reach it, and
@@ -179,8 +179,12 @@ async function listTools(wiring: Wiring, located: Located, who: Who): Promise<re
 function walkedThrough(tool: McpTool, composed: Composed): McpTool {
   const flow = composed.app.screens.find((screen) => screen.story?.writes === tool.name)?.story;
   if (!flow) return tool;
+  /* ⚠️ THE CONDITION IN WORDS — see `saidWhen`. A `Match` is an object, and one
+     interpolated raw is `[object Object]`: not a degraded sentence but a wrong
+     one, because the agent then reads a conditional question as an unconditional
+     one and the guard the flow expresses is missing from its own account. */
   const asked = flow.asks
-    .map((step) => (step.when ? `${step.ask} (only when ${step.when})` : step.ask))
+    .map((step) => (step.when ? `${step.ask} (only when ${saidWhen(step.when)})` : step.ask))
     .join(" ");
   return {
     ...tool,

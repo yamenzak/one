@@ -3725,3 +3725,60 @@ asserted to FAIL so the list can only shrink.
 start from; a dark theme whose page has nothing under it for a dock or a shadow
 to occupy; a crush whose alpha is chosen once for every ground; or a threshold
 written as a constant when it is a claim about a relationship.
+
+---
+
+## D100 — A step names what it asks for, so a flow is a declaration and not a file
+
+`StepSpec` names `takes` (inputs of the write) or `block` (an id in `ASKS`), plus
+`says`, `under`, `when: Match` and `always`. `StorySpec` adds `fills: { by, with }`.
+`Create` turns that into `Story`, once, for every flow in every product, and
+`scripts/story.test.mjs` fails on a second caller.
+
+**Why.** The wizard was ORPHANED rather than deleted. `Story` was 554 lines and
+imported by nothing; `StorySpec` was declared by nothing. The reason was one gap:
+a step named a QUESTION but not what it asked FOR, so the controls had to come
+from somewhere, and the somewhere was a React file per flow inside a product. The
+surface rewrite deleted those files, and what survived was a declaration nothing
+could draw beside a frame nothing imported — both green, both fully tested, both
+inert. **A capability with a hand-written half is a capability with a deletable
+half.**
+
+**The controls come from the write, and that is what closed it.** An operation
+already declares its input as `FieldSpec`s — kind, label, required, the closed set
+and its words, the bounds, the collection a `ref` points at — which is everything
+a control needs. So the shape of the QUESTION is the product's decision and the
+shape of the CONTROL is not a decision at all. What a field cannot be — a camera,
+a viewfinder — is `ASKS`, a second registry because a step's block is ASKED where
+a body's block is FED; the first draft checked against `BLOCKS`, which typechecks
+and hands a camera the props of a table.
+
+**A model fills the RECORD; the flow then confirms instead of asking.** `fills`
+names an operation and maps its inputs from the write's own names, so what a model
+is GIVEN and what it may WRITE are both facts in the manifest rather than lines
+inside a screen. `askedOf` keeps "does not apply" and "arrived filled" strictly
+apart: the first leaves the flow entirely, the second moves into the review where
+a press on its clause opens it. One flow, two entrances.
+
+**Every hole found while wiring it was silent.** A `when` written as a bare string
+was uninterpretable by any renderer; printed to the agent door as a `Match` it was
+`[object Object]`, which reads as a question always asked — so `saidWhen` puts it
+in words. A block step's row in the review said "Nothing set" over six
+photographs, so `AskEntry.said` counts them. A picker handler closing over the
+render's list kept one of six files chosen at once, and only when more than one
+was chosen, which is the case nobody tries by hand.
+
+**And re-founding the guard is part of the work that removes its subject.**
+`story.test.mjs` compared the manifest against the screen that drew it. There is
+no such screen now, so the comparison found nothing and PASSED. **A guard whose
+premise has been deleted does not fail; it succeeds vacuously.** Its two word
+rules moved onto the declaration, and what replaced the comparison is the two
+things composition cannot see: the kernel draws nothing, so it cannot ask whether
+a registered block has a COMPONENT; and nothing but a guard can say the frame has
+exactly one caller.
+
+**Therefore never:** a declared capability whose only renderer is inside one
+product; a step that names a question and not what it asks for; a value a model
+may write that is decided in a component rather than in the manifest; a condition
+interpolated into prose without being put into words; or a guard left pointing at
+a subject the work deleted.

@@ -10,13 +10,28 @@
  * induction, a wiki page and somebody in the warehouse who knows; none of them
  * appears in a code review, and all of them are paid for forever.
  *
- * ⚠️ SO THE THREE RULES BELOW ARE ABOUT WORDS, WHICH IS UNUSUAL FOR A GUARD AND
- * IS THE POINT. A step ASKS rather than heading, it carries the CLAUSE its
- * answer makes, and the clause is the same string in the live echo and in the
- * recap. Any of the three left off renders perfectly and quietly turns the flow
+ * ⚠️ SO THE FIRST TWO RULES BELOW ARE ABOUT WORDS, WHICH IS UNUSUAL FOR A GUARD
+ * AND IS THE POINT. A step ASKS rather than heading, and it carries the CLAUSE
+ * its answer makes. Either left off renders perfectly and quietly turns the flow
  * back into the form it replaced.
  *
- * ⚠️ AND THE FOURTH IS THE ONE THAT PREVENTS A BUG RATHER THAN A REGRESSION.
+ * ⚠️ AND THEY ARE READ OFF THE MANIFEST NOW, WHICH IS THE WHOLE OF WHAT CHANGED.
+ * These rules used to be read off a hand-written screen, because a flow needed
+ * one: a React file supplying the controls for each question, and a fourth rule
+ * comparing the two halves so they could not drift. `Create` is that file — once,
+ * for every flow in every product — so the declaration IS the flow, there is no
+ * second half to disagree with it, and a pattern hunting for hand-written steps
+ * finds none and passes. **A guard whose premise has been deleted does not fail;
+ * it succeeds vacuously**, which is why re-founding one is part of the work that
+ * removes its subject rather than a tidy-up afterwards.
+ *
+ * ⚠️ WHAT REPLACED THAT FOURTH RULE IS THE TWO THINGS COMPOSITION CANNOT SEE.
+ * The kernel refuses a step naming an unregistered block — and it draws nothing,
+ * so it cannot ask whether the registered one has a COMPONENT; and nothing but a
+ * guard can say that the frame has exactly one caller, which is what stops a
+ * hand-written wizard growing back beside the declared one.
+ *
+ * ⚠️ AND THE LAST IS THE ONE THAT PREVENTS A BUG RATHER THAN A REGRESSION.
  * `Story` owns the phone's back gesture: forward pushes an entry, `popstate`
  * steps back, the first step pushes nothing so the Nth Back leaves. Hand-rolled
  * per flow that is four subtle rules and most of them get one wrong — and the
@@ -113,72 +128,71 @@ const HISTORIANS = new Set([
   if (!bad) ok(`historied: only the router and the flow write history — ${DRAWS.length} file(s) read`);
 }
 
-/* ----------------------------------------------- asked, and it narrates --- */
-
-/*
-  ⚠️ AN `Ask` IS FOUND BY `children:`, AND THE FIRST DRAFT WAS NOT. Matching a
-  bare `ask: "…"` reported twelve failures in the proving ground's SAMPLE DATA,
-  where `ask` is a column meaning "who asked" and every value is an email
-  address. `children` is what makes a step a step — it is the controls, it is
-  required by the type, and no row of data has one.
-
-  ⚠️ AND THE WINDOW IS LAZY, WHICH IS WHAT KEEPS ONE STEP OUT OF THE NEXT. Every
-  step declares `children`, so the nearest one after an `ask` is always that
-  step's own; a greedy match would read step A's question against step B's
-  clause and pass whatever B happened to declare.
-*/
-/*
-  ⚠️ ANCHORED ON `ask`, NOT ON `id`, AND THE FIRST DRAFT WAS THE OTHER WAY ROUND.
-  Starting at the nearest preceding `id:` reads whatever id happens to be closest
-  — and a step whose controls declare options (`{ id: "loose", label: … }`) puts
-  three of them between one question and the next, so the barcode step reported
-  its id as `loose`. A question is unambiguous; the id is then read BACKWARD from
-  it, and a step that does not put the two together is reported rather than
-  quietly skipped.
-*/
-const STEP = /\bask:\s*"([^"\\]{2,})"([\s\S]{0,6000}?)\bchildren:/g;
-const NAMED = /\bid:\s*"([^"]+)",\s*$/;
-
-/** The step's own id, or null where it is not written next to the question. */
-const idOf = (src, at) => NAMED.exec(src.slice(Math.max(0, at - 200), at))?.[1] ?? null;
-
 /**
  * ⚠️ THE FRAME ITSELF SYNTHESISES ONE STEP AND IT IS EXEMPT, NAMED HERE RATHER
  * THAN BY LUCK. `Story` appends the review — a step with a question and no
  * clause, which is correct: a review has nothing to add to a story because it IS
- * the story. It currently escapes the pattern above only because its id is the
- * constant `REVIEW` rather than a quoted string, and a rule that holds by an
- * accident of quoting is a rule that breaks the day somebody inlines it.
+ * the story.
  */
 const FRAME = "design/src/frame/story.tsx";
+
+/* ----------------------------------------------- asked, and it narrates --- */
+
+/**
+ * THE STEPS OF EVERY DECLARED FLOW, READ OUT OF THE MANIFESTS.
+ *
+ * ⚠️ THE MANIFEST IS THE ONLY PLACE A STEP EXISTS NOW, AND THAT IS WHY THESE TWO
+ * RULES MOVED. They used to be read off a hand-written screen, because a flow
+ * needed one — a React file supplying the controls for each question. `Create`
+ * is that file, once, for every flow in every product, so the screens the old
+ * pattern searched are gone and searching for them found nothing and passed.
+ *
+ * ⚠️ SPLIT ON `{ id: "`, WHICH IS SAFE ONLY BECAUSE A STEP NESTS NO IDS. `takes`
+ * is names, `says.per` is keyed on the closed set's values, `when` is a field and
+ * a literal — none of them is an `id`. The old pattern read the nearest preceding
+ * `id:` and a step whose controls declared options reported itself as `loose`;
+ * that whole class went with the controls.
+ */
+const stepsOf = (block) => {
+  const at = block.indexOf("asks:");
+  if (at < 0) return [];
+  return block.slice(at).split(/\{\s*id:\s*"/).slice(1).map((piece) => {
+    const id = /^([^"]+)"/.exec(piece)?.[1] ?? "?";
+    /* ⚠️ CUT AT THE NEXT STEP'S OWN START, so one step's `says` is never read as
+       the previous one's. The split already did it — what is left is this step
+       and everything after the last one, which is the closing bracket. */
+    return { id, ask: /\bask:\s*"([^"\\]+)"/.exec(piece)?.[1] ?? "", body: piece };
+  });
+};
+
+const MANIFESTS = appDirs().flatMap((dir) => filesIn(dir, /^index\.tsx?$/));
+const STORIES = MANIFESTS.flatMap((file) => {
+  const src = code(readFileSync(file, "utf8"));
+  return [...src.matchAll(/\bstory:\s*\{([\s\S]*?)\n(\s{4,6})\},/g)]
+    .map(([, block]) => ({ file: rel(file), block }));
+});
 
 {
   let checked = 0;
   let headings = 0;
   let silent = 0;
-  let unnamed = 0;
-  for (const file of DRAWS) {
-    if (rel(file) === FRAME) continue;
-    const src = code(readFileSync(file, "utf8"));
-    for (const match of src.matchAll(STEP)) {
-      const [, text, head] = match;
+
+  if (!STORIES.length) {
+    fail("asked: no declared flow matched at all — every rule below is about the words\n"
+      + "       in one, so a pattern that finds none is a set of checks that stopped\n"
+      + "       looking rather than a set of rules being kept.");
+  }
+
+  for (const { file, block } of STORIES) {
+    const steps = stepsOf(block);
+    if (!steps.length) {
+      fail(`${file}: a declared flow asks nothing.\n`
+        + `       The questions are what the docs print and what an agent is told the\n`
+        + `       flow will want; an empty list describes a screen nobody can prepare for.`);
+      continue;
+    }
+    for (const step of steps) {
       checked++;
-      /*
-        ⚠️ THE ID GOES DIRECTLY ABOVE THE QUESTION, AND A STEP THAT PUTS IT
-        ELSEWHERE IS REPORTED RATHER THAN SKIPPED. Read from anywhere else it is
-        whichever id happened to be nearest — a step whose controls declare
-        options puts three of them between one question and the next, which is
-        how the barcode step came to be called `loose`. The manifest that
-        declares this flow is compared against it BY ID, so a step the guard
-        cannot name is a step the comparison silently gets wrong.
-      */
-      if (!idOf(src, match.index)) {
-        unnamed++;
-        fail(`${rel(file)}: the step asking "${text.slice(0, 40)}" does not name its id\n`
-          + `       directly above the question. Written apart, nothing here can tell which\n`
-          + `       step a question belongs to — and the manifest declaring this flow is\n`
-          + `       compared against it by id.`);
-      }
       /*
         ⚠️ A QUESTION, AND THE `?` IS THE CHECK BECAUSE THE QUESTION IS THE
         DESIGN. "Counting" is a heading: it names the area of the record being
@@ -186,135 +200,133 @@ const FRAME = "design/src/frame/story.tsx";
         you count it in?" has an answer, and anybody who can answer it needs no
         training to.
       */
-      if (!text.trim().endsWith("?")) {
+      if (!step.ask.trim().endsWith("?")) {
         headings++;
-        fail(`${rel(file)}: a step is headed "${text.slice(0, 48)}"\n`
+        fail(`${file}: the step \`${step.id}\` is headed "${step.ask.slice(0, 48)}"\n`
           + `       rather than asking anything. A step of a flow asks ONE thing in the\n`
           + `       second person — that is what makes the flow answerable without an\n`
           + `       induction, and a heading is what it replaced.`);
       }
       /*
-        ⚠️ READ PER DECLARATION RATHER THAN PER FILE. Nine steps and eight
-        clauses passes any check that only asks whether the word appears, and the
-        one step missing its clause is the one that vanishes from the recap
-        without a trace: the screen still draws, Next still works, and the
-        sentence a person was going to check simply is not there.
+        ⚠️ A STEP WITH FIELDS AND NO CLAUSE IS A ROW READING "Nothing set", which
+        is the sharper form of the rule this replaces. `Create` puts a step into
+        the review's paragraph only where it `says` something; everything else is
+        a row whose label is its clause, so a step that has one to make and does
+        not make it reports an answer somebody gave as an omission — on the one
+        screen whose entire job is to show an omission.
+
+        ⚠️ A BLOCK STEP IS EXEMPT AND THE EXEMPTION IS NOT A HOLE. Its clause
+        comes from `AskEntry.said`, which is required, so its row counts what it
+        holds. A `says` could not cover it anyway: `"{shots}"` prints a data URI,
+        because a block's answer is a count rather than a value read back.
       */
-      if (!/\bsays:/.test(head)) {
+      if (/\btakes:\s*\[/.test(step.body) && !/\bsays:/.test(step.body)) {
         silent++;
-        fail(`${rel(file)}: the step "${text.slice(0, 48)}" carries no \`says\`.\n`
-          + `       A step that adds nothing to the story vanishes from the recap, so the\n`
-          + `       answer somebody gave it is the one they can never check and never get\n`
-          + `       back to. \`says: null\` is how a step declares it has no clause YET;\n`
-          + `       leaving the key off declares it will never have one.`);
+        fail(`${file}: the step \`${step.id}\` takes fields and carries no \`says\`.\n`
+          + `       Its row in the review reads "Nothing set" under the question — so the\n`
+          + `       answer somebody gave is reported as an omission, on the screen whose\n`
+          + `       whole job is to show one. A step's clause is the product's words for\n`
+          + `       what its answer MEANS, which no label can be derived into.`);
       }
     }
   }
-  if (!checked) {
-    fail("asked: no step declarations matched at all — both rules here are about the\n"
-      + "       words in one, so a pattern that finds none is two checks that stopped\n"
-      + "       looking rather than two rules being kept.");
+  if (checked && !headings) ok(`asked: every declared step asks a question — ${checked} step(s)`);
+  if (checked && !silent) ok(`narrates: every step with fields carries its clause — ${checked}`);
+}
+
+/* -------------------------------------------------------------- blocked --- */
+
+/**
+ * A STEP'S BLOCK IS DECLARED IN THE KERNEL AND DRAWN IN THE DESIGN PACKAGE, AND
+ * NEITHER HALF CAN SEE THE OTHER.
+ *
+ * ⚠️ THE HOLE IS AN ENTRY WITH NO COMPONENT, AND IT FAILS IN SILENCE. The kernel
+ * refuses `step_block_unknown` against `ASKS`, so a step may only name a
+ * registered block — and `ASKING` is a plain record, so a registered block with
+ * no component resolves to `undefined`, falls through to the fields branch, and
+ * draws a question with NOTHING under it. That is exactly the screen
+ * `step_asks_nothing` exists to refuse, arriving from the side the kernel cannot
+ * look at, because the kernel draws nothing.
+ *
+ * ⚠️ AND THE OTHER DIRECTION IS DEAD CODE WEARING A CONTRACT. A component for an
+ * id `ASKS` does not carry can never be reached — the kernel refuses every step
+ * that would name it — so it is a lazy chunk, a skeleton and a claim, for a block
+ * no flow can ask for.
+ */
+{
+  const idsIn = (path, from, pattern) => {
+    const src = readFileSync(join(ENGINE, path), "utf8");
+    const at = src.indexOf(from);
+    if (at < 0) return null;
+    return new Set([...src.slice(at).matchAll(pattern)].map((m) => m[1]));
+  };
+
+  const declared = idsIn(
+    "kernel/src/blocks.ts", "export const ASKS", /^\s{2}(\w+): asking\(/gm,
+  );
+  const drawn = idsIn(
+    "design/src/rendered/asking.tsx", "export const ASKING", /^\s{2}(\w+):/gm,
+  );
+
+  if (!declared?.size || !drawn?.size) {
+    fail("blocked: one of the two block registries could not be read at all.\n"
+      + "       An empty side makes every comparison below vacuously true, which is a\n"
+      + "       check that stopped looking rather than a rule being kept.");
   } else {
-    if (!headings && !unnamed) ok(`asked: every step asks a question — ${checked} step(s)`);
-    if (!silent) ok(`narrates: every declared step carries the clause its answer makes — ${checked}`);
+    /* ⚠️ ITS OWN COUNT, NOT THE FILE'S. Reading the shared one makes an unrelated
+       failure above suppress this check's `ok`, so the report says nothing about a
+       rule that was kept — and a silent pass reads the same as a missing check. */
+    let apart = 0;
+    for (const id of declared) {
+      if (!drawn.has(id)) {
+        apart++;
+        fail(`blocked: \`${id}\` is in \`ASKS\` and has no component in \`ASKING\`.\n`
+          + `       The kernel lets a step name it; the renderer resolves it to nothing and\n`
+          + `       falls through to the fields branch, which for a block step is empty — so\n`
+          + `       the flow draws that question with no control at all.`);
+      }
+    }
+    for (const id of drawn) {
+      if (!declared.has(id)) {
+        apart++;
+        fail(`blocked: \`${id}\` is in \`ASKING\` and not in \`ASKS\`.\n`
+          + `       No step can name it — the kernel refuses an unregistered block — so it is\n`
+          + `       a chunk, a skeleton and a contract for something nothing can ask for.`);
+      }
+    }
+    if (!apart) ok(`blocked: every asking block is declared and drawn — ${declared.size}`);
   }
 }
 
-/* ------------------------------------------------------------- declared --- */
+/* ---------------------------------------------------------- one drawing --- */
 
 /**
- * A FLOW IS DECLARED IN THE MANIFEST AND DRAWN IN A SCREEN, AND THE TWO AGREE.
- *
- * ⚠️ THE HOLE THIS CLOSES IS TWO HAND-TYPED STRINGS IN TWO FILES. A screen
- * declares `permission: "product:write"`; the flow inside it declares
- * `op: "product.register"`. Nothing checked that the second demands the first —
- * so a wizard could take somebody through ten questions, past a gate that said
- * yes, and be refused by the write at the end. That is the offer-and-refuse
- * failure the whole `op` mechanism exists to prevent, reproduced one level up.
- *
- * ⚠️ AND A DECLARATION NOBODY CHECKS IS WORSE THAN NONE, because it is read as
- * true. The manifest's list of questions is what the docs print and what an
- * agent is told a flow will want; drifted from the screen it describes a product
- * that does not exist. The ids and the questions are compared literally.
+ * ⚠️ THE FLOW HAS ONE RENDERER AND A SECOND CALLER IS A HAND-WRITTEN WIZARD.
+ * `Story` is the frame; `Create` turns a declaration into it. Anything else that
+ * mounts the frame is supplying its own `asks` — which is a file inside one
+ * product holding that product's questions, its controls and its clauses, and it
+ * is the exact shape the whole declared-flow contract replaced. It is also what a
+ * surface rewrite deletes, taking the flow with it.
  */
 {
-  const MANIFESTS = appDirs().flatMap((dir) => filesIn(dir, /^index\.tsx?$/));
-  let flows = 0;
-
-  for (const file of MANIFESTS) {
-    const src = code(readFileSync(file, "utf8"));
-    for (const [, block] of src.matchAll(/\bstory:\s*\{([\s\S]*?)\n(\s{4,6})\},/g)) {
-      flows++;
-      const name = rel(file);
-      const writes = /\bwrites:\s*"([^"]+)"/.exec(block)?.[1];
-      if (!writes) {
-        fail(`${name}: a declared flow names no \`writes\`.\n`
-          + `       A flow exists to reach ONE operation; without it nothing can check\n`
-          + `       that the screen's permission is the one that write demands.`);
-        continue;
-      }
-      /* ⚠️ THE OPERATION HAS TO EXIST — a flow pointed at a name nothing answers
-         is ten questions ending in a 404. */
-      if (!new RegExp(`\\bid:\\s*"${writes.replace(".", "\\.")}"`).test(src)) {
-        fail(`${name}: a flow writes \`${writes}\`, which this app does not declare.\n`
-          + `       Ten questions ending at an operation nothing answers.`);
-      }
-      const declared = [...block.matchAll(/\bid:\s*"([^"]+)",\s*ask:\s*"([^"\\]+)"/g)]
-        .map(([, id, ask]) => `${id}\u0000${ask}`);
-      if (!declared.length) {
-        fail(`${name}: a declared flow asks nothing.\n`
-          + `       The questions are what the docs print and what an agent is told the\n`
-          + `       flow will want; an empty list describes a screen nobody can prepare for.`);
-        continue;
-      }
-      /*
-        ⚠️ COMPARED AGAINST THE SCREEN THAT DRAWS IT, LITERALLY. The screen is
-        found by the operation it writes, which is the one string both halves
-        already have to share — matching on a filename would break the day
-        somebody renamed one.
-      */
-      /*
-        ⚠️ FOUND BY THE OPERATION IT WRITES, NOT BY A FILENAME. That string is
-        the one thing both halves already have to share, so matching on it
-        survives a screen being renamed or moved — and a guard that breaks on a
-        rename is a guard somebody deletes.
-      */
-      /*
-        ⚠️ NOT THE MANIFEST ITSELF, WHICH NOW ALSO CARRIES `ask:` — the file that
-        declares the flow names the operation and the questions, so an unfiltered
-        search finds the declaration and compares it against itself. It passed,
-        which is the worst way for this to be wrong.
-
-        ⚠️ AND A SCREEN IS A FILE WITH REAL STEPS IN IT — `children:` after a
-        question. That is what separates something that DRAWS the flow from
-        something that merely mentions the operation, which the container that
-        calls the write does on every screen in the product.
-      */
-      const drawn = DRAWS
-        .filter((f) => rel(f) !== FRAME && !MANIFESTS.includes(f))
-        .map((f) => code(readFileSync(f, "utf8")))
-        .filter((s) => s.includes(`"${writes}"`) && [...s.matchAll(STEP)].length > 0);
-      if (!drawn.length) {
-        fail(`${name}: nothing draws the flow that writes \`${writes}\`.\n`
-          + `       A declared flow with no screen is a promise in the docs and in the\n`
-          + `       agent surface that resolves to a page nobody built.`);
-        continue;
-      }
-      const screen = drawn[0];
-      const actual = [...screen.matchAll(STEP)]
-        .map((m) => `${idOf(screen, m.index) ?? "?"}\u0000${m[1]}`);
-      const say = (list) => list.map((s) => s.replace("\u0000", " — ")).join("\n         ");
-      if (say(declared) !== say(actual)) {
-        fail(`${name}: the declared flow and the screen that draws it disagree.\n`
-          + `       declared:\n         ${say(declared)}\n`
-          + `       drawn:\n         ${say(actual)}\n`
-          + `       The manifest is what the docs print and what an agent is handed. Drifted,\n`
-          + `       it describes a product that does not exist.`);
-      }
-    }
+  const RENDERER = "design/src/rendered/create.tsx";
+  const MOUNTS = /<Story[\s/>]/;
+  const strays = DRAWS
+    .filter((f) => rel(f) !== FRAME && rel(f) !== RENDERER)
+    .filter((f) => MOUNTS.test(code(readFileSync(f, "utf8"))))
+    .map(rel);
+  for (const name of strays) {
+    fail(`${name}: mounts \`Story\` itself.\n`
+      + `       A flow is DECLARED and \`Create\` draws it. Mounting the frame by hand is a\n`
+      + `       file holding one product's questions, controls and clauses — which is what\n`
+      + `       left the wizard orphaned last time, and what a surface rewrite deletes.`);
   }
-
-  if (flows) ok(`declared: every flow in a manifest is the flow its screen draws — ${flows}`);
+  const at = join(ENGINE, RENDERER);
+  if (!existsSync(at) || !MOUNTS.test(readFileSync(at, "utf8"))) {
+    fail(`${RENDERER}: no longer mounts \`Story\`, so a declared flow draws nothing and\n`
+      + `       this check is guarding an empty rule.`);
+  }
+  if (!strays.length) ok("one drawing: the declared flow has exactly one renderer");
 }
 
 /* -------------------------------------------------------------- paired --- */

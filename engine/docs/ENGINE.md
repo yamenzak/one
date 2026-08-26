@@ -421,7 +421,7 @@ and a manifest that does not compose refuses to boot.
 | `access` | permissions, roles, and what an app may never claim | 15 | — |
 | `reach` | how far one person works inside a workspace — where, as against what (D45) | 4 | — |
 | `gate` | the eight gates, in the order that decides which sentence somebody reads first | 3 | — |
-| `surface` | a screen declared — its shape, its blocks, and the closed vocabulary they bind through | 24 | — |
+| `surface` | a screen declared — its shape, its blocks, and the closed vocabulary they bind through | 25 | — |
 | `blocks` | which blocks a screen may name at all | 3 | — |
 | `manifest` | the whole app, and the composition that refuses a broken one | 14 | — |
 | `entitlement` | what a plan includes, and the allowance algebra over it | 17 | — |
@@ -445,7 +445,7 @@ and a manifest that does not compose refuses to boot.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**317 of them**, 316 reached by something today.
+**318 of them**, 317 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -1000,11 +1000,11 @@ its own header, cited by other files, and doing nothing.
 | `the-bar-centres-what-it-has` | D10 | every item capped and the whole leftover collecting at one end, which is a bar with a hole in it rather than a bar with fewer things in it |
 | `the-destination-somebody-is-on-is-lit` | D7 | the one place a product's colour touches the chrome, silently not painted — the light is a `color-mix` on the declared hue, so a manifest carrying an OKLCH triple instead of a colour makes the whole declaration invalid and nothing else about the bar changes |
 | `only-the-router-and-the-flow-write-history` | D80 | a history entry pushed with no step number on it, so the next back gesture cannot tell forward from back and one bad call corrupts every direction after it — and the existing history guard reads only the browser halves with a `main.tsx`, so every screen in every product was outside it |
-| `a-step-asks-rather-than-heads` | D80 | a flow that reads as a form again — a heading names the area of the record being written and leaves the person to work out what is wanted of them, which is the difference between a screen anybody can answer and one that needs an induction |
-| `every-step-carries-its-clause` | D80 | a step that vanishes from the recap without a trace: the screen draws, Next works, and the one answer somebody most wanted to check is the one they can never see again or get back to |
+| `a-step-asks-rather-than-heads` | D100 | a flow that reads as a form again — a heading names the area of the record being written and leaves the person to work out what is wanted of them, which is the difference between a screen anybody can answer and one that needs an induction |
+| `every-step-carries-its-clause` | D100 | a review row reading "Nothing set" over an answer somebody gave — a step joins the recap's paragraph only where it says something, so one with fields and no clause reports what was entered as an omission, on the one screen whose whole job is to show one |
 | `the-docks-pair-belongs-to-the-flow` | D80 | a Back button over none of the wiring it implies — no recap, no per-step refusal, and no answer to the phone's own back gesture, which is the one that loses five screens of typing |
-| `a-declared-flow-is-the-flow-its-screen-draws` | D81 | a manifest describing a product that does not exist — the declared questions are what the docs print and what an agent is handed before it starts a flow, and drifted from the screen they promise a page nobody built; it also catches a flow whose `writes` names an operation the app never declared, which is ten questions ending in a 404 |
-| `a-step-names-its-id-above-its-question` | D81 | a step the guard cannot name, so the manifest comparison silently reads the wrong id — a step whose controls declare their own options puts three of them between one question and the next, which is how the barcode step came to be called `loose` |
+| `every-asking-block-is-declared-and-drawn` | D100 | a step drawing its question with no control at all — the kernel refuses a step naming an unregistered block and then draws nothing, so it cannot ask whether the registered one has a component, and a missing one resolves to `undefined` and falls through to the fields branch, which for a block step is empty |
+| `the-declared-flow-has-one-renderer` | D100 | a hand-written wizard growing back beside the declared one — a file inside one product holding that product's questions, controls and clauses, which is what left the flow orphaned last time and what a surface rewrite deletes |
 | `a-destructive-statement-never-reaches-a-live-database` | D38 | a schema step that drops or rewrites a column on a database that is already serving — and the fault it was written after answered 503 on every door for an hour behind a green gate, because `boot` threw and static assets kept loading |
 | `no-unbounded-loop-waits-on-anything` | D37 | a loop that is wrong until somebody notices, which is the one class of bug that does not degrade — a wrong answer is wrong once, and what a runaway costs is a function of how long it goes unseen |
 | `a-read-per-row-is-a-ceiling-a-customer-walks-into` | D37 | a screen whose subrequest count is set by how many rows a customer has — `Promise.all` fixes the waiting and leaves the count, so the sequential check above it reports green right up to the request that stops answering |
@@ -1157,8 +1157,8 @@ its own header, cited by other files, and doing nothing.
 | D77 | Moving stock is a verb of its own | 0 |
 | D78 | Some fields are set once, and the write is what says so | 1 |
 | D79 | A design guard that spares the apps is a guard about the wrong tree | 0 |
-| D80 | A multi-step flow asks questions and says the answers back | 4 |
-| D81 | A flow is declared in the manifest and drawn in a screen | 2 |
+| D80 | A multi-step flow asks questions and says the answers back | 2 |
+| D81 | A flow is declared in the manifest and drawn in a screen | 0 |
 | D82 | A manifest is built when something asks for it, not when the module loads | 1 |
 | D83 | The split D3 describes has not been taken, and the trigger is startup CPU | 0 |
 | D84 | A clause reads back to somebody who has left the step, not to somebody standing on it | 0 |
@@ -1177,6 +1177,7 @@ its own header, cited by other files, and doing nothing.
 | D97 | A screen may be narrowed, may draw marks, and may place the app's own book | 0 |
 | D98 | A block takes the whole row or one cell, and a count of cells was a request the browser could not refuse | 0 |
 | D99 | The dark ground is a room with the lights down, and a crush is a share of whatever is under it | 0 |
+| D100 | A step names what it asks for, so a flow is a declaration and not a file | 4 |
 <!-- /generated -->
 
 ---

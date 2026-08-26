@@ -511,12 +511,28 @@ export interface AskEntry {
    * declaration depend on which app mounted it.
    */
   readonly answers: readonly string[];
+  /**
+   * WHAT THE REVIEW SAYS ONCE IT HAS ANSWERS, WITH `{n}` FOR HOW MANY.
+   *
+   * ⚠️ REQUIRED, BECAUSE THE DEFAULT WAS A LIE. A step with no clause is a ROW in
+   * the review, and a row with no clause reads "Nothing set" under its question —
+   * so six photographs and no photographs looked identical, on the one screen
+   * whose whole job is to show an omission. A `says` cannot cover it: a `says` of
+   * `"{shots}"` prints a data URI, and a block's answer is a COUNT rather than a
+   * value anybody reads back.
+   *
+   * ⚠️ AND IT COUNTS RATHER THAN INFLECTING — see `Unit`. "6 taken" and "1 taken"
+   * are both sentences; "1 pictures" is the naive rule this repository has already
+   * decided not to guess at.
+   */
+  readonly said: string;
 }
 
 export type AskIndex = Readonly<Record<string, AskEntry>>;
 
-const asking = (id: string, bones: Bones, answers: readonly string[]): AskEntry =>
-  ({ id, bones, answers });
+const asking = (
+  id: string, bones: Bones, answers: readonly string[], said: string,
+): AskEntry => ({ id, bones, answers, said });
 
 /**
  * ⚠️ ONE ENTRY, AND THAT IS THE HONEST STATE OF IT. The photo strip is the block
@@ -533,5 +549,5 @@ export const ASKS: AskIndex = {
    * output — so what a model may write into a record is a fact in the manifest
    * rather than a decision inside a component.
    */
-  Shots: asking("Shots", "tiles", ["shots"]),
+  Shots: asking("Shots", "tiles", ["shots"], "{n} taken"),
 };

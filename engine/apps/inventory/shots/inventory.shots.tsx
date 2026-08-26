@@ -56,6 +56,15 @@ import { inventory as INVENTORY } from "../src/index.js";
  */
 const DECLARED: readonly string[] = (INVENTORY().screens ?? []).map((one) => one.route);
 
+/**
+ * ⚠️ DERIVED, SO A SECOND FLOW IS PHOTOGRAPHED THE DAY IT IS DECLARED. A list
+ * naming `/add` by hand is a list somebody has to remember, and the whole reason
+ * the routes above are read off the manifest is that nobody does.
+ */
+const FLOWS = (INVENTORY().screens ?? [])
+  .filter((one) => one.story)
+  .map((one) => ({ route: one.route, at: "review" }));
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 const OUT = join(HERE, "..", "shots-out");
 
@@ -101,6 +110,26 @@ describe("OneInventory, photographed", () => {
         await shoot(browser, { code, route }, css, viewport, theme, to);
         /* ⚠️ A blank page encodes to a few hundred bytes. Anything the size of a
            real screen is several thousand. */
+        expect(statSync(to).size, `${to} is blank`).toBeGreaterThan(5_000);
+      }, 60_000);
+    }
+
+    /*
+      ⚠️ A FLOW IS ONE ROUTE AND SEVERAL SCREENS, so walking routes photographs
+      its first question and nothing else. The step is React state — a URL per
+      step would make each one shareable and reloadable into a form with nothing
+      in it — so the sweep asks for it the way it asks for a world, and the board
+      hands it to `Create`.
+
+      ⚠️ AND THE REVIEW IS THE ONE WORTH THE SECOND IMAGE. It is what the flow
+      exists to arrive at, it is the only screen built out of every step at once,
+      and it is where a clause that was never written shows up as a row saying
+      nothing.
+    */
+    for (const { route, at } of FLOWS) {
+      it(`${look}: ${route} at ${at}`, async () => {
+        const to = join(OUT, look, `${idOf(route)}-${at}.png`);
+        await shoot(browser, { code, route, step: at }, css, viewport, theme, to);
         expect(statSync(to).size, `${to} is blank`).toBeGreaterThan(5_000);
       }, 60_000);
     }

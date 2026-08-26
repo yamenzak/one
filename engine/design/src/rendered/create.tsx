@@ -29,7 +29,7 @@
 
 import * as React from "react";
 import type { Fields, Match, SaysSpec, StepSpec, StorySpec } from "@engine/kernel";
-import { ASKS, askedOf } from "@engine/kernel";
+import { ASKS, askedOf, stepApplies } from "@engine/kernel";
 import { Story, type Ask } from "../frame/story.js";
 import type { Act } from "../frame/screen.js";
 import { Field } from "./field.js";
@@ -174,6 +174,24 @@ const clauseOf = (
 };
 
 /**
+ * HOW MANY ANSWERS A BLOCK IS HOLDING.
+ *
+ * ⚠️ A LIST COUNTS ITS ITEMS AND A VALUE COUNTS AS ONE, because a block answers
+ * whichever its field is: `shots` is `json` holding six pictures, and a viewfinder
+ * would answer one code. Counting entries rather than fields is what makes "6
+ * taken" true of one field.
+ */
+const heldCount = (answers: readonly string[], held: Answers): number => {
+  let n = 0;
+  for (const name of answers) {
+    const value = held[name];
+    if (Array.isArray(value)) n += value.length;
+    else if (value !== undefined && value !== null && value !== "") n += 1;
+  }
+  return n;
+};
+
+/**
  * ⚠️ WHY THIS STEP CANNOT GO ON, IN A SENTENCE THAT SAYS WHAT TO DO — see
  * `Ask.short`. Held against the step that owns the field, which is what makes the
  * steps worth having at all: one sentence at the foot of a form tells somebody on
@@ -224,6 +242,16 @@ export function Create({
 }: CreateProps) {
   const arrived = filled ?? new Set<string>();
 
+  /**
+   * WHICH SETTLED STEPS SOMEBODY HAS OPENED FROM THE REVIEW.
+   *
+   * ⚠️ HERE RATHER THAN IN THE CALLER, BECAUSE IT IS ABOUT THE WALK AND NOTHING
+   * ELSE. A press on a clause means "I am answering this now"; the fields did
+   * still arrive, so subtracting them from `filled` would tell every other step
+   * something untrue about what the model answered.
+   */
+  const [opened, setOpened] = React.useState<ReadonlySet<string>>(new Set());
+
   /*
     ⚠️ EVERY DECLARED STEP BECOMES AN `Ask`, INCLUDING THE ONES NOT ASKED — and
     `when: false` is how a step leaves the flow rather than being dropped from
@@ -237,15 +265,38 @@ export function Create({
     [story.asks, held, arrived],
   );
 
+  /* ⚠️ AND A STEP GOES TO THE FRAME AS TWO SEPARATE FACTS — see `Ask.settled`.
+     Folded into one, "its answer arrived" reads as "it does not apply", and the
+     review shows nothing a model filled: every clause missing, on the one screen
+     the whole arrangement exists for. */
+  const go = (id: string) => {
+    setOpened((was) => (was.has(id) ? was : new Set([...was, id])));
+    onGo(id);
+  };
+
   const asks: readonly Ask[] = story.asks.map((step: StepSpec) => {
     /* ⚠️ WHAT THE STEP PUTS INTO THE WRITE, HOWEVER IT DOES IT. A block ANSWERS
        — that is what makes it a step rather than decoration — so a refusal about
        the pictures belongs to the step that took them. Read off `takes` alone,
        a block step had no fields, so the door's complaint about its answer
        appeared nowhere at all and the dock simply refused. */
-    const answers = step.block ? ASKS[step.block]?.answers ?? [] : [];
+    const entry = step.block ? ASKS[step.block] : undefined;
+    const answers = entry?.answers ?? [];
     const names = step.takes ?? [];
-    const clause = clauseOf(step.says, names, takes, held);
+    /*
+      ⚠️ A BLOCK COUNTS ITS ANSWERS WHERE A FIELD STEP SAYS ITS SENTENCE, and the
+      default this replaces was a lie. A step with no clause is a ROW in the
+      review, and a row with no clause reads "Nothing set" under its question —
+      so six photographs and none looked identical on the one screen whose whole
+      job is to show an omission. A `says` cannot cover it: `"{shots}"` prints a
+      data URI, because a block's answer is a count rather than a value read back.
+    */
+    const clause = entry && !step.says
+      ? (() => {
+        const n = heldCount(answers, held);
+        return n === 0 ? null : entry.said.replace("{n}", String(n));
+      })()
+      : clauseOf(step.says, names, takes, held);
     const short = shortOf([...names, ...answers], takes, held, refused);
     const Block = step.block ? blocks[step.block] : undefined;
 
@@ -253,7 +304,8 @@ export function Create({
       id: step.id,
       ask: step.ask,
       ...(step.under ? { under: step.under } : {}),
-      when: asked.has(step.id),
+      when: stepApplies(step.when, held),
+      ...(asked.has(step.id) || opened.has(step.id) ? {} : { settled: true }),
       says: clause,
       ...(short ? { short } : {}),
       /*
@@ -311,7 +363,7 @@ export function Create({
     <Story
       asks={asks}
       at={at}
-      onGo={onGo}
+      onGo={go}
       title={title}
       /* ⚠️ HELD WHILE A FILL RUNS — see `filling`. Next during the run would
          carry somebody past the very steps the answers are about to remove. */

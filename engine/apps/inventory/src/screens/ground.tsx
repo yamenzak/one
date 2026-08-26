@@ -40,7 +40,7 @@ const EVERYTHING = new Set([
  */
 const SOLD = ["processes", "jobs", "imports"];
 
-export function InventoryGround({ route, onGo, sky }: {
+export function InventoryGround({ route, onGo, sky, step }: {
   readonly route: string;
   /** ⚠️ Absent on the ground, where there is no router to go anywhere with. */
   readonly onGo?: (route: string) => void;
@@ -58,6 +58,16 @@ export function InventoryGround({ route, onGo, sky }: {
    * declaration and has no way to reach this.
    */
   readonly sky?: string;
+  /**
+   * OPEN A DECLARED FLOW AT THIS STEP INSTEAD OF ITS FIRST.
+   *
+   * ⚠️ HERE FOR THE SAME REASON `sky` IS: the step is REACT STATE, deliberately.
+   * A flow's route is one address for every step — which is what stops a step
+   * being bookmarked into an empty form — so a sweep walking routes photographs
+   * the first question and nothing else, and the review is the screen the whole
+   * flow exists to arrive at.
+   */
+  readonly step?: string;
 }) {
   const go = onGo ?? (() => undefined);
   /* ⚠️ Asked for rather than imported as a value — the manifest is a thunk so a
@@ -130,7 +140,7 @@ export function InventoryGround({ route, onGo, sky }: {
       {Drawn
         ? <Drawn route={route} onGo={go} />
         : here?.story
-          ? <Walked screen={here} />
+          ? <Walked screen={here} {...(step ? { step } : {})} />
           : here?.body
           ? (
             <Screen shape={here.body.shape} title={here.label}>
@@ -272,9 +282,12 @@ const namedIn = (screens: readonly { id: string; label: string; icon?: string }[
  * first step is a camera; photographed empty it is a picker over an empty rail,
  * which is a real state and not the one that shows what the block is for.
  */
-function Walked({ screen }: { readonly screen: ScreenSpec }) {
+function Walked({ screen, step }: {
+  readonly screen: ScreenSpec;
+  readonly step?: string;
+}) {
   const told = screen.story!;
-  const [at, setAt] = React.useState(told.asks[0]?.id ?? "review");
+  const [at, setAt] = React.useState(step ?? told.asks[0]?.id ?? "review");
   const [held, setHeld] = React.useState<Answers>(DRAFT);
   return (
     <Create
