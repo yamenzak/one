@@ -20,7 +20,7 @@
 import * as React from "react";
 import { Shell, whoFace } from "@engine/design";
 import { inventory } from "../index.js";
-import { InventoryScreen, InventorySurface } from "./index.js";
+import { INVENTORY_SESSIONS, INVENTORY_SURFACES } from "./index.js";
 
 /** ⚠️ Every permission a screen names, so none of them is undrawable here. */
 const EVERYTHING = new Set([
@@ -47,6 +47,11 @@ export function InventoryGround({ route, onGo }: {
   const INVENTORY = inventory();
   const screens = (INVENTORY.screens ?? []).filter(
     (s) => !s.features?.length || s.features.some((f) => SOLD.includes(f)));
+
+  /* ⚠️ Undefined while the surface is being rewritten — see the note below. */
+  const Drawn = INVENTORY_SESSIONS[
+    route.startsWith("surface:") ? route.slice("surface:".length) : route
+  ] as React.ComponentType<{ route: string; onGo: (to: string) => void }> | undefined;
 
   return (
     <Shell
@@ -80,10 +85,16 @@ export function InventoryGround({ route, onGo }: {
         and no page under it to push sideways — which is not the thing that
         ships.
       */}
-      <InventoryScreen route={route.startsWith("surface:") ? "/" : route} onGo={go} />
-      {route.startsWith("surface:")
-        ? <InventorySurface id={route.slice("surface:".length)} />
-        : null}
+      {/*
+        ⚠️ NOTHING, BECAUSE THE APP DRAWS NO SCREEN OF ITS OWN YET. The board is
+        for sessions — the screens that work rather than read and so draw their
+        own controls — and the surface is being rewritten, so there are none. A
+        body and a story are drawn by the engine from the declaration and are
+        photographed there, through the renderer; a copy of one here would be a
+        second answer to what that screen looks like, and the copy is the one
+        that goes out of date. See this directory's `index.tsx`.
+      */}
+      {Drawn ? <Drawn route={route} onGo={go} /> : null}
     </Shell>
   );
 }

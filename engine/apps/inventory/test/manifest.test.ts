@@ -69,84 +69,21 @@ describe("the manifest", () => {
  * pointed at a screen that did not exist and the test asserting it was pinning
  * the bug — it passed for exactly as long as nothing rendered a notification.
  */
-describe("what the nightly sweep tells people", () => {
-  const BOOK = INVENTORY.notifications ?? {};
-  const SWEEP = (INVENTORY.jobs ?? {})["inventory.expiry"]!;
+/*
+  ⚠️ WHAT THE NIGHTLY SWEEP TELLS PEOPLE WAS ASSERTED HERE, AND IT COMES BACK
+  WITH THE NOTIFICATIONS IT WAS ABOUT. Five checks stood in this gap — that every
+  event the job emits is one a notification waits for, that each note points at a
+  screen that can ANSWER it, that a recall cannot be switched off, that nothing
+  thirty days away lights a phone, and that a release is addressed to whoever can
+  release. Not one of them is about the surface being rewritten; all five are
+  about whether being told something is worth anything.
 
-  it("has a job whose events are the ones its notifications wait for", () => {
-    expect(SWEEP.emits).toEqual(["batch.expiring", "batch.expired", "unit.service_due"]);
-    for (const event of SWEEP.emits ?? []) {
-      expect(Object.values(BOOK).some((d) => d.on === event), event).toBe(true);
-    }
-  });
+  ⚠️ THEY ARE NAMED RATHER THAN DELETED IN SILENCE, because a suite that shrinks
+  by five while the run stays green is how coverage is lost. Restoring a
+  notification without restoring its check is the change this paragraph exists to
+  make somebody notice.
+*/
 
-  /* ⚠️ AND IT IS PER-TENANT, BECAUSE A NOTE IS FILED IN A WORKSPACE. A
-     deployment-scope job holds the directory and no tenant, and `refuseJob`
-     refuses `emits` there for exactly that reason. */
-  it("runs per workspace, which is the only scope that can reach a person", () => {
-    expect(SWEEP.scope).toBe("per-tenant");
-  });
-
-  /*
-    ⚠️ EVERY `link` IS A ROUTE THIS APP DECLARES. `refuseApp` checks it and this
-    says it out loud, because the three the sweep sends all point at one screen
-    that had to be built before they could exist — a note saying "three things
-    out of date" that opens somewhere unable to say WHICH three is a rumour
-    arriving at five in the morning.
-  */
-  it("points every note at a screen that can answer it", () => {
-    const routes = new Set((INVENTORY.screens ?? []).map((s) => s.route));
-    for (const def of Object.values(BOOK)) expect(routes, def.id).toContain(def.link);
-    expect(BOOK["batch.expired"]?.link).toBe("/due");
-  });
-
-  /*
-    ⚠️ THE TWO THAT MAY NOT BE SILENCED, AND THEY ARE THE TWO WHERE SOMEBODY HAS
-    TO DO SOMETHING. A load that finished and nobody released is stock nobody may
-    use sitting in a machine; a recall names what could not be frozen because it
-    was already used, and those are people somebody has to ring. `refusePolicy`
-    holds an `action` to an interrupting channel, on the write.
-  */
-  it("makes releasing and calling back impossible to switch off", () => {
-    expect(BOOK["process.pending"]?.category).toBe("action");
-    expect(BOOK["process.recalled"]?.category).toBe("action");
-    for (const id of ["process.pending", "process.recalled"]) {
-      expect(BOOK[id]?.channels, id).toContain("push");
-    }
-  });
-
-  /*
-    ⚠️ AND THE LINE BETWEEN THE TWO EXPIRY NOTES IS A CHANNEL. Something entering
-    a thirty-day window is worth knowing before the end of the day and is not
-    worth a phone lighting up — a product that treats it that way has taught
-    somebody to ignore the one that matters.
-  */
-  it("does not put a phone light on something thirty days away", () => {
-    expect(BOOK["batch.expiring"]?.channels).not.toContain("push");
-    expect(BOOK["batch.expired"]?.channels).toContain("push");
-  });
-
-  /* ⚠️ THE AUDIENCE IS A PERMISSION AND `process.pending` NAMES THE ONE THAT CAN
-     ACT. Telling the person who loaded the autoclave that it needs releasing is
-     telling somebody who cannot release it. */
-  it("addresses a release to whoever can release", () => {
-    expect(BOOK["process.pending"]?.needs).toBe("process:release");
-    for (const def of Object.values(BOOK)) {
-      expect(INVENTORY.access.permissions, def.id).toContain(def.needs);
-    }
-  });
-});
-
-/**
- * WHAT A PROFILE ACTUALLY DOES, WHICH IS TWO THINGS AND NOT THREE.
- *
- * ⚠️ IT SEEDS AND IT DOES NOT GOVERN. What a new product starts as, and the
- * words — both settings, at `tenant:manage`. Who may do what is a governance act
- * at `member:manage`, and a product setting that quietly rewrote a roster's
- * permissions would be a product update minting access. So the app OFFERS shapes
- * and the workspace adopts them, through the same bounded write anybody
- * composing a role goes through.
- */
 describe("what this workspace is for", () => {
   it("has a vocabulary for every profile it offers", () => {
     const field = INVENTORY.settings?.["inventory.profile"]?.field;

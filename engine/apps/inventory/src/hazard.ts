@@ -129,3 +129,34 @@ export function hazardContradictions(codes: readonly string[], signal: Signal): 
  */
 export const isHazardous = (codes: readonly string[], signal: Signal): boolean =>
   codes.length > 0 || signal !== "";
+
+/* ------------------------------------------------------------ on the label --- */
+
+/**
+ * A HAZARD NAME, BROKEN INTO AT MOST TWO BALANCED LINES.
+ *
+ * ⚠️ TWO LINES BECAUSE A DIAMOND IS WIDEST AT ITS MIDDLE. The shape narrows to
+ * nothing at both points, so a phrase set on one line runs out through the red
+ * border — and a hazard name a reader cannot finish is the one thing the label
+ * exists to say. Balanced rather than wrapped at the first fit: two short lines
+ * sit in the widest part of the shape, a long one and a stub do not.
+ *
+ * ⚠️ AND IT IS HERE RATHER THAN IN THE SCREEN THAT PRINTS IT. It lived inside a
+ * screen file, which made it a rule about a bottle expressed as a detail of one
+ * page — so it went out of the tree with that page and its tests broke, which is
+ * how it was found. Nothing about where a phrase breaks depends on the surface
+ * asking; the print sheet, a preview and whatever draws the label next all want
+ * the same answer.
+ */
+export const inTwo = (phrase: string): readonly string[] => {
+  const words = phrase.split(" ");
+  if (words.length < 2) return words;
+  let at = 1;
+  let closest = Number.POSITIVE_INFINITY;
+  for (let cut = 1; cut < words.length; cut++) {
+    const gap = Math.abs(
+      words.slice(0, cut).join(" ").length - words.slice(cut).join(" ").length);
+    if (gap < closest) { closest = gap; at = cut; }
+  }
+  return [words.slice(0, at).join(" "), words.slice(at).join(" ")];
+};

@@ -10,9 +10,9 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  CODES, GHS, SIGNALS, hazardContradictions, hazardOf, hazardsIn, isHazardous, signalIn,
+  CODES, GHS, SIGNALS, hazardContradictions, hazardOf, hazardsIn, inTwo, isHazardous, signalIn,
 } from "../src/hazard.js";
-import { inTwo } from "../src/screens/Labels.js";
+
 
 describe("the nine", () => {
   /*

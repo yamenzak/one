@@ -37,7 +37,24 @@ import { fileURLToPath } from "node:url";
 import { chromium, type Browser } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { DESK, PHONE, mounted, shoot, stylesheet } from "@engine/design/measuring";
-import { INVENTORY_ROUTES } from "../src/screens/index.js";
+import { inventory as INVENTORY } from "../src/index.js";
+
+/**
+ * ⚠️ THE MANIFEST, AND IT MUST BECOME THE RENDERER TOO. This walked the routes
+ * and drew each through the app's own board — so a screen ported to a declared
+ * body went on being photographed as the hand-written file of the same name,
+ * while the product drew the declaration. Eighty-four images were taken of
+ * screens no customer could open, filed under the ids of the ones they could,
+ * and every check reported green. A photograph of the previous design under the
+ * current name is worse than no photograph: one is a gap somebody fills, the
+ * other is evidence somebody trusts.
+ *
+ * ⚠️ SO A BODY AND A STORY ARE PHOTOGRAPHED THROUGH THE ENGINE, from the
+ * declaration, which is the only way the image is of the screen rather than of a
+ * file sharing its name. A session draws itself and is photographed from the
+ * board. Both halves land as the screens do.
+ */
+const DECLARED: readonly string[] = (INVENTORY().screens ?? []).map((one) => one.route);
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const OUT = join(HERE, "..", "shots-out");
@@ -78,7 +95,7 @@ afterAll(async () => { await browser?.close(); });
 
 describe("OneInventory, photographed", () => {
   for (const [look, viewport, theme] of LOOKS) {
-    for (const route of INVENTORY_ROUTES) {
+    for (const route of DECLARED) {
       it(`${look}: ${route}`, async () => {
         const to = join(OUT, look, `${idOf(route)}.png`);
         await shoot(browser, { code, route }, css, viewport, theme, to);
@@ -91,7 +108,11 @@ describe("OneInventory, photographed", () => {
 
   /* ⚠️ AND THE SWEEP FOUND SOMETHING TO SWEEP. Nineteen assertions that never
      ran would report exactly as green as nineteen that passed. */
+  /* ⚠️ AND THE SWEEP FOUND SOMETHING TO SWEEP. Assertions that never ran report
+     exactly as green as assertions that passed — which is the whole reason this
+     one exists. It is FAILING while the surface is rewritten, and that is the
+     correct answer to "did you photograph every screen" when there are none. */
   it("photographed every screen the manifest declares", () => {
-    expect(INVENTORY_ROUTES.length).toBeGreaterThan(15);
+    expect(DECLARED.length).toBeGreaterThan(15);
   });
 });
