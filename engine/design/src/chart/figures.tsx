@@ -571,6 +571,96 @@ function LeadsOn({ leads }: {
   );
 }
 
+/* --------------------------------------------------------------- resuming --- */
+
+/**
+ * THE RECORD SOMEBODY WAS LAST IN, AS THE THING A SCREEN LEADS WITH.
+ *
+ * ⚠️ IT IS A SENTENCE, NOT A READOUT, AND THAT DECIDES THE TYPE. `TYPE.display`
+ * is tuned for a NUMBER — tabular figures, tracking pulled to -0.035em — so a
+ * record's title set in it comes out cramped and reads as a serial. This takes
+ * `TYPE.title`, which is the same rank with a title's own tracking, and the
+ * difference at that size is most of what separates a name from a code.
+ *
+ * ⚠️ THE WHOLE CARD OPENS THE RECORD. A hero that is ABOUT one thing and offers
+ * four ways onward is a hero whose subject is the menu — so the destinations
+ * that belong to the SCREEN move out from under it and onto the page, as the
+ * circle cluster every product already has (`QuickActions`). That is the
+ * arrangement every home screen worth copying uses, and the reason is that a
+ * verb row inside the card competes with the thing the card is about.
+ *
+ * ⚠️ AND IT WEARS A GROUND, WHICH ALMOST NOTHING ELSE DOES. AMBIENCE.md's rule
+ * is that a card earns one when it is a destination or a result; the record you
+ * are about to walk back into is exactly that, and it is what stops the hero
+ * reading as the first of five identical cards.
+ */
+export function Resuming({ of, name, said, when, mark, onOpen, at }: {
+  /** ⚠️ What this IS, above the name — "Where you left off". */
+  readonly of: string;
+  readonly name: string;
+  /** ⚠️ One line. Two is a paragraph, and a paragraph here is a top nobody reads. */
+  readonly said?: React.ReactNode;
+  readonly when?: React.ReactNode;
+  /** ⚠️ A node, not a name — the caller passes `glyphOf(…)`. See `Group.icon`. */
+  readonly mark?: React.ReactNode;
+  readonly onOpen?: () => void;
+  readonly at?: number;
+}) {
+  const inside = (
+    <div className={`flex w-full items-start ${SPACE.snug}`}>
+      {mark
+        ? (
+          <span
+            aria-hidden="true"
+            className="flex shrink-0 items-center justify-center rounded-full bg-current/10"
+            style={{
+              width: `${MARK_PLATE}px`,
+              height: `${MARK_PLATE}px`,
+              ["--icon" as string]: `${ICON.row}px`,
+            }}
+          >
+            {mark}
+          </span>
+        )
+        : null}
+      {/* ⚠️ `min-w-0` OR THE TITLE PUSHES THE CARD SIDEWAYS. A flex child's
+          default `min-width: auto` is its content, so a long name refuses to
+          wrap and takes the row past the gutter — the overflow this repository
+          measures for on every screen. */}
+      <div className={`flex min-w-0 grow flex-col ${SPACE.hair}`}>
+        <span className={TYPE.note}>{of}</span>
+        <span className={TYPE.title}>{name}</span>
+        {said ? <p className={`${TYPE.body} text-muted line-clamp-2`}>{said}</p> : null}
+        {when ? <span className={TYPE.note}>{when}</span> : null}
+      </div>
+      {onOpen
+        ? <span aria-hidden="true" className={`shrink-0 self-center ${TYPE.note}`}>&rsaquo;</span>
+        : null}
+    </div>
+  );
+
+  return (
+    /* ⚠️ `cloth` RATHER THAN `glow`, AND IT IS THE ONE DECISION HERE THAT IS
+       TASTE WITH A REASON. A glow is a light source and reads as a highlight; a
+       cloth is a MATERIAL, which is what a card holding a record wants to be —
+       the thing has weight, it was there before the app was opened, and it will
+       be there after. */
+    <Group at={at ?? 0} sky="cloth">
+      {onOpen
+        ? (
+          <Button
+            variant="ghost"
+            onPress={onOpen}
+            className={`${ROW.press} items-start text-start ${ROW.free} ${ROW.wrap}`}
+          >
+            {inside}
+          </Button>
+        )
+        : inside}
+    </Group>
+  );
+}
+
 /* ------------------------------------------------------------------ meter --- */
 
 /**

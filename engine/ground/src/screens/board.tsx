@@ -106,6 +106,14 @@ const rows = (of: readonly object[]) =>
   makes the picture check the declaration rather than illustrate it.
 */
 const SEEN: Has = {
+  /*
+    ⚠️ A NO-OP, AND IT IS NOT NOTHING. Every affordance in the renderer is gated
+    on the handler being there — a hero opens a record only if something can go
+    somewhere — so a board without one photographs a screen with its presses
+    silently removed, which looks exactly like a screen that was never given
+    them. The hero card drew as a plain panel for one sweep for that reason.
+  */
+  onGo: () => undefined,
   views: {
     "every-note": rows(NOTES),
     "every-person": rows(PEOPLE),

@@ -553,24 +553,38 @@ export const GROUND: AppSpec = defineApp({
           because they answer two different questions: whether anything has
           happened, and what to do about it.
         */
+        /*
+          ⚠️ THE SCREEN LEADS WITH THE NOTE SOMEBODY WAS LAST IN, NOT WITH HOW
+          MANY THERE ARE. It led with the count first, and a count is a question
+          asked once and then known — nobody opens a notebook to find out that it
+          holds six notes. What a person actually comes back for is the thing
+          they walked away from, which is the first row of the list already on
+          this screen, so it costs no second read.
+
+          ⚠️ AND THE COUNT DID NOT DISAPPEAR, IT MOVED DOWN A RANK. It is one of
+          the four tiles' business now — or rather it would be, if a total were
+          worth a tile; what the tiles carry instead is the four questions a
+          notebook actually gets asked. The figure hero is still exercised, on
+          `/pinned`, where a count IS the point of the screen.
+        */
         hero: {
-          as: "figure",
-          nothing: { says: "Nothing yet", under: "Write one and it will be counted here" },
+          as: "subject",
+          nothing: { says: "Nothing written yet", under: "Write the first one" },
+          /* ⚠️ THE CARD IS THE DOOR, AND THE ID COMES OFF THE ROW THE NAME CAME
+             FROM — see `HeroSpec.goes`. One record, one press; the ways onward
+             below belong to the screen and are drawn outside the card. */
+          goes: { to: "note", by: "id" },
+          leads: ["write", "search", "reports"],
           bind: {
-            value: { from: { of: "count", view: "every-note" } },
-            /* ⚠️ NOT THE SCREEN'S OWN NAME AGAIN. The frame draws "Notes" a line
-               above this, so an eyebrow reading "Notes in this workspace" is the
-               same word twice in the two loudest ranks on the page — which is
-               how a hero comes to look like a heading with a number under it. */
-            of: { from: { of: "words", says: "Written so far" } },
-            unit: { from: { of: "words", says: "notes" } },
-            fresh: { from: { of: "words", says: "The most recent was on Thursday" } },
+            of: { from: { of: "words", says: "Where you left off" } },
+            name: { from: { of: "first", view: "every-note", field: "title" } },
+            said: { from: { of: "first", view: "every-note", field: "body" } },
+            /* ⚠️ `happened`, NOT `at`. The row's own timestamp is a column
+               rather than a field this collection declares, so a read may not
+               name it — the same refusal the view above already ran into. */
+            when: { from: { of: "first", view: "every-note", field: "happened" }, as: "when" },
             mark: { from: { of: "words", says: "note" } },
           },
-          /* ⚠️ THREE, AND NONE OF THEM IS THE SCREEN ITSELF. A shortcut back to
-             where somebody already is is the shape a breadcrumb has, and it is
-             the first thing a row of them collects. */
-          leads: ["write", "search", "reports"],
         },
         /*
           ⚠️ THE HERO IS ONE NUMBER AND THE SCREEN NEEDS FOUR, WHICH IS THE
@@ -698,6 +712,21 @@ export const GROUND: AppSpec = defineApp({
       body: {
         shape: "list",
         layout: { as: "stack" },
+        /* ⚠️ THE FIGURE HERO LIVES HERE NOW, AND IT IS NOT A CONSOLATION PRIZE.
+           A count is the point of a screen whose whole subject is "how many of
+           these are there and which" — which is what a narrowed list is, and is
+           not what a home screen is. Both kinds stay placed by a declaration,
+           which is the only way either goes on being exercised. */
+        hero: {
+          as: "figure",
+          nothing: { says: "Nothing pinned", under: "Pin a note and it will be counted here" },
+          bind: {
+            value: { from: { of: "count", view: "pinned-notes" } },
+            of: { from: { of: "words", says: "Kept to hand" } },
+            unit: { from: { of: "words", says: "notes" } },
+            mark: { from: { of: "words", says: "tag" } },
+          },
+        },
         blocks: [{
           block: "Listing",
           shows: [{ field: "title", label: "Note" }, { field: "body", label: "What it says" }],

@@ -744,6 +744,61 @@ describe("a block asks for room the layout has", () => {
     ).map((p) => p.why)).toContain("leads_to_several");
   });
 
+  /* --- the second kind ---------------------------------------------------- */
+
+  /*
+    ⚠️ THE REGION TAKES A KIND AND THE SECOND ONE IS WHAT PROVES IT. `figure`
+    shipped first and was treated as though it were THE hero — a screen either
+    had a big number or opened flat. These assert that a wholly different shape
+    composes through the same contract, and that its one coupling is checked.
+  */
+  const carrying = {
+    as: "subject",
+    nothing: { says: "Nothing yet", under: "Write the first one" },
+    bind: {
+      of: { from: { of: "words", says: "Where you left off" } },
+      name: { from: { of: "first", view: "recent-notes", field: "title" } },
+    },
+  };
+
+  it("accepts a hero of the second kind", () => {
+    expect(refuseSurface(
+      screen({ body: { ...body(), hero: carrying } }),
+      INDEX, [recent], COLLECTIONS, [], [], HEROES,
+    ).map((p) => p.why)).toEqual([]);
+  });
+
+  it("refuses one that opens a screen the app does not declare", () => {
+    expect(refuseSurface(
+      screen({ body: { ...body(), hero: { ...carrying, goes: "nowhere" } } }),
+      INDEX, [recent], COLLECTIONS, [], [], HEROES,
+    ).map((p) => p.why)).toContain("goes_nowhere");
+  });
+
+  /*
+    ⚠️ THE ONE COUPLING IN THE CONTRACT, CHECKED — see `HeroSpec.goes`. The id
+    comes off the row the NAME came from, so a name that is a literal leaves the
+    press with no record to carry: it would open a screen with no subject, which
+    then draws its own empty state over nothing at all.
+  */
+  it("refuses one that opens a record when its name is not read off a row", () => {
+    expect(refuseSurface(
+      screen({ body: { ...body(), hero: {
+        ...carrying,
+        goes: "one-note",
+        bind: { ...carrying.bind, name: { from: { of: "words", says: "A note" } } },
+      } } }),
+      INDEX, [recent], COLLECTIONS, [], ["one-note"], HEROES,
+    ).map((p) => p.why)).toContain("hero_opens_nothing");
+  });
+
+  it("accepts one that opens a record its name came from", () => {
+    expect(refuseSurface(
+      screen({ body: { ...body(), hero: { ...carrying, goes: "one-note" } } }),
+      INDEX, [recent], COLLECTIONS, [], ["one-note"], HEROES,
+    ).map((p) => p.why)).toEqual([]);
+  });
+
   it("accepts a one-destination block that names one", () => {
     const ONE: BlockIndex = {
       ...INDEX,

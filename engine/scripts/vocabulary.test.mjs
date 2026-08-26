@@ -270,7 +270,7 @@ const WHY = {
     renderer has a branch for the kind — which is the same "declared and drawn by
     nothing" fault this file exists for, asked of the other registry.
   */
-  hero: ["Lead"],
+  hero: ["Lead", "Resuming"],
   /*
     ⚠️ A CHART WHOSE DATA A `view` CANNOT DESCRIBE, WHICH IS ELEVEN OF THE
     THIRTEEN. `LineChart` and `BarChart` take a series and a name and are in the

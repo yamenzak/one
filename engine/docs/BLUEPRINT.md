@@ -150,6 +150,37 @@ different left edges because one of them has three letters in front. The same is
 true of the mark — a number alone is read as arithmetic; the same number beside a
 mark is read as a subject.
 
+### The hero is a KIND, and a figure is only one of them
+
+⚠️ **THE FIRST KIND SHIPPED AND WAS TREATED AS THOUGH IT WERE THE HERO.** A screen
+either had a big number or opened flat, and the whole region was built to take a
+kind precisely so that would not be the choice. A count is a question asked once
+and then known; nobody opens a tool to find out how many records are in it. What
+somebody actually comes back for differs per product, and the kinds are where
+that difference lives:
+
+| The hero is… | The kind | When it is the right one |
+|---|---|---|
+| a number that matters | `figure` | the number changes and somebody checks it — a balance, an arrears, what is left |
+| the record you were last in | `subject` | there is a thing to carry on with: a draft, an open count, an order arriving |
+
+**Two, and the list grows only when a screen asks.** A kind with no screen behind
+it is the mistake this engine has made twice already — thirteen charts and six
+list shapes, registered by listing what a design package could export rather than
+by counting what a product draws. Sketching six beautiful heroes is the same
+mistake in a bigger box.
+
+⚠️ **A `subject` HERO IS WORDS, AND THAT CHANGES THE TYPE.** A record's name is set
+in the title role, not the display role: display is tuned for a NUMBER — tabular
+figures, tracking pulled in hard — so a title in it comes out cramped and reads
+as a serial rather than a sentence.
+
+⚠️ **AND THE ONE COUPLING IS WRITTEN DOWN RATHER THAN INFERRED.** A subject hero
+opens the record it is about, and the id comes off the same row its NAME came
+from — there is no second place it could come from, and a hero whose name is a
+literal has no record behind it at all. The composer refuses that pairing, so the
+press can never reach a screen with no subject.
+
 ### Bespoke, and a closed set, at the same time
 
 **The KIND is a closed vocabulary. The CONTENT is the screen's own. Each kind is

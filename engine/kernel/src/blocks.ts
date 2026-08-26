@@ -433,4 +433,43 @@ export const HEROES: BlockIndex = {
        `words` only: it is a property of the screen, not of a record. */
     mark: glyph("The mark beside it"),
   }),
+
+  /**
+   * THE THING SOMEBODY WAS LAST IN, AND THE WAY BACK INTO IT.
+   *
+   * ⚠️ A HOME SCREEN THAT LEADS WITH A TOTAL IS ANSWERING A QUESTION NOBODY
+   * ASKED TWICE. A count is read once and then known; what a person opening a
+   * tool actually wants is the record they walked away from — the count left
+   * open, the order arriving, the draft half written. Every app whose home
+   * screen anybody admires does some version of this, and none of them does it
+   * with a number.
+   *
+   * ⚠️ SO THE FIGURE IS NOT THE ONLY KIND, WHICH IS THE WHOLE REASON THE REGION
+   * TAKES ONE. `figure` shipped first and was treated as though it were THE
+   * hero — a screen either had a big number or opened flat. A kind is what lets
+   * a notebook lead with a draft, a warehouse lead with a scan and a ledger lead
+   * with a balance, out of one contract.
+   *
+   * ⚠️ AND IT IS WORDS RATHER THAN DIGITS, WHICH CHANGES THE TYPE. A record's
+   * name is set in the display face at title rank and reads as a SENTENCE; the
+   * same rank of tabular figures reads as a readout. `TYPE.display` is tuned for
+   * a number — tracking pulled in hard — and putting a title in it is the fault
+   * `type.ts` names in the other direction.
+   *
+   * ⚠️ THE WHOLE THING OPENS THE RECORD, so it takes one destination and not a
+   * row of them. A hero that is ABOUT one thing and offers four ways onward is a
+   * hero whose subject is the menu.
+   */
+  subject: block("subject", "hero", {
+    /* ⚠️ THE RECORD'S OWN NAME — `first` off a view, almost always. A hero that
+       named a record by binding a literal would be a hero about nothing. */
+    name: slot("What it is called", ["field", "first", "words"], true),
+    /* ⚠️ WHAT IT IS, ABOVE THE NAME — "Where you left off", "Arriving today". */
+    of: slot("What this is", SAID, true),
+    /* ⚠️ ONE LINE ABOUT IT, AND ONE ONLY. Two lines of prose under a title is a
+       paragraph, and a paragraph in a hero is a screen nobody reads the top of. */
+    said: slot("One line about it", ["field", "first", "words"]),
+    when: slot("When it was", ["field", "first", "words"]),
+    mark: glyph("The mark beside it"),
+  }),
 };

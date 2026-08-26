@@ -753,6 +753,20 @@ export interface HeroSpec {
    * the work the rest of it would otherwise have to.
    */
   readonly leads?: readonly string[];
+  /**
+   * WHERE THE RECORD ITSELF OPENS — the screen, and which of its fields is the
+   * address. Same shape as `BlockSpec.goes`, for the same reason.
+   *
+   * ⚠️ AND IT READS ITS ID OFF THE SAME VIEW THE NAME CAME FROM, which is the
+   * one coupling in this contract and is written here rather than inferred
+   * quietly. A subject hero is ABOUT the first row of a view; the words on it
+   * are that row's fields, so the row to open is that row and there is no second
+   * place it could come from. `refuseSurface` insists the name is a `first` when
+   * this is set, because a hero whose name is a literal has no record behind it
+   * and the press would open a screen with no subject — which draws its own
+   * empty state over nothing at all.
+   */
+  readonly goes?: string | GoSpec;
 }
 
 /** A screen's body: what it is for, how it is arranged, and what is on it. */
@@ -915,7 +929,7 @@ export type BlockIndex = Readonly<Record<string, BlockEntry>>;
 
 export type SurfaceRefusal =
   | "not_a_name" | "view_unknown" | "view_collection_unknown" | "view_field_unknown"
-  | "block_unknown" | "hero_unknown" | "slot_unknown" | "slot_missing" | "slot_kind_wrong"
+  | "block_unknown" | "hero_unknown" | "hero_opens_nothing" | "slot_unknown" | "slot_missing" | "slot_kind_wrong"
   | "field_unknown" | "field_without_a_subject" | "format_wrong"
   | "dispatch_not_closed" | "dispatch_unreachable" | "two_kinds_of_screen"
   | "goes_nowhere"
@@ -1600,6 +1614,23 @@ export function refuseSurface(
       if (!screens.includes(to)) {
         at("goes_nowhere",
           `${lead} leads to "${to}", which is not a screen this app declares`);
+      }
+    }
+    if (body.hero.goes) {
+      const go = goOf(body.hero.goes);
+      if (!screens.includes(go.to)) {
+        at("goes_nowhere",
+          `${lead} opens "${go.to}", which is not a screen this app declares`);
+      }
+      /* ⚠️ SEE `HeroSpec.goes`. The id comes off the row the name came from, so
+         a name that is not read from a row leaves the press with nothing to
+         open — a destination reached with no subject, drawing its own empty
+         state over a record that was never there. */
+      const named = body.hero.bind?.["name"]?.from;
+      if (named && named.of !== "first") {
+        at("hero_opens_nothing",
+          `${lead} opens "${go.to}" and its name is a ${named.of} rather than a row — `
+          + "there is no record for the press to carry");
       }
     }
   }

@@ -34,7 +34,7 @@ import type {
 } from "@engine/kernel";
 import { BLOCKS, goOf, isGroup, opOf } from "@engine/kernel";
 import { Arranged, spanning } from "../parts/arrange.js";
-import { Group } from "../parts/surfaces.js";
+import { Group, QuickActions } from "../parts/surfaces.js";
 import { Region, ready, type Loaded } from "../parts/state.js";
 import { Lookup, Segmented } from "../parts/forms.js";
 import { SPACE } from "../tokens/metrics.js";
@@ -42,7 +42,7 @@ import { Num, Size, Unit, When } from "../parts/said.js";
 import { Money } from "../parts/surfaces.js";
 import { Tally } from "../parts/tally.js";
 import { PARTS } from "./parts.js";
-import { Lead } from "../chart/figures.js";
+import { Lead, Resuming } from "../chart/figures.js";
 import { glyphOf } from "../frame/shell.js";
 
 /* ------------------------------------------------------------ what it has --- */
@@ -170,6 +170,13 @@ const rowsOf = (has: Has, view: string) => {
   const held = has.views[view];
   return held?.status === "ready" ? held.data.items : undefined;
 };
+
+/* ⚠️ ONE FIELD OFF THE FIRST ROW, AND `undefined` OVER NO ROWS — see the `first`
+   source. A workspace with nothing in it has no first row, and that is a
+   truthful absence rather than a blank: what reads it draws the app's own
+   sentence about emptiness instead of an untitled card. */
+const firstOf = (has: Has, view: string, field: string) =>
+  rowsOf(has, view)?.[0]?.[field];
 
 /* ⚠️ THE VIEW'S OWN COUNT, NOT THE LENGTH OF WHAT CAME BACK — see `Has.views`.
    A view is bounded, so counting the rows in hand answers the limit. */
@@ -556,6 +563,80 @@ function Led({ body, has }: BodyProps) {
         fresh={nothing ? hero.nothing.under : (fresh as React.ReactNode)}
         {...(leadsOn(hero.leads, has))}
       />
+    );
+  }
+  /*
+    ⚠️ THE SECOND KIND, AND IT LOOKS NOTHING LIKE THE FIRST — which is the whole
+    reason the region takes a kind rather than a shape. A figure is a readout; a
+    subject is the thing itself, so the words are a title, the ways onward leave
+    the card, and the card is the press.
+  */
+  if (hero.as === "subject") {
+    const name = hero.bind?.["name"] ? drawn(hero.bind["name"], has) : undefined;
+    const of = hero.bind?.["of"] ? drawn(hero.bind["of"], has) : undefined;
+    const said = hero.bind?.["said"] ? drawn(hero.bind["said"], has) : undefined;
+    const when = hero.bind?.["when"] ? drawn(hero.bind["when"], has) : undefined;
+    const mark = hero.bind?.["mark"] ? drawn(hero.bind["mark"], has) : undefined;
+    /* ⚠️ AN EMPTY VIEW HAS NO FIRST ROW, WHICH IS A TRUTHFUL NOTHING RATHER THAN
+       A BLANK. `first` answers `undefined` over no rows — so a new workspace has
+       no record to carry on with, and the hero says the app's own sentence about
+       that instead of drawing an untitled card. */
+    const nothing = name === undefined || name === null || name === "";
+    /*
+      ⚠️ THE RECORD TO OPEN IS THE ROW THE NAME CAME FROM — see `HeroSpec.goes`.
+      The kernel has already refused a `goes` whose name is not read off a row,
+      so the view is here to be found; reading the id from anywhere else would
+      be a hero whose words are about one record and whose press opens another.
+    */
+    const from = hero.bind?.["name"]?.from;
+    const go = hero.goes ? goOf(hero.goes) : undefined;
+    const id = go && from?.of === "first"
+      ? firstOf(has, from.view, go.by ?? "id")
+      : undefined;
+    const opens = go && has.onGo && id !== undefined && id !== null
+      ? () => has.onGo?.(go.to, String(id))
+      : undefined;
+    /*
+      ⚠️ THE WAYS ONWARD ARE THE SCREEN'S AND THE CARD IS THE RECORD'S, so they
+      are drawn BESIDE each other rather than nested. A row of destinations under
+      a title inside one card reads as that record's own menu, which is a claim
+      the declaration never made — `leads` on a hero is where the SCREEN goes
+      next, and the record has exactly one door, which is the card itself.
+    */
+    const ways = leadsOn(hero.leads, has).leads;
+    return (
+      <>
+        {nothing
+          ? (
+            <Resuming
+              of={hero.nothing.says}
+              name={hero.nothing.under ?? ""}
+              {...(mark ? { mark: glyphOf(String(mark)) } : {})}
+            />
+          )
+          : (
+            <Resuming
+              of={String(of ?? "")}
+              name={String(name)}
+              {...(said === undefined || said === null ? {} : { said: said as React.ReactNode })}
+              {...(when === undefined || when === null ? {} : { when: when as React.ReactNode })}
+              {...(mark ? { mark: glyphOf(String(mark)) } : {})}
+              {...(opens ? { onOpen: opens } : {})}
+            />
+          )}
+        {ways?.length
+          ? (
+            <QuickActions
+              actions={ways.map((one) => ({
+                id: one.id,
+                label: one.label,
+                icon: one.icon ?? null,
+                onDo: one.onDo,
+              }))}
+            />
+          )
+          : null}
+      </>
     );
   }
   return null;
