@@ -79,9 +79,11 @@ const membersOf = (array) => {
  * EVERY SCREEN EVERY APP DECLARES, split by how it is expressed.
  *
  * ⚠️ `kind` IS THE ONE FIELD THAT MATTERS: `body` is drawn from a declaration,
- * `story` asks questions and keeps its controls in the app (which is why it is
- * counted separately rather than lumped in as declared), and `written` is a
- * screen that still names a component. The third is the population that shrinks.
+ * `story` asks questions and `session` is a place somebody works — both keep
+ * their controls in the app, which is why they are counted separately rather
+ * than lumped in as drawn — and `written` is a screen that still names a
+ * component and says nothing about itself. The last is the population that
+ * shrinks.
  */
 export const declaredScreens = () => {
   const out = [];
@@ -96,6 +98,7 @@ export const declaredScreens = () => {
       if (!id) continue;
       const kind = /\bbody:\s*\{/.test(member) ? "body"
         : /\bstory:\s*\{/.test(member) ? "story"
+        : /\bsession:\s*\{/.test(member) ? "session"
         : "written";
       /* ⚠️ THE ROUTE COMES OUT OF THE SAME MEMBER AS THE KIND, because a reader
          that took one from here and the other from a second pass over the block

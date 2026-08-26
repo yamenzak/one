@@ -6082,7 +6082,22 @@ const manifest = (): AppSpec => defineApp({
        behind a live video is a pattern nobody sees competing with the one thing
        somebody is looking at. */
     { id: "scan", route: "/scan", label: "Scan", nav: "primary", icon: "scan",
-      permission: "product:read" },
+      permission: "product:read",
+      /*
+        ⚠️ A READING SCREEN THAT CAN ALSO TEACH, which is why it is offered on
+        `product:read` while its one write asks for more. An unknown code is the
+        ordinary case on the day a workspace starts — it is what the learning
+        path is FOR — so the screen has to open for somebody who cannot yet
+        record what they found.
+      */
+      session: {
+        by: "camera",
+        writes: ["code.learn"],
+        keeps: [
+          { id: "seen", is: "what the last code resolved to", until: "between" },
+          { id: "guess", is: "what a model made of a code nothing knows", until: "once" },
+        ],
+      } },
     /*
       ⚠️ STOCK'S OWN ACTION, NOT A DESTINATION — and the two are not the same
       claim. Receiving is a job somebody does for twenty minutes with a trolley
@@ -6153,7 +6168,24 @@ const manifest = (): AppSpec => defineApp({
       },
     },
     { id: "receive", route: "/receive", label: "Receive", nav: "none", icon: "add",
-      permission: "stock:move" },
+      permission: "stock:move",
+      /*
+        ⚠️ THE SHELF SURVIVES AND THE THING DOES NOT, which is the whole shape of
+        the work and was written in no manifest. A location code moves the
+        session; a product code fills the row and is cleared the moment it is
+        recorded, so the next scan cannot land on the last one's quantity. Get
+        those two backwards and everything books to one shelf, or the shelf is
+        asked for forty times.
+      */
+      session: {
+        by: "camera",
+        writes: ["stock.arrive", "stock.undo", "code.learn"],
+        keeps: [
+          { id: "place", is: "the shelf everything is going to", until: "between" },
+          { id: "seen", is: "the thing in somebody's hand", until: "once" },
+          { id: "undoable", is: "the movement that can still be taken back", until: "between" },
+        ],
+      } },
     /*
       ⚠️ REACHED FROM THE LINE, NEVER FROM THE BAR. Somebody moving stock is
       already looking at what they are moving — the product and the shelf it is
@@ -6239,7 +6271,22 @@ const manifest = (): AppSpec => defineApp({
        everybody — it is SETTLING one that needs `stock:adjust`, which the
        operation asks for rather than the nav. */
     { id: "count", route: "/count", label: "Count", nav: "primary", icon: "tally",
-      permission: "stock:move" },
+      permission: "stock:move",
+      /*
+        ⚠️ CLOSING IS A BIGGER ACT THAN COUNTING, and the grants say so: opening
+        and tallying are `stock:move` and closing adjusts a balance. That is a
+        product decision rather than an oversight, which is why a session's
+        permission is not held to its writes' the way a story's is.
+      */
+      session: {
+        by: "camera",
+        writes: ["count.open", "count.tally", "count.close"],
+        keeps: [
+          { id: "session", is: "the count being taken", until: "between" },
+          { id: "blind", is: "whether the expected number is withheld", until: "between" },
+          { id: "last", is: "the code just read, so a stutter is not two", until: "once" },
+        ],
+      } },
     /*
       ⚠️ THE ONE DESTINATION A BASEMENT NEVER OPENS.
       Runs and jobs are the regulated half of this product — a workshop tracking
@@ -6835,7 +6882,21 @@ const manifest = (): AppSpec => defineApp({
        because that is where somebody is standing when they want one. The session
        is still a session: forty labels at a printer, on one address. */
     { id: "labels", route: "/labels", label: "Labels", nav: "none", icon: "tag",
-      permission: "location:read" },
+      permission: "location:read",
+      /*
+        ⚠️ PRINTING IS WHAT MINTS A CODE, so the writes are real writes and the
+        sheet is drawn from what they answer. Minting at creation would fill a
+        workspace with four hundred codes on shelves nothing is stuck to.
+      */
+      session: {
+        by: "hand",
+        writes: ["location.label", "product.label"],
+        keeps: [
+          { id: "subject", is: "which kind of thing is being labelled", until: "between" },
+          { id: "template", is: "which label is being printed", until: "between" },
+          { id: "picked", is: "the things on the sheet", until: "between" },
+        ],
+      } },
     /*
       ⚠️ `etch` — RULED GEOMETRY, WHICH IS WHAT A SHELF IS. The ambience families
       point monitoring at it, and a shelf grid is what it draws anyway; a report
@@ -6881,8 +6942,41 @@ const manifest = (): AppSpec => defineApp({
        the guide that asks for it. Somebody imports a spreadsheet once, in their
        first hour; a permanent slot for it is a slot spent on a day nobody
        repeats. */
+    /*
+      ⚠️ `stock:adjust`, NOT `product:write`, AND THE GUARD IS WHAT FOUND IT. An
+      import makes products AND sets opening balances, so `product.import`
+      demands the stronger grant — and this screen offered itself on the weaker
+      one. Somebody with `product:write` could choose a file, agree a column
+      mapping, look at a preview of eight hundred rows and be refused at the last
+      press, with nothing anywhere reporting the disagreement.
+
+      ⚠️ AND THE SCREEN MOVED RATHER THAN THE OPERATION, because the operation is
+      right: setting a balance is an adjustment whoever does it, and weakening it
+      would let anybody who may add a product decide what is on the shelves.
+    */
     { id: "import", route: "/import", label: "Import", nav: "none", icon: "file",
-      permission: "product:write", features: ["imports"] },
+      permission: "stock:adjust", features: ["imports"],
+      /*
+        ⚠️ A SESSION RATHER THAN A STORY, BECAUSE IT IS ONE PLACE AND NOT A
+        NARRATED WALK. A story is drawn by the engine's flow frame — one question
+        to a screen, a dock, a review at the end; this is a chooser, a mapping and
+        a preview on one page, and calling it a flow would claim a shape it does
+        not have. The guard says so: it compares a declared flow against the steps
+        the screen actually draws.
+
+        ⚠️ AND THE PREVIEW IS A WRITE, WHICH IS WHY IT IS LISTED. It runs the
+        whole import against nothing and answers what would land — the one thing
+        nobody can work out from a column mapping by looking at it.
+      */
+      session: {
+        by: "file",
+        writes: ["product.preview", "product.import"],
+        keeps: [
+          { id: "text", is: "the spreadsheet somebody chose", until: "between" },
+          { id: "columns", is: "which column is which", until: "between" },
+          { id: "seeing", is: "what the mapping would do to the rows", until: "between" },
+        ],
+      } },
     /* ⚠️ THE LAST STEP OF THE REORDER REPORT'S OWN WORKFLOW. That screen can say
        what to buy and how long the shelf lasts; without this it cannot say who
        to ring, and the decision it worked out is finished somewhere else. */

@@ -48,17 +48,16 @@ const ok = (m) => console.log(`ok   ${m}`);
  * against a setting" is, because it is a sentence somebody can act on and a
  * claim that stops being true the day the vocabulary grows.
  *
- * ⚠️ AND THE THREE FAMILIES ARE WORTH SEEING TOGETHER. A device the browser
- * drives (a camera, a printer, a file), a SESSION somebody is inside (receiving,
- * counting), and ARITHMETIC the rows do not carry (a standing computed against
- * a threshold, a total over a period). Nothing here is waiting on the renderer.
+ * ⚠️ AND WHAT IS LEFT IS ONE FAMILY, WHICH IS THE LIST DOING ITS JOB. It held
+ * three: a device the browser drives, a SESSION somebody is inside, and
+ * ARITHMETIC the rows do not carry. The first two were not waiting on anything —
+ * they were waiting on somebody noticing that a place where work HAPPENS is a
+ * third kind of screen, beside a page that is read and a flow that is walked, and
+ * `SessionSpec` is that. What remains is arithmetic: a total over a period a
+ * person picks, a figure over a whole workspace, prose about the product, and an
+ * answer that arrives in pieces.
  */
 const NOT_YET = new Map([
-  ["inventory:scan", "a camera, a decode loop and a resolve on every read — a device the browser drives, which no declaration describes"],
-  ["inventory:receive", "a session: a shelf that survives between scans, a row cleared after each write, and an undo of the last movement"],
-  ["inventory:count", "a session with a running tally, a blind mode that withholds the expected number, and stutter detection on the trigger"],
-  ["inventory:labels", "a printer sheet: a layout somebody arranges and sends to paper, with no rows on the screen to declare"],
-  ["inventory:import", "a file somebody chooses, a column mapping they agree with, and a preview of what would land"],
   ["inventory:reports", "totals over a period a person picks, which is an aggregate the view grammar has no clause for"],
   ["inventory:stock", "a location tree that narrows the list to everything at or below a place — a filter no `Match` can say"],
   ["inventory:home", "figures over the whole workspace beside three counts, which is the reports gap on a smaller screen"],
@@ -80,7 +79,7 @@ for (const s of written) {
   const why = NOT_YET.get(key);
   if (!why) {
     fail(`private-ui: ${key} is written by hand and says nothing about why.\n`
-      + `       Declare it as a body or a story, or add it to NOT_YET with what the\n`
+      + `       Declare it as a body, a story or a session, or add it to NOT_YET with\n`
       + `       grammar cannot express — a screen nobody wrote a reason for is the\n`
       + `       port losing ground on an afternoon nobody reviewed.`);
     continue;
@@ -146,11 +145,12 @@ for (const app of products()) {
 
 /* --------------------------------------------------------------- the count --- */
 
-const by = { body: 0, story: 0, written: 0 };
+const by = { body: 0, story: 0, session: 0, written: 0 };
 for (const s of screens) by[s.kind]++;
 
 if (!bad) {
-  ok(`declared: ${by.body} product screen(s) drawn from a body, ${by.story} from a story`);
+  ok(`declared: ${by.body} product screen(s) drawn from a body, ${by.story} from a story, `
+    + `${by.session} from a session`);
   ok(`waiting: ${by.written} still written, every one of them saying what it waits for`);
 }
 

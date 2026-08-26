@@ -3524,3 +3524,54 @@ picker whose options are ids because nobody said what names a row; a collection
 offered in a dropdown and left out of the permission check; a form that asks for
 something the screen is standing on; or a fill from a column the subject has not
 got.
+
+---
+
+## D96 — A screen is read, walked or worked in, and a flow's declaration is checked
+
+D92 said a screen is a body or a story: one is READ and drawn by the engine, the
+other is CAPTURE and keeps its controls. Porting the last screens found a third
+shape that is neither, and calling it either would have been a lie a guard can
+catch.
+
+**A story is NARRATED and a session is INHABITED.** The engine's flow frame draws
+a story — one question to a screen, a dock, a review at the end — so a screen
+that is a chooser, a mapping and a preview on one page is not a flow however much
+it reads like one in prose. Receiving is the other end of the same distinction: a
+shelf that survives between scans, a row cleared after each, twenty minutes and
+forty writes. It never ends, so it was never a walk.
+
+**A session declares three things and draws itself.** How a thing gets INTO it —
+a camera, a code, a file, by hand — which decides what the screen is and is the
+first question anybody asks about one they cannot see. Every write it may make,
+which is what lets the grants be checked. And what SURVIVES between the writes
+and what does not, which is the whole shape of the work and was written nowhere:
+get it backwards and a delivery books everything to one shelf, or asks for the
+shelf forty times.
+
+**The bargain is the story's, unchanged.** A camera, a viewfinder and a trigger
+are not fields, and a manifest that could express them would be a second React.
+What the declaration buys is agreement, not generation.
+
+**And the claim a story had been making is finally true.** `StorySpec`'s header
+has said since it was written that a guard proves `writes` is a real operation
+and that the screen's `permission` is the one that operation demands. Nothing
+did. Pointed at the first product it had, it found `/import` offered on
+`product:write` while `product.import` demands `stock:adjust` — choose a file,
+agree a mapping, look at a preview of eight hundred rows, and be refused at the
+last press. The screen moved to the stronger grant; the operation is right, and
+weakening it would let anybody who may add a product decide what is on the
+shelves.
+
+**A session is NOT held to that rule, and both real cases say why.** Scanning is
+a READING screen that can also teach a code, so it is offered on `product:read`
+while its one write asks for more; the label sheet is `location:read` because
+anybody may look at it and minting is what the writes behind it ask for. The
+story's rule would refuse both — correct declarations, refused for being
+generous. A flow exists to reach one write and ends there; a session does not.
+
+**Therefore never:** a session declared as a story or the reverse; a flow whose
+`writes` names nothing, names a read, or names an operation the app does not
+declare; a story offered on a grant its write does not demand; a session that
+keeps something and will not say what it is; or a third kind invented for a
+screen that is really one of these three.

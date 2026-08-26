@@ -170,7 +170,7 @@ if (!unclassified) {
 /* ------------------------------------------------------------ the census --- */
 
 const screens = declaredScreens();
-const kinds = { body: 0, story: 0, written: 0 };
+const kinds = { body: 0, story: 0, session: 0, written: 0 };
 for (const s of screens) kinds[s.kind]++;
 
 /*
@@ -210,6 +210,7 @@ if (shippedStages().has(String(RENDERER)) && !kinds.body) {
     + `       ${tally.reads ?? 0} in favour of reading declarations. Both are reading nothing.`);
 } else {
   ok(`census: ${kinds.body} screen(s) drawn from a body, ${kinds.story} from a story, `
+    + `${kinds.session} from a session, `
     + `${kinds.written} still written`);
 }
 
@@ -229,11 +230,11 @@ if (shippedStages().has(String(RENDERER)) && !kinds.body) {
  * losing. Under it means somebody ported one and did not tighten the number, so
  * the next regression is absorbed in silence instead of being reported.
  */
-const WRITTEN_MOST = 19;
+const WRITTEN_MOST = 14;
 if (kinds.written > WRITTEN_MOST) {
   fail(`${kinds.written} screen(s) are still written by hand, over the ${WRITTEN_MOST} ceiling.\n`
     + `       A new hand-written screen during the port is the port losing ground. Declare\n`
-    + `       it as a body or a story, or raise this deliberately with the reason.`);
+    + `       it as a body, a story or a session, or raise this deliberately with the reason.`);
 } else if (kinds.written < WRITTEN_MOST) {
   fail(`${kinds.written} screen(s) are still written by hand, under the ${WRITTEN_MOST} ceiling.\n`
     + `       Tighten it to ${kinds.written} in the commit that ported one — a ceiling left\n`

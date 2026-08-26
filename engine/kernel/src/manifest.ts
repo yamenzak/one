@@ -159,6 +159,27 @@ export interface ScreenSpec {
    */
   readonly story?: StorySpec;
   /**
+   * THIS SCREEN IS A PLACE SOMEBODY WORKS RATHER THAN A FLOW THEY WALK — see
+   * `SessionSpec`.
+   *
+   * ⚠️ THE THIRD KIND, AND IT IS THE ONE THE PORT FOUND MISSING. A `body` is
+   * READ and drawn by the engine; a `story` is NARRATED by the engine's flow
+   * frame — one question to a screen, a dock, a review at the end. A session is
+   * neither: it is one place with its own controls, where somebody works. The
+   * shapes are real and different, and declaring one as the other claims
+   * something a guard can check and will: receiving is a shelf that survives
+   * between scans and twenty minutes of writes, which is not a walk that ends;
+   * an import is a chooser, a mapping and a preview on one page, which is not a
+   * flow of questions however much it looks like one in prose.
+   *
+   * ⚠️ SAME BARGAIN AS A STORY: the SHAPE is declared and the CONTROLS are not.
+   * A camera, a viewfinder and a trigger are not fields, and a manifest that
+   * could express them would be a second React. What this buys is agreement —
+   * what the session writes, what it holds between writes, and how a thing gets
+   * into it are facts about the product worth knowing outside the browser.
+   */
+  readonly session?: SessionSpec;
+  /**
    * WHICH COLLECTION THIS SCREEN'S RECORD COMES FROM, WHERE IT IS ABOUT ONE.
    *
    * ⚠️ A `detail` SCREEN HAS A SUBJECT AND A `list` SCREEN DOES NOT, and until
@@ -217,6 +238,49 @@ export interface StepSpec {
   readonly ask: string;
   /** ⚠️ Named where an answer earlier in the flow can remove this one. */
   readonly when?: string;
+}
+
+/** A place somebody works — a loop, not a flow. */
+export interface SessionSpec {
+  /**
+   * HOW A THING GETS INTO IT.
+   *
+   * ⚠️ THE ONE FACT THAT DECIDES WHAT THE SCREEN IS. A session fed by a camera
+   * runs a decode loop and needs the viewfinder to be most of the page; one fed
+   * by a typed code is a field and a list; one fed by a file is a chooser and a
+   * preview. Nothing downstream can work that out, and it is the first thing
+   * anybody asks about a screen they cannot see.
+   */
+  readonly by: "camera" | "code" | "file" | "hand";
+  /**
+   * EVERY WRITE IT MAY MAKE.
+   *
+   * ⚠️ SEVERAL, WHICH IS WHAT MAKES IT NOT A STORY. A flow reaches ONE write and
+   * ends; a session makes the same write over and over and usually one more to
+   * take the last one back. Listing them is what lets the screen's `permission`
+   * be checked against what it will actually ask for — two hand-typed strings in
+   * two files, with nothing checking they matched, is a session somebody works
+   * for twenty minutes and is refused at the first write.
+   */
+  readonly writes: readonly string[];
+  /**
+   * WHAT SURVIVES BETWEEN THE WRITES, AND WHAT DOES NOT.
+   *
+   * ⚠️ THIS IS THE WHOLE SHAPE OF THE WORK AND IT WAS WRITTEN NOWHERE. A shelf
+   * moves the session and stays; a product fills the row and is cleared the
+   * moment it is recorded, so the next scan cannot land on the last one's
+   * quantity. Get that backwards and the screen silently books everything to one
+   * shelf, or asks for the shelf forty times.
+   */
+  readonly keeps: readonly KeptSpec[];
+}
+
+export interface KeptSpec {
+  readonly id: string;
+  /** ⚠️ What it is, in the reader's words — never the variable's name. */
+  readonly is: string;
+  /** ⚠️ `between` survives every write; `once` is cleared after each. */
+  readonly until: "between" | "once";
 }
 
 /**
@@ -954,6 +1018,80 @@ export function refuseApp(spec: AppSpec): readonly Refusal[] {
       }
     }
   }
+  /*
+    ⚠️ A FLOW AND A SESSION KEEP THEIR CONTROLS AND NOT THEIR CLAIMS. Both
+    declare a shape and draw themselves — that is the bargain — and what the
+    declaration buys is that the strings in it are checked. `StorySpec`'s own
+    header has claimed since it was written that a guard proves `writes` is a
+    real operation and that the screen's `permission` is the one that operation
+    demands. Nothing did. A flow could take somebody through ten questions and be
+    refused by the write at the end, which is the exact failure the paragraph
+    describes and the exact failure nothing anywhere would have caught.
+
+    ⚠️ AND THE PERMISSION IS THE SHARP ONE, because it fails LATE. An unknown
+    operation id is a 404 on the first press; a permission that does not match is
+    twenty minutes of work and a refusal at the write — and it looks like the
+    platform being broken rather than the manifest disagreeing with itself.
+  */
+  for (const s of spec.screens) {
+    const flows: readonly { readonly what: string; readonly writes: readonly string[] }[] = [
+      ...(s.story ? [{ what: "story", writes: [s.story.writes] }] : []),
+      ...(s.session ? [{ what: "session", writes: s.session.writes }] : []),
+    ];
+    for (const flow of flows) {
+      if (!flow.writes.length) {
+        at(`screen ${s.id}`,
+          `${flow.what}_writes_nothing: declares a ${flow.what} that writes nothing — `
+          + "a place somebody works and cannot record anything is a page, and it says so here");
+      }
+      for (const id of flow.writes) {
+        const op = spec.operations.find((o) => o.id === id);
+        if (!op) {
+          at(`screen ${s.id}`,
+            `${flow.what}_write_unknown: its ${flow.what} writes "${id}", which this app does `
+            + "not declare — the flow would be refused at the press, by a 404");
+          continue;
+        }
+        if (op.kind === "read") {
+          at(`screen ${s.id}`,
+            `${flow.what}_not_a_write: its ${flow.what} writes ${id}, which is a read — `
+            + "nothing would be recorded and the screen would report success");
+        }
+      }
+      /*
+        ⚠️ THE PERMISSION RULE IS THE STORY'S ALONE, AND THE REASON IS WHAT A
+        FLOW IS. A story exists to reach ONE write and ends there, so a screen
+        offered on a grant that write does not demand takes somebody through ten
+        questions and refuses them at the last press — which is the failure
+        `StorySpec`'s own header describes and which nothing checked.
+
+        ⚠️ A SESSION IS DELIBERATELY DIFFERENT AND BOTH REAL CASES PROVE IT.
+        Scanning is a READING screen that can also teach a code, so it is offered
+        on `product:read` and its one write asks for more; the label sheet is
+        `location:read` because anybody may look at it and minting is what the
+        writes behind it ask for. Applying the story's rule to a session would
+        refuse both — correct declarations, refused for being generous.
+      */
+      const told = s.story;
+      if (told) {
+        const wants = String(spec.operations.find((o) => o.id === told.writes)?.permission ?? "");
+        if (wants && wants !== s.permission) {
+          at(`screen ${s.id}`,
+            `story_permission_wrong: is offered on "${s.permission}" and writes ${told.writes}, `
+            + `which demands "${wants}" — somebody would be taken through every question and `
+            + "refused at the last press");
+        }
+      }
+    }
+    for (const kept of s.session?.keeps ?? []) {
+      if (!kept.is.trim()) {
+        at(`screen ${s.id}`,
+          `session_kept_unsaid: keeps "${kept.id}" and does not say what it is — `
+          + "the name of a variable is not a fact about the product");
+      }
+    }
+  }
+
   for (const id of unreadViews(views, spec.screens.map((s) => s.body))) {
     at(`view ${id}`, "declared and read by no screen — a rule about this product's data that nothing honours");
   }

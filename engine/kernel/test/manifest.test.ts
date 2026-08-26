@@ -461,6 +461,72 @@ describe("what would fail on the first request", () => {
     expect(filling({ id: { says: "typed" } })).not.toContain("fill_without_a_subject");
   });
 
+  /*
+    ⚠️ A FLOW AND A SESSION KEEP THEIR CONTROLS AND NOT THEIR CLAIMS — see
+    `SessionSpec`. `StorySpec` has claimed since it was written that a guard
+    proves `writes` is a real operation and that the screen's permission is the
+    one it demands. Nothing did, and the first product it was pointed at had a
+    screen offered on a grant its write refuses.
+  */
+  const flowing = (over: Record<string, unknown>) => whyOf(app({
+    screens: [{
+      id: "one", route: "/one", label: "One", permission: "note:write", ...over,
+    }] as never,
+  }));
+
+  it("accepts a story reaching a write on the grant that write demands", () => {
+    expect(flowing({ story: { writes: stub.id, asks: [{ id: "a", ask: "What is it?" }] } }))
+      .toBe("");
+  });
+
+  /* ⚠️ THE SHARP ONE, AND IT FAILS LATE. An unknown id is a 404 on the first
+     press; a permission that does not match is every question answered and a
+     refusal at the last one, which reads as the platform being broken. */
+  it("refuses a story offered on a grant its write does not demand", () => {
+    expect(flowing({
+      permission: "note:read",
+      story: { writes: stub.id, asks: [{ id: "a", ask: "What is it?" }] },
+    })).toContain("story_permission_wrong");
+  });
+
+  it("refuses a flow writing an operation this app does not declare", () => {
+    expect(flowing({ story: { writes: "note.imagined", asks: [] } }))
+      .toContain("story_write_unknown");
+  });
+
+  it("accepts a session writing several things", () => {
+    expect(flowing({
+      session: {
+        by: "camera", writes: [stub.id],
+        keeps: [{ id: "held", is: "the thing in somebody's hand", until: "once" }],
+      },
+    })).toBe("");
+  });
+
+  it("refuses a session that writes nothing", () => {
+    expect(flowing({ session: { by: "hand", writes: [], keeps: [] } }))
+      .toContain("session_writes_nothing");
+  });
+
+  /*
+    ⚠️ AND A SESSION IS NOT HELD TO ITS WRITES' GRANTS, deliberately. Scanning is
+    a reading screen that can also teach a code; the label sheet is `location:read`
+    because anybody may look at it and minting is what the writes ask for. The
+    story's rule would refuse both, correctly declared.
+  */
+  it("does not hold a session to the grant its writes demand", () => {
+    expect(flowing({
+      permission: "note:read",
+      session: { by: "camera", writes: [stub.id], keeps: [] },
+    })).not.toContain("session_permission_wrong");
+  });
+
+  it("refuses a session keeping something it will not say the meaning of", () => {
+    expect(flowing({
+      session: { by: "hand", writes: [stub.id], keeps: [{ id: "x", is: "  ", until: "once" }] },
+    })).toContain("session_kept_unsaid");
+  });
+
   it("refuses a failure code no catalogue has", () => {
     const broken = app({ operations: [{ ...stub, fails: ["app.imagined"] } as AnyOperation] });
     expect(whyOf(broken)).toContain("which no catalogue has");

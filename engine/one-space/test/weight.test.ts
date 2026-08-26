@@ -103,9 +103,17 @@ const DIST = join(dirname(fileURLToPath(import.meta.url)), "..", "dist");
    and the declared form drew a text box: "To" on a transfer meant typing a
    location id somebody would have to find first. The ROWS are not in this
    number — they come down with the screen, sized by the workspace — and neither
-   is the control, which is `Lookup` and was already here. */
+   is the control, which is `Lookup` and was already here.
+
+   ⚠️ AND 1,412 FOR THE THIRD KIND OF SCREEN — `SessionSpec`, and the refusals a
+   flow and a session now pass through. `StorySpec` had claimed since it was
+   written that a guard proved its `writes` was a real operation and that the
+   screen's permission was the one that operation demands; nothing did, and the
+   first product it was pointed at had a screen offered on a grant its write
+   refuses. The CONTROLS of a session are still not in this number and never will
+   be — a camera and a viewfinder stay in the app, which is the whole bargain. */
 const CEILING = {
-  js: { raw: 1_110_100, gzip: 330_000 },
+  js: { raw: 1_111_800, gzip: 330_000 },
   css: { raw: 470_000, gzip: 50_000 },
 };
 

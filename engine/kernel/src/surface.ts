@@ -1030,7 +1030,7 @@ export const talliedIn = (spec: ViewSpec): readonly string[] =>
 export function refuseSurface(
   screen: {
     readonly id: string; readonly of?: string;
-    readonly body?: SurfaceSpec; readonly story?: unknown;
+    readonly body?: SurfaceSpec; readonly story?: unknown; readonly session?: unknown;
   },
   index: BlockIndex,
   views: readonly ViewSpec[],
@@ -1057,6 +1057,14 @@ export function refuseSurface(
     at("two_kinds_of_screen",
       "declares both a story and a body — one asks questions and holds the answers, "
       + "the other is drawn from what it reads, and nothing can be both");
+  }
+  /* ⚠️ AND THE THIRD KIND IS EXCLUSIVE FOR THE SAME REASON — see `SessionSpec`.
+     A session is a loop holding unsaved state between writes; a body is redrawn
+     from what the door answers, so the two disagree about who owns the screen. */
+  if (screen.session) {
+    at("two_kinds_of_screen",
+      "declares both a session and a body — one is a place somebody works and holds "
+      + "what they are part-way through, the other is drawn from what it reads");
   }
 
   /* --- the layout ------------------------------------------------------- */
