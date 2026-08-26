@@ -14,8 +14,9 @@
  */
 
 import {
-  area, collection, defineApp, field, inReach, job as declareJob, newId, operation, setting,
-  type AppSpec,
+  area, collection, dayPlus, defineApp, field, inReach, job as declareJob, newId, operation,
+  setting,
+  type AppSpec, type Day,
 } from "@engine/kernel";
 import {
   LADDER, MOVES, applyMove, crossedOn, daysLeft, effectiveExpiry, promotes, refuseMove,
@@ -5310,23 +5311,66 @@ const doImport = operation<
  * March changes what February consumed, and a stored figure never learns that.
  */
 interface Reported {
-  told: { recorded: number; inferred: number; share: number };
+  /*
+    ⚠️ A LIST OF ONE, AND THAT IS NOT A CONTORTION. A view is a list wherever it
+    came from, so an aggregate reaches a screen as the first row of one — which
+    is what lets a Hero and two Stats read three figures off one answer without
+    a second shape crossing the wire. See `Read`'s `first`.
+  */
+  told: readonly {
+    recorded: number; inferred: number; share: number;
+    /** ⚠️ Whole per cent, because a screen showing 0.6127 is showing a ratio. */
+    sharePct: number;
+    /** ⚠️ The sentence, decided here — see below. */
+    says: string;
+  }[];
   used: readonly { product: string; name: string; quantity: number }[];
-  losses: readonly { product: string; name: string; lost: number; found: number }[];
+  losses: readonly {
+    product: string; name: string; lost: number; found: number; says: string;
+  }[];
   buy: readonly {
     product: string; name: string; onHand: number; cover: number;
-    order: number; why: string; unit: string;
+    order: number; why: string; unit: string; supplier: string; says: string;
   }[];
   daily: readonly { day: string; quantity: number }[];
 }
 
-const report = operation<{ from: string; to: string }, Reported>({
+/*
+  ⚠️ "NEVER" RATHER THAN "∞". A cover of Infinity is the honest arithmetic for a
+  thing that does not move, and printing the symbol at somebody is showing them a
+  division rather than an answer.
+*/
+const sayCover = (days: number): string => {
+  if (!Number.isFinite(days)) return "Not moving";
+  if (days < 1) return "Gone today";
+  return `${Math.floor(days)} days left`;
+};
+
+/**
+ * ⚠️ HOW LONG, IN DAYS, AND THE SCREEN NAMES IT RATHER THAN COUNTING IT. A
+ * report used to take two dates, which made the browser do calendar arithmetic
+ * to ask a question — and calendar arithmetic done by subtracting milliseconds
+ * is 29 or 31 days across a clock change, silently, in one hemisphere.
+ */
+const SPANS: Readonly<Record<string, number>> = { week: 7, month: 30, quarter: 90 };
+
+const report = operation<{ today: string; span?: string }, Reported>({
   id: "stock.report",
   kind: "read",
   summary: "What went, what was wrong, and what to buy",
+  /*
+    ⚠️ THE DAY AND HOW FAR BACK, NOT TWO DATES. The period is counted in the
+    DEVICE's own days — the ledger's `day` is the local date where the shelf is,
+    so a range cut on the server's calendar puts a shift that ended at 01:00 into
+    the wrong month for half the world — and the arithmetic between the two ends
+    lives here, where the whole period is one decision rather than two values a
+    caller could disagree with itself about.
+  */
   input: {
-    from: field.day({ label: "From", required: true, holds: "none" }),
-    to: field.day({ label: "To", required: true, holds: "none" }),
+    today: field.day({ label: "Today", required: true, holds: "none" }),
+    span: field.enum({
+      label: "Over", values: ["week", "month", "quarter"], holds: "none",
+    }),
   },
   output: {
     told: field.json({ label: "How it was recorded", holds: "none" }),
@@ -5348,6 +5392,13 @@ const report = operation<{ from: string; to: string }, Reported>({
     const db = c.db as Db;
     const lead = Math.trunc(Number(await c.setting("inventory.lead_days"))) || 7;
 
+    /* ⚠️ THE KERNEL'S CALENDAR ARITHMETIC, and inclusive of both ends — "the
+       first to the seventh" is seven days to everybody who is not a computer,
+       and a rate divided by six reports consumption about seventeen per cent
+       high. */
+    const until = input.today;
+    const since = dayPlus(until as Day, -((SPANS[input.span ?? "month"] ?? 30) - 1));
+
     /* ⚠️ BOUNDED BY THE DAY COLUMN, WHICH IS THE DEVICE'S LOCAL DATE. A report
        cut on the server's calendar puts a shift that ended at 01:00 into the
        wrong month for half the world — see `ledger.day`. */
@@ -5357,7 +5408,7 @@ const report = operation<{ from: string; to: string }, Reported>({
          most wants and the one a filter is easiest to leave off. */
       `SELECT move, product, delta, day, against FROM ledger
         WHERE tenant_id = ? AND day >= ? AND day <= ?${only(c).sql}`)
-      .bind(c.tenantId, input.from, input.to, ...only(c).bound)
+      .bind(c.tenantId, since, until, ...only(c).bound)
       .all<{ move: string; product: string; delta: number; day: string; against: string | null }>();
 
     const entries = moves.results.map((row) => ({
@@ -5398,12 +5449,33 @@ const report = operation<{ from: string; to: string }, Reported>({
 
     const used = usageIn(entries);
     const perProduct = new Map(used.map((one) => [one.product, one.quantity]));
-    const days = Math.max(1, dayCount(input.from, input.to));
+    const days = Math.max(1, dayCount(since, until));
 
+    const told = toldIn(entries);
     return {
-      told: toldIn(entries),
+      /*
+        ⚠️ THE SENTENCE IS DECIDED HERE BECAUSE IT IS A CONDITIONAL, and a screen
+        drawn from a declaration has no `if`. "Nothing left the shelves" and "the
+        rest went without anybody scanning it" are two different true things
+        about the same two numbers, and a percentage on its own is a score nobody
+        knows what to do with.
+      */
+      told: [{
+        ...told,
+        sharePct: Math.round(told.share * 100),
+        says: told.recorded + told.inferred === 0
+          ? "Nothing left the shelves in this period"
+          : "The rest went without anybody scanning it, and a count found it missing",
+      }],
       used: used.map((one) => ({ ...one, name: nameOf(one.product) })),
-      losses: lossesIn(entries).map((one) => ({ ...one, name: nameOf(one.product) })),
+      /* ⚠️ SHORT AND OVER STAY APART, and netting them off is what this refuses.
+         A shelf that is forty short and thirty-eight over is a shelf somebody is
+         counting badly, or two products being confused with each other; netted,
+         it is a shelf that is two out and looks fine. */
+      losses: lossesIn(entries).map((one) => ({
+        ...one, name: nameOf(one.product),
+        says: one.found ? `${one.lost} short · ${one.found} over` : "short",
+      })),
       /*
         ⚠️ EVERY PRODUCT IS WEIGHED, NOT ONLY THE ONES THAT MOVED. A par level is
         a standing statement that something must be on the shelf whether or not
@@ -5429,8 +5501,12 @@ const report = operation<{ from: string; to: string }, Reported>({
       ).map((one) => ({
         ...one, name: nameOf(one.product),
         unit: String(named.get(one.product)?.unit ?? "item"),
+        /* ⚠️ WHO TO RING IS ON THE ROW, because this list is only a report until
+           somebody can act on a line without leaving it — and the answer is a
+           fact about the product rather than something to go and look up. */
+        says: [sayCover(one.cover), one.why, one.supplier].filter(Boolean).join(" · "),
       })),
-      daily: dailyIn(entries, input.from, input.to),
+      daily: dailyIn(entries, since, until),
     };
   },
 });
@@ -6043,6 +6119,41 @@ const manifest = (): AppSpec => defineApp({
        notice and nobody clears them in the same trip. */
     { id: "service-due", of: "unit",
       asked: { operation: "unit.due", take: "items", fills: { today: "today" } } },
+
+    /*
+      ⚠️ FIVE VIEWS, ONE OPERATION, ONE ROUND TRIP — and the last part is the
+      door's doing rather than a coincidence. `stock.report` answers consumption,
+      shrinkage, how much of it was actually recorded and what to buy from ONE
+      reading of the SAME movements over the SAME period; five operations could
+      be given five different periods, so a screen could show a month's usage
+      beside a fortnight's losses with nothing anywhere saying they disagreed.
+      The door memoises an ask by operation and input, so these five are one call.
+
+      ⚠️ AND THEY ALL NARROW ON `span`, WHICH IS THE ONE PICK ON THAT SCREEN. A
+      period somebody chose reaches the handler as input; held in the browser it
+      would move a control and leave every figure under it where it was.
+
+      ⚠️ `of: "ledger"` FOR ALL FIVE, INCLUDING THE ONES WHOSE ROWS ARE PRODUCTS.
+      `of` is what the permission is of, and every figure here — the reorder list
+      included, since its rate is what left over the period — is a reading of the
+      movements. A person who may see a balance has not necessarily been given
+      the record of how it got there.
+    */
+    { id: "report-told", of: "ledger",
+      asked: { operation: "stock.report", take: "told",
+        fills: { today: "today", span: { picked: "span" } } } },
+    { id: "report-daily", of: "ledger",
+      asked: { operation: "stock.report", take: "daily",
+        fills: { today: "today", span: { picked: "span" } } } },
+    { id: "report-used", of: "ledger",
+      asked: { operation: "stock.report", take: "used",
+        fills: { today: "today", span: { picked: "span" } } } },
+    { id: "report-losses", of: "ledger",
+      asked: { operation: "stock.report", take: "losses",
+        fills: { today: "today", span: { picked: "span" } } } },
+    { id: "report-buy", of: "ledger",
+      asked: { operation: "stock.report", take: "buy",
+        fills: { today: "today", span: { picked: "span" } } } },
   ],
 
   /*
@@ -6914,7 +7025,172 @@ const manifest = (): AppSpec => defineApp({
       that are the same place — and the seat it gave up went to the root itself.
     */
     { id: "reports", route: "/reports", label: "Reports", nav: "none", icon: "chart",
-      permission: "ledger:read", sky: "etch" },
+      permission: "ledger:read", sky: "etch",
+      /*
+        ⚠️ ONE NARROWING, AND EVERY FIGURE ON THE SCREEN HANGS OFF IT. The period
+        is the only thing a person changes here, so it is a pick rather than a
+        control per panel — five panels each with their own would be five
+        readings of five periods that all look like one report.
+      */
+      body: {
+        shape: "figure",
+        layout: { as: "stack" },
+        picks: [{
+          id: "span",
+          label: "Over",
+          options: [
+            { value: "week", label: "7 days" },
+            { value: "month", label: "30 days" },
+            { value: "quarter", label: "90 days" },
+          ],
+        }],
+        blocks: [
+          /*
+            ⚠️ THE HERO IS THE NUMBER THAT MAKES THE PRODUCT LOOK BAD, and that is
+            the decision this screen is built on. "Sixty-one per cent of what left
+            was recorded" is the honest measure of whether anybody is actually
+            scanning, and it is the one figure an inventory product is never
+            willing to lead with. Hiding it does not make the stock come back — it
+            makes every other number here unfalsifiable, because there is no way
+            to tell a quiet month from a month nobody logged.
+          */
+          {
+            group: "Recorded",
+            of: [
+              {
+                block: "Hero",
+                nothing: { says: "Nothing has moved yet" },
+                bind: {
+                  /* ⚠️ THE FIRST ROW OF A LIST OF ONE — see `Read`'s `first`. An
+                     aggregate has no collection to be a field of. */
+                  value: { from: { of: "first", view: "report-told", field: "sharePct" } },
+                  eyebrow: { from: { of: "words", says: "Recorded" } },
+                  under: { from: { of: "words", says: "per cent of what left was scanned out" } },
+                },
+              },
+              {
+                block: "Stat",
+                nothing: { says: "—" },
+                bind: {
+                  value: { from: { of: "first", view: "report-told", field: "recorded" } },
+                  label: { from: { of: "words", says: "Scanned out" } },
+                },
+              },
+              {
+                block: "Stat",
+                nothing: { says: "—" },
+                bind: {
+                  value: { from: { of: "first", view: "report-told", field: "inferred" } },
+                  label: { from: { of: "words", says: "Found gone by a count" } },
+                },
+              },
+              /* ⚠️ SAID IN WORDS, BECAUSE A PERCENTAGE ON ITS OWN IS A SCORE and
+                 nobody knows what to do with a score. The sentence is the
+                 operation's because it is a conditional — see `Reported.told`. */
+              {
+                block: "NoteRow",
+                nothing: { says: "Nothing left the shelves in this period" },
+                bind: {
+                  children: { from: { of: "first", view: "report-told", field: "says" } },
+                },
+              },
+            ],
+          },
+          {
+            group: "What left, day by day",
+            of: [{
+              block: "LineChart",
+              /* ⚠️ A SERIES NEEDS NO NAME PER MARK — see `BlockEntry.plots`. A
+                 line draws a run and the days are its own axis. */
+              plots: { of: "quantity" },
+              nothing: { says: "Nothing left the shelves in this period" },
+              bind: {
+                describes: { from: { of: "words", says: "What left the shelves each day" } },
+                series: { from: { of: "view", view: "report-daily" } },
+              },
+            }],
+          },
+          {
+            group: "What went most",
+            of: [{
+              block: "BarChart",
+              /* ⚠️ SIDEWAYS, BECAUSE THESE LABELS ARE PRODUCT NAMES — see
+                 `BarChart`. A column chart gives each category the width of one
+                 bar for a name like "Fire extinguisher, CO₂ 5 kg". */
+              plots: { along: "name", of: "quantity" },
+              nothing: { says: "Nothing left the shelves in this period" },
+              bind: {
+                describes: { from: { of: "words", says: "The products that left the shelves most" } },
+                data: { from: { of: "view", view: "report-used" } },
+              },
+            }],
+          },
+          /*
+            ⚠️ CONSUMPTION AND CORRECTION NEVER SHARE A PANEL. Somebody took it,
+            or the number was wrong — different events, different causes,
+            different people. A screen that summed them reports theft as usage.
+          */
+          {
+            group: "What the numbers were wrong by",
+            of: [{
+              block: "Listing",
+              shows: [
+                { field: "name", label: "What it is" },
+                { field: "lost", label: "Short" },
+                { field: "says", label: "Against the record" },
+              ],
+              nothing: {
+                says: "Every count agreed with the record",
+                under: "Short and over are kept apart here, never netted off",
+              },
+              goes: { to: "product", by: "product" },
+              bind: {
+                label: { from: { of: "words", says: "What the numbers were wrong by" } },
+                of: { from: { of: "view", view: "report-losses" } },
+              },
+            }],
+          },
+          /*
+            ⚠️ SOONEST TO RUN OUT AT THE TOP, WHICH IS THE ORDER A BUYER WORKS IN
+            — and it is the operation's ordering rather than this screen's, so a
+            list and a notification cannot disagree about what is urgent. A list
+            sorted by quantity is how a store room runs out of the one thing that
+            takes a month to get.
+          */
+          {
+            group: "What to buy",
+            of: [
+              {
+                block: "Listing",
+                shows: [
+                  { field: "name", label: "What it is" },
+                  { field: "order", label: "Order" },
+                  { field: "unit", label: "In" },
+                  { field: "says", label: "Why" },
+                ],
+                nothing: {
+                  says: "Everything lasts longer than a delivery takes",
+                  under: "Give a product a par level and it is weighed here",
+                },
+                goes: { to: "product", by: "product" },
+                bind: {
+                  label: { from: { of: "words", says: "What to buy" } },
+                  of: { from: { of: "view", view: "report-buy" } },
+                },
+              },
+              /* ⚠️ INSIDE THE LIST IT FINISHES, NOT IN A GROUP OF ITS OWN. Who to
+                 ring is already on every row above; this is the same subject one
+                 step further, and a section between them would put a heading
+                 between a decision and the act it ends in. */
+              {
+                block: "NavRow",
+                goes: "supplier",
+                bind: { label: { from: { of: "words", says: "Suppliers" } } },
+              },
+            ],
+          },
+        ],
+      } },
     /* ⚠️ NOT A DESTINATION — THE CHROME'S OWN BUTTON, beside the notifications.
        Asking is something somebody does FROM wherever they are, about whatever
        they are looking at; a slot in the bar would make it a place to go first

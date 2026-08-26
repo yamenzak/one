@@ -391,6 +391,14 @@ export interface Here {
   readonly record?: string | undefined;
   readonly me?: string | undefined;
   readonly today?: string | undefined;
+  /**
+   * ⚠️ WHAT SOMEBODY NARROWED THE SCREEN TO, BY PICK ID — see `PickSpec`. It
+   * travels with the request for the same reason `today` does: it is a fact
+   * about where the reader is rather than about the workspace, and the worker
+   * has no way to know it. Nothing narrows ON it; it is here because an asked
+   * view FILLS from it.
+   */
+  readonly picked?: Readonly<Record<string, string>> | undefined;
 }
 
 export const narrow = (

@@ -111,9 +111,23 @@ const DIST = join(dirname(fileURLToPath(import.meta.url)), "..", "dist");
    screen's permission was the one that operation demands; nothing did, and the
    first product it was pointed at had a screen offered on a grant its write
    refuses. The CONTROLS of a session are still not in this number and never will
-   be — a camera and a viewfinder stay in the app, which is the whole bargain. */
+   be — a camera and a viewfinder stay in the app, which is the whole bargain.
+
+   ⚠️ AND THE GZIP CEILING MOVES TO 330,400 FOR THE NARROWING AND THE PLOTS —
+   `PickSpec`, `PlotSpec`, the `picked` fill source, and the refusals that check
+   a pick nothing narrows and a `plots` on a block that draws none. Both are the
+   same bargain the valve struck: a report screen is a period somebody CHOOSES
+   and figures drawn as marks, and without a way to say either, the one screen in
+   the product whose whole subject is arithmetic stayed a hand-written file. The
+   CHARTS are not in this number and will not be — `LineChart` and `BarChart`
+   come down with `Declared`, which is lazy — and neither is the narrowing
+   control, which is `Segmented` and `Lookup` and was already here. What is here
+   is the reading of the declaration: a projection from rows to marks, and one
+   control row above a body. Raw goes to 1,114,200 for the same reason gzip
+   goes to 330,400 — a contract read in the browser is parsed before the first
+   frame, and it does not compress. */
 const CEILING = {
-  js: { raw: 1_111_800, gzip: 330_000 },
+  js: { raw: 1_114_200, gzip: 330_400 },
   css: { raw: 470_000, gzip: 50_000 },
 };
 

@@ -103,7 +103,13 @@ const ROWS: BlockIndex = {
    * nobody's field — "Scanning a shelf puts everything after it there".
    */
   NoteRow: block("NoteRow", "rows", {
-    children: slot("The sentence", SAID, true),
+    /* ⚠️ AND `first` IS HERE, WHICH IS WHAT LETS THE SENTENCE BE A CONDITIONAL.
+       "Nothing left the shelves" and "the rest went without anybody scanning it"
+       are two true things about the same two numbers, and a declaration has no
+       `if` — so the operation decides which, answers it as a column, and this
+       reads it off the first row. A `words` here could only ever say one of
+       them, on the period where the other is true. */
+    children: slot("The sentence", TOLD, true),
   }),
 
   /** An identifier somebody will read out or retype. */
@@ -255,17 +261,20 @@ const FIGURES: BlockIndex = {
  * comes back with it.
  */
 const CHARTS: BlockIndex = {
+  /* ⚠️ A SERIES OF POINTS, WHICH IS WHY IT NEEDS NO NAME PER MARK. A line draws
+     a run and no x labels at all — see `BlockEntry.plots`. */
   /** A series over time. */
-  LineChart: block("LineChart", "chart", {
+  LineChart: { ...block("LineChart", "chart", {
     describes: slot("What the chart is", ["words"], true),
     series: slot("What is plotted", ["view"], true),
-  }),
+  }), plots: "series" },
 
+  /* ⚠️ A MARK PER ROW WITH ITS NAME DOWN THE SIDE, so the name is required. */
   /** Named things compared, laid out along the reading direction. */
-  BarChart: block("BarChart", "chart", {
+  BarChart: { ...block("BarChart", "chart", {
     describes: slot("What the chart is", ["words"], true),
     data: slot("What is compared", ["view"], true),
-  }),
+  }), plots: "labelled" },
 };
 
 /* ------------------------------------------------------------------ marks --- */

@@ -51,6 +51,14 @@ export interface Drawn {
    * operation in the product on the wire for a screen with one button on it.
    */
   readonly acts: Readonly<Record<string, Act>>;
+  /**
+   * WHAT EACH NARROWING OFFERS, BY PICK ID — see `PickSpec`.
+   *
+   * ⚠️ ONLY THE ONES BACKED BY A COLLECTION. A pick with a written set of options
+   * already has them in the body the browser is holding; sending those back would
+   * be the manifest arriving twice, and the two could disagree.
+   */
+  readonly picks: Readonly<Record<string, readonly Choice[]>>;
 }
 
 export interface Act {
@@ -198,6 +206,10 @@ export const collectionsFor = (app: AppSpec, screen: ScreenSpec): readonly strin
      caller with no `location:read` the whole map of the building through a
      dropdown. Same leak as an uncounted hop, one control over. */
   for (const one of choosesIn(app, screen)) ids.add(one.to);
+  /* ⚠️ AND WHAT A NARROWING OFFERS, for the same reason — see `PickSpec`. A
+     control listing every location by name is a read of the location collection
+     whether it is a filter or a form field. */
+  for (const one of screen.body?.picks ?? []) if (one.of) ids.add(one.of);
   return [...ids];
 };
 
@@ -225,6 +237,8 @@ export async function drawnFor(
   today: string | null = null,
   /** ⚠️ How an asked view is answered, supplied by the door — see `Ask`. */
   ask?: Ask,
+  /** ⚠️ What somebody narrowed the screen to, by pick id — see `PickSpec`. */
+  picked: Readonly<Record<string, string>> = {},
 ): Promise<Drawn | Refused> {
   /*
     ⚠️ `permissionFor`, NOT `spec.permission`. A collection declares a PREFIX —
@@ -243,7 +257,7 @@ export async function drawnFor(
 
   const reads = screen.body ? viewsIn(screen.body) : [];
   const here = {
-    record: record ?? undefined, me: me ?? undefined, today: today ?? undefined,
+    record: record ?? undefined, me: me ?? undefined, today: today ?? undefined, picked,
   };
 
   const of = (app.collections ?? []).find((c) => c.id === screen.of);
@@ -259,9 +273,13 @@ export async function drawnFor(
      `stock.move` has exactly that shape, taking a shelf to leave and a shelf to
      arrive at. */
   const chooses = choosesIn(app, screen);
-  const wanted = [...new Set(chooses.map((one) => one.to))];
+  /* ⚠️ A NARROWING OVER ROWS IS THE SAME QUERY AN ACT'S PICKER RUNS, so it joins
+     the same deduplicated list — a screen offering "which shelf" as a filter and
+     as an input to a write asks for the shelves once. */
+  const narrowing = (screen.body?.picks ?? []).flatMap((p) => (p.of ? [p] : []));
+  const wanted = [...new Set([...chooses.map((one) => one.to), ...narrowing.map((p) => p.of!)])];
 
-  const [held, views, picked] = await Promise.all([
+  const [held, views, fetched] = await Promise.all([
     (async () => {
       if (!of || !record) return null;
       const one = await readOne(db, of, scope, record);
@@ -272,7 +290,7 @@ export async function drawnFor(
     runViews(db, app, reads, scope, here, reaching, ask),
     Promise.all(wanted.map(async (id) => [id, await choicesOf(db, app, id, scope)] as const)),
   ]);
-  const byCollection = new Map(picked);
+  const byCollection = new Map(fetched);
 
   /* ⚠️ ONLY WHAT THE BODY NAMES, and an id the app does not declare is dropped
      rather than sent as a stub — `refuseSurface` refuses one at composition, so
@@ -295,7 +313,13 @@ export async function drawnFor(
     acts[id] = { summary: spec.summary, input: spec.input, fills: fills[id] ?? {}, choices };
   }
 
-  return { record: held ?? null, views, acts };
+  const picks: Record<string, readonly Choice[]> = {};
+  for (const one of narrowing) {
+    const rows = byCollection.get(one.of!);
+    if (rows?.length) picks[one.id] = rows;
+  }
+
+  return { record: held ?? null, views, acts, picks };
 }
 
 /**

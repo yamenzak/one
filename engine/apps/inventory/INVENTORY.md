@@ -483,11 +483,11 @@ entry whose screen becomes a declaration fails until it is deleted.
 
 | Route | Name | Nav | Needs | Component | Container |
 |---|---|---|---|---|---|
-| `/` | Home | primary | `stock:read` | `screens/Home.tsx:135` | `screens/live.tsx:1593` |
-| `/stock` | Stock | primary | `stock:read` | `screens/Stock.tsx:93` | `screens/live.tsx:430` |
-| `/scan` | Scan | primary | `product:read` | `screens/Scan.tsx:133` | `screens/live.tsx:510` |
-| `/receive` | Receive | primary | `stock:move` | `screens/Receive.tsx:144` | `screens/live.tsx:631` |
-| `/count` | Count | primary | `stock:move` | `screens/Count.tsx:83` | `screens/live.tsx:800` |
+| `/` | Home | primary | `stock:read` | `screens/Home.tsx:135` | `screens/live.tsx:1566` |
+| `/stock` | Stock | primary | `stock:read` | `screens/Stock.tsx:93` | `screens/live.tsx:429` |
+| `/scan` | Scan | primary | `product:read` | `screens/Scan.tsx:133` | `screens/live.tsx:509` |
+| `/receive` | Receive | primary | `stock:move` | `screens/Receive.tsx:144` | `screens/live.tsx:630` |
+| `/count` | Count | primary | `stock:move` | `screens/Count.tsx:83` | `screens/live.tsx:799` |
 | `/work` | Work | primary | `process:read` | `declared` | `declared` |
 | `/move` | Move it | none | `stock:move` | `declared` | `declared` |
 | `/thing` | A product | none | `product:read` | `declared` | `declared` |
@@ -497,13 +497,13 @@ entry whose screen becomes a declaration fails until it is deleted.
 | `/run` | A run | none | `process:read` | `declared` | `declared` |
 | `/case` | A job | none | `process:read` | `declared` | `declared` |
 | `/due` | Running out | secondary | `stock:read` | `declared` | `declared` |
-| `/labels` | Labels | secondary | `location:read` | `screens/Labels.tsx:248` | `screens/live.tsx:1286` |
-| `/reports` | Reports | none | `ledger:read` | `screens/Reports.tsx:84` | `screens/live.tsx:1200` |
-| `/ask` | Ask | secondary | `stock:read` | `screens/Ask.tsx:54` | `screens/live.tsx:1066` |
-| `/import` | Import | secondary | `product:write` | `screens/Import.tsx:131` | `screens/live.tsx:1391` |
+| `/labels` | Labels | secondary | `location:read` | `screens/Labels.tsx:248` | `screens/live.tsx:1246` |
+| `/reports` | Reports | none | `ledger:read` | `declared` | `declared` |
+| `/ask` | Ask | secondary | `stock:read` | `screens/Ask.tsx:54` | `screens/live.tsx:1026` |
+| `/import` | Import | secondary | `product:write` | `screens/Import.tsx:131` | `screens/live.tsx:1364` |
 | `/suppliers` | Suppliers | secondary | `product:write` | `declared` | `declared` |
-| `/register` | Add a product | none | `product:write` | `screens/Register.tsx:205` | `screens/live.tsx:1391` |
-| `/start` | Getting started | secondary | `product:read` | `screens/Start.tsx:70` | `screens/live.tsx:1391` |
+| `/register` | Add a product | none | `product:write` | `screens/Register.tsx:205` | `screens/live.tsx:1364` |
+| `/start` | Getting started | secondary | `product:read` | `screens/Start.tsx:70` | `screens/live.tsx:1364` |
 
 ### The surfaces that are not routes
 

@@ -58,7 +58,6 @@ const ok = (m) => console.log(`ok   ${m}`);
  * answer that arrives in pieces.
  */
 const NOT_YET = new Map([
-  ["inventory:reports", "totals over a period a person picks, which is an aggregate the view grammar has no clause for"],
   ["inventory:stock", "a location tree that narrows the list to everything at or below a place — a filter no `Match` can say"],
   ["inventory:home", "figures over the whole workspace beside three counts, which is the reports gap on a smaller screen"],
   ["inventory:ask", "a question, a stream of tokens and the sources it drew on — an answer that arrives in pieces"],

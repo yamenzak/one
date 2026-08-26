@@ -320,13 +320,19 @@ describe("the figures", () => {
     await write("count.tally", { count: session, raw: code, year: 2026, quantity: 60 });
     await write("count.close", { count: session, day: TODAY });
 
-    const said = await read("stock.report", { from: "2026-08-01", to: TODAY });
+    const said = await read("stock.report", { today: TODAY, span: "month" });
     expect(said.status, JSON.stringify(said.body)).toBe(200);
-    const told = said.body.told as { recorded: number; inferred: number; share: number };
+    /* ⚠️ A LIST OF ONE, because a view is a list wherever it came from and the
+       declared Reports screen reads its three figures off the first row. */
+    const told = (said.body.told as readonly {
+      recorded: number; inferred: number; share: number; sharePct: number; says: string;
+    }[])[0]!;
     expect(told.recorded).toBe(30);
     /* ⚠️ Ten the count found gone that nobody recorded taking. */
     expect(told.inferred).toBe(10);
     expect(told.share).toBeCloseTo(0.75);
+    expect(told.sharePct).toBe(75);
+    expect(told.says).toContain("without anybody scanning it");
   });
 });
 

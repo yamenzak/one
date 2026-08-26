@@ -230,7 +230,7 @@ if (shippedStages().has(String(RENDERER)) && !kinds.body) {
  * losing. Under it means somebody ported one and did not tighten the number, so
  * the next regression is absorbed in silence instead of being reported.
  */
-const WRITTEN_MOST = 14;
+const WRITTEN_MOST = 13;
 if (kinds.written > WRITTEN_MOST) {
   fail(`${kinds.written} screen(s) are still written by hand, over the ${WRITTEN_MOST} ceiling.\n`
     + `       A new hand-written screen during the port is the port losing ground. Declare\n`

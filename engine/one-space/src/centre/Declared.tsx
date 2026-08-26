@@ -38,6 +38,8 @@ import { useLoad } from "./data.js";
 interface Drawn {
   readonly record: Readonly<Record<string, unknown>> | null;
   readonly views: Readonly<Record<string, Viewed>>;
+  /** ⚠️ What each narrowing offers — see `Drawn.picks`. */
+  readonly picks: Readonly<Record<string, readonly { id: string; label: string }[]>>;
   /** ⚠️ The acts this body offers, with their input — see `Drawn.acts`. */
   readonly acts: Readonly<Record<string, {
     summary: string; input: Fields; fills?: Readonly<Record<string, Fill>>;
@@ -102,6 +104,17 @@ export function Declared({ screen, screens, at, go, currency }: {
     for nothing.
   */
   const [asking, setAsking] = React.useState<string | null>(null);
+  /*
+    ⚠️ WHAT SOMEBODY NARROWED THIS SCREEN TO, HELD HERE AND SENT WITH THE READ —
+    see `PickSpec`. It is not in the address on purpose: narrowing a list is a
+    filter rather than a destination, and putting it in the path would make the
+    back gesture undo a filter one step at a time before it left the screen.
+
+    ⚠️ AND CHANGING IT IS A REFETCH, WHICH IS THE WHOLE POINT. The narrowing
+    reaches an asked view's input on the worker; held in the browser it would
+    move a control and leave the figures under it exactly where they were.
+  */
+  const [picked, setPicked] = React.useState<Readonly<Record<string, string>>>({});
   const record = at[0];
   /* ⚠️ SENT WITH EVERY SCREEN, NOT ONLY THE ONES THAT ASK. Which views a body
      reads is the manifest's business and the browser does not open it to find
@@ -110,7 +123,16 @@ export function Declared({ screen, screens, at, go, currency }: {
      day, so it changes nothing about caching within one. */
   const got = useLoad<Drawn>(
     `${SCREEN_PATH}/${screen.id}`,
-    { today: today(), ...(record ? { record } : {}) },
+    {
+      today: today(),
+      ...(record ? { record } : {}),
+      /* ⚠️ PREFIXED, so a pick can never take over `record` or `today` — see the
+         door. A product declaring one called `today` would otherwise silently
+         replace the device's own calendar day. */
+      ...Object.fromEntries(Object.entries(picked)
+        .filter(([, v]) => v !== "")
+        .map(([k, v]) => [`pick.${k}`, v])),
+    },
   );
 
   /* ⚠️ FROM THE BODY, NOT FROM THE ANSWER. Reading the ids off `views` would
@@ -207,8 +229,12 @@ export function Declared({ screen, screens, at, go, currency }: {
     views: spread(ids, got.of),
     onGo: onGo,
     onDo,
+    picked,
+    onPick: (id: string, value: string) =>
+      setPicked((was) => ({ ...was, [id]: value })),
+    ...(got.of.status === "ready" ? { picks: got.of.data.picks } : {}),
     ...(currency ? { currency } : {}),
-  }), [got.of, ids, onGo, onDo, currency]);
+  }), [got.of, ids, onGo, onDo, currency, picked]);
 
   if (!body) return null;
   return (

@@ -350,6 +350,27 @@ export interface Span {
 }
 
 /**
+ * WHICH FIELDS OF A LIST BECOME A CHART'S AXES.
+ *
+ * ⚠️ A CHART'S DATA IS A PROJECTION AND THE COMPONENTS SAID SO ALL ALONG.
+ * `LineChart` takes series of points and `BarChart` takes labelled values; the
+ * declared binding passed a view's rows into both, so the entry composed, the
+ * screen mounted, and the chart drew an empty box. `blocks.ts` was right that
+ * inventing a binding which silently drops what it does not understand is the
+ * fault to avoid — this is the contract growing a way to say what a chart takes.
+ *
+ * ⚠️ AND WHICH FIELDS ARE REQUIRED IS THE BLOCK'S TO SAY — see `BlockEntry.plots`.
+ * A bar needs a name for each bar; a line does not draw one, so demanding it
+ * would be a field declared and read by nothing.
+ */
+export interface PlotSpec {
+  /** ⚠️ The measure — what the height or the length of the mark is. */
+  readonly of: string;
+  /** ⚠️ What each mark is called, where the chart draws one. */
+  readonly along?: string;
+}
+
+/**
  * ONE COLUMN OF A LIST — the field, and the word over it.
  *
  * ⚠️ THE WORD IS REQUIRED AND IS NOT THE FIELD'S OWN LABEL. A column heading is
@@ -425,7 +446,11 @@ export type Layout =
  * and its own calendar would call a box expired the evening before it is — or,
  * west of Greenwich, current for a few hours after it is not.
  */
-export type Fill = "record" | "today" | { readonly field: string } | { readonly says: Said };
+export type Fill =
+  | "record" | "today"
+  | { readonly field: string } | { readonly says: Said }
+  /** ⚠️ What somebody narrowed the screen to — see `PickSpec`. */
+  | { readonly picked: string };
 
 /**
  * ⚠️ THE THIRD SOURCE, AND IT IS THE ONE `/move` FOUND. `record` is the id of
@@ -446,14 +471,58 @@ export type Fill = "record" | "today" | { readonly field: string } | { readonly 
  */
 export type Said = string | number | boolean;
 
-/** ⚠️ One reading of the four forms, so no caller writes the branch twice. */
+/**
+ * A CONTROL THAT CHANGES WHAT THE SCREEN READS.
+ *
+ * ⚠️ THE LAST THING A READING SCREEN DOES THAT A DECLARATION COULD NOT SAY. A
+ * report is over a period somebody picks; a stock list is narrowed to a place
+ * they choose. Both are the SAME shape — a value held on the screen, fed into
+ * what its views ask for — and without it the two screens that need it were the
+ * two screens still written by hand.
+ *
+ * ⚠️ IT NARROWS A READ AND CAN DO NOTHING ELSE. A pick reaches exactly one place:
+ * the `fills` of an asked view, checked at composition. It is not state a block
+ * can bind, not a value an act can be given, and not a condition a `when` can
+ * branch on — each of those would make a body a program, which is the line D92
+ * draws and this does not cross.
+ *
+ * ⚠️ AND THE OPTIONS ARE DECLARED OR THEY ARE ROWS, never assembled. A period is
+ * a closed set the product wrote down; a place is every row of a collection,
+ * named by its `names` field and fetched by the door — the same list an act's
+ * `ref` input offers, from the same query, under the same permission.
+ */
+export interface PickSpec {
+  readonly id: string;
+  /** ⚠️ The word over the control — "Over", "Where". Never the id. */
+  readonly label: string;
+  /** ⚠️ A closed set the product wrote down. The first is what it opens on. */
+  readonly options?: readonly PickOption[];
+  /** ⚠️ Or every row of a collection — see `CollectionSpec.names`. */
+  readonly of?: string;
+  /**
+   * ⚠️ THE WORDS FOR "NOT NARROWED", WHERE THAT IS AN ANSWER. A stock list opens
+   * on everything and a place is how somebody narrows it; without a way back the
+   * control is a trap. Absent means the first option is the only starting point,
+   * which is right for a period — "no period" is not a report.
+   */
+  readonly any?: string;
+}
+
+export interface PickOption {
+  readonly value: string;
+  readonly label: string;
+}
+
+/** ⚠️ One reading of the five forms, so no caller writes the branch twice. */
 export const fillOf = (
   one: Fill,
 ): { readonly of: "record" | "today" } | { readonly of: "field"; readonly field: string }
-  | { readonly of: "says"; readonly says: Said } => (
+  | { readonly of: "says"; readonly says: Said }
+  | { readonly of: "picked"; readonly picked: string } => (
     typeof one === "string" ? { of: one }
       : "field" in one ? { of: "field", field: one.field }
-        : { of: "says", says: one.says });
+        : "picked" in one ? { of: "picked", picked: one.picked }
+          : { of: "says", says: one.says });
 
 /**
  * AN ACT A BLOCK OFFERS, AND WHAT THE SCREEN FILLS IN FOR IT.
@@ -530,6 +599,17 @@ export interface BlockSpec {
    */
   readonly shows?: readonly Column[];
   /**
+   * WHICH FIELDS OF A LIST BECOME A CHART'S AXES — see `PlotSpec`.
+   *
+   * ⚠️ THE SAME KIND OF THING AS `shows`, AND FOR THE SAME REASON. A chart's
+   * data is not recoverable from a view's rows: which column is the measure and
+   * which one names each bar are decisions, and a component handed a list of
+   * rows would have to guess. The two charts in the vocabulary took `series` and
+   * `data` in their own shapes and the renderer passed rows straight in, so
+   * every declared chart drew an empty box.
+   */
+  readonly plots?: PlotSpec;
+  /**
    * WHAT ITS EMPTINESS MEANS, IN THE APP'S OWN WORDS.
    *
    * ⚠️ REQUIRED OF ANY BLOCK THAT READS A LIST, for the reason `Region.nothing`
@@ -581,6 +661,14 @@ export interface SurfaceSpec {
   readonly shape: ScreenShape;
   readonly layout: Layout;
   readonly blocks: readonly Placed[];
+  /**
+   * ⚠️ WHAT SOMEBODY CAN NARROW THIS SCREEN TO — see `PickSpec`. Above the
+   * blocks, because a control that changes what everything below it says belongs
+   * where it is read first, and because a body has one such row rather than one
+   * per block: two narrowings of one screen disagreeing about what is being
+   * looked at is the shape a filter panel exists to avoid.
+   */
+  readonly picks?: readonly PickSpec[];
 }
 
 /* --------------------------------------------------------- the block index --- */
@@ -656,6 +744,20 @@ export interface BlockEntry {
   readonly takes: Readonly<Record<string, SlotSpec>>;
   /** ⚠️ What its absence looks like — see `Bones`. The frame draws the rest. */
   readonly bones: Bones;
+  /**
+   * THIS BLOCK IS A CHART, AND WHICH SHAPE OF DATA IT TAKES — see `PlotSpec`.
+   *
+   * ⚠️ `labelled` NEEDS A NAME PER MARK AND `series` DOES NOT, which is the whole
+   * reason this is on the entry rather than assumed. A bar chart draws the name
+   * of every bar down its side; a line draws a run of points and no x labels at
+   * all, so requiring one there would be a field declared and read by nothing —
+   * and the reader would go looking for where it appears.
+   *
+   * ⚠️ AND ITS ABSENCE IS WHAT MAKES `plots` REFUSABLE ON EVERYTHING ELSE. A
+   * `plots` on a `FieldRow` is a projection nothing applies, which is the class
+   * of quietly-ignored declaration this registry exists to close.
+   */
+  readonly plots?: "labelled" | "series";
 }
 
 export type BlockIndex = Readonly<Record<string, BlockEntry>>;
@@ -670,6 +772,12 @@ export type SurfaceRefusal =
   | "goes_nowhere"
   | "span_too_wide" | "span_without_a_grid"
   | "shows_without_a_list" | "shows_field_unknown" | "nothing_unsaid"
+  /* ⚠️ THE THREE A CHART'S AXES CAN GET WRONG — see `PlotSpec`. Every one of
+     them draws an empty box under a correct heading. */
+  | "plots_on_a_block_that_draws_none" | "plots_missing" | "plots_unlabelled"
+  /* ⚠️ THE FOUR A NARROWING CAN GET WRONG — see `PickSpec`. A control drawn over
+     rows nothing narrows is the sharpest: it moves, and the screen does not. */
+  | "pick_name_taken" | "pick_says_nothing" | "pick_two_ways" | "pick_narrows_nothing"
   /* ⚠️ THE SIX A DOTTED PATH CAN GET WRONG — see `reachFor`. They are separate
      from `field_unknown` because the fix is different for each: a typo, a hop
      through something that is not a reference, a second hop that is not coming. */
@@ -1091,6 +1199,58 @@ export function refuseSurface(
       `declares an aside on a ${body.layout.as}, which has nothing to put it beside`);
   }
 
+  /* --- what narrows it -------------------------------------------------- */
+
+  /*
+    ⚠️ A CONTROL THAT NARROWS NOTHING IS THE SHARPEST FAULT HERE, and it is the
+    one that looks like the platform being slow. The picker draws, it moves, the
+    screen underneath does not change, and somebody presses it again. Nothing
+    throws, nothing is missing, and every other check is green.
+  */
+  const named = new Set<string>();
+  for (const pick of body.picks ?? []) {
+    if (!NAME.test(pick.id)) {
+      at("not_a_name", `narrows by "${pick.id}", which is not a name a view can fill from`);
+    }
+    if (named.has(pick.id)) {
+      at("pick_name_taken",
+        `narrows by "${pick.id}" twice — a view filling from it would take whichever `
+        + "control the reader happened to write second");
+    }
+    named.add(pick.id);
+    const ways = [pick.options?.length ? "options" : null, pick.of ?? null].filter(Boolean);
+    if (ways.length !== 1) {
+      at("pick_two_ways",
+        ways.length === 0
+          ? `narrows by "${pick.id}" and offers nothing to pick — a control with no options `
+            + "is a label"
+          : `narrows by "${pick.id}" with both a written set and a collection's rows, and `
+            + "nothing decides which the control draws");
+    }
+    if (!pick.label.trim()) {
+      at("pick_says_nothing",
+        `narrows by "${pick.id}" under no words — an unlabelled control on a screen full of `
+        + "figures is one nobody knows the effect of");
+    }
+  }
+  /*
+    ⚠️ AND EVERY ONE OF THEM HAS TO REACH A VIEW. A pick fills exactly one thing
+    — the input of an asked view — so a pick nothing fills is a control that
+    moves over a screen that does not. Checked here from the body's own views
+    rather than from the app's, which is why the view list is passed in.
+  */
+  for (const pick of body.picks ?? []) {
+    const filled = viewsIn(body)
+      .map((id) => views.find((v) => v.id === id))
+      .some((v) => Object.values(v?.asked?.fills ?? {})
+        .some((f) => typeof f === "object" && "picked" in f && f.picked === pick.id));
+    if (!filled) {
+      at("pick_narrows_nothing",
+        `narrows by "${pick.id}" and no view this screen reads fills from it — the control `
+        + "would move and the screen under it would not change");
+    }
+  }
+
   /* --- the subject ------------------------------------------------------ */
 
   /*
@@ -1337,6 +1497,42 @@ export function refuseSurface(
               : reach,
               `${where} shows ${sayReach(reach, col.field, view.of, held)}`);
           }
+        }
+      }
+    }
+
+    /*
+      ⚠️ A CHART WITHOUT ITS AXES DRAWS AN EMPTY BOX UNDER A CORRECT HEADING —
+      see `PlotSpec`. The view is fetched, the region reports ready, the label is
+      right, and the figure is blank; nothing throws and nothing is missing, so
+      it reads as a workspace with no data in it.
+    */
+    if (entry.plots && !b.plots) {
+      at("plots_missing",
+        `${where} is a chart and does not say which fields are its axes — the rows would `
+        + "go in as they are and the chart would draw nothing");
+    }
+    if (!entry.plots && b.plots) {
+      at("plots_on_a_block_that_draws_none",
+        `${where} names chart axes and is not a chart — nothing would apply them`);
+    }
+    if (entry.plots === "labelled" && b.plots && !b.plots.along) {
+      at("plots_unlabelled",
+        `${where} draws a mark per row and does not say what each one is called — `
+        + "every bar would be nameless");
+    }
+    if (b.plots) {
+      const reads = Object.values(b.bind ?? {}).map((x) => x.from).find((r) => r.of === "view");
+      const view = reads?.of === "view" ? views.find((v) => v.id === reads.view) : undefined;
+      /* ⚠️ AN ASKED VIEW IS EXEMPT, exactly as its columns are — the row shape is
+         a handler's answer and nothing writes it down. */
+      const held = view && !view.asked
+        ? collections.find((c) => c.id === view.of)?.fields
+        : undefined;
+      for (const name of [b.plots.of, b.plots.along].filter((n): n is string => Boolean(n))) {
+        if (held && !(name in held) && !(view && talliedIn(view).includes(name))) {
+          at("shows_field_unknown",
+            `${where} plots "${name}", which ${view?.of} does not have`);
         }
       }
     }

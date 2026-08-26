@@ -35,6 +35,8 @@ import { BLOCKS, goOf, isGroup, opOf } from "@engine/kernel";
 import { Arranged, spanning } from "../parts/arrange.js";
 import { Group } from "../parts/surfaces.js";
 import { Region, ready, type Loaded } from "../parts/state.js";
+import { Lookup, Segmented } from "../parts/forms.js";
+import { SPACE } from "../tokens/metrics.js";
 import { Num, Size, Unit, When } from "../parts/said.js";
 import { Money } from "../parts/surfaces.js";
 import { Tally } from "../parts/tally.js";
@@ -85,6 +87,19 @@ export interface Has {
    * prices in another's symbol — right to the penny and wrong by a factor.
    */
   readonly currency?: string | undefined;
+  /**
+   * WHAT THE SCREEN IS NARROWED TO, BY PICK ID — see `PickSpec`.
+   *
+   * ⚠️ HELD BY THE CALLER RATHER THAN BY THIS COMPONENT, because changing it is a
+   * REFETCH. The narrowing reaches an asked view's input on the worker, so a
+   * value kept here would move a control and leave the rows it filters exactly
+   * where they were — which is the "control that narrows nothing" the kernel
+   * refuses one shape earlier.
+   */
+  readonly picked?: Readonly<Record<string, string>> | undefined;
+  /** ⚠️ The rows a collection-backed narrowing offers — see `Drawn.picks`. */
+  readonly picks?: Readonly<Record<string, readonly { id: string; label: string }[]>> | undefined;
+  readonly onPick?: ((id: string, value: string) => void) | undefined;
 }
 
 /* ------------------------------------------------------------- the values --- */
@@ -248,6 +263,31 @@ function Placed({ block, has }: { readonly block: BlockSpec; readonly has: Has }
       }
       continue;
     }
+    /*
+      ⚠️ A CHART'S DATA IS A PROJECTION AND NOT THE ROWS — see `PlotSpec`. Both
+      charts declare their own shape (`Series[]` of points, `Datum[]` of labelled
+      values) and the rows went in untouched, so every declared chart drew an
+      empty box under a correct heading. The kernel has already refused a `plots`
+      naming a field the collection has not got, so this maps rather than checks.
+    */
+    if (entry.plots && block.plots && binding.from.of === "view") {
+      const rows = rowsOf(has, binding.from.view) ?? [];
+      const plots = block.plots;
+      props[slot] = entry.plots === "labelled"
+        ? rows.map((row) => ({
+          label: String(row[plots.along ?? ""] ?? ""), value: Number(row[plots.of] ?? 0),
+        }))
+        /* ⚠️ ONE SERIES, AND ITS x IS THE POSITION. A line draws a run in the
+           order the view answered; a date on the axis is not something this
+           chart draws, which is why `along` is not asked for. */
+        : [{
+          id: plots.of,
+          label: block.label ?? plots.of,
+          subject: true,
+          points: rows.map((row, i) => ({ x: i, y: Number(row[plots.of] ?? 0) })),
+        }];
+      continue;
+    }
     const value = drawn(binding, has);
     if (slot === "children") children = value as React.ReactNode;
     else props[slot] = value;
@@ -357,12 +397,68 @@ export function Body({ body, has }: BodyProps) {
   const beside = body.blocks.find((p) => p.beside);
   const rest = body.blocks.filter((p) => !p.beside);
   return (
-    <Arranged
-      layout={body.layout}
-      aside={beside ? wrap(beside, has, -1, body.layout) : undefined}
-    >
-      {rest.map((p, i) => wrap(p, has, i, body.layout))}
-    </Arranged>
+    <>
+      <Narrowing body={body} has={has} />
+      <Arranged
+        layout={body.layout}
+        aside={beside ? wrap(beside, has, -1, body.layout) : undefined}
+      >
+        {rest.map((p, i) => wrap(p, has, i, body.layout))}
+      </Arranged>
+    </>
+  );
+}
+
+/**
+ * WHAT SOMEBODY CAN NARROW THIS SCREEN TO — see `PickSpec`.
+ *
+ * ⚠️ ABOVE THE BLOCKS AND OUTSIDE THE LAYOUT, because a control that changes
+ * what everything below it says belongs where it is read first — and because it
+ * is not one of the things being arranged. Put through `Arranged` it would take
+ * a grid cell and sit beside the figures it filters.
+ *
+ * ⚠️ A FEW OPTIONS ARE WORN ON THE SURFACE AND MANY ARE BEHIND A FIELD. Past a
+ * dozen, a segmented control is a row that wraps three times; the same rule
+ * `Lookup`'s own header states, applied by the number of rows rather than by
+ * which declaration produced them.
+ */
+const WORN_MOST = 4;
+
+function Narrowing({ body, has }: BodyProps) {
+  const picks = body.picks ?? [];
+  if (!picks.length || !has.onPick) return null;
+  return (
+    <div className={`flex flex-wrap ${SPACE.snug}`}>
+      {picks.map((pick) => {
+        /* ⚠️ THE ROWS COME FROM THE DOOR AND THE WRITTEN SET FROM THE BODY — see
+           `Drawn.picks`. A collection-backed pick whose rows have not arrived
+           draws nothing rather than an empty control, which is the same rule
+           every region on the screen follows. */
+        const options = pick.options
+          ? pick.options.map((o) => ({ id: o.value, label: o.label }))
+          : (has.picks?.[pick.id] ?? []).map((o) => ({ id: o.id, label: o.label }));
+        /* ⚠️ AND "NOT NARROWED" IS AN OPTION WHERE THE PRODUCT SAYS IT IS. A
+           control somebody can enter and not leave is a trap; `any` is the way
+           back, and its absence means there was never anywhere to go back to. */
+        const all = pick.any ? [{ id: "", label: pick.any }, ...options] : options;
+        if (!all.length) return null;
+        const value = has.picked?.[pick.id] ?? all[0]!.id;
+        const onChange = (next: string) => has.onPick?.(pick.id, next);
+        return all.length > WORN_MOST
+          ? (
+            <Lookup
+              key={pick.id} label={pick.label} value={value}
+              onChange={onChange} options={all}
+            />
+          )
+          : (
+            <Segmented
+              key={pick.id} label={pick.label} value={value}
+              onChange={onChange} options={all}
+            />
+          );
+      })}
+    </div>
   );
 }
 

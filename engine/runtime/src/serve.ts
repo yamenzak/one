@@ -871,20 +871,40 @@ export function serve(wiring: Wiring): (request: Request) => Promise<Response> {
            composing an app to serve a body that never calls this would charge
            every screen in the product for a feature two of them use. */
         let composed: Composed | null = null;
+        /*
+          ⚠️ ONE ANSWER PER QUESTION PER REQUEST. A report screen reads five views
+          off one operation — the totals, the daily run, what went most, what was
+          wrong and what to buy are five regions of one answer — and without this
+          that is the same aggregate computed five times, against the same rows,
+          inside one request. Keyed on the input as well as the id, so two views
+          asking the same operation different things still both run.
+        */
+        const answered = new Map<string, Promise<Record<string, unknown> | null>>();
         const ask = async (
           operation: string, input: Record<string, unknown>,
         ): Promise<Record<string, unknown> | null> => {
-          composed ??= compose(app);
-          const op = composed.byId.get(operation);
-          if (!op || op.kind !== "read") return null;
+          const already = `${operation}\u0000${JSON.stringify(input)}`;
+          const held = answered.get(already);
+          if (held) return held;
+          const running = (async () => {
+            composed ??= compose(app);
+            const op = composed.byId.get(operation);
+            if (!op || op.kind !== "read") return null;
+            return runAsked(op);
+          })();
+          answered.set(already, running);
+          return running;
+
+          async function runAsked(op: _Op): Promise<Record<string, unknown> | null> {
           const outcome = await performOperation(
-            wiring, located, who, { composed, op }, input, null, now,
+            wiring, located!, who, { composed: composed!, op }, input, null, now,
             { origin: url.origin, slug: door.kind === "tenant" ? door.slug : null },
             caring, switching,
           );
           return outcome.kind === "ok" && outcome.answer && typeof outcome.answer === "object"
             ? outcome.answer as Record<string, unknown>
             : null;
+          }
         };
         const drawn = await drawnFor(
           located.db, app, screen, located.tenantId,
@@ -893,6 +913,12 @@ export function serve(wiring: Wiring): (request: Request) => Promise<Response> {
           who.accountId,
           url.searchParams.get("today"),
           ask,
+          /* ⚠️ WHAT SOMEBODY NARROWED THE SCREEN TO — see `PickSpec`. Prefixed
+             rather than bare so a pick can never collide with `record` or
+             `today`: a product declaring a pick called `today` would otherwise
+             silently take over the device's calendar day. */
+          Object.fromEntries([...url.searchParams]
+            .flatMap(([k, v]) => (k.startsWith("pick.") ? [[k.slice(5), v] as const] : []))),
         );
         if ("needs" in drawn) {
           return asProblem(problem(PLATFORM_PROBLEMS, "platform.forbidden"));

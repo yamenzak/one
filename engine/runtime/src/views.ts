@@ -22,7 +22,7 @@
  */
 
 import type { AppSpec, CollectionSpec, Reach, Viewed, ViewSpec } from "@engine/kernel";
-import { eraseBy } from "@engine/kernel";
+import { eraseBy, fillOf } from "@engine/kernel";
 import { joinRows, tallyRows } from "./joined.js";
 import { narrow, type Here } from "./records.js";
 import { column, table, type Db } from "./sql.js";
@@ -94,8 +94,19 @@ export async function runView(
          same rule the browser follows for an act. An empty string in a required
          field is a refusal that says the field is missing when the truth is that
          the screen has not resolved. */
-      const value = from === "record" ? here.record : here.today;
-      if (value !== undefined) input[name] = value;
+      const source = fillOf(from);
+      const value = source.of === "record" ? here.record
+        : source.of === "today" ? here.today
+          /* ⚠️ A PICK IS THE ONLY PLACE A NARROWING REACHES — see `PickSpec`.
+             `refuseSurface` refuses a pick no view fills from and a fill naming
+             no pick, so an id absent here is a screen nobody has narrowed yet. */
+          : source.of === "picked" ? here.picked?.[source.picked]
+            : source.of === "says" ? String(source.says)
+              /* ⚠️ A COLUMN OF THE RECORD IS THE SCREEN'S AND NOT A VIEW'S. An
+                 asked view runs before any record is joined, so this source has
+                 nothing to read and is left out rather than guessed at. */
+              : undefined;
+      if (value !== undefined && value !== "") input[name] = value;
     }
     const said = await ask(view.asked.operation, input);
     const rows = said?.[view.asked.take];

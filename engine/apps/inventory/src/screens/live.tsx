@@ -38,7 +38,6 @@ import { Scan, type Guess, type Seen } from "./Scan.js";
 import { Stock } from "./Stock.js";
 import { Home, type Moving, type Needs, type Shelf } from "./Home.js";
 import { Labels, type Labelled, type Subject, type Template } from "./Labels.js";
-import { Reports, type Reported, type Span } from "./Reports.js";
 /* ⚠️ A JSON COLUMN IS WHATEVER IS IN THE COLUMN — see `packing.ts`. */
 import { readLevels } from "../packing.js";
 import { Start } from "./Start.js";
@@ -1010,45 +1009,6 @@ const ASK = (api: Door) => function AskHere() {
 };
 
 /**
- * REPORTS — one ask, because a figure screen is one screen.
- *
- * ⚠️ THE ARITHMETIC IS THE OPERATION'S, DOWN TO THE ORDERING. What runs out
- * first is a question about the workspace's own lead time, which is a
- * `tenant:manage` setting a person on the floor cannot read — a container
- * sorting this list would either hard-code a number or show everybody the same
- * wrong order.
- *
- * ⚠️ AND THE PERIOD IS COUNTED IN THE DEVICE'S OWN DAYS. The ledger's `day` is
- * the local date where the shelf is; a range cut on the server's calendar puts a
- * shift that ended at 01:00 into the wrong month for half the world.
- */
-const SPAN_DAYS: Readonly<Record<Span, number>> = { week: 7, month: 30, quarter: 90 };
-
-const REPORTS = (api: Door) => function ReportsHere({ go }: Mounted) {
-  const [span, setSpan] = React.useState<Span>("month");
-  const today = dayHere();
-  /* ⚠️ THE KERNEL'S CALENDAR ARITHMETIC, not a subtraction on an instant. Thirty
-     days back across a clock change is 29 or 31 by the millisecond, and a report
-     silently covering the wrong period is one nobody can catch by looking. */
-  const from = React.useMemo(
-    () => dayPlus(today as Day, -(SPAN_DAYS[span] - 1)), [today, span]);
-
-  const said = useAsked<Reported>(api, "stock.report",{ from, to: today });
-
-  return (
-    <Reports
-      title={nameOf("/reports")}
-      of={said.of}
-      span={span}
-      onSpan={setSpan}
-      again={said.again}
-      onOpen={(product) => go(`/thing/${product}`)}
-      onSuppliers={() => go("/suppliers")}
-    />
-  );
-};
-
-/**
  * LABELS — the sheet, and the codes it mints on the way to the printer.
  *
  * ⚠️ PRINTING IS WHAT MINTS A CODE, so the button is a WRITE before it is a
@@ -1334,14 +1294,27 @@ const START = (api: Door) => function StartHere({ app, go }: Mounted) {
 };
 
 /**
+ * WHAT `stock.report` ANSWERS — the operation's shape, not the screen's.
+ *
+ * ⚠️ `told` IS A LIST OF ONE, because a view is a list wherever it came from and
+ * the declared Reports screen reads its three figures off the first row. The
+ * hand-written Home below takes the same answer apart by hand.
+ */
+interface Reading {
+  readonly told: readonly { readonly recorded: number; readonly share: number }[];
+  readonly losses: readonly { readonly lost: number }[];
+  readonly buy: readonly unknown[];
+  readonly daily: readonly { readonly day: string; readonly quantity: number }[];
+}
+
+/**
  * ⚠️ WHAT A REPORT LOOKS LIKE WHEN NOBODY ASKED FOR ONE. `useAsked` needs an
  * answer of the right shape whether or not the read was made, and the block it
  * feeds is not drawn at all without `ledger:read` — so this is never rendered.
  * It exists so the hook has one branch rather than two.
  */
-const EMPTY_REPORT: Reported = {
-  told: { recorded: 0, inferred: 0, share: 0 },
-  used: [], losses: [], buy: [], daily: [],
+const EMPTY_REPORT: Reading = {
+  told: [], losses: [], buy: [], daily: [],
 };
 
 /**
@@ -1648,18 +1621,18 @@ const HOME = (api: Door) => function HomeHere({ app, go }: Mounted) {
       : null,
   };
 
-  /* ⚠️ THIRTY DAYS, THROUGH THE KERNEL'S CALENDAR. A subtraction on an instant
-     is 29 or 31 days across a clock change, and a home screen quietly covering
-     the wrong period is one nobody can catch by looking. */
-  const from = React.useMemo(() => dayPlus(today as Day, -29), [today]);
-  const report = useAsked<Reported>(
-    api, may("ledger:read") ? "stock.report" : null, { from, to: today }, EMPTY_REPORT);
+  /* ⚠️ THE PERIOD IS NAMED RATHER THAN COUNTED — see `stock.report`. Thirty days
+     back is 29 or 31 by the millisecond across a clock change, and the calendar
+     arithmetic belongs where the whole period is one decision. */
+  const report = useAsked<Reading>(
+    api, may("ledger:read") ? "stock.report" : null,
+    { today, span: "month" }, EMPTY_REPORT);
 
   const moving: Loaded<Moving> | null = may("ledger:read")
     ? (report.of.status === "ready"
       ? ready({
-        share: report.of.data.told.share,
-        out: report.of.data.told.recorded,
+        share: report.of.data.told[0]?.share ?? 0,
+        out: report.of.data.told[0]?.recorded ?? 0,
         short: report.of.data.losses.reduce((n, one) => n + one.lost, 0),
         buy: report.of.data.buy.length,
         daily: report.of.data.daily,
@@ -1719,7 +1692,6 @@ export function mount({ register, api }: Mounting): void {
     ["/count", COUNT(api)],
     ["/ask", ASK(api)],
     ["/labels", LABELS(api)],
-    ["/reports", REPORTS(api)],
     ["/import", IMPORT(api)],
     ["/start", START(api)],
   ];
