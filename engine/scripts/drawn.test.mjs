@@ -115,6 +115,18 @@ for (const [app, path] of appManifests()) {
   for (const m of src.matchAll(/\bblock:\s*"(\w+)"/g)) {
     (placedIn.get(m[1]) ?? placedIn.set(m[1], new Set()).get(m[1])).add(app);
   }
+  /*
+    ⚠️ AND A HERO IS PLACED BY ITS KIND, NOT BY `block:`. The hero region takes a
+    KIND — `as: "figure"`, `as: "subject"` — so a manifest leading with either
+    never writes the key this guard was reading, and both were reported as
+    vocabulary nothing had ever asked the renderer to draw while two products
+    opened on them. A guard that cannot see half the ways a thing is placed
+    reports the half it can and calls the rest dead.
+  */
+  for (const m of src.matchAll(/\bas:\s*"(\w+)"/g)) {
+    if (!declared.includes(m[1])) continue;
+    (placedIn.get(m[1]) ?? placedIn.set(m[1], new Set()).get(m[1])).add(app);
+  }
 }
 
 if (!placedIn.size) {

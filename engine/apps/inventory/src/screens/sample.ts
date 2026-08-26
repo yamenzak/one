@@ -82,6 +82,38 @@ export const LINES: readonly Line[] = [
   { id: "s6", product: "t-ladder", name: "Step ladder, 2.4 m", brand: "Zarges",
     where: "p-floor", whereName: "Shop floor", quantity: 1, unit: "item",
     tracking: "listed", seen: "2026-01-06T10:00:00.000Z" },
+  /* ⚠️ A SECOND EMPTY LINE, AND IT IS NOT PADDING. One zero draws a list of one
+     row, which is the state that looks like a bug rather than like a list — and
+     the two of them are deliberately far apart in time, because a shelf emptied
+     yesterday and one emptied in the spring are the same number and completely
+     different problems. */
+  { id: "s7", product: "t-tie", name: "Cable ties, 200 mm", brand: "HellermannTyton",
+    where: "p-b1", whereName: "B1", quantity: 0, unit: "bag", par: 4,
+    tracking: "counted", seen: "2026-05-02T09:20:00.000Z" },
+];
+
+/**
+ * A SHELF SOMEBODY IS PART WAY THROUGH COUNTING.
+ *
+ * ⚠️ OPEN SESSIONS ONLY, WHICH IS THE STATE THE PRODUCT SHOWS. A closed count is
+ * history and reads on a different screen; what a workspace needs to see at a
+ * glance is the shelf whose numbers nobody's read is settled on yet.
+ *
+ * ⚠️ AND ONE OF THEM IS BLIND. Whether the expected number was hidden cannot be
+ * changed once counting has started, so somebody taking a session over has to
+ * know which kind they walked into — which means the sample has to have both.
+ */
+export interface Counting {
+  readonly id: string;
+  readonly where: string;
+  readonly whereName: string;
+  readonly day: string;
+  readonly blind: boolean;
+}
+
+export const COUNTS: readonly Counting[] = [
+  { id: "c1", where: "p-b1", whereName: "B1", day: "2026-08-24", blind: true },
+  { id: "c2", where: "p-bench", whereName: "Bench", day: "2026-08-26", blind: false },
 ];
 
 /** ⚠️ What the ground shows for a place with nothing in it — a real state, not

@@ -61,8 +61,23 @@ const LANDS = [
 ].filter((one): one is { path: string; sky: string } => !!one.sky);
 
 describe("the world a person actually opens", () => {
+  /*
+    ⚠️ A FLOOR, BECAUSE A SUITE THAT SHRANK TO NOTHING REPORTS AS GREEN AS ONE
+    THAT PASSED. Every reading below is per address, so a corpus of zero is a
+    file of assertions that never ran and a summary that says so in no way at
+    all.
+
+    ⚠️ AND THE NUMBER IS ABOUT THE PRODUCT'S SURFACE RATHER THAN ABOUT THIS
+    FILE — which is why it is red while that surface is rebuilt. It was three,
+    counted against a twenty-one-screen product that has been emptied and is
+    coming back one screen at a time; each arrival screen that returns brings a
+    world with it. Lowering it to whatever is here today would be a floor that
+    can never fail.
+  */
   it("has screens to check at all", () => {
-    expect(LANDS.length, "no screen in OneInventory names a sky, so this suite checks nothing")
+    expect(LANDS.length,
+      `${LANDS.length} screen(s) in OneInventory name a sky, which is too few worlds for `
+      + "this suite to be checking the range of them")
       .toBeGreaterThan(2);
   });
 

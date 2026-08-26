@@ -467,11 +467,34 @@ generated ones) — plus every platform guard in `pnpm engine:gate`.
 
 ## Part III — the screen index
 
-**There are no screens.** The surface was emptied whole on 2026-08-26 and is
-being rebuilt one screen at a time, each designed from what somebody standing in
-front of it is trying to do rather than ported from what stood there before.
+**Five, and every one of them is drawn by the engine from the declaration.** The
+surface was emptied whole on 2026-08-26 and is being rebuilt one screen at a
+time, each designed from what somebody standing in front of it is trying to do
+rather than ported from what stood there before.
 [../../docs/BLUEPRINT.md](../../docs/BLUEPRINT.md) is the order that rebuild
 follows and the shape every screen is drawn to.
+
+| Route | Name | Nav | Needs | Component | Container |
+|---|---|---|---|---|---|
+| `/` | Stock | primary | `stock:read` | `declared` | `declared` |
+| `/out` | What ran out | — | `stock:read` | `declared` | `declared` |
+| `/products` | Products | primary | `product:read` | `declared` | `declared` |
+| `/places` | Places | primary | `location:read` | `declared` | `declared` |
+| `/counts` | Being counted | — | `stock:read` | `declared` | `declared` |
+
+⚠️ **`declared` IN BOTH FILE COLUMNS IS THE ANSWER, NOT A GAP.** A declared body
+has no component and no container — the renderer draws it from `src/index.ts`, and a
+row naming a file here would send a reader to code the product does not run.
+That is the fault this whole index nearly became: for a while it named a
+hand-written file per route while the product drew the declaration.
+
+**What the home leads with, and why it is not a total.** `/` opens on how many
+lines have run out — the one number that decides whether somebody walks to the
+store room, asked every morning and answered differently every morning. The
+reference app's home leads with the record somebody walked away from instead,
+because a notebook's total is a question asked once; the hero region takes a
+KIND so both are one contract. Under it are four tiles, each a `count` over the
+view its own list draws, so a figure and the rows behind it cannot disagree.
 
 ⚠️ **THE ENGINE UNDERNEATH IS UNTOUCHED, WHICH IS WHY THIS IS A SHORT SECTION
 RATHER THAN A SHORT PRODUCT.** Part I is what this product does and Part II is

@@ -201,6 +201,22 @@ export async function mounted(entry: string): Promise<string> {
     build: {
       write: false,
       lib: { entry, formats: ["iife"], name: "Harness", fileName: () => "h.js" },
+      /*
+        ⚠️ EVERY `import()` IS FOLDED IN, AND WITHOUT THIS A LAZY COMPONENT NEVER
+        ARRIVES. The bundle is injected as one inline `<script>` on a page with
+        no server behind it, so a chunk left as a real dynamic import is a fetch
+        of a relative URL that cannot resolve — the promise never settles and
+        `Suspense` shows its fallback for ever.
+
+        ⚠️ WHICH IS A SKELETON, AND THAT IS WHY IT WAS INVISIBLE. `Listing` loads
+        its grid lazily, so every table in this product photographed as its own
+        waiting state at desk width and was MEASURED as one — a screen of
+        placeholder bars that overflows nothing, hits no contrast floor and
+        reports green on every assertion the sweep makes. The phone lane draws
+        rows instead of a grid, so half the pictures were right and nothing
+        looked wrong.
+      */
+      rollupOptions: { output: { inlineDynamicImports: true } },
     },
   });
   const chunks = Array.isArray(out) ? out[0]! : out;
@@ -231,7 +247,8 @@ const pageMounting = (live: Live, css: string, theme: "dark" | "light"): string 
  */
 async function show(
   page: { setContent: (html: string) => Promise<void>;
-    waitForFunction: (fn: () => boolean, arg?: unknown, opts?: { timeout: number }) => Promise<unknown> },
+    waitForFunction: (fn: () => boolean, arg?: unknown, opts?: { timeout: number }) => Promise<unknown>;
+    evaluate: <T>(fn: () => T | Promise<T>) => Promise<T> },
   what: ReactNode | Live, css: string, theme: "dark" | "light",
 ): Promise<void> {
   if (!isLive(what)) {
@@ -258,6 +275,46 @@ async function show(
     () => (document.getElementById("root")?.children.length ?? 0) > 0
       || (document.body.innerText ?? "").trim().length > 0,
     undefined, { timeout: 20_000 });
+
+  /*
+    ⚠️ AND THEN UNTIL IT STOPS CHANGING, BECAUSE THE FIRST PAINT IS NOT THE
+    SCREEN. A block that loads its heavy half lazily paints its SKELETON first
+    and swaps in the real thing a frame or two later — so a sweep that measured
+    the first paint measured a waiting state and called it a screen. `Listing`
+    is one: it defers the grid, so every table in this repository photographed
+    as placeholder bars at desk width and was ASSERTED against as one. A
+    skeleton overflows nothing, hits no contrast floor and has no small
+    controls, so all of it reported green.
+
+    ⚠️ IT WAS INVISIBLE BECAUSE HALF THE PICTURES WERE RIGHT. The same component
+    draws rows rather than a grid in a narrow box, and nothing is deferred on
+    that path — so the phone lane was the real screen and the desk lane was the
+    skeleton, in one suite, under one name.
+
+    ⚠️ THE QUESTION IS "IS ANYTHING STILL WAITING", NOT "HAS THE DOM STOPPED
+    MOVING". Two agreeing frames is the rule for a thing that is SLIDING, and it
+    is the wrong one here: the first two frames of a lazy load are identical to
+    each other and identical to a page that will never change, so a stillness
+    check settles on the skeleton and reports it as the screen. Every waiting
+    state in the vocabulary is a `role="status"`, which makes "nothing is
+    waiting any more" a question the document can answer directly.
+
+    ⚠️ BOUNDED, AND IT RETURNS RATHER THAN THROWING ON THE BOUND. A screen that
+    genuinely never settles is a finding for the assertions below — a skeleton
+    measured and reported — rather than a harness timeout with nothing measured
+    and nothing said.
+  */
+  await page.evaluate(() => new Promise<void>((done) => {
+    const started = Date.now();
+    const tick = () => {
+      if (!document.querySelector('[role="status"]') || Date.now() - started > 5_000) {
+        requestAnimationFrame(() => done());
+        return;
+      }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }));
 }
 
 /* ------------------------------------------------------------- what it is --- */

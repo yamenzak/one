@@ -6188,19 +6188,41 @@ const manifest = (): AppSpec => defineApp({
     screens asking the same question get one answer (see `ViewSpec`).
   */
   /*
-    ⚠️ EMPTY, BECAUSE A VIEW EXISTS TO SERVE A SCREEN AND THERE ARE NO SCREENS.
-    This is not a consequence somebody had to remember — the composer REFUSES a
-    view no screen reads, in the same breath it refuses a screen binding a view
-    that does not exist. Both directions, so neither half can outlive the other.
+    ⚠️ FIVE, BECAUSE FIVE SCREENS READ THEM. A view no screen draws is refused,
+    and so is a screen binding a view that does not exist — both directions, so
+    this list can only ever be exactly what the surface below asks for. It grew
+    from nothing with the first screen and grows the same way with the next.
 
-    ⚠️ AND THAT IS WHAT MAKES THE SURFACE BIGGER THAN THE SCREENS. A view is the
-    shape of a read chosen for one page to draw; it is a surface fact wearing a
-    data fact's clothes, and emptying the pages without it would leave twenty
-    rules about this product's records that nothing honours. They come back one
-    at a time with the screens that read them, which is the only order in which
-    each one is a decision rather than an inheritance.
+    ⚠️ AND THE NARROWED ONES ARE THE SAME READ NARROWED, NEVER A SECOND READ.
+    `run-out` is what the home's hero counts AND what `/out` lists, from one
+    declaration — which is what makes the number on the home and the rows behind
+    it the same answer rather than two queries that agree today.
   */
   views: [
+    /* ⚠️ A CEILING ON THE ROWS, AND `Viewed.count` STILL CARRIES THE TOTAL — see
+       `ViewSpec.limit`. A workspace with nine thousand lines must not send nine
+       thousand to a phone, and the list says "50 of 9,140" rather than claiming
+       the workspace holds fifty. */
+    { id: "shelf-lines", of: "stock", limit: 50 },
+    /*
+      ⚠️ EQUALITY, WHICH IS ALL A `Match` WILL EVER BE, AND IT IS ENOUGH FOR THE
+      ONE QUESTION THIS PRODUCT IS OPENED WITH. "Below par" is arithmetic against
+      a threshold on another table and belongs in `stock.report`, which needs the
+      history's own grant; "there is none left on that shelf" is a fact about the
+      row and everybody with `stock:read` may see it.
+
+      ⚠️ AND A PRODUCT THAT WAS NEVER RECEIVED IS CORRECTLY ABSENT. A line exists
+      because something was once there — you cannot run out of what you never
+      had, and putting the whole unstocked catalogue in this list would bury the
+      shelves somebody actually has to refill.
+    */
+    { id: "run-out", of: "stock", limit: 100, where: [{ field: "quantity", is: { literal: 0 } }] },
+    /* ⚠️ EMPTY MEANS OPEN — see `count.closed`. The absence IS the state, so the
+       view asks for the absence rather than for a status column that would be a
+       second answer to the same question. */
+    { id: "counting", of: "count", where: [{ field: "closed", unset: true }] },
+    { id: "catalogue", of: "product", limit: 50 },
+    { id: "every-place", of: "location", limit: 50 },
   ],
 
   /*
@@ -6210,22 +6232,303 @@ const manifest = (): AppSpec => defineApp({
     once, which is a product that looks broken rather than unfinished.
   */
   /*
-    ⚠️ EMPTY, ON PURPOSE, AND THIS IS THE START OF THE REWRITE RATHER THAN A
-    GAP. Twenty-one screens were ported onto the declared surface faithfully —
-    the same flows, the same order, drawn by the engine instead of by hand —
-    and a faithful port of a surface nobody had designed is a surface nobody
-    has designed. Every screen comes back one at a time, from the question of
-    what somebody standing in front of it is trying to do, and none of them
-    comes back because it used to be here.
+    ⚠️ THE REWRITE'S FIRST FIVE, AND EVERY ONE OF THEM CAME BACK FROM THE
+    QUESTION RATHER THAN FROM THE OLD TREE. Twenty-one screens were ported onto
+    the declared surface faithfully and then emptied, because a faithful port of
+    a surface nobody had designed is a surface nobody has designed. What is here
+    is what somebody standing in a store room with a phone needs answered before
+    anything else; the rest arrive the same way, one at a time.
 
     ⚠️ THE APP UNDERNEATH IS UNTOUCHED. The collections, the operations and the
     pure logic above are what this product can DO, and none of that was in
-    question — what was in question is what it looks like to do it. Emptying
-    the screens and keeping the operations is what makes this a surface
-    rewrite; a screen that comes back binds to an operation that was already
-    here, or it names one that has to be written, and the second is a finding.
+    question — what was in question is what it looks like to do it. A screen
+    that comes back binds to an operation that was already here, or it names one
+    that has to be written, and the second is a finding.
   */
   screens: [
+    /*
+      ⚠️ THE HOME LEADS WITH WHAT RAN OUT, AND THAT IS A DIFFERENT DECISION FROM
+      THE ONE A NOTEBOOK MAKES. A total is a question asked once and then known,
+      which is why the reference app's home leads with the record somebody walked
+      away from rather than with a count. An inventory is the opposite case: the
+      numbers ARE the subject, "what have we run out of" is asked every morning,
+      and it is answered differently every morning. That is precisely the
+      distinction the hero KINDS exist to make — one contract, two products
+      opening on the thing each is actually about.
+
+      ⚠️ AND ZERO IS THE GOOD ANSWER, NOT AN EMPTY STATE. `nothing` fires when a
+      figure is absent; a workspace that has counted and found none has a figure
+      and it is 0, which is the reassurance somebody opened the app for. Reading
+      the two the same way is how an empty state comes to cover a real answer.
+    */
+    /*
+      ⚠️ THE ONE SCREEN IN THIS PRODUCT WITH A WORLD, AND `etch` IS NOT A MOOD.
+      AMBIENCE's rule is that ambience everywhere is ambience nowhere: what earns
+      one is a screen somebody ARRIVES at, never a form and never a list. This is
+      the arrival, and ruled geometry is what a store room looks like — racking,
+      shelves, a grid of bays. The four narrowed lists below name none, so the
+      home is somewhere and the pages behind it are the product.
+    */
+    { id: "shelves", route: "/", label: "Stock", nav: "primary", icon: "box",
+      permission: "stock:read", tone: "neutral", sky: "etch",
+      body: {
+        shape: "list",
+        /* ⚠️ A NARROWEST CELL RATHER THAN A COLUMN COUNT, so the four tiles are
+           two across on a phone and four on a desk with no breakpoint anywhere
+           in the declaration. */
+        layout: { as: "grid", least: "tile" },
+        hero: {
+          as: "figure",
+          nothing: { says: "Nothing on the shelves yet", under: "Receive a delivery and it will be here" },
+          /*
+            ⚠️ ONE WAY ONWARD, AND IT IS THE LIST THE NUMBER WAS COUNTED FROM.
+            It carried three — the catalogue and what was being counted beside
+            it — and photographed as a row of pills naming the same places as
+            the tiles directly underneath them. Two rows of destinations to the
+            same four screens is a screen saying everything twice, and the tiles
+            say it better: they carry the numbers.
+
+            ⚠️ AND THE HERO KEEPS THIS ONE BECAUSE NOTHING ELSE HAS IT. Every
+            other figure on the screen is a tile that opens its own list; the
+            hero's is the only number with no way through to what it counted.
+          */
+          leads: ["out"],
+          bind: {
+            value: { from: { of: "count", view: "run-out" } },
+            of: { from: { of: "words", says: "Run out" } },
+            /* ⚠️ AFTER THE NUMBER, NEVER FOLDED INTO IT — see `figure.unit`. A
+               line is a product on a shelf, which is the thing that ran out;
+               "3 products" would be wrong the moment one of them is empty in
+               two places. */
+            unit: { from: { of: "words", says: "lines" } },
+            mark: { from: { of: "words", says: "alert" } },
+          },
+          /* ⚠️ NO `fresh`, BECAUSE THIS FIGURE IS COUNTED ON READ AND GENUINELY
+             HAS NO AGE. The slot exists for a STORED total, where omitting it
+             would be showing a number without saying whether to believe it. */
+        },
+        blocks: [
+          {
+            group: null,
+            of: [{
+              block: "Stat",
+              leads: ["products"],
+              bind: {
+                value: { from: { of: "count", view: "catalogue" } },
+                label: { from: { of: "words", says: "Products" } },
+                mark: { from: { of: "words", says: "tag" } },
+              },
+            }],
+          },
+          {
+            group: null,
+            of: [{
+              block: "Stat",
+              leads: ["places"],
+              bind: {
+                value: { from: { of: "count", view: "every-place" } },
+                label: { from: { of: "words", says: "Places" } },
+                mark: { from: { of: "words", says: "workspace" } },
+              },
+            }],
+          },
+          {
+            group: null,
+            of: [{
+              block: "Stat",
+              leads: ["counts"],
+              bind: {
+                value: { from: { of: "count", view: "counting" } },
+                label: { from: { of: "words", says: "Being counted" } },
+                mark: { from: { of: "words", says: "check" } },
+                /*
+                  ⚠️ NO TONE ANYWHERE ON THIS SCREEN, AND THAT IS THE DECISION
+                  RATHER THAN AN OMISSION. This tile carried amber for one sweep
+                  and photographed as the only colour on the page sitting on the
+                  least urgent number: a count in progress is work somebody is
+                  already doing, while the figure that decides whether anybody
+                  walks to the store room is the hero, in plain ink above it.
+                  Colour pointing at the wrong thing is worse than none.
+
+                  ⚠️ AND THE HERO CANNOT TAKE IT INSTEAD, WHICH IS THE HONEST
+                  LIMIT. A tone in a declaration is a constant, and "run out" is
+                  a warning at 2 and a reassurance at 0 — a static amber over a
+                  zero would be the renderer stating a verdict the number
+                  contradicts. A tone that reads the value is a branch, which is
+                  the line a body does not cross.
+                */
+              },
+            }],
+          },
+          {
+            group: null,
+            of: [{
+              /* ⚠️ THE TRUE TOTAL, WHICH IS WHY IT IS NOT REDUNDANT WITH THE LIST
+                 UNDER IT. `shelf-lines` is capped at fifty rows; `count` answers
+                 how many there are either way, so the tile is where the size of
+                 the workspace is READ and the table is where the top of it is
+                 looked through. */
+              block: "Stat",
+              bind: {
+                value: { from: { of: "count", view: "shelf-lines" } },
+                label: { from: { of: "words", says: "On the shelves" } },
+                mark: { from: { of: "words", says: "box" } },
+              },
+            }],
+          },
+          {
+            block: "Listing",
+            /* ⚠️ THE WHOLE ROW — see `Wide`. Three columns in a tile-wide cell is
+               a table nobody can read beside two figures. */
+            wide: true,
+            /*
+              ⚠️ ONE HOP, WHICH IS THE DIFFERENCE BETWEEN THIS AND A COLUMN OF
+              IDENTIFIERS — see `reachFor`. A stock line holds the product and
+              the place as references; what somebody standing in the room needs
+              is the two NAMES, and the join happens on the server so the browser
+              gets flat rows.
+            */
+            shows: [
+              { field: "product.name", label: "Product" },
+              { field: "location.name", label: "Where" },
+              { field: "quantity", label: "How many" },
+            ],
+            nothing: {
+              says: "Nothing on the shelves",
+              under: "Receive a delivery and its lines will be here",
+            },
+            bind: {
+              label: { from: { of: "words", says: "On the shelves" } },
+              of: { from: { of: "view", view: "shelf-lines" } },
+            },
+          },
+        ],
+      } },
+    /*
+      ⚠️ THE ROWS THE HERO COUNTED, AND THEY ARE THE SAME DECLARATION. Pressing
+      through from a number to a list built by a second query is how a home
+      screen and the page behind it come to disagree; here they cannot, because
+      `run-out` is one view read twice.
+
+      ⚠️ `nav: "none"` — it is reached from the figure that is about it, which is
+      where somebody is already looking. A bar item as well would be a second
+      name for one place.
+    */
+    { id: "out", route: "/out", label: "What ran out", nav: "none", icon: "alert",
+      permission: "stock:read",
+      body: {
+        shape: "list",
+        layout: { as: "stack" },
+        blocks: [{
+          block: "Listing",
+          shows: [
+            { field: "product.name", label: "Product" },
+            { field: "location.name", label: "Where" },
+            /* ⚠️ WHEN THE LINE LAST MOVED, WHICH IS THE COLUMN THAT MAKES THIS
+               LIST ACTIONABLE. A shelf emptied this morning and one emptied in
+               the spring are the same zero and completely different problems.
+
+               ⚠️ AND `when`, BECAUSE THE STORED VALUE IS AN INSTANT AND AN
+               INSTANT SAID PLAINLY IS AN ISO STRING — twenty characters on every
+               row, wider than the product beside it, and unreadable at the
+               glance this column exists for. */
+            { field: "seen", label: "Last seen", as: "when" },
+          ],
+          nothing: {
+            says: "Nothing has run out",
+            under: "Every shelf with a line on it has something on it",
+          },
+          bind: {
+            label: { from: { of: "words", says: "What ran out" } },
+            of: { from: { of: "view", view: "run-out" } },
+          },
+        }],
+      } },
+    { id: "products", route: "/products", label: "Products", nav: "primary", icon: "tag",
+      permission: "product:read",
+      body: {
+        shape: "list",
+        layout: { as: "stack" },
+        blocks: [{
+          block: "Listing",
+          shows: [
+            { field: "name", label: "Name" },
+            { field: "brand", label: "Brand" },
+            /* ⚠️ THE UNIT, BECAUSE EVERY NUMBER THIS PRODUCT EVER REPORTS IS IN
+               IT. A catalogue that does not say what a thing is counted in is a
+               catalogue where "97" means nothing. */
+            { field: "unit", label: "Counted in" },
+          ],
+          nothing: {
+            says: "Nothing in the catalogue",
+            under: "Register the first product and it will be here",
+          },
+          bind: {
+            label: { from: { of: "words", says: "Products" } },
+            of: { from: { of: "view", view: "catalogue" } },
+          },
+        }],
+      } },
+    { id: "places", route: "/places", label: "Places", nav: "primary", icon: "workspace",
+      permission: "location:read",
+      body: {
+        shape: "list",
+        layout: { as: "stack" },
+        blocks: [{
+          block: "Listing",
+          /* ⚠️ THE PARENT'S NAME RATHER THAN THE TREE, AND THAT IS HONEST FOR
+             NOW. A place points at the place it is inside, so one hop says
+             "Bay 3, inside Cold store" — which is what somebody reads a list
+             for. Drawing the nesting is a different block and it arrives
+             designed against the screen that wants it. */
+          shows: [
+            { field: "name", label: "Name" },
+            { field: "within.name", label: "Inside" },
+            { field: "kind", label: "Kind" },
+          ],
+          nothing: {
+            says: "Nowhere to put anything yet",
+            under: "Add a room, an aisle or a shelf and it will be here",
+          },
+          bind: {
+            label: { from: { of: "words", says: "Places" } },
+            of: { from: { of: "view", view: "every-place" } },
+          },
+        }],
+      } },
+    /*
+      ⚠️ OPEN COUNTS ONLY, AND THE VIEW ASKS FOR AN ABSENCE. A session that has
+      not been closed is a shelf whose numbers are in limbo — nobody else's read
+      of it is settled until somebody finishes. That is the whole reason it has a
+      tile on the home and a screen of its own; a list of every count ever taken
+      is history, and history is a different question.
+    */
+    { id: "counts", route: "/counts", label: "Being counted", nav: "none", icon: "check",
+      permission: "stock:read",
+      body: {
+        shape: "list",
+        layout: { as: "stack" },
+        blocks: [{
+          block: "Listing",
+          shows: [
+            { field: "location.name", label: "Where" },
+            { field: "day", label: "Started" },
+            /* ⚠️ WHETHER THE EXPECTED NUMBER WAS HIDDEN, WHICH IS THE ONE FACT
+               ABOUT A SESSION THAT CANNOT BE CHANGED ONCE IT IS RUNNING. It
+               belongs on the row for the same reason it is per session: somebody
+               taking over a count has to know which kind they walked into. */
+            { field: "blind", label: "Blind" },
+          ],
+          nothing: {
+            says: "Nothing is being counted",
+            under: "Open a count on a shelf and it stays here until settled",
+          },
+          bind: {
+            label: { from: { of: "words", says: "Being counted" } },
+            of: { from: { of: "view", view: "counting" } },
+          },
+        }],
+      } },
   ],
 
   problems: {

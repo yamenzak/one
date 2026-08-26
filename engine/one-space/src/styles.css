@@ -84,7 +84,7 @@
   and get both, because on a receiving screen they are the two controls somebody
   presses more than anything else in the product.
 
-  `apps/inventory/test/geometry.screens.test.tsx` measures this in a browser
+  `apps/inventory/test/geometry.seen.test.tsx` measures this in a browser
   across every screen the product has, which is what stops it being deleted by
   somebody who cannot see what it was for.
 */
@@ -102,12 +102,26 @@
     switch; what is short is the row it sits in, not the mark.
   */
   .switch__content,
+  /*
+    ⚠️ A PAGER'S NUMBERS ARE THE CASE THE PARAGRAPH ABOVE PREDICTED, AND THE
+    SWEEP IS WHAT FOUND THEM. Measured 36 × 36 — a page number, a previous and a
+    next, all under the floor, on every list long enough to page. Nothing had
+    caught it because no screen in the reference or the product had more rows
+    than one page held, so the control that only exists past fifty rows was the
+    one no measurement had ever seen.
+
+    ⚠️ AND BOTH DIMENSIONS, BECAUSE IT IS SQUARE. Raising only the height turns
+    every page number into an oval — the same reason an icon-only button is in
+    the list below.
+  */
+  .pagination__link,
   .select__trigger,
   .combo-box__trigger,
   .color-picker__trigger,
   .number-field__decrement-button,
   .number-field__increment-button { min-height: 44px; }
   .button--icon-only,
+  .pagination__link,
   .number-field__decrement-button,
   .number-field__increment-button { min-width: 44px; }
 }

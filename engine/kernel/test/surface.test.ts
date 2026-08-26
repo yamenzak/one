@@ -1149,6 +1149,48 @@ describe("what a screen can be narrowed to", () => {
 /* ------------------------------------------------------------------ marks --- */
 
 /**
+ * ⚠️ A COLUMN SAYS ITS VALUE THE WAY A BINDING DOES — see `Column.as`. Without
+ * one a timestamp column is twenty characters of ISO on every row; with the
+ * wrong one it is `Invalid Date` down the whole column, which is a string by the
+ * time it reaches a browser and therefore throws nowhere.
+ */
+describe("how a column says its value", () => {
+  const shown = (col: unknown) => refuseSurface(
+    screen({
+      body: body({
+        blocks: [{
+          block: "Listing",
+          shows: [col as never],
+          nothing: { says: "None" },
+          bind: { rows: { from: { of: "view", view: "recent-notes" } } },
+        }],
+      }),
+    }),
+    INDEX, [recent], COLLECTIONS, [],
+  ).map((p) => p.why);
+
+  it("accepts a formatter the field's kind can wear", () => {
+    expect(shown({ field: "at", label: "Written", as: "when" })).toEqual([]);
+  });
+
+  it("accepts one over a hop", () => {
+    expect(shown({ field: "author.email", label: "Email" })).toEqual([]);
+  });
+
+  it("refuses a date drawn as money", () => {
+    expect(shown({ field: "at", label: "Written", as: "money" })).toContain("format_wrong");
+  });
+
+  it("refuses a name drawn as a date", () => {
+    expect(shown({ field: "title", label: "Title", as: "when" })).toContain("format_wrong");
+  });
+
+  it("says nothing about a column that names no formatter", () => {
+    expect(shown({ field: "at", label: "Written" })).toEqual([]);
+  });
+});
+
+/**
  * ⚠️ A CHART WITH NO AXES DRAWS AN EMPTY BOX UNDER A CORRECT HEADING — see
  * `PlotSpec`. The view is fetched, the region reports ready, the label is right
  * and the figure is blank, so it reads as a workspace with no data in it.
@@ -1245,6 +1287,26 @@ describe("a row of shortcuts", () => {
 
   it("refuses shortcuts on a block that draws none", () => {
     expect(led("Heading", ["one-note"])).toContain("leads_on_a_block_that_takes_none");
+  });
+
+  /*
+    ⚠️ A TILE WITH NO DESTINATION IS A WHOLE TILE — see `BlockEntry.leads`. The
+    rule above is about a block whose ONLY body is its destinations; a figure
+    with a label and a number draws completely without one, and the press is an
+    affordance on it rather than the thing it is. Requiring one anyway made a
+    number whose list has no screen yet unplaceable, so the choice was an
+    invented destination or a deleted tile — a checker deciding a screen's
+    composition.
+  */
+  it("accepts a one-destination block that names none", () => {
+    const ONE: BlockIndex = {
+      ...INDEX,
+      Tile: { id: "Tile", bones: "figure", takes: {}, leads: "one" },
+    };
+    expect(refuseSurface(
+      screen({ body: { ...body(), blocks: [{ block: "Tile" }] } }),
+      ONE, [recent], COLLECTIONS, [], ["a"],
+    ).map((p) => p.why)).toEqual([]);
   });
 });
 

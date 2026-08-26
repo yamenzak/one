@@ -153,7 +153,19 @@ export interface Has {
  * seven. That is the guard's `refused: format_wrong` answer made good.
  */
 const DRAWN: Record<Format, (v: unknown, has: Has) => React.ReactNode> = {
-  plain: (v) => (v === null || v === undefined ? null : String(v)),
+  /*
+    ⚠️ `plain` IS `String(v)` WITH ONE EXCEPTION, AND THE EXCEPTION IS NOT A
+    FORMATTER. `String(true)` is "true", which is programmer output: a column
+    headed "Blind" reading `true` / `false` down a stockroom screen is the
+    stored value shown to somebody who has never seen a boolean. Yes and no are
+    what that value MEANS in English, and there is no second reasonable reading
+    of it — which is why this is here rather than an eighth `Format`. A screen
+    wanting different words wants a different value, and the place to compute
+    one is the collection.
+  */
+  plain: (v) => (v === null || v === undefined
+    ? null
+    : typeof v === "boolean" ? (v ? "Yes" : "No") : String(v)),
   num: (v) => <Num value={Number(v)} />,
   /* ⚠️ NO CURRENCY, NO PRICE. Drawing the number bare would read as a quantity;
      drawing it in a guessed currency reads as a price and is a different one. */
@@ -351,10 +363,40 @@ function Placed({ block, has }: { readonly block: BlockSpec; readonly has: Has }
      the accessor the grid calls per row; the kernel has already refused a field
      the collection does not have, so this reads rather than checks. */
   if (block.shows?.length) {
+    /*
+      ⚠️ A COLUMN OF NUMBERS IS RIGHT-ALIGNED AND TABULAR, AND NOTHING IN THE
+      DECLARATION SAYS SO. `Col.num` is what makes a quantity column comparable
+      down the page — a ragged left-aligned column of 1200, 4 and 137 is three
+      numbers nobody can weigh against each other, which on an inventory's list
+      is the whole reason the column is there.
+
+      ⚠️ AND IT IS READ OFF THE ROWS RATHER THAN ASKED FOR. The collection
+      already declares the field's kind, so a `numeric` in `shows` would be a second
+      answer to a question already settled — and the first list where the two
+      disagree is a screen the author is sure is right. What reaches the browser
+      is what the door answered with, and a number column arrives as numbers.
+
+      ⚠️ THE FIRST ROW THAT HAS A VALUE, NOT THE FIRST ROW. A blank cell in the
+      top row is ordinary — a product with no brand, a line never counted — and
+      deciding the whole column's alignment on it would left-align a column of
+      figures because one of them was missing.
+    */
+    const seen = block.bind?.["of"]?.from.of === "view"
+      ? rowsOf(has, block.bind["of"].from.view) ?? []
+      : [];
+    const figures = (field: string) =>
+      typeof seen.find((row) => row[field] !== undefined && row[field] !== null)?.[field]
+        === "number";
     props["cols"] = block.shows.map((col) => ({
       id: col.field,
       label: col.label,
-      cell: (row: Readonly<Record<string, unknown>>) => row[col.field] as React.ReactNode,
+      ...(figures(col.field) ? { numeric: true } : {}),
+      /* ⚠️ THE SAME FORMATTERS A BINDING PICKS FROM — see `Column.as`. Without
+         one a timestamp column is twenty characters of ISO on every row, which
+         is the column that exists to say whether a number is stale saying
+         nothing at all. */
+      cell: (row: Readonly<Record<string, unknown>>) =>
+        DRAWN[col.as ?? "plain"](row[col.field], has),
     }));
     props["rowKey"] = (row: Readonly<Record<string, unknown>>, i: number) =>
       String(row["id"] ?? i);
@@ -366,10 +408,14 @@ function Placed({ block, has }: { readonly block: BlockSpec; readonly has: Has }
       `keys.test.mjs` is about with the declaration supplying the key.
     */
     const [first, second, third] = block.shows;
+    /* ⚠️ AND THE NARROW HALF SAYS ITS VALUES THE SAME WAY — see `Column.as`.
+       Applying a formatter to the columns alone left a phone showing the raw
+       stored value of the very field a desk drew properly: one list, one
+       declaration, two answers, and only the one nobody works on was right. */
     props["asRow"] = (row: Readonly<Record<string, unknown>>) => ({
       name: String(row[first!.field] ?? ""),
       ...(second ? { under: String(row[second.field] ?? "") } : {}),
-      ...(third ? { aside: row[third.field] as React.ReactNode } : {}),
+      ...(third ? { aside: DRAWN[third.as ?? "plain"](row[third.field], has) } : {}),
     });
   }
   /*

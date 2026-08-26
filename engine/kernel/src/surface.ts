@@ -405,6 +405,24 @@ export interface PlotSpec {
 export interface Column {
   readonly field: string;
   readonly label: string;
+  /**
+   * HOW THE VALUE IS SAID — the same closed set a binding picks from.
+   *
+   * ⚠️ WITHOUT IT A TIMESTAMP COLUMN IS AN ISO STRING, and that is not a
+   * formatting nicety: `2026-08-11T14:55:00.000Z` in a "Last seen" column is
+   * unreadable at a glance, wider than the name beside it, and the same twenty
+   * characters on every row — so the column that exists to say whether a number
+   * is stale says nothing at all. Every list in the vocabulary went out that
+   * way, because a column had nowhere to say it.
+   *
+   * ⚠️ AND IT IS DECLARED WHERE ALIGNMENT IS DERIVED, WHICH IS NOT AN
+   * INCONSISTENCY. That a field holds numbers is a FACT the collection already
+   * states, so the renderer reads it off the rows rather than asking twice.
+   * Whether an instant is said as "four months ago" or as a date is a DECISION
+   * with two right answers — which is the whole reason a binding carries `as`
+   * as well.
+   */
+  readonly as?: Format;
 }
 
 /**
@@ -903,6 +921,14 @@ export interface BlockEntry {
    * would set a prop the tile does not take and React would drop it without a
    * word. The kernel refuses a second entry, so "which one did it mean" is never
    * a question anybody has to answer at runtime.
+   *
+   * ⚠️ AND `true` IS REQUIRED WHERE `"one"` IS OPTIONAL, WHICH IS NOT A
+   * SOFTENING. A row of shortcuts with no destinations is a block that draws
+   * NOTHING — the heading above it is right and the gap reads as a screen still
+   * loading. A tile with no destination is a whole tile: a figure to read rather
+   * than a door, which is the correct shape for a number whose list has no
+   * screen yet. Requiring one there forced either an invented destination or a
+   * tile deleted for a reason that was the checker's rather than the design's.
    */
   readonly leads?: true | "one";
   /**
@@ -1731,6 +1757,22 @@ export function refuseSurface(
               ? "shows_field_unknown"
               : reach,
               `${where} shows ${sayReach(reach, col.field, view.of, held)}`);
+            continue;
+          }
+          /* ⚠️ AND A COLUMN'S FORMATTER IS CHECKED LIKE A BINDING'S — see
+             `Column.as`. `money` over a name and `when` over a quantity are not
+             type errors: both are strings by the time they reach a browser, so
+             they render as `$NaN` and `Invalid Date` down a whole column on a
+             screen nobody opened during review. */
+          if (!col.as || col.as === "plain") continue;
+          const of = reach.on === "self"
+            ? held[reach.field]
+            : collections.find((c) => c.id === reach.to)?.fields[reach.field];
+          const takes = FORMATS[col.as];
+          if (of && takes !== "any" && !takes.includes(of.kind)) {
+            at("format_wrong",
+              `${where} shows "${col.field}", which is a ${of.kind}, as ${col.as} — `
+              + `that says ${takes.join(" or ")}`);
           }
         }
       }
@@ -1777,8 +1819,14 @@ export function refuseSurface(
       see `BlockSpec.leads`. It is the same failure as a chart with no axes and
       it is quieter: the heading above it is right, the region reports ready, and
       the gap where four tiles should be reads as a screen still loading.
+
+      ⚠️ `true` ONLY, AND `"one"` IS DELIBERATELY EXEMPT. A tile whose whole body
+      is a label and a number is a complete tile; the destination is an
+      affordance ON it, not the thing it draws. Asking for one anyway made a
+      figure with no list behind it unplaceable, which is a checker deciding a
+      screen's composition.
     */
-    if (entry.leads && !b.leads?.length) {
+    if (entry.leads === true && !b.leads?.length) {
       at("leads_missing",
         `${where} is a row of shortcuts and names no screens — it would draw a gap `
         + "under a correct heading");

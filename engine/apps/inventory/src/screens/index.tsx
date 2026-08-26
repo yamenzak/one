@@ -23,6 +23,25 @@
  * itself. The list below is empty and will refill with those.
  */
 
+import { inventory } from "../index.js";
+
+/**
+ * EVERY ROUTE THIS PRODUCT DECLARES, FOR THE SUITES THAT SWEEP THEM.
+ *
+ * ⚠️ READ OFF THE MANIFEST, NEVER WRITTEN OUT. A hand-kept list is one a screen
+ * can be added without joining — measured by nothing and photographed by nothing
+ * — and the omission looks exactly like a screen that has not been built.
+ *
+ * ⚠️ AND IT IS HONEST AGAIN ONLY BECAUSE THE BOARD DRAWS DECLARATIONS. It was
+ * deleted rather than emptied when the surface was, because every measured suite
+ * walked it while the board handed each route to a hand-written file of the same
+ * name — so the sweep reported on components the product no longer ran. The
+ * ground renders the declared body through the renderer now, which is what makes
+ * walking these routes a measurement of the screen.
+ */
+export const INVENTORY_ROUTES: readonly string[] =
+  (inventory().screens ?? []).map((s) => s.route);
+
 /**
  * THE SCREENS THIS APP DRAWS ITSELF, KEYED BY DECLARED ROUTE.
  *

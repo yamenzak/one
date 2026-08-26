@@ -18,9 +18,11 @@
  */
 
 import * as React from "react";
-import { Shell, whoFace } from "@engine/design";
+import { Screen, Shell, ready, whoFace } from "@engine/design";
+import { Body, type Has } from "@engine/design/body";
 import { inventory } from "../index.js";
 import { INVENTORY_SESSIONS, INVENTORY_SURFACES } from "./index.js";
+import { COUNTS, LINES, PLACES } from "./sample.js";
 
 /** ⚠️ Every permission a screen names, so none of them is undrawable here. */
 const EVERYTHING = new Set([
@@ -47,6 +49,8 @@ export function InventoryGround({ route, onGo }: {
   const INVENTORY = inventory();
   const screens = (INVENTORY.screens ?? []).filter(
     (s) => !s.features?.length || s.features.some((f) => SOLD.includes(f)));
+
+  const here = screens.find((s) => s.route === route);
 
   /* ⚠️ Undefined while the surface is being rewritten — see the note below. */
   const Drawn = INVENTORY_SESSIONS[
@@ -86,15 +90,94 @@ export function InventoryGround({ route, onGo }: {
         ships.
       */}
       {/*
-        ⚠️ NOTHING, BECAUSE THE APP DRAWS NO SCREEN OF ITS OWN YET. The board is
-        for sessions — the screens that work rather than read and so draw their
-        own controls — and the surface is being rewritten, so there are none. A
-        body and a story are drawn by the engine from the declaration and are
-        photographed there, through the renderer; a copy of one here would be a
-        second answer to what that screen looks like, and the copy is the one
-        that goes out of date. See this directory's `index.tsx`.
+        ⚠️ A DECLARED SCREEN IS DRAWN THROUGH THE RENDERER AND A WRITTEN ONE
+        THROUGH ITS FILE — which is the difference between a photograph OF the
+        screen and a photograph of a file that shares its name. The board handed
+        every route to the hand-written map once, and eighty-four images were
+        taken of screens no customer could open, filed under the ids of the ones
+        they could, with every suite green.
+
+        ⚠️ AND A DECLARED BODY GOES IN A `Screen`, WHICH IS THE FRAME EVERY
+        WRITTEN ONE ALREADY BRINGS. `Body` places blocks and states; the gutter,
+        the reading width, the crown's collapse and the shape's own skeleton are
+        the frame's, and mounting a body bare leaves every one of them off.
       */}
-      {Drawn ? <Drawn route={route} onGo={go} /> : null}
+      {Drawn
+        ? <Drawn route={route} onGo={go} />
+        : here?.body
+          ? (
+            <Screen shape={here.body.shape} title={here.label}>
+              <Body body={here.body} has={{ ...SEEN, named: namedIn(screens) }} />
+            </Screen>
+          )
+          : null}
     </Shell>
   );
 }
+
+/**
+ * THE SAMPLE WORLD A DECLARED SCREEN READS.
+ *
+ * ⚠️ THE ROWS ARE THE COLLECTION'S FIELDS, NOT THE OLD SCREENS' PROPS. A
+ * declaration names fields by string and the door answers with flat rows — a
+ * one-hop column arriving as the plain key `"product.name"`, resolved on the
+ * server — so what is written here is what a real read returns. The sample's own
+ * types are shaped for the hand-written screens that used to draw them, which is
+ * a different shape and would have drawn six blank columns under six correct
+ * headings.
+ *
+ * ⚠️ AND THE NARROWED VIEWS ARE NARROWED HERE TOO, RATHER THAN GIVEN A NUMBER. A
+ * figure is a `count` over a view, so a board answering each one with a plausible
+ * integer would photograph a screen whose figures agree with nothing — and the
+ * one fault this shape exists to prevent is a figure and the list behind it
+ * disagreeing. Filtering the same sample the list draws is what makes the picture
+ * check the declaration rather than illustrate it.
+ */
+const rows = (of: readonly Readonly<Record<string, unknown>>[]) =>
+  ready({ items: of, count: of.length });
+
+const SHELF = LINES.map((one) => ({
+  id: one.id,
+  "product.name": one.name,
+  "location.name": one.whereName,
+  quantity: one.quantity,
+  seen: one.seen,
+}));
+
+const SEEN: Has = {
+  /*
+    ⚠️ A NO-OP, AND IT IS NOT NOTHING. Every affordance in the renderer is gated
+    on the handler being there — a tile opens a list only if something can go
+    somewhere — so a board without one photographs a screen with its presses
+    silently removed, which looks exactly like a screen never given them.
+  */
+  onGo: () => undefined,
+  views: {
+    "shelf-lines": rows(SHELF),
+    "run-out": rows(SHELF.filter((one) => one.quantity === 0)),
+    "catalogue": rows(LINES.map((one) => ({
+      id: one.product, name: one.name, brand: one.brand ?? "", unit: one.unit,
+    }))),
+    "every-place": rows(PLACES.map((one) => ({
+      id: one.id,
+      name: one.name,
+      "within.name": PLACES.find((p) => p.id === one.of)?.name ?? "",
+      kind: one.kind,
+    }))),
+    "counting": rows(COUNTS.map((one) => ({
+      id: one.id, "location.name": one.whereName, day: one.day, blind: one.blind,
+    }))),
+  },
+};
+
+/**
+ * ⚠️ WHAT A SHORTCUT SAYS, OUT OF THE MANIFEST — see `Has.named`. Without it
+ * every `leads` in every declaration resolves to nothing and is DROPPED, which
+ * is correct behaviour (a screen this person may not open has no shortcut) and
+ * indistinguishable in a photograph from a row that was never declared.
+ */
+const namedIn = (screens: readonly { id: string; label: string; icon?: string }[]) =>
+  (id: string) => {
+    const one = screens.find((s) => s.id === id);
+    return one ? { label: one.label, ...(one.icon ? { icon: one.icon } : {}) } : undefined;
+  };
