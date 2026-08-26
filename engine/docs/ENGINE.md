@@ -1323,9 +1323,9 @@ a later decision superseded, so neither list can rot into a promise nobody owes.
 | 95 | The guards, re-founded on the schema | shipped |
 | 96 | The renderer: a screen is drawn from what it declares | shipped |
 | 97 | OneInventory, ported — everything the vocabulary covers, and what it does not | shipped |
-| 98 | The door closes: no private UI in an app | **planned** |
+| 98 | The door closes: no private UI in an app | shipped |
 
-**85 shipped, 12 planned, 1 superseded.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it, and nothing may defer to a superseded one — `scripts/docs.test.mjs` fails the build on either, which is the only reason this table can be read instead of the code.
+**86 shipped, 11 planned, 1 superseded.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it, and nothing may defer to a superseded one — `scripts/docs.test.mjs` fails the build on either, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---
