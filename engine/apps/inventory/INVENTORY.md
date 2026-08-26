@@ -503,6 +503,20 @@ product page leads with WHERE the thing is — the shelves it is on, and the
 quantities under that — because somebody opening it is standing in front of a box
 asking a question about the world rather than about the record.
 
+**The look is settled, and it is one world on one screen.** `/` names `neon` and
+nothing else names anything. Every other family in the engine is quiet by design,
+and a quiet world on a screen this dense is a texture visible only in the gutters
+— every surface below the crown is opaque, so a soft ground is a photograph of the
+ground with nothing on it. `neon` carries a hard source that reaches the crown,
+the hero's face and the tile edges, which is what puts the chrome and the content
+in one room. The four narrowed lists behind it name none: the home is somewhere,
+the pages behind it are the product.
+
+**The ground under it is the deployment's, not this product's** — `GROUND.dark`
+moved off near-black the same day (D99), which took page-to-card from 1.03:1 to
+1.23:1 and is what makes a card read as a card here at all. It is written once in
+`design/src/tokens/ground.ts` and every product on the engine wears it.
+
 ⚠️ **AND ITS TITLE STILL READS "Product" RATHER THAN THE PRODUCT'S NAME.** The
 frame is handed the SCREEN's label, which on a detail screen is the one word on
 the page that is not about the thing somebody opened — and it is the live path as

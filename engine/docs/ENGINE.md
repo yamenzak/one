@@ -1176,6 +1176,7 @@ its own header, cited by other files, and doing nothing.
 | D96 | A screen is read, walked or worked in, and a flow's declaration is checked | 0 |
 | D97 | A screen may be narrowed, may draw marks, and may place the app's own book | 0 |
 | D98 | A block takes the whole row or one cell, and a count of cells was a request the browser could not refuse | 0 |
+| D99 | The dark ground is a room with the lights down, and a crush is a share of whatever is under it | 0 |
 <!-- /generated -->
 
 ---

@@ -3681,3 +3681,47 @@ than by what a product draws.
 **Therefore never:** a grid item given a track count a declaration chose; a
 comment asserting a browser behaviour that no test reproduces; or a measuring
 sweep pointed at the components a product used to be made of.
+
+---
+
+## D99 — The dark ground is a room with the lights down, and a crush is a share of whatever is under it
+
+`GROUND.dark` is `0.19 / 0.265 / 0.325 / 0.38`. The dock is `0.115` — below the
+page in both themes. `DEEP`, the depth crush's alpha, is `0.68–0.86`.
+`depth.seen`'s floor is stated as `GROUND.dark.background - 0.02` rather than as
+a number.
+
+**Why.** oklch lightness compresses hard at the bottom of its range: the step
+from `0.055` to `0.135` that separated a page from a card was eight sRGB values,
+and the same step taken through the middle is twenty-five. So the ladder was
+even in the number it was written in, every pair cleared `MIN_DELTA`, the guard
+reported the palette sound, and the screen was one black rectangle — measured at
+1.03:1 page-to-card. It is 1.23:1 now, from steps that did not change. What
+changed is where the bottom is.
+
+**A near-black page is bought with the whole elevation language.** An emissive
+panel will draw one and it costs nothing to ask for; what it costs is that there
+is nowhere under a card for the page to be. Two things this file already claimed
+started holding only after the floor moved: the dock is the same plate in both
+themes — dark on a cream page and dark on a dark one — which a floor with
+nothing beneath it cannot do, so the plate went up instead and became a raised
+tier wearing a dock's name; and a night casts shadow, which needs the ground to
+have somewhere to fall to.
+
+**A crush is an alpha, so what it REACHES depends on the ground.** The same
+share removed from a near-black page is a few sRGB values and from a lifted one
+is twenty-five. That is why `DEEP` is tuned against `GROUND.dark.background` and
+not chosen once: a constant here is a copy of where the ground happened to be.
+
+**And a threshold calibrated against a value is a copy of that value.**
+`depth.seen`'s floor was `0.11`, which was `0.055` plus room. Restated as a
+relationship it asks what it always meant — that the darkest tenth of a night is
+genuinely below the ground it is drawn on, which an inert crush cannot produce —
+and it survives the ground moving again. Lifting the floor did not break `tint`
+and `space`; it stopped hiding them, and they are named in `SHORT`, each
+asserted to FAIL so the list can only shrink.
+
+**Therefore never:** a surface ladder judged by its steps without the floor they
+start from; a dark theme whose page has nothing under it for a dock or a shadow
+to occupy; a crush whose alpha is chosen once for every ground; or a threshold
+written as a constant when it is a claim about a relationship.

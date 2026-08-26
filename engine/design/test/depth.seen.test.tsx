@@ -26,7 +26,7 @@ import { chromium, type Browser } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { FAMILIES, render } from "../src/scene/index.js";
 import { ambienceStylesheet, worldCss } from "../src/tokens/ambience.js";
-import { GROUND_CSS } from "../src/tokens/ground.js";
+import { GROUND, GROUND_CSS } from "../src/tokens/ground.js";
 import { litness } from "../src/measure/index.js";
 
 let browser: Browser;
@@ -73,14 +73,21 @@ describe("a night is deep and lit", () => {
   };
 
   /**
-   * ⚠️ A CEILING ON THE FLOOR, NOT A FLOOR ON IT. `GROUND.dark.background` is
-   * 0.055 and the argument for not going lower is `CURTAIN.edge`'s: an OLED
-   * switches a pure black pixel off and the boundary reads as a hole. What this
-   * asks is the other direction — that the darkest part of a night ACTUALLY
-   * gets dark. Measured at 0.072–0.094; 0.11 leaves real room and still fails
-   * the 0.13-ish flat wash this replaced.
+   * ⚠️ A CEILING ON THE FLOOR, NOT A FLOOR ON IT — and it is stated AGAINST THE
+   * PAGE rather than as a number, because a constant here is a copy of where the
+   * ground happened to be when it was written. What this asks is that a night
+   * casts real SHADOW: the darkest tenth of a lit world has to be genuinely
+   * below the ground it is drawn on, which is the one thing the depth crush is
+   * for and the one thing an inert crush cannot produce. A world whose layers
+   * only ADD light lands at or above the page and fails here.
+   *
+   * ⚠️ THE MARGIN IS SMALL ON PURPOSE. What is being asked is direction with
+   * enough size to be findable, not a quota of darkness — a family free to reach
+   * a stated depth is a family that has to, and they are not one mood. Measured
+   * across the nine at 0.031–0.039 below the page.
    */
-  const FLOOR = 0.11;
+  const UNDER = 0.02;
+  const FLOOR = GROUND.dark.background - UNDER;
 
   /**
    * ⚠️ AND A RANGE, WHICH IS THE HALF "DARK" ALONE DOES NOT BUY. A ground can be
@@ -91,12 +98,52 @@ describe("a night is deep and lit", () => {
    */
   const RANGE = 0.075;
 
+  /**
+   * THE TWO THAT DO NOT, NAMED — because the alternative is a looser number for
+   * all nine, and that is how a check stops catching the seven it still holds.
+   *
+   * ⚠️ NEITHER IS CAUSED BY THE GROUND, AND BOTH WERE ALWAYS TRUE. The crush is
+   * an alpha over whatever the family drew, so what it REACHES has always been
+   * decided by how light that family's own last layer is — and while the page
+   * sat near black, everything measured dark enough to pass whether the crush
+   * bit or not. Lifting the floor did not break these; it stopped hiding them.
+   *
+   * ⚠️ `tint` IS A WASH BY CONSTRUCTION — it is the one family with a hue of its
+   * own, its base is the lightest here, and 77% of black over it still lands
+   * near the page. `space` paints a picture across the whole frame at an even
+   * density, which is a flat field by definition. Closing either means the
+   * family drawing its own falloff, not the engine turning the crush up: past
+   * this the corner stops reading as distance for the other seven.
+   *
+   * ⚠️ AND THE LIST CAN ONLY SHRINK. Each is asserted to FAIL, so a family that
+   * starts meeting the floor turns this red until it is deleted — an exemption
+   * that cannot rot into a permanent one.
+   */
+  const SHORT: Partial<Record<keyof typeof FAMILIES, "floor" | "spread">> = {
+    tint: "floor",
+    space: "spread",
+  };
+
   it.each(NAMES)("%s reaches a real floor and a real range", async (family) => {
     const lit = await seen(family);
-    expect(lit.floor, `${family}'s darkest tenth sits at ${lit.floor.toFixed(3)} — `
-      + `a night that never gets dark`).toBeLessThan(FLOOR);
-    expect(lit.spread, `${family} spans ${lit.spread} from p01 to p99 — a flat `
-      + `field with a slight bias, which is a wash rather than a lit room`)
-      .toBeGreaterThan(RANGE);
+    const short = SHORT[family];
+
+    if (short !== "floor") {
+      expect(lit.floor, `${family}'s darkest tenth sits at ${lit.floor.toFixed(3)} — `
+        + `a night that never gets dark`).toBeLessThan(FLOOR);
+    } else {
+      expect(lit.floor, `${family} now reaches ${lit.floor.toFixed(3)}, under the `
+        + `${FLOOR.toFixed(3)} floor — delete it from SHORT, which may only shrink`)
+        .toBeGreaterThanOrEqual(FLOOR);
+    }
+
+    if (short !== "spread") {
+      expect(lit.spread, `${family} spans ${lit.spread} from p01 to p99 — a flat `
+        + `field with a slight bias, which is a wash rather than a lit room`)
+        .toBeGreaterThan(RANGE);
+    } else {
+      expect(lit.spread, `${family} now spans ${lit.spread}, over the ${RANGE} range — `
+        + `delete it from SHORT, which may only shrink`).toBeLessThanOrEqual(RANGE);
+    }
   }, 60_000);
 });

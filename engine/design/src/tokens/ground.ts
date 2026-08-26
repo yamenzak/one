@@ -85,27 +85,31 @@ export const GROUND = {
     chosen: 0.88,
   },
   /**
-   * ⚠️ THE DARK LADDER IS PITCHED FOR AN OLED PANEL, WHICH IS A DIFFERENT GROUND
-   * FROM A DARK LCD. A backlit panel cannot reach black, so its "dark" theme is
-   * built around a lifted floor and every tier has to clear it — which is where
-   * `0.12 / 0.21 / 0.28 / 0.36` came from, and on a phone that switches pixels
-   * off it reads as four shades of grey card laid on a grey page. An emissive
-   * panel gives the floor away for free: the page can go nearly to nothing, and
-   * the whole ladder moves down with it while keeping the SAME steps.
+   * ⚠️ THE DARK GROUND IS A ROOM WITH THE LIGHTS DOWN, NOT A PANEL SWITCHED OFF.
+   * The floor a ladder starts from decides everything above it, and oklch
+   * lightness compresses hard at the bottom of its range: a step of 0.08 taken
+   * from 0.055 is EIGHT sRGB values, and the same step taken from 0.19 is
+   * twenty-five. So a ladder can be perfectly even in the number it is written
+   * in and be one black rectangle on the screen — every tier declared, every
+   * pair clearing the floor, and a card that cannot be seen.
    *
-   * ⚠️ IT IS THE STEPS THAT ARE THE PALETTE, NOT THE VALUES. Every tier moved by
-   * about the same amount, so a card is still raised off the page by more than
-   * the floor and a control still clears all three grounds it can sit on. What
-   * changed is where the bottom is.
+   * ⚠️ WHICH IS WHY THE FLOOR IS STATED IN WHAT A PANEL SHOWS RATHER THAN IN
+   * WHAT THE PAGE SAVES. An emissive display will happily draw a near-black page
+   * and it costs nothing to ask for; what it costs is the whole elevation
+   * language, because there is nowhere under a card for the page to be. Above
+   * roughly 0.17 the same steps that were invisible become obvious, and every
+   * relationship in this file starts working as written.
+   *
+   * ⚠️ IT IS THE STEPS THAT ARE THE PALETTE, AND THEY ARE UNCHANGED. A card is
+   * raised off the page by more than the floor, a control clears all three
+   * grounds it can sit on, and every pair `ground.test.mjs` generates clears
+   * `MIN_DELTA`. What moved is where the bottom is. D99.
    */
   dark: {
-    /* ⚠️ NOT ZERO, AND `CURTAIN.edge` HAS THE ARGUMENT: an OLED switches a pure
-       black pixel off, and the boundary between an off pixel and a lit one reads
-       as a hole rather than as depth. This is as low as the ground goes. */
-    background: 0.055,
-    surface: 0.135,
-    raised: 0.195,
-    control: 0.255,
+    background: 0.19,
+    surface: 0.265,
+    raised: 0.325,
+    control: 0.38,
     /*
      * ⚠️ THIS IS NO LONGER A GREY THE BRAND IS TINTED INTO — see `CHOSEN_TINT`.
      * The number is the ANCHOR the mix pulls toward, and it is high because the
@@ -158,8 +162,21 @@ export const MIN_DELTA = 0.04;
 export const DOCK = {
   /** Near the ink, so it is the highest-contrast object on a cream page. */
   light: 0.215,
-  /** One step off the floor — the same distance a raised surface goes. */
-  dark: 0.195,
+  /**
+   * ⚠️ DARKER THAN THE PAGE IN BOTH THEMES, WHICH IS WHAT MAKES IT ONE OBJECT.
+   * The paragraph above claims the dock is the same plate everywhere and reads
+   * as hardware laid on the page; that is only true if it goes the same
+   * DIRECTION from the ground in both themes. A dark theme whose floor is near
+   * black leaves nothing below it, so the plate has to go up instead and the
+   * claim quietly stops holding — the dock becomes a surface in light and a
+   * raised tier in dark, wearing one name.
+   *
+   * ⚠️ A LIFTED FLOOR IS WHAT BUYS THE ROOM. With the page at 0.19 there is a
+   * real step underneath it, so the plate is below the page here exactly as it
+   * is below a cream one, and its near-white ink works for the same reason in
+   * both. It is deliberately NOT on the surface ladder — see the note above. D99.
+   */
+  dark: 0.115,
   /** Its own ink, and it is the same in both themes because the plate is. */
   ink: 0.97,
 } as const;

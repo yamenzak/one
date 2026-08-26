@@ -447,9 +447,22 @@ const NIGHT = /\.night$/;
     vignette that starts at the edge reads as a frame rather than as falloff. */
 const REACH = { near: 10, far: 22 } as const;
 
-/** ⚠️ How black the corner gets. Below 0.4 nothing changed; above 0.7 the
-    corners read as a hole punched in the page rather than as distance. */
-const DEEP = { least: 0.55, most: 0.72 } as const;
+/**
+ * ⚠️ HOW BLACK THE CORNER GETS, AND IT IS AN ALPHA OVER THE GROUND RATHER THAN A
+ * VALUE — so what it actually reaches depends on how high the ground is. That is
+ * the coupling to know about: the same share removed from a near-black page is a
+ * few sRGB values and from a lifted one is twenty-five, so a crush that was a
+ * hole punched in one floor is barely a falloff on another. It is stated as a
+ * share because the absence of light is proportional; it is TUNED against
+ * `GROUND.dark.background`, and `depth.seen` is what re-asks the question when
+ * that number moves.
+ *
+ * ⚠️ THE CEILING IS WHERE THE CORNER STOPS READING AS DISTANCE. Past it the
+ * falloff arrives at something the panel draws as off, and an edge between an
+ * unlit pixel and a lit one is a hole rather than a room — the same argument
+ * `CURTAIN.edge` makes about a ground going to zero. D99.
+ */
+const DEEP = { least: 0.68, most: 0.86 } as const;
 
 const depth = (family: Family, seed: string): readonly string[] => {
   if (!NIGHT.test(family.id)) return [];

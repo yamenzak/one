@@ -6270,15 +6270,21 @@ const manifest = (): AppSpec => defineApp({
       the two the same way is how an empty state comes to cover a real answer.
     */
     /*
-      ⚠️ THE ONE SCREEN IN THIS PRODUCT WITH A WORLD, AND `etch` IS NOT A MOOD.
-      AMBIENCE's rule is that ambience everywhere is ambience nowhere: what earns
-      one is a screen somebody ARRIVES at, never a form and never a list. This is
-      the arrival, and ruled geometry is what a store room looks like — racking,
-      shelves, a grid of bays. The four narrowed lists below name none, so the
-      home is somewhere and the pages behind it are the product.
+      ⚠️ THE ONE SCREEN IN THIS PRODUCT WITH A WORLD, AND `neon` IS THE ONE THAT
+      REACHES THE THINGS STANDING ON IT. AMBIENCE's rule is that ambience
+      everywhere is ambience nowhere: what earns one is a screen somebody ARRIVES
+      at, never a form and never a list. The other families are quiet by design,
+      and a quiet world on a dense screen is a texture visible only in the
+      gutters — every surface below the crown is opaque, so a soft ground is
+      photographed as the ground with nothing on it. This family carries a hard
+      source that lands on the crown, the hero's face and the tile edges, which
+      is the only way the chrome and the content read as being in one room.
+
+      ⚠️ AND THE FOUR NARROWED LISTS BELOW NAME NONE, which is half the argument
+      for this one. The home is somewhere; the pages behind it are the product.
     */
     { id: "shelves", route: "/", label: "Stock", nav: "primary", icon: "box",
-      permission: "stock:read", tone: "neutral", sky: "etch",
+      permission: "stock:read", tone: "neutral", sky: "neon",
       body: {
         shape: "list",
         /* ⚠️ A NARROWEST CELL RATHER THAN A COLUMN COUNT, so the four tiles are
