@@ -408,27 +408,32 @@ the `settings` guard enforces).
 
 | Where | What it holds |
 |---|---|
-| `apps/inventory/test/*.test.ts` | the pure halves — 193 tests over ten files |
-| `apps/inventory/test/ground.screens.test.tsx` | every declared screen renders, and says the true thing — 97 |
-| `apps/inventory/test/geometry.seen.test.tsx` | every declared screen MEASURED, in real Chromium, in the frame, at a phone and a desk — 56 |
-| `apps/inventory/test/acts.screens.test.tsx` | every primary action names the operation it calls, and it is real — 31 |
-| `apps/inventory/test/hazard.seen.test.tsx` | every hazard name, whole and inside its diamond, measured in a browser — 3 |
-
-⚠️ **AND A DATE ON A SCREEN IS THE READER'S, NOT THE RECORD'S.** `ground.screens`
-fails on any screen that renders a stored `2026-08-19` — five did, and on the run
-screen the two formats were in ADJACENT rows of one card. The printed label is
-the one exemption and it is the opposite rule: a decant sticker may be read in
-another country by somebody who reads dates the other way round, so ISO is right
-there and only there.
+| `apps/inventory/test/*.test.ts` | the pure halves — 292 tests over thirteen files |
 | `one/test/inventory.test.ts` | the golden path through the **real worker** — 16 |
 | `one/test/inventory-deep.test.ts` | batches, items, kits, the rail, the night — 19 |
 
-**And a photograph of every screen, which is NOT part of `test`:**
-`pnpm --filter @engine/inventory shots` writes `shots-out/<look>/<screen>.png` —
-nineteen screens at a phone and a desk, in light and in dark, from the same
-ground data the suites use. It takes minutes and answers no question with a pass
-or a fail, so it runs when images are wanted rather than on every push; what it
-asserts is only that each file exists and is not blank.
+⚠️ **THE SUITES THAT RENDERED A SCREEN WENT WITH THE SCREENS, AND THEY ARE NAMED
+HERE RATHER THAN QUIETLY ABSENT.** Four stood in this table: every screen
+rendering and saying the true thing; every screen MEASURED in real Chromium at a
+phone and a desk; every primary action naming a real operation; and every hazard
+name whole inside its diamond. Not one of them is about any particular screen —
+all four are about whether a screen can be trusted — so all four come back as the
+rebuild produces something for them to check. A suite that shrinks while the run
+stays green is how coverage is lost.
+
+⚠️ **AND A DATE ON A SCREEN IS THE READER'S, NOT THE RECORD'S.** The render sweep
+failed any screen showing a stored `2026-08-19` — five did, and on one screen the
+two formats were in ADJACENT rows of a single card. The printed label is the one
+exemption and it is the opposite rule: a sticker may be read in another country
+by somebody who reads dates the other way round, so ISO is right there and only
+there. That is the first thing the sweep re-asserts.
+
+**A photograph of every screen is NOT part of `test`:**
+`pnpm --filter @engine/inventory shots` writes `shots-out/<look>/<screen>.png` at
+a phone and a desk, in light and in dark. It takes minutes and answers no
+question with a pass or a fail, so it runs when images are wanted rather than on
+every push. It reads the manifest, and its floor — that it found something to
+sweep — is correctly failing at zero while the surface is empty.
 
 ⚠️ **BOTH THE SWEEP AND THE SHOTS MOUNT THE PRODUCT RATHER THAN RENDERING IT TO
 A STRING.** A sub-page hands its name, its way back and its actions UP to the
@@ -462,117 +467,25 @@ generated ones) — plus every platform guard in `pnpm engine:gate`.
 
 ## Part III — the screen index
 
-**Twenty-one screens, and they are no longer one kind of thing.** Eight are
-`declared` — drawn by the engine from a `body` in `src/index.ts`, with no
-component and no container, which is what those cells say. One is a story. The
-rest are still a pure component in `src/screens/`, mounted by a container in
-`src/screens/live.tsx`, and rendered over a sample world by
-`src/screens/index.tsx`.
+**There are no screens.** The surface was emptied whole on 2026-08-26 and is
+being rebuilt one screen at a time, each designed from what somebody standing in
+front of it is trying to do rather than ported from what stood there before.
+[../../docs/BLUEPRINT.md](../../docs/BLUEPRINT.md) is the order that rebuild
+follows and the shape every screen is drawn to.
 
-⚠️ **A `declared` ROW MEANS THE FILES ARE NOT REACHED, and that is the whole
-reason it says so.** Several of those components are still on disk — the sample
-world draws some of them, and one holds a vocabulary its neighbours import — so a
-row naming a file would send a reader to code the product does not run and
-nothing would look wrong. `screen-index.test.mjs` refuses either half of a
-declared screen's row naming a file, and refuses a written screen's row claiming
-to be declared.
+⚠️ **THE ENGINE UNDERNEATH IS UNTOUCHED, WHICH IS WHY THIS IS A SHORT SECTION
+RATHER THAN A SHORT PRODUCT.** Part I is what this product does and Part II is
+how, and neither changed: the collections, the operations and the pure logic are
+all still here and still tested. What was emptied is the surface — and, because
+the composer refuses each of them without a screen to point at, the views, the
+notifications, the guide and the help entries that were claims about particular
+screens.
 
-**What is still written, and what each one waits for, is
-`engine/scripts/private-ui.test.mjs`.** It is a list that can only shrink: an
-entry whose screen becomes a declaration fails until it is deleted.
+**The index returns as the screens do**, one row per screen, naming the file only
+where a file draws it. A screen the engine renders from a declaration has no
+component and no container, and a row naming one would send a reader to code the
+product does not run.
 
-| Route | Name | Nav | Needs | Component | Container |
-|---|---|---|---|---|---|
-| `/` | Home | primary | `stock:read` | `declared` | `declared` |
-| `/stock` | Stock | primary | `stock:read` | `declared` | `declared` |
-| `/scan` | Scan | primary | `product:read` | `screens/Scan.tsx:133` | `screens/live.tsx:451` |
-| `/receive` | Receive | primary | `stock:move` | `screens/Receive.tsx:144` | `screens/live.tsx:572` |
-| `/count` | Count | primary | `stock:move` | `screens/Count.tsx:83` | `screens/live.tsx:741` |
-| `/work` | Work | primary | `process:read` | `declared` | `declared` |
-| `/move` | Move it | none | `stock:move` | `declared` | `declared` |
-| `/thing` | A product | none | `product:read` | `declared` | `declared` |
-| `/where` | A location | none | `location:read` | `declared` | `declared` |
-| `/item` | An item | none | `stock:read` | `declared` | `declared` |
-| `/kit` | A kit | none | `stock:read` | `declared` | `declared` |
-| `/run` | A run | none | `process:read` | `declared` | `declared` |
-| `/case` | A job | none | `process:read` | `declared` | `declared` |
-| `/due` | Running out | secondary | `stock:read` | `declared` | `declared` |
-| `/labels` | Labels | secondary | `location:read` | `screens/Labels.tsx:248` | `screens/live.tsx:968` |
-| `/reports` | Reports | none | `ledger:read` | `declared` | `declared` |
-| `/ask` | Ask | secondary | `stock:read` | `screens/Ask.tsx:54` | `screens/live.tsx:968` |
-| `/import` | Import | secondary | `product:write` | `screens/Import.tsx:131` | `screens/live.tsx:1256` |
-| `/suppliers` | Suppliers | secondary | `product:write` | `declared` | `declared` |
-| `/register` | Add a product | none | `product:write` | `screens/Register.tsx:205` | `screens/live.tsx:1256` |
-| `/start` | Getting started | secondary | `product:read` | `declared` | `declared` |
-
-### The surfaces that are not routes
-
-| Where | What | File |
-|---|---|---|
-| `/register` | the nine questions, and the sentence each answer makes | `screens/Register.tsx` — `ASKS`; `src/saying.ts` |
-| `/suppliers` | the supplier editor (a tray) | `screens/Suppliers.tsx` — `SupplierTray` |
-| `/labels` | the printable sheet and the four templates | `screens/Labels.tsx` — `Template`, `TEMPLATES` |
-| `/labels` | the decant label's hazard diamonds | `screens/Labels.tsx` — `Diamond` |
-| `/import` | the column mapping | `screens/Import.tsx` — `MAPPABLE` |
-| `/count` | what closing would change | `screens/Count.tsx` |
-| `/scan` | the viewfinder and what a model suggested | `screens/Scan.tsx` |
-| `/thing` | deliveries, movements and pieces | `screens/Thing.tsx` |
-
-### The grounds
-
-`src/screens/index.tsx` chooses the state each screen is photographed in, and the
-choices are deliberate: a month at **sixty-one per cent recorded** rather than a
-hundred, a preview with a **refused row that is not last**, a decant label with a
-**real classification** on it, and a due list with **one gone, one going and one
-that is out because it was opened**.
-
-### Five nav slots, and the fifth is the one a basement never opens
-
-**Home, Stock, Scan, Count, Work.** The root answers "is everything all right" —
-what is on the shelf, what is running out, what count is half done, what run is
-waiting — and everything under it is one tap away with its own name on it. Stock
-was the root for as long as this product had four screens, which made the first
-thing anybody saw a page of rows they had to read to find out whether there was
-anything to do.
-
-**The three numbers in its hero are one request** — `totals.read`, which every
-app on the engine gets the moment it declares a collection. They were three list
-reads asked for one row each, because a list was the only thing on offer that
-knew a total: three round trips, each carrying identity, workspace, membership
-and standing, to run three `SELECT COUNT(*)`. A collection the reader may not
-open is left out of the answer rather than counted as nought, so a role built by
-hand without `product:read` gets the shelf figure with no caption under it.
-
-**Reports gave up its seat to it**, because most of its figures are on Home
-already, cut down to what a first screen holds: the recorded share, what left,
-what was found short, and how many lines run out before a delivery lands. A bar
-seat for a screen that is largely another screen's summary is the bar answering
-"where am I" with two places that are the same place.
-
-**Receiving is not a seat either, and never was** — it is Stock's own act. What
-Home offers in its quick row is exactly what the bar does not: receiving,
-labels, the spreadsheet and the people it is bought from. A shortcut to something
-a thumb already reaches from every screen is a second answer to one question.
-
-Runs and jobs are the regulated half of this product — a workshop tracking work
-orders, a clinic releasing sterilisation loads — and nobody storing paint in a
-garage. The `alone` preset holds no `process:*` key at all, so the destination is
-not drawn for somebody on it, which is the difference between a screen that is
-hidden and a screen that is not reachable. And the plan gates it too (engine 67):
-on a tier with neither runs nor work orders the screen never leaves the server,
-so the fifth slot goes back to the four a garage actually uses.
-
-### The checklist knows whose step it is
-
-Naming a place and building the catalogue happen once, for everybody; putting
-something on a shelf is the gesture this product IS, and somebody who has not
-done it has not learnt the product whatever their colleagues did last year. So
-`first-count` is `who: "person"` and the other two are the workspace's — see
-[DECISIONS.md](../../docs/DECISIONS.md) D54. An invited counter opening Home on
-their first morning is shown their own first delivery and is not congratulated
-for a year of somebody else's work.
-
----
 
 ## What is not built
 

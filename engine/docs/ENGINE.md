@@ -25,6 +25,7 @@ failing test, a capability that silently does not apply (D12).
 |---|---|
 | **This file** | what exists, and whether it is reachable |
 | [BUILDING.md](BUILDING.md) | why it is shaped this way, and how to add to it |
+| [BLUEPRINT.md](BLUEPRINT.md) | how a product is built on it, in the order it is built |
 | [DECISIONS.md](DECISIONS.md) | what is forbidden, and why — cited by number from code and guards |
 | [../design/README.md](../design/README.md) | what a screen draws, and where a screen starts |
 | [SURFACE.md](SURFACE.md) | the arc that moves a screen out of an app and into its manifest |
