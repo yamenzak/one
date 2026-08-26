@@ -83,6 +83,8 @@ const product = collection({
     hazard, and neither is a phrase anybody types into a search box.
   */
   searchable: ["name", "brand", "labelText"],
+  /* ⚠️ WHAT A PICKER PUTS ON THE ROW — see `CollectionSpec.names`. */
+  names: "name",
   fields: {
     name: field.text({ label: "Name", required: true, holds: "none", max: 200 }),
     brand: field.text({ label: "Brand", holds: "none", max: 120 }),
@@ -284,6 +286,10 @@ const location = collection({
   quota: "locations",
   offline: "queue",
   searchable: ["name"],
+  /* ⚠️ WHAT A PICKER PUTS ON THE ROW — see `CollectionSpec.names`. Every form
+     that asks "which shelf" reads this; without it the control is a list of
+     identifiers nobody standing in the building can match to a place. */
+  names: "name",
   /* ⚠️ A PLACE IS THE THING BEING REACHED, so its own id is what a grant names —
      and a member narrowed to two sites sees those two and everything under
      them, which is what makes the picker on the roster honest. */
@@ -1547,9 +1553,14 @@ const shift = operation<ShiftInput, Moved & { arrived: number }>({
   kind: "write",
   summary: "Carry stock from one shelf to another",
   input: {
-    product: field.text({ label: "Product", required: true, holds: "none" }),
-    from: field.text({ label: "From", required: true, holds: "none" }),
-    to: field.text({ label: "To", required: true, holds: "none" }),
+    /* ⚠️ REFERENCES RATHER THAN TEXT, AND THE DIFFERENCE IS THE CONTROL. All
+       three were `text`, which typechecked and validated and meant a declared
+       form drew three boxes asking somebody in a warehouse to type identifiers.
+       Declared as what they are, the form asks "which shelf" and offers the
+       shelves — see `Act.choices`. Nothing about the handler changes. */
+    product: field.ref({ label: "Product", required: true, holds: "none", to: "product" }),
+    from: field.ref({ label: "From", required: true, holds: "none", to: "location" }),
+    to: field.ref({ label: "To", required: true, holds: "none", to: "location" }),
     /* ⚠️ IN THE LEVEL NAMED BESIDE IT, exactly as `stock.arrive` is in the unit
        the code implies. The multiplication happens once, on the server, in
        `perOf`. */
@@ -6151,7 +6162,78 @@ const manifest = (): AppSpec => defineApp({
       move is an action on a shelf, not a place to be.
     */
     { id: "move", route: "/move", label: "Move it", nav: "none", icon: "box",
-      permission: "stock:move" },
+      permission: "stock:move", of: "stock",
+      /*
+        ⚠️ THE SCREEN IS ABOUT THE LINE AND THE FORM ASKS THE REST — see `Fill`.
+        The product, the shelf it is leaving and the day are all facts this screen
+        is standing on: they come off the record, they are never drawn, and what
+        is left is the two questions a person actually has.
+
+        ⚠️ AND "Recorded by" IS THE SCREEN'S OWN ANSWER. `capture` is what tells a
+        movement somebody keyed from one a camera read, which is exactly the
+        question asked when a count looks wrong — so it is required input, it is
+        never a question, and a literal is what says so.
+      */
+      body: {
+        shape: "form",
+        layout: { as: "stack" },
+        blocks: [
+          {
+            group: "What is moving",
+            of: [
+              { block: "FieldRow",
+                bind: {
+                  label: { from: { of: "words", says: "Product" } },
+                  value: { from: { of: "field", field: "product.name" } },
+                } },
+              { block: "AmountRow",
+                bind: {
+                  label: { from: { of: "words", says: "On the shelf" } },
+                  amount: { from: { of: "field", field: "quantity" }, as: "num" },
+                  under: { from: { of: "field", field: "location.name" } },
+                } },
+              { block: "FieldRow",
+                when: { has: { of: "field", field: "seen" } },
+                bind: {
+                  label: { from: { of: "words", says: "Last seen" } },
+                  value: { from: { of: "field", field: "seen" }, as: "when" },
+                } },
+            ],
+          },
+          {
+            group: "Carry it",
+            of: [
+              { block: "ActionRow",
+                does: [{
+                  op: "stock.move",
+                  fills: {
+                    product: { field: "product" },
+                    from: { field: "location" },
+                    day: "today",
+                    capture: { says: "typed" },
+                  },
+                }],
+                bind: {
+                  label: { from: { of: "words", says: "Move it" } },
+                  under: { from: { of: "words", says: "Say where it is going and how much" } },
+                } },
+              /* ⚠️ THE RULE SOMEBODY WOULD OTHERWISE FIND OUT BY BEING REFUSED. A
+                 move to where it already is writes two rows that cancel, and the
+                 door refuses it — saying so before the press is cheaper than a
+                 refusal after it. */
+              { block: "NoteRow",
+                bind: {
+                  children: {
+                    from: {
+                      of: "words",
+                      says: "It cannot go to the shelf it is already on",
+                    },
+                  },
+                } },
+            ],
+          },
+        ],
+      } },
     /* ⚠️ A COUNT IS A JOB SOMEBODY SPENDS AN AFTERNOON ON, so it is a
        destination rather than a mode. `stock:move` because counting is open to
        everybody — it is SETTLING one that needs `stock:adjust`, which the

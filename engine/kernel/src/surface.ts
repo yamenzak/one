@@ -425,7 +425,35 @@ export type Layout =
  * and its own calendar would call a box expired the evening before it is — or,
  * west of Greenwich, current for a few hours after it is not.
  */
-export type Fill = "record" | "today";
+export type Fill = "record" | "today" | { readonly field: string } | { readonly says: Said };
+
+/**
+ * ⚠️ THE THIRD SOURCE, AND IT IS THE ONE `/move` FOUND. `record` is the id of
+ * the thing the screen is about; a write often wants something ON that row
+ * instead. Carrying stock takes the PRODUCT and the SHELF, and a stock line
+ * holds both as columns — so with only `record` the form asked a person to type
+ * two identifiers they were looking at.
+ *
+ * ⚠️ AND THE FOURTH IS A CONSTANT THE SCREEN SUPPLIES. `capture: "typed"`
+ * distinguishes a movement somebody keyed from one a camera read; it is required
+ * input, it is never a question, and without a way to say it the only options
+ * were a form asking "Recorded by" or an operation with a default that made the
+ * two indistinguishable in the ledger.
+ *
+ * ⚠️ NEITHER IS AN ESCAPE HATCH. `field` is checked against the screen's subject
+ * at composition, exactly as a binding is, and `says` is a literal in a manifest
+ * rather than a value from a browser — the caller cannot reach either.
+ */
+export type Said = string | number | boolean;
+
+/** ⚠️ One reading of the four forms, so no caller writes the branch twice. */
+export const fillOf = (
+  one: Fill,
+): { readonly of: "record" | "today" } | { readonly of: "field"; readonly field: string }
+  | { readonly of: "says"; readonly says: Said } => (
+    typeof one === "string" ? { of: one }
+      : "field" in one ? { of: "field", field: one.field }
+        : { of: "says", says: one.says });
 
 /**
  * AN ACT A BLOCK OFFERS, AND WHAT THE SCREEN FILLS IN FOR IT.

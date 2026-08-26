@@ -39,7 +39,6 @@ import { Stock } from "./Stock.js";
 import { Home, type Moving, type Needs, type Shelf } from "./Home.js";
 import { Labels, type Labelled, type Subject, type Template } from "./Labels.js";
 import { Reports, type Reported, type Span } from "./Reports.js";
-import { Move } from "./Move.js";
 /* ⚠️ A JSON COLUMN IS WHATEVER IS IN THE COLUMN — see `packing.ts`. */
 import { readLevels } from "../packing.js";
 import { Start } from "./Start.js";
@@ -629,101 +628,6 @@ const SCAN = (api: Door) => function ScanHere({ go }: Mounted) {
  * calls out here would leave a nameless product with no code the first time the
  * signal drops, and four queued items offline instead of one.
  */
-/**
- * CARRYING SOME OF A SHELF TO ANOTHER SHELF.
- *
- * ⚠️ IT IS REACHED FROM THE LINE, so the product and the shelf it is on are
- * facts this screen arrived with rather than questions it asks. What is left is
- * where to and how many, which is why the surface is three fields instead of a
- * scanning session.
- *
- * ⚠️ AND THE LADDER COMES FROM THE PRODUCT, NOT FROM THE LINE. A stock row knows
- * how many and where; how the thing is PACKAGED is a fact about the product, and
- * it is what the rung picker offers.
- */
-const MOVE = (api: Door) => function MoveHere({ go, at }: Mounted) {
-  const id = at[0] ?? "";
-  /* ⚠️ THE ONE CHANNEL — see `telling.tsx`. Every write below could fail into
-     nothing without it, which is what "the button does not do anything" is. */
-  const tell = useTelling();
-  const today = dayHere();
-  const world = useWorld(api);
-  const [busy, setBusy] = React.useState(false);
-
-  const places = world.places.status === "ready" && world.stock.status === "ready"
-    ? placesOf(world.places.data.items, world.stock.data.items)
-    : [];
-  const line = both(world.stock, world.kinds, (stock, kinds) =>
-    pick(linesOf(stock.items, places, kinds.items, api.file), id));
-
-  const held = line.status === "ready" ? line.data : undefined;
-  /* ⚠️ THE PRODUCT'S OWN ROW, because the ladder is the product's. */
-  const kind = world.kinds.status === "ready"
-    ? world.kinds.data.items.find((row) => text(row.id) === (held?.product ?? ""))
-    : undefined;
-
-  /*
-    ⚠️ EVERY SHELF EXCEPT THE ONE IT IS ON. A move to where it already is writes
-    two rows that cancel — the balance would be right, which is exactly why the
-    picker must not offer it. The door refuses it too.
-  */
-  const shelves = places
-    .filter((one) => one.id !== (held?.where ?? ""))
-    .map((one) => ({ id: one.id, name: one.name }));
-
-  if (line.status === "ready" && !held) {
-    /*
-      ⚠️ AN ADDRESS NAMING A LINE THIS WORKSPACE DOES NOT HAVE IS A MISTAKE TO
-      REPORT, never a blank form to fill in. Drawing the move screen over an
-      empty line would offer to carry nothing from nowhere, and the person would
-      find out by pressing.
-    */
-    return (
-      <Screen shape="form" title="Move it" back={() => go("/stock")}>
-        <Nothing
-          /* ⚠️ THE SCREEN'S OWN NOUN, never a shrug — this emptiness is about a
-             thing on a shelf, and the mark is what says which. */
-          icon={glyphOf("box")}
-          says="That is not on a shelf any more"
-          under="Somebody moved or took the last of it"
-          offer={{ label: "Back to the stock", onDo: () => go("/stock") }}
-        />
-      </Screen>
-    );
-  }
-
-  return (
-    <Move
-      line={held ?? EMPTY_LINE}
-      levels={readLevels(kind?.levels)}
-      shelves={shelves}
-      busy={busy}
-      back={() => go(held ? `/thing/${id}` : "/stock")}
-      onMove={({ to, quantity, rung }) => {
-        if (!held) return;
-        setBusy(true);
-        void api.post("stock.move", {
-          product: held.product,
-          from: held.where,
-          to,
-          quantity,
-          /* ⚠️ THE NAME, NEVER THE MULTIPLIER — resolved on the server against
-             the ladder the product declares now. */
-          ...(rung ? { rung } : {}),
-          day: today,
-          capture: "typed",
-        }).then((got) => {
-          setBusy(false);
-          if (!got.ok) { tell.failed(got.problem); return; }
-          tell.did("Moved.");
-          world.again();
-          go(`/thing/${id}`);
-        });
-      }}
-    />
-  );
-};
-
 const RECEIVE = (api: Door) => function ReceiveHere() {
   /* ⚠️ THE ONE CHANNEL — see `telling.tsx`. Every write below could fail
      into nothing before this, and several of them did. */
@@ -1812,7 +1716,6 @@ export function mount({ register, api }: Mounting): void {
     ["/scan", SCAN(api)],
     ["/register", REGISTER(api)],
     ["/receive", RECEIVE(api)],
-    ["/move", MOVE(api)],
     ["/count", COUNT(api)],
     ["/ask", ASK(api)],
     ["/labels", LABELS(api)],

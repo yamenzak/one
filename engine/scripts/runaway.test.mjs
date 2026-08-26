@@ -393,6 +393,13 @@ const ALL = [
     ["runtime/src/joined.ts",
       [2, "the references one body names and the counts one view asks for, both "
         + "deduplicated — never one per row"]],
+    /* ⚠️ ONE PER COLLECTION A PICKER OFFERS, NOT ONE PER ROW OR PER FIELD — see
+       `Act.choices`. The fan-out is over the DISTINCT collections the acts on
+       one screen reference, which is a number written in the manifest and is one
+       or two on every screen in this repository; `stock.move` takes two shelves
+       and they are one query. Each is capped at `CHOICES_MOST`. */
+    ["runtime/src/screen.ts",
+      [1, "the collections the acts on one screen offer a picker over, deduplicated"]],
     ["runtime/src/centre-ops.ts",
       [1, "the products a workspace has switched on — the deployment's own catalogue"]],
     ["runtime/src/operator.ts",

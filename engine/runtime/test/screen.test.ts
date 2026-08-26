@@ -348,3 +348,74 @@ describe("every collection the screen touches is asked for by name", () => {
     expect([...collectionsFor(counting, screen)].sort()).toEqual(["shelf", "supplier"]);
   });
 });
+
+/**
+ * WHAT A `ref` INPUT MAY BE — see `Act.choices`.
+ *
+ * ⚠️ THE ROWS TRAVEL WITH THE SCREEN, and the reason is where these forms are
+ * used. A press on a warehouse phone must open a filled form rather than a
+ * spinner — so this is one more statement in a batch the screen already runs,
+ * not a round trip on the gesture.
+ */
+describe("a form that asks which one", () => {
+  /* ⚠️ THE COLLECTION SAYS WHICH FIELD NAMES A ROW — without it a picker is a
+     list of identifiers, which is the failure this whole seam is about. */
+  const named = { ...supplier, names: "name" } as CollectionSpec;
+  const picking = {
+    ...APP,
+    collections: [shelf, named],
+    operations: [
+      ...(APP.operations ?? []),
+      {
+        id: "shelf.supply", summary: "Say who supplies it",
+        input: { by: field.ref({ label: "Supplier", required: true, holds: "none", to: "supplier" }) },
+      },
+    ],
+  } as unknown as AppSpec;
+
+  const asking = {
+    ...place,
+    id: "asking",
+    body: {
+      ...place.body!,
+      blocks: [{
+        block: "ActionRow",
+        does: ["shelf.supply"],
+        bind: { label: { from: { of: "words", says: "Say who supplies it" } } },
+      }],
+    },
+  } as unknown as ScreenSpec;
+
+  it("answers the rows, named, beside the act", async () => {
+    const got = await drawnFor(shard(), picking, asking, TENANT, all, cold);
+    if ("needs" in got) throw new Error(got.needs);
+    expect(got.acts["shelf.supply"]?.choices["by"]?.map((c) => c.label))
+      .toEqual(["Ferris Chemicals"]);
+  });
+
+  /*
+    ⚠️ AND THE COLLECTION BEHIND A PICKER IS A TOUCH, WHICH IS THE SHARP HALF. A
+    form listing every supplier by name is a read of the supplier collection
+    whatever it is drawn as — leaving it out of the permission check would hand a
+    caller with no `supplier:read` the whole list through a dropdown.
+  */
+  it("counts the collection it offers as one the screen touches", () => {
+    expect([...collectionsFor(picking, asking)].sort()).toEqual(["shelf", "supplier"]);
+  });
+
+  it("refuses the screen to somebody who may not read them", async () => {
+    const got = await drawnFor(shard(), picking, asking, TENANT, only("stock:read"), cold);
+    expect(got).toEqual({ needs: "supplier:read" });
+  });
+
+  /* ⚠️ A COLLECTION THAT NAMES NO FIELD FALLS BACK TO ITS IDENTIFIER, which is
+     the honest thing to show for a row with no name — and visibly wrong in a way
+     a guess assembled out of columns is not. */
+  it("falls back to the identifier where a collection names nothing", async () => {
+    const bare = { ...picking, collections: [shelf, supplier] } as unknown as AppSpec;
+    const got = await drawnFor(shard(), bare, asking, TENANT, all, cold);
+    if ("needs" in got) throw new Error(got.needs);
+    const [one] = got.acts["shelf.supply"]?.choices["by"] ?? [];
+    expect(one?.label).toBe(one?.id);
+  });
+});

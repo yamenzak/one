@@ -24,7 +24,7 @@ import {
 } from "@heroui/react";
 import { sentence } from "../tokens/type.js";
 import { SPACE } from "../tokens/metrics.js";
-import { Tail } from "../parts/forms.js";
+import { Lookup, Tail } from "../parts/forms.js";
 import type { PickerProps } from "../parts/pickers.js";
 
 /**
@@ -91,9 +91,26 @@ export interface FieldProps {
    * optional chain per caller.
    */
   readonly error?: string;
+  /**
+   * WHAT A `ref` MAY BE — the rows, named, from whoever is drawing this form.
+   *
+   * ⚠️ A REFERENCE IS A QUESTION ABOUT WHICH ROW, AND WITHOUT THESE IT DREW A
+   * TEXT BOX. "Which shelf" became "type a location id", which is not a question
+   * anybody standing in a warehouse can answer — and the value that came back
+   * was whatever they typed, so the refusal arrived at the door rather than at
+   * the control.
+   *
+   * ⚠️ AND THIS COMPONENT DOES NOT FETCH THEM, DELIBERATELY. A field that read
+   * rows would be a design component with a data layer under it, in a package
+   * whose whole boundary is that it draws what it is handed. The screen door
+   * already answers them beside the act.
+   */
+  readonly choices?: readonly { readonly id: string; readonly label: string }[];
 }
 
-export function Field({ name, spec, value, onChange, disabled, set, bare, error }: FieldProps) {
+export function Field({
+  name, spec, value, onChange, disabled, set, bare, error, choices,
+}: FieldProps) {
   const label = spec.label;
   const help = bare ? undefined : spec.help;
   const pending = value === undefined;
@@ -167,6 +184,33 @@ export function Field({ name, spec, value, onChange, disabled, set, bare, error 
           {tail}
         </Select>
       );
+
+    /*
+      ⚠️ A REFERENCE IS A LOOKUP, NEVER A FREE WORD — see `Lookup`'s `own`. A
+      shelf, a product and a supplier are rows that exist or do not, so a control
+      that accepted something typed would send an id nothing resolves; the door
+      would refuse it, and the person would have found out by pressing.
+
+      ⚠️ AND WITH NOTHING TO OFFER IT FALLS THROUGH TO THE TEXT BOX BELOW. A
+      collection with no rows yet, or one the caller may not read, has no
+      question this control could ask — and an empty dropdown is a control that
+      looks broken rather than one that says there is nothing there.
+    */
+    case "ref":
+      if (choices?.length) {
+        return (
+          <Lookup
+            label={label}
+            value={value === undefined ? undefined : String(value ?? "")}
+            onChange={onChange}
+            options={choices.map((one) => ({ id: one.id, label: one.label }))}
+            disabled={disabled || pending}
+            {...(help ? { help } : {})}
+            {...(error !== undefined ? { error } : {})}
+          />
+        );
+      }
+      break;
 
     case "number":
     case "money":

@@ -96,9 +96,16 @@ const DIST = join(dirname(fileURLToPath(import.meta.url)), "..", "dist");
    a screen whose subject is ARITHMETIC — what runs out, what a period totalled —
    had nowhere to come from. The arithmetic itself is not in this number and
    never will be: it is a declared operation, running on the worker, behind the
-   same permission and audit row as every other. */
+   same permission and audit row as every other.
+
+   ⚠️ AND 1,095 FOR THE PICKER — `fillOf`, the two new fill sources and the three
+   refusals that check them. A `ref` input is an operation asking "which one",
+   and the declared form drew a text box: "To" on a transfer meant typing a
+   location id somebody would have to find first. The ROWS are not in this
+   number — they come down with the screen, sized by the workspace — and neither
+   is the control, which is `Lookup` and was already here. */
 const CEILING = {
-  js: { raw: 1_108_900, gzip: 330_000 },
+  js: { raw: 1_110_100, gzip: 330_000 },
   css: { raw: 470_000, gzip: 50_000 },
 };
 

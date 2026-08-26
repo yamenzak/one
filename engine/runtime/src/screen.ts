@@ -24,12 +24,12 @@
 
 import type { AppSpec, Fields, Fill, Reach, ScreenSpec } from "@engine/kernel";
 import {
-  SCREEN_PATH, actsIn, columnsIn, fieldsIn, fillsIn, permissionFor, reachFor, viewsIn,
+  SCREEN_PATH, actsIn, columnsIn, eraseBy, fieldsIn, fillsIn, permissionFor, reachFor, viewsIn,
 } from "@engine/kernel";
 import { joinRows } from "./joined.js";
 import { readOne } from "./records.js";
 import { runViews, type Ask, type Viewed } from "./views.js";
-import { type Db } from "./sql.js";
+import { column, table, type Db } from "./sql.js";
 
 /* ⚠️ `SCREEN_PATH` IS THE KERNEL'S — see its header. The browser speaks it too,
    and a constant each end declares is two strings kept in step by nothing. */
@@ -62,7 +62,37 @@ export interface Act {
    * they are standing on.
    */
   readonly fills: Readonly<Record<string, Fill>>;
+  /**
+   * WHAT A `ref` INPUT MAY BE, BY FIELD NAME — the rows, named.
+   *
+   * ⚠️ WITHOUT THIS EVERY DECLARED FORM ASKS FOR AN IDENTIFIER. An operation
+   * taking a `ref` is asking "which one", and the declared form drew a text box:
+   * `stock.move`'s "To" meant typing a location id somebody would have to find
+   * first. The rows are what turns it into a question a person can answer.
+   *
+   * ⚠️ SENT WITH THE SCREEN RATHER THAN FETCHED WHEN THE SHEET OPENS, and the
+   * reason is where these forms are used. A press on a warehouse phone must open
+   * a filled form, not a spinner — and this is one more statement in a batch the
+   * screen is already running, rather than a round trip on the gesture.
+   *
+   * ⚠️ AND IT IS BOUNDED, DELIBERATELY — see `CHOICES_MOST`. A picker is a
+   * question with an answer somebody can find by looking; past that ceiling the
+   * right control is a search, and shipping ten thousand rows to a phone to
+   * populate a dropdown is the failure this whole layer exists to avoid.
+   */
+  readonly choices: Readonly<Record<string, readonly Choice[]>>;
 }
+
+export interface Choice { readonly id: string; readonly label: string }
+
+/**
+ * ⚠️ WHAT A PICKER MAY HOLD, AND IT IS A CEILING ON THE WIRE RATHER THAN ON THE
+ * TRUTH. A workspace with more locations than this has a form whose control is
+ * the wrong one — and the honest failure is a list that stops, not a screen that
+ * takes four seconds to open. The collection's own list operation is where the
+ * whole set is answered.
+ */
+export const CHOICES_MOST = 200;
 
 /** ⚠️ Refused rather than empty — see `Refused`. */
 export interface Refused { readonly needs: string }
@@ -126,6 +156,27 @@ const reachesFor = (app: AppSpec, screen: ScreenSpec) => {
  * one collection over, and the only thing between the two was that a hop was not
  * counted as a touch.
  */
+/**
+ * EVERY `ref` INPUT OF EVERY ACT THIS BODY OFFERS — see `Act.choices`.
+ *
+ * ⚠️ READ ONCE AND USED BY BOTH ENDS, for the reason `reachesFor` is. The
+ * permission check and the fetch have to agree about which collections a screen
+ * touches; two walks of one question is how a picker comes to be served past the
+ * grant that governs the rows in it.
+ */
+const choosesIn = (
+  app: AppSpec, screen: ScreenSpec,
+): readonly { readonly op: string; readonly field: string; readonly to: string }[] => {
+  const out: { op: string; field: string; to: string }[] = [];
+  for (const id of screen.body ? actsIn(screen.body) : []) {
+    const spec = (app.operations ?? []).find((o) => o.id === id);
+    for (const [field, f] of Object.entries(spec?.input ?? {})) {
+      if (f.kind === "ref" && f.to) out.push({ op: id, field, to: f.to });
+    }
+  }
+  return out;
+};
+
 export const collectionsFor = (app: AppSpec, screen: ScreenSpec): readonly string[] => {
   const ids = new Set<string>();
   if (screen.of) ids.add(screen.of);
@@ -141,6 +192,12 @@ export const collectionsFor = (app: AppSpec, screen: ScreenSpec): readonly strin
   }
   const { subject, byView } = reachesFor(app, screen);
   for (const reach of [...subject, ...Object.values(byView).flat()]) ids.add(reach.to);
+  /* ⚠️ AND WHAT A PICKER OFFERS, WHICH IS ROWS LIKE ANY OTHER — see
+     `Act.choices`. A form listing every location by name is a read of the
+     location collection, whatever it is drawn as; leaving it out would hand a
+     caller with no `location:read` the whole map of the building through a
+     dropdown. Same leak as an uncounted hop, one control over. */
+  for (const one of choosesIn(app, screen)) ids.add(one.to);
   return [...ids];
 };
 
@@ -197,7 +254,14 @@ export async function drawnFor(
      charges every detail screen an extra hop in front of its own blocks. The
      subject's own hop is INSIDE this arm rather than after it, so a detail
      screen still waits once rather than twice. */
-  const [held, views] = await Promise.all([
+  /* ⚠️ ONE STATEMENT PER COLLECTION, NOT PER FIELD. Two `ref` inputs pointing at
+     the same collection are one dropdown's worth of rows asked for twice — and
+     `stock.move` has exactly that shape, taking a shelf to leave and a shelf to
+     arrive at. */
+  const chooses = choosesIn(app, screen);
+  const wanted = [...new Set(chooses.map((one) => one.to))];
+
+  const [held, views, picked] = await Promise.all([
     (async () => {
       if (!of || !record) return null;
       const one = await readOne(db, of, scope, record);
@@ -206,7 +270,9 @@ export async function drawnFor(
       return joined ?? one;
     })(),
     runViews(db, app, reads, scope, here, reaching, ask),
+    Promise.all(wanted.map(async (id) => [id, await choicesOf(db, app, id, scope)] as const)),
   ]);
+  const byCollection = new Map(picked);
 
   /* ⚠️ ONLY WHAT THE BODY NAMES, and an id the app does not declare is dropped
      rather than sent as a stub — `refuseSurface` refuses one at composition, so
@@ -215,8 +281,50 @@ export async function drawnFor(
   const fills = screen.body ? fillsIn(screen.body) : {};
   for (const id of screen.body ? actsIn(screen.body) : []) {
     const spec = (app.operations ?? []).find((o) => o.id === id);
-    if (spec) acts[id] = { summary: spec.summary, input: spec.input, fills: fills[id] ?? {} };
+    if (!spec) continue;
+    const choices: Record<string, readonly Choice[]> = {};
+    for (const one of chooses) {
+      if (one.op !== id) continue;
+      /* ⚠️ AN EMPTY LIST IS LEFT OUT RATHER THAN SENT, so the form draws a plain
+         field for a collection with nothing in it yet — a dropdown with no
+         options is a control that looks broken, and the honest state of "there
+         are no shelves" is a question the person cannot answer here. */
+      const rows = byCollection.get(one.to);
+      if (rows?.length) choices[one.field] = rows;
+    }
+    acts[id] = { summary: spec.summary, input: spec.input, fills: fills[id] ?? {}, choices };
   }
 
   return { record: held ?? null, views, acts };
 }
+
+/**
+ * ⚠️ THE ROWS A PICKER OFFERS — id and the field the collection says names one.
+ *
+ * ⚠️ TWO COLUMNS, NOT `SELECT *`. A form needs a label and a value; sending the
+ * whole row would put every column of every option on the wire, and on a
+ * collection carrying prose or a vault-backed field it would put them in front
+ * of somebody who only opened a dropdown.
+ *
+ * ⚠️ AND A COLLECTION THAT NAMES NO FIELD FALLS BACK TO ITS IDENTIFIER — see
+ * `CollectionSpec.names`. That is the honest thing to show for a row with no
+ * name, and it is visibly wrong in a way a guess assembled out of columns is
+ * not, so it gets fixed rather than lived with.
+ */
+const choicesOf = async (
+  db: Db, app: AppSpec, id: string, scope: string,
+): Promise<readonly Choice[]> => {
+  const spec = (app.collections ?? []).find((c) => c.id === id);
+  if (!spec) return [];
+  const erase = eraseBy(spec);
+  const named = spec.names && spec.names in spec.fields ? spec.names : null;
+  const rows = await db.prepare(
+    `SELECT id${named ? `, ${column(named)} AS said` : ""} FROM ${table(spec.id)}`
+    + `${erase ? ` WHERE ${column(erase.column)} = ?` : ""}`
+    + ` ORDER BY ${named ? `${column(named)} ASC, ` : ""}id ASC LIMIT ?`)
+    .bind(...(erase ? [scope] : []), CHOICES_MOST)
+    .all<{ id: string; said?: string | null }>();
+  return rows.results.map((row) => ({
+    id: String(row.id), label: String(row.said ?? row.id),
+  }));
+};

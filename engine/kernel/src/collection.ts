@@ -85,6 +85,21 @@ export interface CollectionSpec {
    * wherever anybody stands. Only what is somewhere is narrowed.
    */
   readonly reachBy?: string;
+  /**
+   * WHICH OF ITS FIELDS NAMES ONE OF THESE TO A PERSON.
+   *
+   * ⚠️ WITHOUT IT EVERY PICKER IN EVERY PRODUCT IS A LIST OF IDS. An operation
+   * taking a `ref` is an operation asking "which one", and a declared form has
+   * no other way to find out what to put on the row — `label.one` says what the
+   * COLLECTION is called, and a field is what one ROW is called. Two different
+   * questions, and only the first was ever answered.
+   *
+   * ⚠️ ABSENT IS A REAL ANSWER. A ledger entry, a movement, a session: rows
+   * nobody refers to by name, that no form asks somebody to choose between. The
+   * fallback is the identifier, which is the honest thing to show for a row that
+   * has no name rather than a guess assembled out of its columns.
+   */
+  readonly names?: string;
   /** ⚠️ Which operations the collection does NOT get. See `operationsFor`. */
   readonly without?: readonly CrudVerb[];
 }
@@ -211,7 +226,8 @@ export type CollectionRefusal =
   | "field_invalid" | "global_holds_data" | "kept_without_reason"
   | "subject_column_missing" | "quota_without_ceiling" | "no_operations_at_all"
   | "not_a_name" | "vault_without_a_subject"
-  | "searchable_unknown" | "searchable_not_text" | "searchable_vault";
+  | "searchable_unknown" | "searchable_not_text" | "searchable_vault"
+  | "names_unknown" | "names_not_words" | "names_vault";
 
 /**
  * ⚠️ AN ID AND A FIELD NAME BECOME A TABLE AND A COLUMN, AND AN IDENTIFIER
@@ -361,6 +377,29 @@ export function refuseCollection(spec: CollectionSpec): readonly CollectionProbl
       at("searchable_not_text",
         `${name} is a ${f.kind} — search matches meaning in prose, and a number or a `
         + `reference indexed as prose returns noise for every query`);
+    }
+  }
+
+  /*
+    ⚠️ THE FIELD THAT NAMES A ROW IS READ BY A PICKER, so all three of these
+    produce a control full of blanks rather than an error. A name that is not a
+    field resolves to undefined on every row; a number or a reference reads as an
+    id standing where a name should be; and a vault-backed one would put a
+    special category in a dropdown in front of everybody who can open the form,
+    with no consent asked and no record of who looked.
+  */
+  if (spec.names !== undefined) {
+    const f = spec.fields[spec.names];
+    if (!f) {
+      at("names_unknown", `names by "${spec.names}", which is not one of its fields`);
+    } else if (f.vault) {
+      at("names_vault",
+        `${spec.names} is vault-backed — a picker draws it for everybody who can open the `
+        + `form, with no consent asked and no record of who saw it`);
+    } else if (f.kind !== "text" && f.kind !== "enum") {
+      at("names_not_words",
+        `${spec.names} is a ${f.kind} — what names a row to a person is words, and a `
+        + `${f.kind} in a dropdown is an identifier standing where a name should be`);
     }
   }
 

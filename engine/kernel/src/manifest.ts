@@ -58,7 +58,7 @@ import { refuseSettings } from "./setting.js";
 import { LADDER, refuseLadder } from "./dunning.js";
 import { SURFACES, refuseSurfaces } from "./brand.js";
 import type { SurfaceSpec, ViewSpec } from "./surface.js";
-import { fillsIn, refuseSurface, refuseView, unreadViews } from "./surface.js";
+import { fillOf, fillsIn, refuseSurface, refuseView, unreadViews } from "./surface.js";
 import { BLOCKS } from "./blocks.js";
 import type { PurposeBook, VaultBook } from "./vault.js";
 import { refuseVault, strayFacts } from "./vault.js";
@@ -930,10 +930,26 @@ export function refuseApp(spec: AppSpec): readonly Refusal[] {
             `fills_field_unknown: fills "${name}" for ${id}, which takes no such input — `
             + "the value would be dropped at the door and the act would refuse for want of it");
         }
-        if (from === "record" && !s.of) {
+        const source = fillOf(from);
+        /* ⚠️ BOTH SOURCES THAT READ THE RECORD NEED ONE — see `Fill`. The id and
+           a column on it are the same requirement: without `of` there is no row,
+           and the value would arrive undefined at a required field. */
+        if ((source.of === "record" || source.of === "field") && !s.of) {
           at(`screen ${s.id}`,
             `fill_without_a_subject: fills "${name}" from the record and names no \`of\` — `
-            + "there is no record for it to be the id of");
+            + "there is no record for it to be a value of");
+        }
+        /* ⚠️ AND A COLUMN THAT IS NOT THERE IS A FORM THAT REFUSES FOR WANT OF A
+           FIELD IT NEVER DREW. Same class as `fills_field_unknown`, from the
+           other end: the input is real and the value going into it is not. */
+        if (source.of === "field" && s.of) {
+          const held = spec.collections.find((c) => c.id === s.of)?.fields;
+          if (held && !(source.field in held)) {
+            at(`screen ${s.id}`,
+              `fill_without_a_subject: fills "${name}" from "${source.field}", which `
+              + `${s.of} does not have — the act would refuse for want of a value the `
+              + "screen was supposed to know");
+          }
         }
       }
     }

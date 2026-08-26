@@ -398,6 +398,69 @@ describe("what would fail on the first request", () => {
       .toContain("asked_take_unknown");
   });
 
+  /*
+    ⚠️ A FILL FROM A COLUMN THE SUBJECT HAS NOT GOT IS THE SAME FAILURE AS ONE
+    NAMING AN INPUT THAT IS NOT THERE, from the other end: the input is real and
+    the value going into it is undefined, so the act refuses for want of a field
+    the form never drew.
+  */
+  const filling = (fills: Record<string, unknown>, of?: string) => whyOf(app({
+    screens: [{
+      id: "one", route: "/one", label: "One", permission: "note:read",
+      ...(of ? { of } : {}),
+      body: {
+        shape: "detail", layout: { as: "stack" },
+        blocks: [{
+          block: "NoteRow",
+          does: [{ op: stub.id, fills }],
+          bind: { children: { from: { of: "words", says: "One" } } },
+        }],
+      },
+    }] as never,
+  }));
+
+  /*
+    ⚠️ WHAT A PICKER PUTS ON THE ROW — see `CollectionSpec.names`. All three of
+    these produce a control full of blanks rather than an error: a name that is
+    not a field resolves to undefined on every option, and a number in a dropdown
+    is an identifier standing where a name should be.
+  */
+  const naming = (names: string, fields = note.fields) =>
+    whyOf(app({ collections: [{ ...note, quota: "notes", names, fields }] }));
+
+  it("accepts a collection naming its rows by a text field", () => {
+    expect(naming("title")).not.toContain("names_unknown");
+  });
+
+  it("refuses one naming a field it has not got", () => {
+    expect(naming("nowhere")).toContain("names_unknown");
+  });
+
+  it("refuses one naming a number", () => {
+    const fields = {
+      ...note.fields, size: field.number({ label: "Size", holds: "none" }),
+    };
+    expect(naming("size", fields)).toContain("names_not_words");
+  });
+
+  it("accepts a fill from a column the subject has", () => {
+    expect(filling({ id: { field: "title" } }, "note")).not.toContain("fill_without_a_subject");
+  });
+
+  it("refuses a fill from a column it has not", () => {
+    expect(filling({ id: { field: "nowhere" } }, "note")).toContain("fill_without_a_subject");
+  });
+
+  /* ⚠️ AND A COLUMN NEEDS A ROW, exactly as the id does. */
+  it("refuses a fill from a column on a screen with no subject", () => {
+    expect(filling({ id: { field: "title" } })).toContain("fill_without_a_subject");
+  });
+
+  /* ⚠️ A LITERAL NEEDS NOTHING — it is a constant the manifest wrote down. */
+  it("accepts a literal on a screen about nothing", () => {
+    expect(filling({ id: { says: "typed" } })).not.toContain("fill_without_a_subject");
+  });
+
   it("refuses a failure code no catalogue has", () => {
     const broken = app({ operations: [{ ...stub, fails: ["app.imagined"] } as AnyOperation] });
     expect(whyOf(broken)).toContain("which no catalogue has");

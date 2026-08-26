@@ -29,7 +29,7 @@ import { Body, type Has } from "@engine/design/body";
    browser bundle — so what both ends need is declared once, in the layer both
    are allowed to reach. */
 import {
-  SCREEN_PATH, viewsIn, type Fields, type Fill, type ScreenSpec, type Viewed,
+  SCREEN_PATH, fillOf, viewsIn, type Fields, type Fill, type ScreenSpec, type Viewed,
 } from "@engine/kernel";
 import { api, forget } from "../api.js";
 import { useLoad } from "./data.js";
@@ -41,6 +41,8 @@ interface Drawn {
   /** ⚠️ The acts this body offers, with their input — see `Drawn.acts`. */
   readonly acts: Readonly<Record<string, {
     summary: string; input: Fields; fills?: Readonly<Record<string, Fill>>;
+    /** ⚠️ What a `ref` input may be — see `Act.choices`. */
+    choices?: Readonly<Record<string, readonly { id: string; label: string }[]>>;
   }>>;
 }
 
@@ -147,18 +149,31 @@ export function Declared({ screen, screens, at, go, currency }: {
    * than inside the form is what makes `asks` able to say "nothing left to ask"
    * and run the act on the press.
    */
+  const held = got.of.status === "ready" ? got.of.data.record : null;
   const filled = React.useCallback((id: string): Record<string, unknown> => {
     const out: Record<string, unknown> = {};
     for (const [name, from] of Object.entries(acts[id]?.fills ?? {})) {
+      const source = fillOf(from);
       /* ⚠️ A FILL WITH NOTHING BEHIND IT IS LEFT OUT RATHER THAN SENT EMPTY. A
          detail screen whose address has not resolved has no record, and an empty
          string in a required field is a refusal that says the field is missing
          when the truth is that the screen is not ready. */
-      if (from === "record" && record) out[name] = record;
-      if (from === "today") out[name] = today();
+      if (source.of === "record" && record) out[name] = record;
+      if (source.of === "today") out[name] = today();
+      /* ⚠️ A COLUMN ON THE RECORD, WHICH IS NOT THE RECORD'S ID — see `Fill`.
+         Carrying stock takes the product and the shelf, and a stock line holds
+         both; with only the id the form asked a person to type two identifiers
+         they were looking at. */
+      if (source.of === "field") {
+        const value = held?.[source.field];
+        if (value !== undefined && value !== null && value !== "") out[name] = value;
+      }
+      /* ⚠️ A CONSTANT THE SCREEN SUPPLIES, and it is a literal from the manifest
+         rather than a value from anywhere a caller could reach. */
+      if (source.of === "says") out[name] = source.says;
     }
     return out;
-  }, [acts, record]);
+  }, [acts, record, held]);
 
   const onDo = React.useCallback((id: string) => {
     const spec = acts[id];
@@ -205,6 +220,7 @@ export function Declared({ screen, screens, at, go, currency }: {
           summary={acts[asking]!.summary}
           input={acts[asking]!.input}
           fills={filled(asking)}
+          {...(acts[asking]!.choices ? { choices: acts[asking]!.choices } : {})}
           open
           onOpen={(next: boolean) => { if (!next) setAsking(null); }}
           /* ⚠️ THE FILLS LAST, so a field the screen supplies cannot be

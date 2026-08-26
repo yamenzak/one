@@ -57,7 +57,6 @@ const NOT_YET = new Map([
   ["inventory:scan", "a camera, a decode loop and a resolve on every read — a device the browser drives, which no declaration describes"],
   ["inventory:receive", "a session: a shelf that survives between scans, a row cleared after each write, and an undo of the last movement"],
   ["inventory:count", "a session with a running tally, a blind mode that withholds the expected number, and stutter detection on the trigger"],
-  ["inventory:move", "a form whose questions depend on the product's packing ladder, which the operation resolves and the rows do not carry"],
   ["inventory:labels", "a printer sheet: a layout somebody arranges and sends to paper, with no rows on the screen to declare"],
   ["inventory:import", "a file somebody chooses, a column mapping they agree with, and a preview of what would land"],
   ["inventory:reports", "totals over a period a person picks, which is an aggregate the view grammar has no clause for"],

@@ -3474,3 +3474,53 @@ by a write, or by an operation whose answer the manifest cannot name; a clause
 beside `asked` that nothing applies; a runner for screen-time operations separate
 from the one every other door uses; or the browser computing what a view could
 not say.
+
+---
+
+## D95 — A reference is a question about which row, and a form has to be able to ask it
+
+An operation taking a `ref` is asking "which one". The declared form drew a text
+box: `stock.move`'s "To" meant typing a location id somebody would have to go and
+find first, and whatever they typed came back refused at the door rather than at
+the control. Every detail screen in every product has this shape, so the port
+stopped at the first screen whose act named a row.
+
+**A collection says which of its fields names a row to a person.** `label.one` is
+what the COLLECTION is called and a field is what one ROW is called — two
+different questions, and only the first was ever answered. Absent is a real
+answer: a ledger entry, a movement, a session are rows nobody refers to by name,
+and the fallback is the identifier, which is the honest thing to show and visibly
+wrong in a way a guess assembled out of columns is not.
+
+**The rows travel with the screen, and that is about where these forms are used.**
+A press on a warehouse phone must open a filled form, not a spinner — so the
+picker's options are one more statement in a batch the screen already runs rather
+than a round trip on the gesture. Bounded at two hundred: past that the right
+control is a search, and shipping ten thousand rows to populate a dropdown is the
+failure this layer exists to avoid.
+
+**And the collection behind a picker is a TOUCH.** A form listing every supplier
+by name is a read of the supplier collection whatever it is drawn as, so it is in
+the permission check with the screen's own and its views' and everything they
+reach into. This is D93's uncounted hop, one control over: without it a caller
+holding no `supplier:read` gets the whole list through a dropdown.
+
+**Two more fill sources came with it, and both are about a value the screen has
+and the person does not.** `record` is the id of the thing somebody opened; a
+write often wants something ON that row instead — carrying stock takes the
+product and the shelf, and a stock line holds both as columns. And a literal:
+`capture: "typed"` is what tells a movement somebody keyed from one a camera
+read, which is exactly the question asked when a count looks wrong. It is
+required input, it is never a question, and the alternatives were a form asking
+"Recorded by" or a default that made the two indistinguishable in the ledger.
+
+**Neither is an escape hatch.** A `field` fill is checked against the screen's
+subject at composition exactly as a binding is, and a literal is a constant in a
+manifest rather than a value from anywhere a caller can reach. There is still no
+`me` — an identity taken from the browser is the caller naming somebody else.
+
+**Therefore never:** a `ref` input drawn as free text where the rows are known; a
+picker whose options are ids because nobody said what names a row; a collection
+offered in a dropdown and left out of the permission check; a form that asks for
+something the screen is standing on; or a fill from a column the subject has not
+got.

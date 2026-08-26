@@ -17,7 +17,7 @@ import { describe, expect, it } from "vitest";
 import { collection } from "../src/collection.js";
 import { field } from "../src/field.js";
 import {
-  CELLS_MOST, actsIn, blocksIn, fieldsIn, fillsIn, refuseSurface, refuseView, unreadViews,
+  CELLS_MOST, actsIn, blocksIn, fieldsIn, fillOf, fillsIn, refuseSurface, refuseView, unreadViews,
   viewsIn, type ActSpec, type BlockIndex, type SurfaceSpec, type ViewSpec,
 } from "../src/surface.js";
 import { BLOCKS } from "../src/blocks.js";
@@ -961,5 +961,29 @@ describe("where a row leads", () => {
 
   it("refuses one addressed by a field they do not", () => {
     expect(asks({ to: "one-note", by: "nowhere" })).toEqual(["shows_field_unknown"]);
+  });
+});
+
+/**
+ * ⚠️ THE TWO SOURCES A DETAIL SCREEN'S ACTS NEEDED — see `Fill`. `record` is the
+ * id of the thing somebody opened, and a write often wants something ON that row
+ * instead: carrying stock takes the product and the shelf, and a stock line
+ * holds both as columns.
+ */
+describe("what the screen fills in", () => {
+  it("reads the bare forms unchanged", () => {
+    expect(fillOf("record")).toEqual({ of: "record" });
+    expect(fillOf("today")).toEqual({ of: "today" });
+  });
+
+  it("reads a column off the record", () => {
+    expect(fillOf({ field: "author" })).toEqual({ of: "field", field: "author" });
+  });
+
+  /* ⚠️ A CONSTANT THE SCREEN SUPPLIES, and it is a literal in a manifest rather
+     than a value from anywhere a caller could reach. */
+  it("reads a literal", () => {
+    expect(fillOf({ says: "typed" })).toEqual({ of: "says", says: "typed" });
+    expect(fillOf({ says: 1 })).toEqual({ of: "says", says: 1 });
   });
 });

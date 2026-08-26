@@ -59,12 +59,18 @@ export interface DoingProps {
    * have to copy it out of a URL.
    */
   readonly fills?: Readonly<Record<string, unknown>>;
+  /**
+   * ⚠️ WHAT A `ref` INPUT MAY BE, BY FIELD NAME — see `Field.choices`. An
+   * operation taking a reference is asking "which one", and without the rows the
+   * form asks somebody to type an identifier instead.
+   */
+  readonly choices?: Readonly<Record<string, readonly { readonly id: string; readonly label: string }[]>>;
   readonly open: boolean;
   readonly onOpen: (open: boolean) => void;
   readonly run: (input: Record<string, unknown>) => Promise<Ran>;
 }
 
-export function Doing({ id, summary, input, fills, open, onOpen, run }: DoingProps) {
+export function Doing({ id, summary, input, fills, choices, open, onOpen, run }: DoingProps) {
   const names = unasked(input, fills);
   const [draft, setDraft] = React.useState<Record<string, unknown>>({});
   const [working, setWorking] = React.useState(false);
@@ -128,6 +134,7 @@ export function Doing({ id, summary, input, fills, open, onOpen, run }: DoingPro
                    showing only the title would put "that does not look right"
                    over a form with nothing marked on it. */
                 error={refusedOn(refused, name)}
+                {...(choices?.[name] ? { choices: choices[name] } : {})}
               />
             </Stack>
           );
