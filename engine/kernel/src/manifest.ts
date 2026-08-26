@@ -58,7 +58,7 @@ import { refuseSettings } from "./setting.js";
 import { LADDER, refuseLadder } from "./dunning.js";
 import { SURFACES, refuseSurfaces } from "./brand.js";
 import type { SurfaceSpec, ViewSpec } from "./surface.js";
-import { refuseSurface, refuseView, unreadViews } from "./surface.js";
+import { fillsIn, refuseSurface, refuseView, unreadViews } from "./surface.js";
 import { BLOCKS } from "./blocks.js";
 import type { PurposeBook, VaultBook } from "./vault.js";
 import { refuseVault, strayFacts } from "./vault.js";
@@ -876,6 +876,34 @@ export function refuseApp(spec: AppSpec): readonly Refusal[] {
   for (const s of spec.screens) {
     for (const p of refuseSurface(s, BLOCKS, views, spec.collections, ops, screenIds)) {
       at(p.of, `${p.why}: ${p.detail}`);
+    }
+    /*
+      ⚠️ A FILL NAMING A FIELD THE OPERATION DOES NOT TAKE IS A VALUE THAT GOES
+      NOWHERE — the door drops an input it never declared, so the act runs
+      missing the thing the screen was supposed to supply and refuses with the
+      field marked required and nothing in it. Checked here rather than in
+      `refuseSurface` because this is the one place an operation's `input` is in
+      scope: that function is handed ids alone.
+
+      ⚠️ AND A GENERATED VERB IS NOT CHECKED, because its input is composed by
+      the runtime from the collection's fields rather than written here. Filling
+      one is legal and unverified; that is the honest state of it, and a fills on
+      `note.update` is not a shape anything in this repository has wanted.
+    */
+    for (const [id, fills] of Object.entries(s.body ? fillsIn(s.body) : {})) {
+      const takes = spec.operations.find((o) => o.id === id)?.input;
+      for (const [name, from] of Object.entries(fills)) {
+        if (takes && !(name in takes)) {
+          at(`screen ${s.id}`,
+            `fills_field_unknown: fills "${name}" for ${id}, which takes no such input — `
+            + "the value would be dropped at the door and the act would refuse for want of it");
+        }
+        if (from === "record" && !s.of) {
+          at(`screen ${s.id}`,
+            `fill_without_a_subject: fills "${name}" from the record and names no \`of\` — `
+            + "there is no record for it to be the id of");
+        }
+      }
     }
   }
   for (const id of unreadViews(views, spec.screens.map((s) => s.body))) {

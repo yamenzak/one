@@ -52,13 +52,20 @@ export interface DoingProps {
   readonly summary: string;
   /** ⚠️ `OperationSpec.input`. Empty means it runs on the press. */
   readonly input: Fields;
+  /**
+   * ⚠️ WHICH OF THOSE THE SCREEN SUPPLIES — see `Fill`. They are not drawn: the
+   * item somebody opened and the day it is are facts the screen is standing on,
+   * and a form asking for either puts a row id in front of a person who would
+   * have to copy it out of a URL.
+   */
+  readonly fills?: Readonly<Record<string, unknown>>;
   readonly open: boolean;
   readonly onOpen: (open: boolean) => void;
   readonly run: (input: Record<string, unknown>) => Promise<Ran>;
 }
 
-export function Doing({ id, summary, input, open, onOpen, run }: DoingProps) {
-  const names = Object.keys(input);
+export function Doing({ id, summary, input, fills, open, onOpen, run }: DoingProps) {
+  const names = unasked(input, fills);
   const [draft, setDraft] = React.useState<Record<string, unknown>>({});
   const [working, setWorking] = React.useState(false);
   const [refused, setRefused] = React.useState<Problem | null>(null);
@@ -139,10 +146,30 @@ export function Doing({ id, summary, input, open, onOpen, run }: DoingProps) {
 }
 
 /**
+ * WHAT IS LEFT FOR A PERSON TO FILL IN — the form's fields, in declared order.
+ *
+ * ⚠️ EXPORTED, AND PURE, BECAUSE IT IS THE DECISION RATHER THAN THE DRAWING. The
+ * sheet is an overlay: it renders through a portal, so nothing about which
+ * fields it drew is visible to a test that is not driving a browser. Naming the
+ * choice makes it assertable in a plain suite, which is where a rule this
+ * consequential belongs — a filled field drawn as a question is a row id put in
+ * front of somebody, and it would otherwise only be caught by looking.
+ */
+export const unasked = (
+  input: Fields | undefined, fills: Readonly<Record<string, unknown>> = {},
+): readonly string[] => Object.keys(input ?? {}).filter((name) => !(name in fills));
+
+/**
  * ⚠️ WHETHER AN OPERATION NEEDS ASKING AT ALL, decided in one place. A caller
  * checking `Object.keys(input).length` itself is a caller that will one day
  * check it differently from this one — and the two disagreeing means either a
  * sheet with nothing in it or a write that happens without being asked for.
+ *
+ * ⚠️ AND WHAT THE SCREEN FILLS IN DOES NOT COUNT AS ASKING. `batch.open` takes
+ * the batch and the day and nothing else; both are the screen's, so there is
+ * nothing left to put in a form — and a sheet holding one button to confirm a
+ * press somebody already made is a second press for nothing.
  */
-export const asks = (input: Fields | undefined): boolean =>
-  Object.keys(input ?? {}).length > 0;
+export const asks = (
+  input: Fields | undefined, fills: Readonly<Record<string, unknown>> = {},
+): boolean => unasked(input, fills).length > 0;

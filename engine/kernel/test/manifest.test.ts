@@ -317,6 +317,46 @@ describe("what would fail on the first request", () => {
     expect(whyOf(broken)).toContain("SQL already means something by");
   });
 
+  /*
+    ⚠️ A FILL NAMING A FIELD THE OPERATION DOES NOT TAKE IS A VALUE THAT GOES
+    NOWHERE. The door drops an input it never declared, so the act runs missing
+    the thing the screen was supposed to supply and refuses with the field marked
+    required and nothing in it — which reads as the person having left a box
+    empty in a form that never drew one.
+  */
+  it("refuses a fill for an input the operation does not take", () => {
+    const acting = {
+      id: "one", route: "/one", label: "One", permission: "note:read", of: "note",
+      body: {
+        shape: "detail", layout: { as: "stack" },
+        blocks: [{
+          block: "NoteRow",
+          does: [{ op: stub.id, fills: { imagined: "record" } }],
+          bind: { children: { from: { of: "words", says: "One" } } },
+        }],
+      },
+    };
+    expect(whyOf(app({ screens: [acting] as never }))).toContain("fills_field_unknown");
+  });
+
+  /* ⚠️ AND A SCREEN THAT IS ABOUT NOTHING HAS NO RECORD TO FILL FROM. The value
+     would be undefined, the field would arrive empty, and the act would refuse
+     for want of a thing the screen was supposed to know. */
+  it("refuses a fill from the record on a screen with no subject", () => {
+    const acting = {
+      id: "one", route: "/one", label: "One", permission: "note:read",
+      body: {
+        shape: "detail", layout: { as: "stack" },
+        blocks: [{
+          block: "NoteRow",
+          does: [{ op: stub.id, fills: { note: "record" } }],
+          bind: { children: { from: { of: "words", says: "One" } } },
+        }],
+      },
+    };
+    expect(whyOf(app({ screens: [acting] as never }))).toContain("fill_without_a_subject");
+  });
+
   it("refuses a failure code no catalogue has", () => {
     const broken = app({ operations: [{ ...stub, fails: ["app.imagined"] } as AnyOperation] });
     expect(whyOf(broken)).toContain("which no catalogue has");

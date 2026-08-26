@@ -80,9 +80,16 @@ const DIST = join(dirname(fileURLToPath(import.meta.url)), "..", "dist");
    throws and every door answers 503 — the sharpest failure the kernel can refuse
    at composition, found by naming a test fixture's reference `from`. The list is
    one space-separated string rather than sixty quoted ones, which is worth 109
-   bytes of the cost; the rest is the words themselves and it buys an outage. */
+   bytes of the cost; the rest is the words themselves and it buys an outage.
+
+   ⚠️ AND 603 FOR WHAT THE SCREEN FILLS IN — `Fill`, `ActSpec`, `opOf` and
+   `fillsIn`. Without them the first form a declared screen draws asks somebody
+   to type the id of the thing they opened: every write in a real product takes
+   its subject and the day, and both are facts the screen is standing on. The
+   FORM is still not in this number — `Doing` is reached through `Declared`,
+   which is lazy — so what is here is the reading of the declaration alone. */
 const CEILING = {
-  js: { raw: 1_106_500, gzip: 330_000 },
+  js: { raw: 1_107_150, gzip: 330_000 },
   css: { raw: 470_000, gzip: 50_000 },
 };
 

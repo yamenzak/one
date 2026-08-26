@@ -191,6 +191,43 @@ describe("a screen is handed its record and its views together", () => {
     expect(Object.keys(got.acts["shelf.rename"]?.input ?? {})).toEqual(["name"]);
   });
 
+  /*
+    ⚠️ AND WHAT THE SCREEN FILLS IN TRAVELS WITH IT. Without this the first form
+    a declared screen draws asks somebody to type the id of the thing they
+    opened — the browser has no way to know which of an operation's inputs are
+    questions and which are facts the screen is standing on.
+  */
+  it("sends what the screen fills in beside what it asks for", async () => {
+    const acting: ScreenSpec = {
+      ...place,
+      id: "filling",
+      body: {
+        ...place.body!,
+        blocks: [{
+          ...place.body!.blocks[0]!,
+          does: [{ op: "shelf.rename", fills: { name: "record" } }],
+        }],
+      },
+    } as unknown as ScreenSpec;
+    const got = await drawnFor(shard(), APP, acting, TENANT, all, cold);
+    if ("needs" in got) throw new Error(got.needs);
+    expect(got.acts["shelf.rename"]?.fills).toEqual({ name: "record" });
+  });
+
+  it("fills in nothing for an act declared as a bare id", async () => {
+    const acting: ScreenSpec = {
+      ...place,
+      id: "acting",
+      body: {
+        ...place.body!,
+        blocks: [{ ...place.body!.blocks[0]!, does: ["shelf.rename"] }],
+      },
+    } as unknown as ScreenSpec;
+    const got = await drawnFor(shard(), APP, acting, TENANT, all, cold);
+    if ("needs" in got) throw new Error(got.needs);
+    expect(got.acts["shelf.rename"]?.fills).toEqual({});
+  });
+
   it("sends no acts at all for a body that offers none", async () => {
     const got = await drawnFor(shard(), APP, place, TENANT, all, cold);
     if ("needs" in got) throw new Error(got.needs);

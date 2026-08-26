@@ -30,7 +30,7 @@ const INVENTORY = inventory();
 import { hazardsIn, signalIn } from "../hazard.js";
 import { coverage, stuttering } from "../count.js";
 import { Count, type Change, type Counted, type Uncovered } from "./Count.js";
-import { Item, SAID, type Kept } from "./Item.js";
+import { SAID, type Kept } from "./Item.js";
 import { Kit, KIT_SAID, type Member, type Missing } from "./Kit.js";
 import { Receive, keyOf, type Noted } from "./Receive.js";
 import { Ask, type Answer } from "./Ask.js";
@@ -1260,112 +1260,18 @@ const COUNT = (api: Door) => function CountHere() {
   );
 };
 
-/**
- * ONE OBJECT — reachable by its row id or by the label printed on it.
- *
- * ⚠️ THE LABEL IS AN ADDRESS, WHICH IS WHY BOTH RESOLVE HERE. Somebody standing
- * in a store room has the code in their hand and nothing else; making the
- * scanner look up a row id first would put a round trip between the camera and
- * the screen it is supposed to open.
- */
-const ITEM = (api: Door) => function ItemHere({ go, at }: Mounted) {
-  const id = at[0] ?? "";
-  const today = dayHere();
-  const world = useWorld(api);
-  const items = useAsked<{ items: readonly Row[] }>(api, "unit.list");
-  const history = useAsked<{ items: readonly Row[] }>(api, "ledger.list");
-  /* ⚠️ THE STANDING IS THE OPERATION'S, NOT THIS FILE'S. How many days counts as
-     "soon" for a service is a setting a person on the floor cannot read, so a
-     container working it out here would hard-code a number or show everybody the
-     same wrong answer. */
-  const dated = useAsked<{ items: readonly Row[] }>(api, "unit.due",{ today });
-
-  const places = world.places.status === "ready" && world.stock.status === "ready"
-    ? placesOf(world.places.data.items, world.stock.data.items)
-    : [];
-  const named = new Map(places.map((p) => [p.id, p.name]));
-  const kinds = new Map(
-    world.kinds.status === "ready"
-      ? world.kinds.data.items.map((row) => [text(row.id), text(row.name)])
-      : [],
-  );
-  const standing = new Map(
-    dated.of.status === "ready"
-      ? dated.of.data.items.map((row) => [text(row.id), row])
-      : [],
-  );
-
-  const row = items.of.status === "ready"
-    ? items.of.data.items.find((r) => text(r.id) === id || text(r.code) === id)
-    : undefined;
-
-  const of: Kept = row
-    ? {
-      id: text(row.id),
-      code: text(row.code),
-      name: kinds.get(text(row.product)) ?? "—",
-      product: text(row.product),
-      serial: text(row.serial),
-      life: lifeOf(row.life),
-      where: named.get(text(row.location)) ?? "",
-      holder: text(row.holder),
-      issued: text(row.issued),
-      due: text(row.due),
-      standing: text(standing.get(text(row.id))?.standing),
-      days: num(standing.get(text(row.id))?.days),
-      services: num(row.services),
-      retired: text(row.retired),
-      note: text(row.note),
-    }
-    : EMPTY_ITEM;
-
-  /* ⚠️ THE MOVEMENTS OF THIS OBJECT, WHICH THE LEDGER NAMES IN `against`. Every
-     act on an item moves the balance through the same chokepoint as a box of
-     gloves, so the history is one query and one vocabulary — see `stockMove`. */
-  const moves: Loaded<readonly Movement[]> = history.of.status === "ready"
-    ? ready(movesOf(
-      history.of.data.items.filter((r) => text(r.against) === of.id), places))
-    : history.of;
-
-  const after = () => { items.again(); history.again(); dated.again(); world.again(); };
-
-  return (
-    <Item
-      of={of}
-      history={moves}
-      again={after}
-      back={() => go(of.product ? `/thing/${of.product}` : "/")}
-      onIssue={(holder) => {
-        void api.post("unit.issue", { unit: of.id, holder, day: today })
-          .then((got) => { if (got.ok) after(); });
-      }}
-      onReturn={() => {
-        void api.post("unit.return", { unit: of.id, day: today })
-          .then((got) => { if (got.ok) after(); });
-      }}
-      onServe={({ next, note }) => {
-        void api.post("unit.serve", {
-          unit: of.id, day: today, ...(next ? { next } : {}), ...(note ? { note } : {}),
-        }).then((got) => { if (got.ok) after(); });
-      }}
-      onRetire={(reason) => {
-        void api.post("unit.retire", { unit: of.id, day: today, reason })
-          .then((got) => { if (got.ok) after(); });
-      }}
-    />
-  );
-};
+/*
+  ⚠️ THE ITEM SCREEN IS A DECLARATION NOW — see `unit` in `../index.ts`. What
+  stood here fetched three lists, resolved a label to a row, worked out a
+  standing and wired four operations into four trays; the manifest says the
+  same screen in blocks, and `AppSurface` draws a declared body ahead of any
+  mount. `Item.tsx` itself stays: it is what the sample world draws, and it is
+  where `SAID` lives.
+*/
 
 const LIVES: readonly Kept["life"][] = ["held", "issued", "retired"];
 const lifeOf = (v: unknown): Kept["life"] =>
   LIVES.includes(v as Kept["life"]) ? (v as Kept["life"]) : "held";
-
-/** ⚠️ What the screen draws while its subject is arriving — see `EMPTY_LINE`. */
-const EMPTY_ITEM: Kept = {
-  id: "", code: "", name: "", product: "", serial: "", life: "held",
-  where: "", holder: "", issued: "", due: "", standing: "", days: 0,
-  services: 0, retired: "", note: "",
-};
 
 /**
  * ONE KIT — and the check is the server's, not this file's.
@@ -2564,7 +2470,6 @@ export function mount({ register, api }: Mounting): void {
     ["/work", WORK(api)],
     ["/run", RUN(api)],
     ["/case", CASE(api)],
-    ["/item", ITEM(api)],
     ["/kit", KIT(api)],
     ["/due", DUE(api)],
     ["/labels", LABELS(api)],

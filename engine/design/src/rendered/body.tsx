@@ -31,7 +31,7 @@ import * as React from "react";
 import type {
   Binding, BlockSpec, Format, GroupSpec, Layout, Placed, Presence, Read, SurfaceSpec, Viewed,
 } from "@engine/kernel";
-import { BLOCKS, isGroup } from "@engine/kernel";
+import { BLOCKS, isGroup, opOf } from "@engine/kernel";
 import { Arranged, spanning } from "../parts/arrange.js";
 import { Group } from "../parts/surfaces.js";
 import { Region, ready, type Loaded } from "../parts/state.js";
@@ -269,7 +269,10 @@ function Placed({ block, has }: { readonly block: BlockSpec; readonly has: Has }
      same thing, which is the shape `ActionRow` and the crown share. Handing all
      of them to one press would run several operations from one tap. */
   const act = block.does?.[0];
-  if (act && has.onDo) props["onPress"] = () => has.onDo?.(act);
+  /* ⚠️ EITHER FORM — see `ActSpec`. What the screen fills in travels with the
+     act to the door, not to the press, so the id is all this needs. */
+  const id = act === undefined ? undefined : opOf(act);
+  if (id && has.onDo) props["onPress"] = () => has.onDo?.(id);
 
   return (
     <Region

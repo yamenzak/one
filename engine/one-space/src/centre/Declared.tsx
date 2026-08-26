@@ -28,7 +28,9 @@ import { Body, type Has } from "@engine/design/body";
    runtime is the worker's and importing it here would put a D1 client in a
    browser bundle — so what both ends need is declared once, in the layer both
    are allowed to reach. */
-import { SCREEN_PATH, viewsIn, type Fields, type ScreenSpec, type Viewed } from "@engine/kernel";
+import {
+  SCREEN_PATH, viewsIn, type Fields, type Fill, type ScreenSpec, type Viewed,
+} from "@engine/kernel";
 import { api, forget } from "../api.js";
 import { useLoad } from "./data.js";
 
@@ -37,8 +39,23 @@ interface Drawn {
   readonly record: Readonly<Record<string, unknown>> | null;
   readonly views: Readonly<Record<string, Viewed>>;
   /** ⚠️ The acts this body offers, with their input — see `Drawn.acts`. */
-  readonly acts: Readonly<Record<string, { summary: string; input: Fields }>>;
+  readonly acts: Readonly<Record<string, {
+    summary: string; input: Fields; fills?: Readonly<Record<string, Fill>>;
+  }>>;
 }
+
+/**
+ * ⚠️ THE DEVICE'S OWN CALENDAR DAY, AND IT IS READ HERE RATHER THAN SENT. A
+ * shelf life is counted where the shelf is: the worker has no way to know what
+ * day it is where somebody is standing, and its own calendar would call a box
+ * expired the evening before it is — or, west of Greenwich, current for a few
+ * more hours after it is not.
+ */
+const today = (): string => {
+  const at = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}`;
+};
 
 /**
  * ⚠️ AN ABSENT VIEW IS EMPTY, NOT MISSING. The door runs only the views a body
@@ -109,12 +126,34 @@ export function Declared({ screen, at, go, currency }: {
     reaching here means a manifest that never composed.
   */
   const acts = got.of.status === "ready" ? got.of.data.acts : {};
+
+  /**
+   * ⚠️ WHAT THE SCREEN SUPPLIES, RESOLVED ONCE PER ACT — see `Fill`. The person
+   * is never asked for either of these: the record is the thing they opened, and
+   * the day is the one they are standing in. Filling them at the seam rather
+   * than inside the form is what makes `asks` able to say "nothing left to ask"
+   * and run the act on the press.
+   */
+  const filled = React.useCallback((id: string): Record<string, unknown> => {
+    const out: Record<string, unknown> = {};
+    for (const [name, from] of Object.entries(acts[id]?.fills ?? {})) {
+      /* ⚠️ A FILL WITH NOTHING BEHIND IT IS LEFT OUT RATHER THAN SENT EMPTY. A
+         detail screen whose address has not resolved has no record, and an empty
+         string in a required field is a refusal that says the field is missing
+         when the truth is that the screen is not ready. */
+      if (from === "record" && record) out[name] = record;
+      if (from === "today") out[name] = today();
+    }
+    return out;
+  }, [acts, record]);
+
   const onDo = React.useCallback((id: string) => {
     const spec = acts[id];
     if (!spec) return;
-    if (asks(spec.input)) { setAsking(id); return; }
-    void run(id, {});
-  }, [acts, run]);
+    const already = filled(id);
+    if (asks(spec.input, already)) { setAsking(id); return; }
+    void run(id, already);
+  }, [acts, filled, run]);
 
   const has: Has = React.useMemo(() => ({
     ...(got.of.status === "ready" && got.of.data.record
@@ -135,9 +174,13 @@ export function Declared({ screen, at, go, currency }: {
           id={asking}
           summary={acts[asking]!.summary}
           input={acts[asking]!.input}
+          fills={filled(asking)}
           open
           onOpen={(next: boolean) => { if (!next) setAsking(null); }}
-          run={(input: Record<string, unknown>) => run(asking, input)}
+          /* ⚠️ THE FILLS LAST, so a field the screen supplies cannot be
+             overwritten by a draft — `Doing` does not draw them, and a stale key
+             left in the draft from an earlier open would otherwise win. */
+          run={(input: Record<string, unknown>) => run(asking, { ...input, ...filled(asking) })}
         />
       ) : null}
     </>

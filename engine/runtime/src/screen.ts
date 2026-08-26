@@ -22,9 +22,9 @@
  * nothing — it is the same answer as a record with empty columns.
  */
 
-import type { AppSpec, Fields, Reach, ScreenSpec } from "@engine/kernel";
+import type { AppSpec, Fields, Fill, Reach, ScreenSpec } from "@engine/kernel";
 import {
-  SCREEN_PATH, actsIn, columnsIn, fieldsIn, permissionFor, reachFor, viewsIn,
+  SCREEN_PATH, actsIn, columnsIn, fieldsIn, fillsIn, permissionFor, reachFor, viewsIn,
 } from "@engine/kernel";
 import { joinRows } from "./joined.js";
 import { readOne } from "./records.js";
@@ -56,6 +56,12 @@ export interface Drawn {
 export interface Act {
   readonly summary: string;
   readonly input: Fields;
+  /**
+   * ⚠️ WHAT THE SCREEN SUPPLIES RATHER THAN ASKS FOR — see `Fill`. Without it the
+   * first form a declared screen draws asks somebody to type the id of the thing
+   * they are standing on.
+   */
+  readonly fills: Readonly<Record<string, Fill>>;
 }
 
 /** ⚠️ Refused rather than empty — see `Refused`. */
@@ -195,9 +201,10 @@ export async function drawnFor(
      rather than sent as a stub — `refuseSurface` refuses one at composition, so
      an unknown here is a manifest that never composed. */
   const acts: Record<string, Act> = {};
+  const fills = screen.body ? fillsIn(screen.body) : {};
   for (const id of screen.body ? actsIn(screen.body) : []) {
     const spec = (app.operations ?? []).find((o) => o.id === id);
-    if (spec) acts[id] = { summary: spec.summary, input: spec.input };
+    if (spec) acts[id] = { summary: spec.summary, input: spec.input, fills: fills[id] ?? {} };
   }
 
   return { record: held ?? null, views, acts };

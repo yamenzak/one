@@ -6003,6 +6003,16 @@ const manifest = (): AppSpec => defineApp({
        a quantity, and this is where they are. */
     { id: "units-here", of: "unit", where: [{ field: "product", is: { here: "record" } }],
       limit: 200 },
+    /*
+      ⚠️ WHAT HAPPENED TO ONE OBJECT, WHICH THE LEDGER NAMES IN `against`. Every
+      act on an item moves the balance through the same chokepoint as a box of
+      gloves — see `stockMove` — so the history of a drill and the history of a
+      shelf of gloves are one query and one vocabulary. Reading `moves-here`
+      instead would answer with every movement of that PRODUCT, which on an
+      itemised line is every other object of the same kind.
+    */
+    { id: "moves-for-item", of: "ledger", where: [{ field: "against", is: { here: "record" } }],
+      limit: 50 },
   ],
 
   /*
@@ -6433,8 +6443,144 @@ const manifest = (): AppSpec => defineApp({
        the point of it — where it has been, who had it, when it was serviced —
        and a life somebody has to hold a sheet open to read is a life nobody
        reads. */
+    /*
+      ⚠️ THE FIRST DECLARED SCREEN THAT ACTS RATHER THAN ONLY READS, and the two
+      things that made it possible are both about what the screen already knows.
+      It reaches through its own subject — `product.name` off a unit — so the
+      heading rows say what the object IS rather than which id it points at; and
+      every act `fills` the item and the day, so nobody is asked to type either.
+      An item screen that asked for both would be four buttons that each open a
+      form whose first two fields are a row id and today's date.
+
+      ⚠️ AND THE ACTS ARE OFFERED BY STANDING. A held object wants giving out and
+      an issued one wants taking back; drawing both would put the wrong one under
+      the thumb half the time, and a retired object wants neither. The door
+      refuses the wrong one anyway (`inventory.wrongLife`) — this is so the
+      screen never draws a control that can only argue.
+    */
     { id: "unit", route: "/item", label: "An item", nav: "none", icon: "tag",
-      permission: "stock:read" },
+      permission: "stock:read", of: "unit",
+      body: {
+        shape: "detail",
+        layout: { as: "stack" },
+        blocks: [
+          /* ⚠️ OURS, AND COPYABLE, because somebody reads it off a screen and
+             types it into a label printer. */
+          { block: "CopyRow",
+            when: { has: { of: "field", field: "code" } },
+            bind: {
+              label: { from: { of: "words", says: "Label" } },
+              value: { from: { of: "field", field: "code" } },
+            } },
+          { block: "FieldRow",
+            bind: {
+              label: { from: { of: "words", says: "What it is" } },
+              value: { from: { of: "field", field: "product.name" } },
+            } },
+          /* ⚠️ THE MAKER'S, WHICH IS WHAT A WARRANTY CLAIM AND A RECALL NAME. */
+          { block: "FieldRow",
+            when: { has: { of: "field", field: "serial" } },
+            bind: {
+              label: { from: { of: "words", says: "Serial" } },
+              value: { from: { of: "field", field: "serial" } },
+            } },
+          { block: "FieldRow",
+            bind: {
+              label: { from: { of: "words", says: "Standing" } },
+              value: { from: { of: "field", field: "life" } },
+            } },
+          { block: "FieldRow",
+            when: { has: { of: "field", field: "location" } },
+            bind: {
+              label: { from: { of: "words", says: "Where" } },
+              value: { from: { of: "field", field: "location.name" } },
+            } },
+          /* ⚠️ ONLY WHILE IT IS OUT. "With —" on a thing on the shelf is a blank
+             where a name belongs, which reads as a name that failed to load. */
+          { block: "FieldRow",
+            when: { has: { of: "field", field: "holder" } },
+            bind: {
+              label: { from: { of: "words", says: "With" } },
+              value: { from: { of: "field", field: "holder" } },
+            } },
+          { block: "FieldRow",
+            when: { has: { of: "field", field: "issued" } },
+            bind: {
+              label: { from: { of: "words", says: "Out since" } },
+              value: { from: { of: "field", field: "issued" }, as: "when" },
+            } },
+          { block: "FieldRow",
+            when: { has: { of: "field", field: "due" } },
+            bind: {
+              label: { from: { of: "words", says: "Next service" } },
+              value: { from: { of: "field", field: "due" }, as: "when" },
+            } },
+          { block: "AmountRow",
+            bind: {
+              label: { from: { of: "words", says: "Services" } },
+              amount: { from: { of: "field", field: "services" }, as: "num" },
+            } },
+          { block: "NoteRow",
+            when: { has: { of: "field", field: "note" } },
+            bind: { children: { from: { of: "field", field: "note" } } } },
+          {
+            group: "What can be done",
+            of: [
+              { block: "ActionRow",
+                when: { is: { of: "field", field: "life" }, one: ["held"] },
+                does: [{ op: "unit.issue", fills: { unit: "record", day: "today" } }],
+                bind: {
+                  label: { from: { of: "words", says: "Give it to somebody" } },
+                  under: { from: { of: "words", says: "It keeps its shelf while it is out" } },
+                } },
+              { block: "ActionRow",
+                when: { is: { of: "field", field: "life" }, one: ["issued"] },
+                /* ⚠️ NOTHING LEFT TO ASK, SO IT RUNS ON THE PRESS — see `asks`.
+                   Taking a thing back is the item and the day and no third
+                   question, and a sheet holding one button to confirm a press
+                   somebody already made is a second press for nothing. */
+                does: [{ op: "unit.return", fills: { unit: "record", day: "today" } }],
+                bind: {
+                  label: { from: { of: "words", says: "Take it back" } },
+                  under: { from: { of: "words", says: "Back on its own shelf" } },
+                } },
+              { block: "ActionRow",
+                when: { not: { is: { of: "field", field: "life" }, one: ["retired"] } },
+                does: [{ op: "unit.serve", fills: { unit: "record", day: "today" } }],
+                bind: {
+                  label: { from: { of: "words", says: "Record a service" } },
+                  under: { from: { of: "words", says: "And when the next one is due" } },
+                } },
+              { block: "ActionRow",
+                when: { not: { is: { of: "field", field: "life" }, one: ["retired"] } },
+                does: [{ op: "unit.retire", fills: { unit: "record", day: "today" } }],
+                bind: {
+                  label: { from: { of: "words", says: "Take it out of service" } },
+                  under: { from: { of: "words", says: "For good, with the reason kept" } },
+                } },
+            ],
+          },
+          {
+            group: "What has happened to it",
+            of: [{
+              block: "Listing",
+              shows: [
+                { field: "day", label: "When" },
+                { field: "move", label: "What" },
+                { field: "reason", label: "Why" },
+              ],
+              nothing: {
+                says: "Nothing has happened to it yet",
+                under: "Give it out or record a service and it appears here",
+              },
+              bind: {
+                label: { from: { of: "words", says: "What has happened to it" } },
+                of: { from: { of: "view", view: "moves-for-item" } },
+              },
+            }],
+          },
+        ],
+      } },
     { id: "kit", route: "/kit", label: "A kit", nav: "none", icon: "layers",
       permission: "stock:read", of: "kit",
       body: {

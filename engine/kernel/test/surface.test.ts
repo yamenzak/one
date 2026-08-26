@@ -17,8 +17,8 @@ import { describe, expect, it } from "vitest";
 import { collection } from "../src/collection.js";
 import { field } from "../src/field.js";
 import {
-  CELLS_MOST, blocksIn, fieldsIn, refuseSurface, refuseView, unreadViews,
-  viewsIn, type BlockIndex, type SurfaceSpec, type ViewSpec,
+  CELLS_MOST, actsIn, blocksIn, fieldsIn, fillsIn, refuseSurface, refuseView, unreadViews,
+  viewsIn, type ActSpec, type BlockIndex, type SurfaceSpec, type ViewSpec,
 } from "../src/surface.js";
 import { BLOCKS } from "../src/blocks.js";
 
@@ -759,5 +759,60 @@ describe("a block is registered, complete, and offers what exists", () => {
         }],
       }),
     }))).toEqual([]);
+  });
+});
+
+/* ------------------------------------------- what the screen fills in --- */
+
+/**
+ * ⚠️ WITHOUT THIS EVERY DECLARED SCREEN'S FIRST BUTTON ASKS FOR AN ID. Every
+ * write in OneInventory takes the thing it acts on and the day it happened, and
+ * a form drawn from `input` alone puts both in front of somebody who opened the
+ * item and is pressing the button today.
+ */
+describe("an act says what the screen already knows", () => {
+  const offering = (does: readonly (string | ActSpec)[]) => screen({
+    body: body({
+      blocks: [{
+        block: "Heading",
+        does,
+        bind: { says: { from: { of: "words", says: "Note" } } },
+      }],
+    }),
+  });
+
+  it("takes the operation's id out of either form", () => {
+    expect(actsIn(body({
+      blocks: [
+        { block: "Heading", does: ["note.publish"], bind: { says: { from: { of: "words", says: "A" } } } },
+        { block: "Heading", does: [{ op: "note.archive" }], bind: { says: { from: { of: "words", says: "B" } } } },
+      ],
+    }))).toEqual(["note.publish", "note.archive"]);
+  });
+
+  /* ⚠️ THE BARE STRING STAYS LEGAL, because most acts take nothing or take only
+     what a person types. The object form is for the rest. */
+  it("reads no fills off the bare string", () => {
+    expect(fillsIn(body({
+      blocks: [{ block: "Heading", does: ["note.publish"], bind: { says: { from: { of: "words", says: "A" } } } }],
+    }))).toEqual({});
+  });
+
+  it("reads the fills off the object form, by operation", () => {
+    expect(fillsIn(body({
+      blocks: [{
+        block: "Heading",
+        does: [{ op: "note.publish", fills: { note: "record", day: "today" } }],
+        bind: { says: { from: { of: "words", says: "A" } } },
+      }],
+    }))).toEqual({ "note.publish": { note: "record", day: "today" } });
+  });
+
+  it("still refuses an operation the app does not declare in the object form", () => {
+    expect(why(offering([{ op: "note.vanish" }]))).toContain("operation_unknown");
+  });
+
+  it("accepts the object form of one it does", () => {
+    expect(why(offering([{ op: "note.publish", fills: { note: "record" } }]))).toEqual([]);
   });
 });

@@ -344,6 +344,43 @@ export type Layout =
  * already checks, the permission gate already reads, and the agent surface
  * already exposes. What happens when it succeeds is the operation's business.
  */
+/**
+ * WHERE A VALUE THE PERSON IS NOT ASKED FOR COMES FROM — and there are two.
+ *
+ * ⚠️ `record` IS THE THING THE SCREEN IS ABOUT and `today` IS THE DEVICE'S OWN
+ * CALENDAR DAY. Both are facts the screen is standing on, and both appear in the
+ * input of nearly every write this product has: `unit.issue` takes the item and
+ * the day, `batch.open` takes the batch and the day, `stock.move` takes four
+ * things of which two are already known.
+ *
+ * ⚠️ AND THERE IS NO `me`, DELIBERATELY. An operation that needs to know who is
+ * acting reads the session — a value the browser supplied would be the caller
+ * naming somebody else, which is the one thing an identity must never be taken
+ * from. The absence is the security property, not an omission.
+ *
+ * ⚠️ `today` IS THE DEVICE'S DAY BECAUSE A SHELF LIFE IS COUNTED WHERE THE SHELF
+ * IS. The server has no way to know what day it is where somebody is standing,
+ * and its own calendar would call a box expired the evening before it is — or,
+ * west of Greenwich, current for a few hours after it is not.
+ */
+export type Fill = "record" | "today";
+
+/**
+ * AN ACT A BLOCK OFFERS, AND WHAT THE SCREEN FILLS IN FOR IT.
+ *
+ * ⚠️ THE BARE STRING IS STILL THE COMMON CASE and stays legal, because most acts
+ * take nothing or take only what a person types. This form exists for the ones
+ * whose input names something the screen already knows.
+ */
+export interface ActSpec {
+  readonly op: string;
+  /** ⚠️ Field name → where its value comes from. Never drawn, never asked. */
+  readonly fills?: Readonly<Record<string, Fill>>;
+}
+
+/** ⚠️ One reading of the two forms, so no caller writes the ternary twice. */
+export const opOf = (one: string | ActSpec): string => (typeof one === "string" ? one : one.op);
+
 export interface BlockSpec {
   /** ⚠️ A registered component — see `BlockEntry`. */
   readonly block: string;
@@ -351,7 +388,7 @@ export interface BlockSpec {
   readonly span?: Span;
   readonly when?: Presence;
   readonly bind?: Readonly<Record<string, Binding>>;
-  readonly does?: readonly string[];
+  readonly does?: readonly (string | ActSpec)[];
   /**
    * ⚠️ WHERE A ROW LEADS, AS A SCREEN'S ID RATHER THAN A PATH. `does` names
    * operations and could not express "open the shelf this row is about" — which
@@ -598,7 +635,42 @@ export const viewsIn = (body: SurfaceSpec): readonly string[] =>
 export const actsIn = (body: SurfaceSpec): readonly string[] => {
   const out: string[] = [];
   for (const { block } of blocksIn(body)) {
-    for (const id of block.does ?? []) if (!out.includes(id)) out.push(id);
+    for (const one of block.does ?? []) {
+      const id = opOf(one);
+      if (!out.includes(id)) out.push(id);
+    }
+  }
+  return out;
+};
+
+/**
+ * WHAT THE SCREEN ALREADY KNOWS, PER OPERATION — the fields a form must not ask.
+ *
+ * ⚠️ WITHOUT IT EVERY DECLARED SCREEN'S FIRST BUTTON ASKS FOR AN ID. Measured
+ * across OneInventory: every write takes the thing it acts on and the day it
+ * happened, both of which the screen is standing on — so a form drawn from
+ * `input` alone puts "Item" and "On" in front of somebody who opened the item
+ * and is pressing the button today. They would have to copy a row id off a URL.
+ *
+ * ⚠️ AND IT IS ON THE BLOCK RATHER THAN ON THE OPERATION, because it is a fact
+ * about where the button is. `unit.issue` is the same operation from a detail
+ * screen (which knows the item) and from a list (which does not); an operation
+ * declaring its own fills would be an operation that knows which screen called
+ * it.
+ *
+ * ⚠️ LAST BLOCK WINS, and it is not a case worth designing around: two blocks on
+ * one screen offering the same act with different fills is a screen with two
+ * different buttons for one thing, which `refuseSurface` has no way to call
+ * wrong and no reader would write on purpose.
+ */
+export const fillsIn = (
+  body: SurfaceSpec,
+): Readonly<Record<string, Readonly<Record<string, Fill>>>> => {
+  const out: Record<string, Readonly<Record<string, Fill>>> = {};
+  for (const { block } of blocksIn(body)) {
+    for (const one of block.does ?? []) {
+      if (typeof one !== "string" && one.fills) out[one.op] = one.fills;
+    }
   }
   return out;
 };
@@ -1001,7 +1073,8 @@ export function refuseSurface(
     }
 
 
-    for (const op of b.does ?? []) {
+    for (const one of b.does ?? []) {
+      const op = opOf(one);
       if (!operations.includes(op)) {
         at("operation_unknown", `${where} offers "${op}", which is not an operation this app declares`);
       }
