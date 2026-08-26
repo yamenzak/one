@@ -5295,6 +5295,147 @@ const doImport = operation<
   },
 });
 
+/* -------------------------------------------------------------- the shelf --- */
+
+/**
+ * WHAT IS ON THE SHELVES — the stock list, narrowed to a place and everything
+ * under it.
+ *
+ * ⚠️ "AT OR BELOW THIS PLACE" IS NOT A FILTER A VIEW CAN SAY, and that is the
+ * whole reason this exists. A `Match` is equality and presence over one row's
+ * own columns; a location tree is a transitive closure over a self-reference,
+ * and there is no `where` clause that could express it. Inventing one would put
+ * a graph walk in every manifest in the deployment (D92).
+ *
+ * ⚠️ AND A ROW ARRIVES FLATTENED RATHER THAN AS THREE IDS. The name, the shelf's
+ * name and the unit come from `product` and `location`, and a browser resolving
+ * them is a browser joining three collections it may only hold a page of — which
+ * is what the hand-written screen did, and why a product that had scrolled off
+ * the first page of the catalogue drew "—" on its own stock line.
+ *
+ * ⚠️ THE SHELF IS SORTED BY NAME AND NOT BY WHAT MOVED LAST. This is the list
+ * somebody reads down looking for one thing; newest-first is right for a history
+ * and wrong for a shelf, where the order changing under a reader between two
+ * visits is the whole complaint.
+ */
+interface Shelved {
+  id: string; product: string; name: string;
+  quantity: number; unit: string; amount: string;
+  where: string; says: string;
+}
+
+/**
+ * ⚠️ "LAST SEEN" IS THE APP ADMITTING A NUMBER MAY BE FICTION, and it is only
+ * said when it is worth saying. Four months is a line nobody has touched since
+ * the spring; four minutes is noise on every row of the list. Hiding staleness
+ * is how people stop believing a system, and saying it everywhere is how they
+ * stop reading it.
+ */
+const STALE_MS = 60 * 86_400_000;
+
+/**
+ * ⚠️ THE SAME CEILING A VIEW HAS, AND IT SAYS SO — see `AskedSpec.total`. A
+ * shelf list is a screen's block rather than an export, and a workspace with
+ * nine thousand lines must not send nine thousand rows to a phone. What makes
+ * the bound honest rather than a silent truncation is `total`: the list says
+ * "200 of 9,140" instead of claiming the workspace has two hundred.
+ */
+const SHELF_MOST = 200;
+
+const shelf = operation<
+  { where?: string }, { items: readonly Shelved[]; total: number }
+>({
+  id: "stock.lines",
+  kind: "read",
+  summary: "What is on the shelves, and how many",
+  input: {
+    /* ⚠️ OPTIONAL, BECAUSE THE WHOLE WORKSPACE IS THE ANSWER SOMEBODY OPENS ON.
+       A required place would make the first thing this screen asks "which one of
+       your four hundred shelves", which is a question nobody has an answer to
+       before they have seen the list. */
+    where: field.ref({ label: "Where", holds: "none", to: "location" }),
+  },
+  output: {
+    items: field.json({ label: "The lines", holds: "none" }),
+    total: field.number({ label: "How many there are", holds: "none" }),
+  },
+  permission: "stock:read",
+  idempotency: { mode: "none" },
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const db = c.db as Db;
+
+    /* ⚠️ NARROWED ON `id`, NOT ON `location` — a place IS the thing a narrowed
+       member is confined to, so the column that carries it is its own. */
+    const places = await db.prepare(
+      `SELECT id, name, within FROM location WHERE tenant_id = ?${only(c, "id").sql}`)
+      .bind(c.tenantId, ...only(c, "id").bound)
+      .all<{ id: string; name: string; within: string | null }>();
+    const named = new Map(places.results.map((row) => [String(row.id), String(row.name)]));
+
+    /* ⚠️ THE CLOSURE, WALKED ONCE RATHER THAN QUERIED PER LEVEL. A workspace has
+       hundreds of places and a recursive query per row is the fan-out this
+       repository keeps a guard for; one pass per level over a list already in
+       memory is bounded by the depth of the tree. */
+    const held = new Set<string>();
+    if (input.where) {
+      held.add(input.where);
+      for (let pass = 0; pass < places.results.length; pass++) {
+        for (const row of places.results) {
+          if (row.within && held.has(String(row.within))) held.add(String(row.id));
+        }
+      }
+    }
+
+    const rows = await db.prepare(
+      `SELECT id, product, location, quantity, seen, at FROM stock
+        WHERE tenant_id = ?${only(c).sql}`)
+      .bind(c.tenantId, ...only(c).bound)
+      .all<{
+        id: string; product: string; location: string;
+        quantity: number; seen: string | null; at: string;
+      }>();
+
+    const kinds = await db.prepare(
+      `SELECT id, name, unit FROM product WHERE tenant_id = ?`)
+      .bind(c.tenantId).all<{ id: string; name: string; unit: string | null }>();
+    const kind = new Map(kinds.results.map((row) => [String(row.id), row]));
+
+    const now = Date.parse(c.now);
+    const items = rows.results
+      .filter((row) => !input.where || held.has(String(row.location)))
+      .map((row): Shelved => {
+        const of = kind.get(String(row.product));
+        const unit = String(of?.unit ?? "") || "item";
+        const seen = String(row.seen ?? row.at ?? "");
+        return {
+          id: String(row.id),
+          product: String(row.product),
+          /* ⚠️ A LINE WHOSE PRODUCT IS MISSING IS STILL A LINE. It should not
+             happen; if it does, "—" beside a real number is honest, and dropping
+             the row silently changes a total nobody can then explain. */
+          name: String(of?.name ?? "—"),
+          quantity: Number(row.quantity),
+          unit,
+          amount: `${Number(row.quantity)} ${unit}`,
+          where: String(row.location),
+          /* ⚠️ WHERE IT IS, AND WHETHER TO BELIEVE IT. Two facts on one line
+             because a stock row has one second line — and both are about
+             trusting the number rather than about the product. */
+          says: [
+            named.get(String(row.location)) ?? "—",
+            seen && Number.isFinite(now) && now - Date.parse(seen) > STALE_MS
+              ? "not seen in a while"
+              : null,
+          ].filter(Boolean).join(" · "),
+        };
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    return { items: items.slice(0, SHELF_MOST), total: items.length };
+  },
+});
+
 /* ------------------------------------------------------------ the reports --- */
 
 /**
@@ -6039,7 +6180,7 @@ const manifest = (): AppSpec => defineApp({
     identify, readLabel, seeProduct, readNote, askInWords,
     openRun, loadRun, endRun, releaseRun, failRun, recallRun, liftHold, lateResult,
     openJob, closeJob, traceJob,
-    labelPlaces, labelThings, report, seeImport, doImport,
+    labelPlaces, labelThings, shelf, report, seeImport, doImport,
   ],
 
   /*
@@ -6139,6 +6280,17 @@ const manifest = (): AppSpec => defineApp({
       movements. A person who may see a balance has not necessarily been given
       the record of how it got there.
     */
+    /*
+      ⚠️ THE SHELF, NARROWED TO A PLACE AND EVERYTHING UNDER IT — see
+      `stock.lines`. It is an asked view rather than a query because "at or below
+      this location" is a transitive closure over a self-reference and a `Match`
+      is equality and presence. The whole workspace is what it opens on, so the
+      pick carries `any`.
+    */
+    { id: "shelf", of: "stock",
+      asked: { operation: "stock.lines", take: "items", total: "total",
+        fills: { where: { picked: "where" } } } },
+
     { id: "report-told", of: "ledger",
       asked: { operation: "stock.report", take: "told",
         fills: { today: "today", span: { picked: "span" } } } },
@@ -6184,7 +6336,83 @@ const manifest = (): AppSpec => defineApp({
     { id: "home", route: "/", label: "Home", nav: "primary", icon: "home",
       permission: "stock:read", sky: "neon" },
     { id: "stock", route: "/stock", label: "Stock", nav: "primary", icon: "box",
-      permission: "stock:read" },
+      permission: "stock:read",
+      /*
+        ⚠️ THE ONE QUESTION THIS SCREEN ANSWERS IS "HAVE WE GOT ANY". Everything
+        else a stock list could show — the supplier, the cost, the batch, the
+        last delivery — belongs to the product's own screen, and putting any of
+        it on a row costs the number the width it needs to be read at arm's
+        length in a cold store.
+      */
+      body: {
+        shape: "list",
+        layout: { as: "stack" },
+        /*
+          ⚠️ THE PLACE IS A NARROWING, NOT A DESTINATION — see `PickSpec`, and
+          the tree it replaces. Descending used to be a control of its own with
+          a line count per branch; what it always MEANT is what the pick says,
+          and the closure it stands for is `stock.lines`'. The counts went with
+          the tree and are the one thing lost — they were a tally the pick has
+          nowhere to carry.
+
+          ⚠️ AND `any` IS WHAT MAKES IT ESCAPABLE. A stock list opens on the
+          whole workspace and a place is how somebody narrows it; a control with
+          no way back is a trap on the screen people spend the most time on.
+        */
+        picks: [{ id: "where", label: "Where", of: "location", any: "Everywhere" }],
+        blocks: [
+          {
+            block: "Listing",
+            /*
+              ⚠️ THE FIGURE IS THE ROW'S SUBJECT AND EVERYTHING ELSE IS THE
+              LABEL. The first three columns are the name, the second line and
+              the end of the row — which on a phone is exactly what a person
+              reads across — so the amount is last on purpose.
+            */
+            shows: [
+              { field: "name", label: "What it is" },
+              { field: "says", label: "Where" },
+              { field: "amount", label: "How many" },
+            ],
+            nothing: {
+              says: "Nothing counted yet",
+              under: "Scan something, receive a delivery, or bring a spreadsheet in",
+            },
+            /* ⚠️ THE PRODUCT, NEVER THE LINE — see `GoSpec`. A row here is one
+               product on one shelf and there is no screen for a line; the
+               product's is where all of its shelves are listed. */
+            goes: { to: "product", by: "product" },
+            bind: {
+              label: { from: { of: "words", says: "Stock" } },
+              of: { from: { of: "view", view: "shelf" } },
+            },
+          },
+          /*
+            ⚠️ THE TWO WAYS THIS LIST IS FILLED, UNDER THE LAST ROW. They sit
+            where somebody who has finished reading already is, rather than
+            competing with the numbers at the top — and both are destinations
+            rather than forms, because receiving is a session somebody stands
+            inside with a camera and an import is a spreadsheet.
+          */
+          {
+            group: null,
+            of: [
+              { block: "NavRow",
+                goes: "receive",
+                bind: {
+                  label: { from: { of: "words", says: "Add stock" } },
+                  under: { from: { of: "words", says: "Scan a delivery in, or key it" } },
+                } },
+              { block: "NavRow",
+                goes: "import",
+                bind: {
+                  label: { from: { of: "words", says: "Import a spreadsheet" } },
+                  under: { from: { of: "words", says: "Nobody types in eight hundred products" } },
+                } },
+            ],
+          },
+        ],
+      } },
     /* ⚠️ A PRIMARY DESTINATION, BECAUSE IT IS THE GESTURE THE PRODUCT IS FOR.
        Filed under Stock as a button it would be one press further away than
        typing, which is the whole thing scanning exists to beat.

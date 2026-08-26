@@ -35,7 +35,6 @@ import { Receive, keyOf, type Noted } from "./Receive.js";
 import { Ask, type Answer } from "./Ask.js";
 import type { Movement } from "./Thing.js";
 import { Scan, type Guess, type Seen } from "./Scan.js";
-import { Stock } from "./Stock.js";
 import { Home, type Moving, type Needs, type Shelf } from "./Home.js";
 import { Labels, type Labelled, type Subject, type Template } from "./Labels.js";
 /* ⚠️ A JSON COLUMN IS WHATEVER IS IN THE COLUMN — see `packing.ts`. */
@@ -425,61 +424,6 @@ function both<A, B, C>(a: Loaded<A>, b: Loaded<B>, join: (a: A, b: B) => C): Loa
   if (a.status !== "ready" || b.status !== "ready") return waiting();
   return ready(join(a.data, b.data));
 }
-
-const STOCK = (api: Door) => function StockHere({ app, go }: Mounted) {
-  const world = useWorld(api);
-  /* ⚠️ WHAT THIS PERSON HOLDS COMES WITH THE PRODUCT, NOT FROM A SECOND
-     REQUEST — the centre already resolved it to draw the nav. Same narrowing
-     `START` does, for the same reason. */
-  const held = React.useMemo(
-    () => new Set((app as { readonly permissions?: readonly string[] }).permissions ?? []),
-    [app],
-  );
-  /* ⚠️ WHERE THE READER IS IN THE TREE, HELD HERE. It is not in the address on
-     purpose: narrowing a list is a filter rather than a destination, and putting
-     it in the path would make the back button undo a filter one step at a time
-     before it left the screen. */
-  const [here, setHere] = React.useState<string | null>(null);
-
-  const places = world.places.status === "ready" && world.stock.status === "ready"
-    ? placesOf(world.places.data.items, world.stock.data.items)
-    : [];
-
-  const reach = under(places, here);
-  const rows = both(world.stock, world.kinds, (stock, kinds) => {
-    const all = linesOf(stock.items, places, kinds.items, api.file);
-    return here ? all.filter((l) => reach.has(l.where)) : all;
-  });
-
-  return (
-    <Stock
-      title={nameOf("/stock")}
-      of={rows}
-      places={places}
-      here={here}
-      /* ⚠️ THE COLLECTION'S OWN COUNT, NOT THE PAGE'S. `rows.length` is what is
-         drawn; `lines` is what there is, and the gap between them is the whole
-         reason the screen can say so. */
-      total={world.lines}
-      /* ⚠️ AND NOT WHILE THE READER HAS NARROWED. The count and the cursor are
-         both about the unfiltered list; offering another page under a filter
-         would append rows the filter then hides. */
-      more={world.more && here === null}
-      onMore={world.onMore}
-      again={world.again}
-      onGo={setHere}
-      onOpen={(line) => go(`/thing/${line.id}`)}
-      /* ⚠️ RECEIVING IS STOCK'S OWN ACT, AND THIS IS THE ONE PLACE IT IS
-         OFFERED. It was `() => undefined` with a comment calling that honest;
-         it stopped being honest the moment `/receive` existed, and it was the
-         only thing standing between the screen and the session it names. */
-      onAdd={() => go("/receive")}
-      onImport={() => go("/import")}
-      held={held}
-    />
-  );
-};
-
 
 /**
  * ⚠️ WHAT A SCREEN DRAWS WHILE ITS SUBJECT IS STILL ARRIVING. `Thing` takes a
@@ -1685,7 +1629,6 @@ export function mount({ register, api }: Mounting): void {
   const declared = new Set((INVENTORY.screens ?? []).map((s) => s.route));
   const screens: readonly [string, React.ComponentType<Mounted>][] = [
     ["/", HOME(api)],
-    ["/stock", STOCK(api)],
     ["/scan", SCAN(api)],
     ["/register", REGISTER(api)],
     ["/receive", RECEIVE(api)],

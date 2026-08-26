@@ -955,6 +955,15 @@ export function refuseApp(spec: AppSpec): readonly Refusal[] {
         + `${Object.keys(op.output ?? {}).join(", ") || "nothing"} — the view would be empty `
         + "and the screen would say the workspace is");
     }
+    /* ⚠️ THE SAME CHECK FOR THE COUNT, because a `total` naming nothing falls
+       back to the page's own length — which is the exact wrong number this
+       field exists to stop a list from reporting. */
+    if (asked.total !== undefined && !(asked.total in (op.output ?? {}))) {
+      at(`view ${v.id}`,
+        `asked_take_unknown: counts by "${asked.total}", which ${op.id} does not answer — `
+        + "the list would fall back to the length of the page it was handed and "
+        + "report a bounded answer as the whole of it");
+    }
   }
   /*
     ⚠️ THE GENERATED ONES COUNT, AND LEAVING THEM OUT REFUSED THE ORDINARY CASE.

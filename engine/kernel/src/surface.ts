@@ -148,6 +148,22 @@ export interface AskedSpec {
    * which is the one half of the shape that IS written down.
    */
   readonly take: string;
+  /**
+   * WHICH OUTPUT FIELD SAYS HOW MANY THERE ARE, WHERE THE ROWS ARE A PAGE.
+   *
+   * ⚠️ WITHOUT IT A BOUNDED ANSWER READS AS THE WHOLE ANSWER. A view sorts and
+   * is bounded and reports its count separately; an asked view had no such
+   * channel, so a handler returning its first two hundred rows produced a list
+   * that says "200" in a product whose entire purpose is answering how many
+   * there are. Naming the field is what lets `Listing` say "200 of 4,310"
+   * instead of quietly claiming the workspace has two hundred.
+   *
+   * ⚠️ AND IT IS DECLARED RATHER THAN GUESSED. Reading a field called `count`
+   * off any answer that happens to have one would misread an operation whose
+   * `count` means something else entirely — which is a wrong number rather than
+   * a missing one.
+   */
+  readonly total?: string;
   /** ⚠️ What the screen supplies rather than asks for — see `Fill`. */
   readonly fills?: Readonly<Record<string, Fill>>;
 }

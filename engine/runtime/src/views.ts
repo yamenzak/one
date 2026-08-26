@@ -115,7 +115,12 @@ export async function runView(
        place a mismatch surfaces — and a region drawing its empty state is a far
        better answer than a renderer handed a number where it expects rows. */
     if (!Array.isArray(rows)) return { items: [], count: 0 };
-    return { items: rows as readonly Record<string, unknown>[], count: rows.length };
+    /* ⚠️ HOW MANY THERE ARE, WHERE THE HANDLER SAID — see `AskedSpec.total`. A
+       bounded answer with no count reads as the whole answer, which is the one
+       thing a list in an inventory product must never say. */
+    const said_total = view.asked.total === undefined ? undefined : said?.[view.asked.total];
+    const total = typeof said_total === "number" ? said_total : rows.length;
+    return { items: rows as readonly Record<string, unknown>[], count: total };
   }
 
   const erase = eraseBy(spec);
