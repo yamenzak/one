@@ -1298,6 +1298,7 @@ Some of this is guarded and some is judgement:
 - `problem` — every refusal comes from a catalogue, and one naming an input is rendered on that input.
 - `reading` — a decode is paced; the thread that answers a tap is not spent reading.
 - `reflow` — a screen composes the vocabulary; it does not re-derive it.
+- `rendered` — a product's browser half holds only files something renders; a component nothing imports is deleted, not kept.
 - `renewal` — a deploy reaches a browser that is already open.
 - `rhythm` — one rhythm per container, and a screen's is the DOM's rather than a walk over React children.
 - `scene` — seeded, compositor-only, masked rather than washed, sized by area, bound rather than built.

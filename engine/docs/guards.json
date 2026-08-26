@@ -4032,6 +4032,16 @@
       "fails": "a registry that grows entries nothing composes - the slot-to-prop join is asserted statically and no render ever makes it good, so the entry is correct on paper and draws an empty region the first time an app names it; thirteen charts and six list shapes were registered that way, chosen by listing what the design package exports rather than by counting what a product draws"
     },
     {
+      "id": "a-file-a-product-draws-with-is-rendered-by-something",
+      "protects": "D92",
+      "stage": "98",
+      "status": "live",
+      "impl": "scripts/rendered.test.mjs",
+      "becomes": "elsewhere: the import graph, which is where a file is reached or is not, whatever the product's browser half turns into",
+      "proves": "rendered by something",
+      "fails": "a hand-written screen left inside a product with its wiring already done - no route names it, no session map holds it and no harness photographs it, so every check here reports ok while it sits one import away from being live again; that is the shape somebody reaches for when a declaration will not say what they want, and 210 lines of it survived the surface being emptied"
+    },
+    {
       "id": "a-declaration-in-a-screen-out",
       "protects": "D92",
       "stage": "96",
