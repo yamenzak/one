@@ -274,6 +274,49 @@ describe("what would fail on the first request", () => {
     expect(whyOf(broken)).toContain("points at no collection");
   });
 
+  /*
+    ⚠️ THIS ONE IS A 503 ON EVERY DOOR, NOT A BROKEN SCREEN. `from` passes the
+    field-name pattern and produces `CREATE TABLE note (…, from TEXT, …)`, which
+    SQLite will not parse — so the DDL batch throws, `ensureSchema` throws with
+    it, and every route that touches the database answers 503. It was found by
+    naming a test fixture's reference `from`, which is exactly how a real
+    manifest would find it: the word is the obvious name for where something
+    came from.
+  */
+  it("refuses a field named after a word SQL already means something by", () => {
+    const broken = app({
+      collections: [{ ...note, quota: "notes", fields: {
+        ...note.fields,
+        from: field.text({ label: "From", holds: "none", max: 40 }),
+      } }],
+    });
+    expect(whyOf(broken)).toContain("SQL already means something by");
+  });
+
+  /* ⚠️ AND A COLLECTION ID BECOMES A TABLE NAME, WHICH BREAKS THE SAME WAY.
+     `CREATE TABLE order (…)` is the same unparseable statement one level up. */
+  it("refuses a collection named after one too", () => {
+    expect(whyOf(app({ collections: [{ ...note, id: "order", quota: "notes" }] })))
+      .toContain("SQL already means something by");
+  });
+
+  /*
+    ⚠️ AND CASE DOES NOT SAVE IT. SQL keywords are not case-sensitive, so `orDer`
+    is the same keyword and the same unparseable statement. The spelling here is
+    one nobody would choose deliberately — which is the point: the check is about
+    the WORD, and a comparison against the string as written would pass this and
+    then break a database.
+  */
+  it("refuses it however it is capitalised", () => {
+    const broken = app({
+      collections: [{ ...note, quota: "notes", fields: {
+        ...note.fields,
+        orDer: field.number({ label: "Order", holds: "none" }),
+      } }],
+    });
+    expect(whyOf(broken)).toContain("SQL already means something by");
+  });
+
   it("refuses a failure code no catalogue has", () => {
     const broken = app({ operations: [{ ...stub, fails: ["app.imagined"] } as AnyOperation] });
     expect(whyOf(broken)).toContain("which no catalogue has");

@@ -34,6 +34,10 @@ const made = (id: string, permission: string, fields: CollectionSpec["fields"]):
 const shelf = made("shelf", "stock", {
   name: field.text({ label: "Name", required: true, holds: "none", max: 80 }),
   inside: field.text({ label: "Inside", holds: "none", max: 40 }),
+  /* ⚠️ A REFERENCE INTO A COLLECTION WITH A DIFFERENT PERMISSION, which is the
+     only shape that can tell a hop that is checked from one that is not. Both
+     ends under one grant would pass either way. */
+  supplier: field.ref({ label: "Supplied by", holds: "none", to: "supplier" }),
 });
 const supplier = made("supplier", "supplier", {
   name: field.text({ label: "Name", required: true, holds: "none", max: 80 }),
@@ -97,6 +101,27 @@ const overreaching: ScreenSpec = {
   },
 } as unknown as ScreenSpec;
 
+/**
+ * ⚠️ THE SCREEN THAT REACHES THROUGH ITS OWN SUBJECT — a shelf saying who
+ * supplies it. The path is on the RECORD rather than on a view's rows, which is
+ * the half nothing fetched: the kernel accepts it, the binding composes, and the
+ * row came back without the column in it.
+ */
+const supplied: ScreenSpec = {
+  id: "supplied", route: "/supplied", label: "Supplied", permission: "stock", of: "shelf",
+  body: {
+    shape: "detail",
+    layout: { as: "stack" },
+    blocks: [{
+      block: "FieldRow",
+      bind: {
+        label: { from: { of: "words", says: "Supplied by" } },
+        value: { from: { of: "field", field: "supplier.name" } },
+      },
+    }],
+  },
+} as unknown as ScreenSpec;
+
 /* ⚠️ THE ID IS THE ONE `put` MINTED, NOT ONE THIS FILE CHOSE. `put` always
    generates its own — a caller-supplied id in the values is ignored — so a
    fixture that assumed otherwise writes rows whose references point at nothing,
@@ -113,9 +138,9 @@ beforeEach(async () => {
   await applySchema(shard(), [schemaFor(APP)]);
   await shard().prepare("DELETE FROM shelf").run();
   await shard().prepare("DELETE FROM supplier").run();
-  cold = await add(shelf, { name: "Cold room", inside: "" });
+  const ferris = await add(supplier, { name: "Ferris Chemicals" });
+  cold = await add(shelf, { name: "Cold room", inside: "", supplier: ferris });
   await add(shelf, { name: "Bay four", inside: cold });
-  await add(supplier, { name: "Ferris Chemicals" });
 });
 
 const all = () => true;
@@ -177,6 +202,24 @@ describe("a screen is handed its record and its views together", () => {
     if ("needs" in got) throw new Error(got.needs);
     expect(Object.keys(got.views)).toEqual(["below"]);
   });
+
+  /*
+    ⚠️ THE RECORD REACHES TOO, AND IT DID NOT. Every other assertion in this file
+    passes over a subject that carries only its own columns, so a screen binding
+    `from.name` drew a blank beside a label — which reads as a shelf with no
+    supplier rather than as a value nothing went to fetch.
+  */
+  it("carries a field of what the record points at", async () => {
+    const got = await drawnFor(shard(), APP, supplied, TENANT, all, cold);
+    if ("needs" in got) throw new Error(got.needs);
+    expect(got.record?.["supplier.name"]).toBe("Ferris Chemicals");
+  });
+
+  it("leaves the record's own columns alone", async () => {
+    const got = await drawnFor(shard(), APP, supplied, TENANT, all, cold);
+    if ("needs" in got) throw new Error(got.needs);
+    expect(got.record?.["name"]).toBe("Cold room");
+  });
 });
 
 describe("every collection the screen touches is asked for by name", () => {
@@ -217,5 +260,54 @@ describe("every collection the screen touches is asked for by name", () => {
       shard(), APP, overreaching, TENANT, only("stock:read", "supplier:read"), cold);
     if ("needs" in got) throw new Error(got.needs);
     expect(got.views["everyone"]?.items).toHaveLength(1);
+  });
+
+  /*
+    ⚠️ A HOP IS A TOUCH, AND IT WAS NOT COUNTED AS ONE. `supplier.name` is a
+    field of a SUPPLIER's row reached through a shelf — so a screen declaring
+    `stock` and binding it handed out catalogue names to a caller holding `stock`
+    alone. The screen composes, the door served it, and the only difference from
+    the case two tests up is that the second collection arrives through a
+    reference rather than through a view.
+  */
+  it("counts what a path reaches into as a collection it touches", () => {
+    expect([...collectionsFor(APP, supplied)].sort()).toEqual(["shelf", "supplier"]);
+  });
+
+  it("refuses a screen that reaches past its own permission", async () => {
+    const got = await drawnFor(shard(), APP, supplied, TENANT, only("stock:read"), cold);
+    expect(got).toEqual({ needs: "supplier:read" });
+  });
+
+  /*
+    ⚠️ AND A TALLY COUNTS TOO. "How many suppliers point at this" is a smaller
+    answer than their names and it is still an answer about rows — a screen that
+    could report a competitor count it may not read is the same leak with the
+    detail removed.
+  */
+  it("counts a tally's collection as one it touches", () => {
+    const counting = {
+      ...APP,
+      /* ⚠️ SUPPLIERS, WITH HOW MANY SHELVES EACH ONE STOCKS — the tally reads
+         `shelf`, which is a collection the view itself never names. */
+      views: [...APP.views!,
+        { id: "tallied", of: "supplier", tally: [{ as: "shelves", of: "shelf", by: "supplier" }] }],
+    } as unknown as AppSpec;
+    /* ⚠️ ABOUT NOTHING, so the only collections it touches are the view's and
+       the tally's — which is what makes the assertion about the tally alone. */
+    const screen = {
+      id: "tallied", route: "/tallied", label: "Tallied", permission: "supplier",
+      body: {
+        ...place.body!,
+        blocks: [{
+          ...place.body!.blocks[0]!,
+          bind: {
+            label: { from: { of: "words", says: "Suppliers" } },
+            of: { from: { of: "view", view: "tallied" } },
+          },
+        }],
+      },
+    } as unknown as ScreenSpec;
+    expect([...collectionsFor(counting, screen)].sort()).toEqual(["shelf", "supplier"]);
   });
 });

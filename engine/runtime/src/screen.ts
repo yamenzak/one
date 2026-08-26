@@ -22,11 +22,11 @@
  * nothing — it is the same answer as a record with empty columns.
  */
 
-import type { AppSpec, Fields, ScreenSpec } from "@engine/kernel";
-import type { Reach } from "@engine/kernel";
+import type { AppSpec, Fields, Reach, ScreenSpec } from "@engine/kernel";
 import {
-  SCREEN_PATH, actsIn, columnsIn, permissionFor, reachFor, viewsIn,
+  SCREEN_PATH, actsIn, columnsIn, fieldsIn, permissionFor, reachFor, viewsIn,
 } from "@engine/kernel";
+import { joinRows } from "./joined.js";
 import { readOne } from "./records.js";
 import { runViews, type Viewed } from "./views.js";
 import { type Db } from "./sql.js";
@@ -62,9 +62,63 @@ export interface Act {
 export interface Refused { readonly needs: string }
 
 /**
- * ⚠️ EVERY COLLECTION THE SCREEN TOUCHES, WHICH IS ITS OWN AND ITS VIEWS'. The
- * subject's collection is in the list because a `detail` screen hands back the
- * record itself, and a record is rows too.
+ * EVERY PATH THIS BODY NAMES, RESOLVED ONCE — the subject's own and each view's.
+ *
+ * ⚠️ RESOLVED HERE RATHER THAN GUESSED BY THE RUNNER, AND ONCE RATHER THAN
+ * TWICE. `refuseSurface` has already refused a path that does not resolve, so a
+ * `string` back from `reachFor` is a manifest that never composed — it is
+ * dropped rather than thrown, because re-raising would be a second answer to a
+ * question already asked. What matters more is that `collectionsFor` and
+ * `drawnFor` read the SAME resolution: the permission check and the fetch
+ * disagreeing about which collections a screen touches is how a joined column
+ * comes to be served past the grant that governs it.
+ */
+/* ⚠️ ONLY THE HOPS. A `self` reach is a plain column already on the row, so
+   keeping it would put the row's own collection in the touched list twice and
+   ask `joinRows` for a query with nothing to fetch. */
+type Hop = Extract<Reach, { readonly on: "ref" }>;
+
+const reachesFor = (app: AppSpec, screen: ScreenSpec) => {
+  const collections = app.collections ?? [];
+  const resolve = (held: Fields | undefined, paths: readonly string[]): readonly Hop[] => (held
+    ? paths.map((path) => reachFor(path, held, collections))
+      .filter((r): r is Hop => typeof r !== "string" && r.on === "ref")
+    : []);
+
+  const byView: Record<string, readonly Hop[]> = {};
+  for (const [view, cols] of Object.entries(screen.body ? columnsIn(screen.body) : {})) {
+    const of = (app.views ?? []).find((v) => v.id === view);
+    byView[view] = resolve(collections.find((c) => c.id === of?.of)?.fields, cols);
+  }
+
+  /*
+    ⚠️ AND THE SUBJECT REACHES TOO, WHICH IS THE HALF THAT WAS MISSING. The
+    kernel has always accepted `product.name` as a `field` read on a detail
+    screen — `refuseSurface` resolves it through `reachFor` and refuses a path
+    that does not — and nothing on this side ever fetched the far end, so the
+    binding composed, typechecked and drew a blank. A screen about a stock line
+    that cannot say which product it is about is a screen about an id.
+  */
+  const subject = resolve(
+    collections.find((c) => c.id === screen.of)?.fields,
+    screen.body ? fieldsIn(screen.body) : [],
+  );
+
+  return { subject, byView };
+};
+
+/**
+ * ⚠️ EVERY COLLECTION THE SCREEN TOUCHES, WHICH IS ITS OWN, ITS VIEWS' AND
+ * EVERYTHING THEY REACH INTO. The subject's collection is in the list because a
+ * `detail` screen hands back the record itself, and a record is rows too.
+ *
+ * ⚠️ THE REACHED ONES ARE THE SHARP HALF, AND THEY WERE MISSING. A joined column
+ * is a field of ANOTHER collection's row — `product.name` on a stock listing is
+ * the product's name — so a screen listing `location:read` and showing
+ * `product.name` handed out catalogue rows to somebody with no `product:read`.
+ * The screen composes, the header of this file warns about exactly this shape
+ * one collection over, and the only thing between the two was that a hop was not
+ * counted as a touch.
  */
 export const collectionsFor = (app: AppSpec, screen: ScreenSpec): readonly string[] => {
   const ids = new Set<string>();
@@ -72,8 +126,15 @@ export const collectionsFor = (app: AppSpec, screen: ScreenSpec): readonly strin
   const reads = screen.body ? viewsIn(screen.body) : [];
   for (const id of reads) {
     const view = (app.views ?? []).find((v) => v.id === id);
-    if (view) ids.add(view.of);
+    if (!view) continue;
+    ids.add(view.of);
+    /* ⚠️ AND WHAT THE VIEW COUNTS UP. A `tally` reads another collection's rows
+       to answer "how many point at this" — a number is less than a name and it
+       is still an answer about rows somebody may not be allowed to see. */
+    for (const t of view.tally ?? []) ids.add(t.of);
   }
+  const { subject, byView } = reachesFor(app, screen);
+  for (const reach of [...subject, ...Object.values(byView).flat()]) ids.add(reach.to);
   return [...ids];
 };
 
@@ -111,30 +172,22 @@ export async function drawnFor(
   const reads = screen.body ? viewsIn(screen.body) : [];
   const here = { record: record ?? undefined, me: me ?? undefined };
 
-  /*
-    ⚠️ THE PATHS A BODY NAMES, RESOLVED ONCE HERE RATHER THAN GUESSED BY THE
-    RUNNER. `refuseSurface` has already refused a path that does not resolve, so
-    a `string` back from `reachFor` is a manifest that never composed — it is
-    dropped rather than thrown, because a screen that got this far has been
-    validated and re-raising here would be a second answer to one question.
-  */
-  const reaching: Record<string, readonly Reach[]> = {};
-  for (const [view, cols] of Object.entries(screen.body ? columnsIn(screen.body) : {})) {
-    const of = (app.views ?? []).find((v) => v.id === view);
-    const held = (app.collections ?? []).find((c) => c.id === of?.of)?.fields;
-    if (!held) continue;
-    reaching[view] = cols
-      .map((path) => reachFor(path, held, app.collections ?? []))
-      .filter((r): r is Reach => typeof r !== "string");
-  }
+  const of = (app.collections ?? []).find((c) => c.id === screen.of);
+  const { subject: mine, byView: reaching } = reachesFor(app, screen);
 
   /* ⚠️ THE RECORD AND THE VIEWS TOGETHER. Neither is an input to the other —
      `here` is the id, which the caller already had — and taken in sequence this
-     charges every detail screen an extra hop in front of its own blocks. */
+     charges every detail screen an extra hop in front of its own blocks. The
+     subject's own hop is INSIDE this arm rather than after it, so a detail
+     screen still waits once rather than twice. */
   const [held, views] = await Promise.all([
-    screen.of && record
-      ? readOne(db, (app.collections ?? []).find((c) => c.id === screen.of)!, scope, record)
-      : Promise.resolve(null),
+    (async () => {
+      if (!of || !record) return null;
+      const one = await readOne(db, of, scope, record);
+      if (!one || !mine.length) return one;
+      const [joined] = await joinRows(db, [one], mine, app.collections ?? [], scope);
+      return joined ?? one;
+    })(),
     runViews(db, app, reads, scope, here, reaching),
   ]);
 

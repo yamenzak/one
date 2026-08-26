@@ -223,6 +223,38 @@ export type CollectionRefusal =
 export const NAME = /^[a-z][a-z0-9-]*$/;
 export const FIELD_NAME = /^[a-z][a-zA-Z0-9_]*$/;
 
+/**
+ * ⚠️ AND A NAME SQL ALREADY MEANS SOMETHING BY IS NOT A NAME EITHER. `from`
+ * matches `FIELD_NAME` perfectly and produces
+ * `CREATE TABLE shelf (…, from TEXT, …)`, which SQLite refuses to parse — so
+ * `ensureSchema` throws, the DDL batch throws with it, and every route that
+ * touches the database answers 503. That is the outage `sql.ts`'s own header is
+ * about, reached through the one door its identifier check does not cover:
+ * quoting would hide it, and a column nobody can write in a hand query is worse
+ * than a field with a different name.
+ *
+ * ⚠️ THE LIST IS THE WORDS A DECLARATION WOULD PLAUSIBLY REACH FOR, not SQLite's
+ * whole keyword table. Most of the 147 are unreachable here — `FIELD_NAME` bars
+ * anything with a space in it, and nobody names a field `vacuum` — while these
+ * are the ones a real manifest wants: where something came `from`, the `order`
+ * it goes in, its `group`, the `default`, the `check`, the `index`, the `key`.
+ * A word that turns out to be missing is a line here and a test, which is the
+ * cheap direction; guessing at completeness would make the list unreadable.
+ *
+ * ⚠️ AND IT IS ONE STRING RATHER THAN SIXTY QUOTED ONES, because this module is
+ * in the browser's entry chunk — the design package imports the kernel, so every
+ * byte of it is parsed before the first frame. An array literal costs about six
+ * bytes a word in quotes and commas that a space-separated string does not, and
+ * `weight.test.ts` is what noticed.
+ */
+export const RESERVED_FIELD_NAMES: ReadonlySet<string> = new Set((
+  "from to where select order group by on as in and or not null is like between "
+  + "join left right inner outer cross using union all distinct having limit "
+  + "offset insert into values update set delete create drop alter table index "
+  + "view trigger primary foreign key unique check default references constraint "
+  + "when then else end case cast collate escape exists"
+).split(" "));
+
 export interface CollectionProblem {
   readonly collection: string;
   readonly why: CollectionRefusal;
@@ -267,8 +299,19 @@ export function refuseCollection(spec: CollectionSpec): readonly CollectionProbl
   }
 
   if (!NAME.test(spec.id)) at("not_a_name", `"${spec.id}" cannot be a table name`);
+  if (RESERVED_FIELD_NAMES.has(spec.id)) {
+    at("not_a_name", `"${spec.id}" is a word SQL already means something by, so it cannot be a table name`);
+  }
   for (const name of Object.keys(spec.fields)) {
     if (!FIELD_NAME.test(name)) at("not_a_name", `"${name}" cannot be a column name`);
+    /* ⚠️ LOWER-CASED, BECAUSE SQL KEYWORDS ARE NOT CASE-SENSITIVE. A field
+       called `From` parses exactly as badly as `from` and would pass a check
+       that compared the spelling as written. */
+    else if (RESERVED_FIELD_NAMES.has(name.toLowerCase())) {
+      at("not_a_name",
+        `"${name}" is a word SQL already means something by — the generated `
+        + `CREATE TABLE will not parse, and the whole schema fails with it`);
+    }
   }
 
   if (spec.scope.of === "global" && holdingsIn(spec.fields).length > 0) {

@@ -73,9 +73,16 @@ const DIST = join(dirname(fileURLToPath(import.meta.url)), "..", "dist");
    reached from `Declared`, which is lazy, so a browser that never opens a
    product never downloads a form for one. And 34 for counting the GENERATED
    operations into the set a body may name — without it `supplier.create` was
-   refused as undeclared, which is the one act every list screen has. */
+   refused as undeclared, which is the one act every list screen has.
+
+   ⚠️ AND 662 FOR THE SQL KEYWORDS A FIELD MAY NOT BE NAMED AFTER. A field called
+   `from` produces a `CREATE TABLE` SQLite will not parse, so `ensureSchema`
+   throws and every door answers 503 — the sharpest failure the kernel can refuse
+   at composition, found by naming a test fixture's reference `from`. The list is
+   one space-separated string rather than sixty quoted ones, which is worth 109
+   bytes of the cost; the rest is the words themselves and it buys an outage. */
 const CEILING = {
-  js: { raw: 1_105_740, gzip: 330_000 },
+  js: { raw: 1_106_500, gzip: 330_000 },
   css: { raw: 470_000, gzip: 50_000 },
 };
 
