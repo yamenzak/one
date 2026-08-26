@@ -226,13 +226,41 @@ const seedsFromStore = (src) => {
     write again by accident on the next home screen somebody builds.
   */
   const ONE = /\blimit:\s*(?:"1"|'1'|1)\s*[,}]/g;
+
+  /**
+   * ⚠️ A FILTERED COUNT IS A DIFFERENT QUESTION, AND `totals.read` CANNOT ANSWER
+   * IT. That operation counts every row of a collection this caller may read —
+   * it has no `where` and will not grow one, because a count with a filter is a
+   * query and the point of it is that it is not. "How many counts are still
+   * open" is a filtered count, so the advice below does not apply to it and the
+   * shape it would push somebody towards is a list of two hundred rows fetched
+   * to be counted.
+   *
+   * ⚠️ THE ENCLOSING OBJECT IS READ, NOT A WINDOW OF TEXT. A fixed number of
+   * characters either side is a rule about formatting; the braces are the
+   * declaration.
+   */
+  const filtered = (src, at) => {
+    let depth = 0;
+    for (let i = at; i >= 0; i--) {
+      if (src[i] === "}") depth++;
+      else if (src[i] === "{") {
+        if (!depth) return /\bwhere:/.test(src.slice(i, src.indexOf("}", at) + 1));
+        depth--;
+      }
+    }
+    return false;
+  };
+
   let counted = 0;
   let files = 0;
   for (const dir of [...appDirs(), "one-space/src"]) {
     for (const file of filesIn(dir)) {
       files++;
       const src = readFileSync(file, "utf8");
-      for (const [whole] of src.matchAll(ONE)) {
+      for (const m of src.matchAll(ONE)) {
+        const whole = m[0];
+        if (filtered(src, m.index)) continue;
         counted++;
         fail(`${rel(file)}: asks a list for one row — \`${whole.trim()}\`.\n` +
              "       That is a count, and `totals.read` answers every collection's at once,\n" +

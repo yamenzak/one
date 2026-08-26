@@ -35,7 +35,6 @@ import { Receive, keyOf, type Noted } from "./Receive.js";
 import { Ask, type Answer } from "./Ask.js";
 import type { Movement } from "./Thing.js";
 import { Scan, type Guess, type Seen } from "./Scan.js";
-import { Home, type Moving, type Needs, type Shelf } from "./Home.js";
 import { Labels, type Labelled, type Subject, type Template } from "./Labels.js";
 /* ⚠️ A JSON COLUMN IS WHATEVER IS IN THE COLUMN — see `packing.ts`. */
 import { readLevels } from "../packing.js";
@@ -1456,117 +1455,6 @@ function bytesOf(url: string): { body: ArrayBuffer; type: string } | null {
   return { body: out.buffer, type: head.slice(0, -";base64".length) || "application/octet-stream" };
 }
 
-const HOME = (api: Door) => function HomeHere({ app, go }: Mounted) {
-  const today = dayHere();
-  const held = React.useMemo(
-    () => new Set((app as { readonly permissions?: readonly string[] }).permissions ?? []),
-    [app],
-  );
-  const may = React.useCallback((one: string) => held.has(one), [held]);
-
-  const totals = useAsked<Totals>(api, "totals.read");
-
-  /* ⚠️ ABSENT IS NOT NOUGHT, AND THAT IS THE PLATFORM'S RULE ARRIVING HERE. A
-     collection this person may not read is missing from the answer rather than
-     counted as empty — so it travels as `null` and the hero leaves it out, the
-     same way the three lanes under it do. Every preset role holds all three
-     keys; a role somebody built by hand need not. */
-  const shelf: Loaded<Shelf> = totals.of.status === "ready"
-    ? ready({
-      lines: totals.of.data.counts.stock ?? null,
-      products: totals.of.data.counts.product ?? null,
-      places: totals.of.data.counts.location ?? null,
-    })
-    : totals.of as Loaded<Shelf>;
-
-  /* ⚠️ THE SAME TWO ASKS THE EXPIRY SWEEP MAKES, so the number on this screen
-     and the number in the notification cannot disagree. How many days counts as
-     "soon" is a setting a person on the floor cannot read, which is why the
-     arithmetic is the operation's rather than this file's. */
-  const dated = useAsked<{ items: readonly Row[] }>(api, "batch.due",{ today });
-  const serviced = useAsked<{ items: readonly Row[] }>(api, "unit.due",{ today });
-  const sessions = useAsked<{ items: readonly Row[] }>(
-    api, may("count:write") ? "count.list" : null, undefined, { items: [] });
-  const runs = useAsked<{ items: readonly Row[] }>(
-    api, may("process:read") ? "process.list" : null, undefined, { items: [] });
-
-  /*
-    ⚠️ WAITING IS NOT ZERO, AND NEITHER IS FORBIDDEN. A count still in flight
-    draws no number rather than a confident nought — the screen would be telling
-    somebody nothing needs them and then changing its mind — and a lane this
-    person may not read is left out of the list entirely rather than shown as
-    clear. Both are `null`; the screen distinguishes them by whether the row is
-    there at all.
-  */
-  const many = (
-    of: Loaded<{ items: readonly Row[] }>, pick: (rows: readonly Row[]) => number,
-  ): number | null => (of.status === "ready" ? pick(of.data.items) : null);
-
-  const needs: Needs = {
-    due: dated.of.status === "ready" && serviced.of.status === "ready"
-      ? dated.of.data.items.length + serviced.of.data.items.length
-      : null,
-    counts: may("count:write")
-      ? many(sessions.of, (rows) => rows.filter((r) => !text(r.closed)).length)
-      : null,
-    runs: may("process:read")
-      ? many(runs.of, (rows) => rows.filter((r) => text(r.state) === "ended").length)
-      : null,
-  };
-
-  /* ⚠️ THE PERIOD IS NAMED RATHER THAN COUNTED — see `stock.report`. Thirty days
-     back is 29 or 31 by the millisecond across a clock change, and the calendar
-     arithmetic belongs where the whole period is one decision. */
-  const report = useAsked<Reading>(
-    api, may("ledger:read") ? "stock.report" : null,
-    { today, span: "month" }, EMPTY_REPORT);
-
-  const moving: Loaded<Moving> | null = may("ledger:read")
-    ? (report.of.status === "ready"
-      ? ready({
-        share: report.of.data.told[0]?.share ?? 0,
-        out: report.of.data.told[0]?.recorded ?? 0,
-        short: report.of.data.losses.reduce((n, one) => n + one.lost, 0),
-        buy: report.of.data.buy.length,
-        daily: report.of.data.daily,
-      })
-      : report.of as Loaded<Moving>)
-    : null;
-
-  const starts = useAsked<{ words: { said: string } }>(api, "product.start");
-  const far = useAsked<Far>(api, "guide.view");
-  const got = far.of.status === "ready" ? far.of.data : null;
-
-  return (
-    <Home
-      title={nameOf("/")}
-      said={starts.of.status === "ready" ? starts.of.data.words.said : ""}
-      of={shelf}
-      again={totals.again}
-      needs={needs}
-      moving={moving}
-      /* ⚠️ BOTH AXES, AND `null` WHILE THE ANSWER IS STILL COMING. This read
-         `Object.keys(got?.counts ?? {})`, so a workspace that had not answered
-         yet was indistinguishable from one that had done nothing: the card drew
-         every step under a confident "0 of 3 done" and then took most of it away
-         — and the comment here said the section was held back, which `Guide`
-         had no way to do because it was handed two empty lists. It takes `null`
-         now and draws nothing until it knows. */
-      raised={got ? { workspace: Object.keys(got.counts), person: got.mine } : null}
-      held={held}
-      onGo={go}
-      onRegister={() => go("/register")}
-      onLabels={() => go("/labels")}
-      onImport={() => go("/import")}
-      onSuppliers={() => go("/suppliers")}
-      onDue={() => go("/due")}
-      onCounts={() => go("/count")}
-      onRuns={() => go("/work")}
-      onReports={() => go("/reports")}
-      onStart={() => go("/start")}
-    />
-  );
-};
 
 /**
  * ⚠️ THE ROUTES COME FROM THE MANIFEST, NOT FROM A LIST HERE. A second list is a
@@ -1577,7 +1465,6 @@ const HOME = (api: Door) => function HomeHere({ app, go }: Mounted) {
 export function mount({ register, api }: Mounting): void {
   const declared = new Set((INVENTORY.screens ?? []).map((s) => s.route));
   const screens: readonly [string, React.ComponentType<Mounted>][] = [
-    ["/", HOME(api)],
     ["/scan", SCAN(api)],
     ["/register", REGISTER(api)],
     ["/receive", RECEIVE(api)],

@@ -6281,6 +6281,27 @@ const manifest = (): AppSpec => defineApp({
       the record of how it got there.
     */
     /*
+      ⚠️ FOUR VIEWS READ ONLY FOR THEIR COUNT — see `Read`'s `count`, and the
+      `limit: 1`. A view reports how many there are separately from the rows it
+      hands over, so asking for one row and reading the count is a `SELECT
+      COUNT(*)` plus a row nobody draws. That is the cheapest honest way for a
+      home screen to say "eleven places" without fetching eleven places.
+    */
+    /*
+      ⚠️ ONE ASK FOR ALL THREE, AND IT IS THE PLATFORM'S — see `totals.read`.
+      Three list reads with `limit: 1` is three round trips for three integers,
+      each carrying identity, workspace, membership and standing to run a
+      `SELECT COUNT(*)`; `asking.test.mjs` refuses the shape by name. The row is
+      the counts with the collection ids as its columns.
+    */
+    { id: "how-many", of: "stock", asked: { operation: "totals.read", take: "all" } },
+    /* ⚠️ `unset`, WHICH IS PRESENCE AND NOT A COMPARISON — an open count is one
+       nobody has closed, and that is a column with nothing in it. */
+    { id: "counts-open", of: "count", where: [{ field: "closed", unset: true }], limit: 1 },
+    { id: "runs-to-release", of: "process",
+      where: [{ field: "state", is: { literal: "ended" } }], limit: 1 },
+
+    /*
       ⚠️ THE SHELF, NARROWED TO A PLACE AND EVERYTHING UNDER IT — see
       `stock.lines`. It is an asked view rather than a query because "at or below
       this location" is a transitive closure over a self-reference and a `Match`
@@ -6290,6 +6311,23 @@ const manifest = (): AppSpec => defineApp({
     { id: "shelf", of: "stock",
       asked: { operation: "stock.lines", take: "items", total: "total",
         fills: { where: { picked: "where" } } } },
+
+    /*
+      ⚠️ THE SAME FOUR ANSWERS ON THE ROOT, OVER A PERIOD NOBODY CHOSE. Home has
+      no narrowing — it is what somebody opens the app onto, not a screen they
+      work in — so the span is a constant the screen supplies (`Fill`'s `says`).
+      A month is what a home screen means by "how it is going"; anybody who wants
+      to change it is on Reports, which is a tap away with the control on it.
+    */
+    { id: "month-told", of: "ledger",
+      asked: { operation: "stock.report", take: "told",
+        fills: { today: "today", span: { says: "month" } } } },
+    { id: "month-daily", of: "ledger",
+      asked: { operation: "stock.report", take: "daily",
+        fills: { today: "today", span: { says: "month" } } } },
+    { id: "month-buy", of: "ledger",
+      asked: { operation: "stock.report", take: "buy",
+        fills: { today: "today", span: { says: "month" } } } },
 
     { id: "report-told", of: "ledger",
       asked: { operation: "stock.report", take: "told",
@@ -6334,7 +6372,164 @@ const manifest = (): AppSpec => defineApp({
       nowhere; a home that is lit is only lit because a shelf list is not.
     */
     { id: "home", route: "/", label: "Home", nav: "primary", icon: "home",
-      permission: "stock:read", sky: "neon" },
+      permission: "stock:read", sky: "neon",
+      /*
+        ⚠️ A HOME SCREEN IS NOT A SUMMARY OF THE APP, IT IS THE ANSWER TO "IS
+        EVERYTHING ALL RIGHT". Somebody opening an inventory in the morning wants
+        two things in the first second — how much is on the shelf, and what has
+        gone wrong while they were away — and every other block here is
+        subordinate to those. A dashboard that leads with a chart makes them read
+        a picture to find out whether there is anything to do.
+
+        ⚠️ ONE HERO, AND IT IS THE SHELF. The recorded share is the number Reports
+        leads with and is the right hero THERE — a screen about whether the
+        figures mean anything. Here it is a stat beside two others, because two
+        display-sized figures on one screen is no hero at all.
+      */
+      body: {
+        shape: "board",
+        layout: { as: "stack" },
+        blocks: [
+          {
+            group: null,
+            of: [
+              { block: "Hero",
+                nothing: { says: "Nothing counted yet" },
+                bind: {
+                  value: { from: { of: "first", view: "how-many", field: "stock" } },
+                  eyebrow: { from: { of: "words", says: "On the shelf" } },
+                  under: { from: { of: "words", says: "product-and-place rows with something on them" } },
+                } },
+              { block: "Stat",
+                nothing: { says: "—" },
+                bind: {
+                  value: { from: { of: "first", view: "how-many", field: "product" } },
+                  label: { from: { of: "words", says: "Products" } },
+                } },
+              { block: "Stat",
+                nothing: { says: "—" },
+                bind: {
+                  value: { from: { of: "first", view: "how-many", field: "location" } },
+                  label: { from: { of: "words", says: "Places" } },
+                } },
+              /*
+                ⚠️ THE QUICK ROW IS WHAT THE BAR DOES NOT ALREADY HOLD. A
+                shortcut to something a thumb reaches in one tap from every
+                screen in the product is a second answer to the same question,
+                and the pair drift the day either moves. Scanning and counting
+                are destinations; labelling, importing and the people it is
+                bought from are not.
+
+                ⚠️ AND THE ROW HOLDS FOUR — `QuickActions` draws four and drops a
+                fifth without a word, because at 80px with a 24px gap five do not
+                fit a phone.
+              */
+              { block: "QuickActions", leads: ["register", "labels", "import", "supplier"], bind: {} },
+            ],
+          },
+          /*
+            ⚠️ THE ONE BLOCK SOMEBODY OPENS THIS PRODUCT FOR, AND IT IS ABOVE
+            EVERYTHING THAT EXPLAINS THE BUSINESS. A number that has run out, a
+            count left half done and a batch nobody released are three different
+            people's Monday; the figures below are nobody's.
+          */
+          {
+            group: "What needs you",
+            of: [
+              { block: "NavRow",
+                goes: "due",
+                bind: {
+                  label: { from: { of: "words", says: "Running out" } },
+                  under: { from: { of: "words", says: "Deliveries past their date" } },
+                  aside: { from: { of: "count", view: "running-out" } },
+                } },
+              { block: "NavRow",
+                goes: "due",
+                bind: {
+                  label: { from: { of: "words", says: "Due a service" } },
+                  under: { from: { of: "words", says: "Items with an inspection coming" } },
+                  aside: { from: { of: "count", view: "service-due" } },
+                } },
+              { block: "NavRow",
+                goes: "count",
+                bind: {
+                  label: { from: { of: "words", says: "Counts open" } },
+                  under: { from: { of: "words", says: "Somebody started and has not closed" } },
+                  aside: { from: { of: "count", view: "counts-open" } },
+                } },
+              { block: "NavRow",
+                goes: "work",
+                bind: {
+                  label: { from: { of: "words", says: "Runs to release" } },
+                  under: { from: { of: "words", says: "Finished, and waiting to be signed off" } },
+                  aside: { from: { of: "count", view: "runs-to-release" } },
+                } },
+            ],
+          },
+          /*
+            ⚠️ ONE BLOCK, AND IT SURVIVES THE CHECKLIST. `Guide` draws nothing
+            once a workspace has finished, which is right — a list that stays
+            after it is done is a permanent reminder of something already
+            handled — but the screen it belongs to is not only a checklist. The
+            ladder is the one decision this product cannot make for anybody and
+            is worth re-reading a year in, so the way to it is a row under the
+            same heading rather than a second "Getting started" further down.
+          */
+          {
+            group: "Getting started",
+            of: [
+              { block: "Guide", bind: {} },
+              { block: "NavRow",
+                goes: "start",
+                bind: {
+                  label: { from: { of: "words", says: "What each step is for" } },
+                } },
+            ],
+          },
+          {
+            group: "How it is going",
+            of: [
+              /* ⚠️ THE HONEST ONE FIRST. How much left is a fact about the
+                 business; how much of it anybody wrote down is what says whether
+                 the other two mean anything. */
+              { block: "Stat",
+                nothing: { says: "—" },
+                bind: {
+                  value: { from: { of: "first", view: "month-told", field: "sharePct" } },
+                  label: { from: { of: "words", says: "Recorded, per cent" } },
+                } },
+              { block: "Stat",
+                nothing: { says: "—" },
+                bind: {
+                  value: { from: { of: "first", view: "month-told", field: "recorded" } },
+                  label: { from: { of: "words", says: "Left the shelves" } },
+                } },
+              { block: "Stat",
+                nothing: { says: "—" },
+                bind: {
+                  value: { from: { of: "count", view: "month-buy" } },
+                  label: { from: { of: "words", says: "Lines to buy" } },
+                } },
+              {
+                block: "LineChart",
+                plots: { of: "quantity" },
+                nothing: { says: "Nothing left the shelves this month" },
+                bind: {
+                  describes: { from: { of: "words", says: "What left the shelves each day" } },
+                  series: { from: { of: "view", view: "month-daily" } },
+                },
+              },
+              /* ⚠️ THE WAY ON, AT THE END OF WHAT IT CONTINUES. Everything above
+                 is the report's own numbers cut down to what fits a home screen;
+                 the row that opens the whole thing belongs under them rather
+                 than in a menu somewhere else. */
+              { block: "SeeAll",
+                goes: "reports",
+                bind: { label: { from: { of: "words", says: "Everything that moved" } } } },
+            ],
+          },
+        ],
+      } },
     { id: "stock", route: "/stock", label: "Stock", nav: "primary", icon: "box",
       permission: "stock:read",
       /*

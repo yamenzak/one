@@ -381,6 +381,30 @@ export interface AppSpec {
  * being tappable and becomes a menu — and a nav item added because a feature had
  * nowhere else to go is a sign the feature belongs inside an existing one.
  */
+/**
+ * WHAT EVERY APP CAN ASK FOR WITHOUT DECLARING IT — by operation, its answer's
+ * fields.
+ *
+ * ⚠️ THE PLATFORM MOUNTS THESE AND NO MANIFEST HOLDS THEM, which is exactly why
+ * they are written here. `refuseApp` checks an asked view against the app's own
+ * operations; a platform read is not in that list, so a body naming one was
+ * refused as naming nothing — and the screen that wanted a total went back to
+ * asking three lists for one row each, which is the shape `totals.read` exists
+ * to end.
+ *
+ * ⚠️ AND THE FIELDS ARE NAMED, NOT WAIVED. Listing the operation and skipping
+ * the `take` check would let a body read a field the answer does not carry —
+ * silently, as an empty region — which is the same failure the check catches for
+ * an app's own operations. The names here and the object the runtime returns are
+ * two spellings of one shape, and the same rule `SCREEN_PATH` follows applies:
+ * both ends speak it, so it is written once in the layer both may reach.
+ */
+export const SHARED_READS: Readonly<Record<string, readonly string[]>> = {
+  /* ⚠️ `counts` is the record, keyed by collection; `all` is the same numbers as
+     a list of one, which is the shape an asked view can bind. */
+  "totals.read": ["counts", "all"],
+};
+
 export const PRIMARY_MAX = 5;
 
 export const primaryOf = (screens: readonly ScreenSpec[]): readonly ScreenSpec[] =>
@@ -936,6 +960,23 @@ export function refuseApp(spec: AppSpec): readonly Refusal[] {
     */
     const asked = v.asked;
     if (!asked) continue;
+    /*
+      ⚠️ THE PLATFORM'S OWN READS COUNT TOO, AND THEY ARE NAMED HERE — see
+      `SHARED_READS`. Every app gets them and none of them declares them, so a
+      body asking for one was refused as naming an operation that does not exist
+      — which pushed the one screen that wanted a total straight back into the
+      three-lists-with-`limit:-1` shape the platform added `totals.read` to end.
+    */
+    const shared = SHARED_READS[asked.operation];
+    if (shared) {
+      if (!shared.includes(asked.take)) {
+        at(`view ${v.id}`,
+          `asked_take_unknown: takes "${asked.take}" off ${asked.operation}, which answers `
+          + `${shared.join(", ")} — the view would be empty and the screen would say the `
+          + "workspace is");
+      }
+      continue;
+    }
     const op = spec.operations.find((o) => o.id === asked.operation);
     if (!op) {
       at(`view ${v.id}`,

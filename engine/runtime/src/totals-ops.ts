@@ -69,15 +69,23 @@ export function totalsOps(app: AppSpec): Readonly<Record<string, Resolved>> {
         const mine = app.collections.filter(
           (c: CollectionSpec) => ctx.permissions.has(permissionFor(c, "read")),
         );
-        return {
-          counts: await countAll(
-            ctx.db, mine,
-            /* ⚠️ WHOSE ROWS THESE ARE, PER COLLECTION — the workspace's, or the
-               person's. See `countAll`. */
-            (c) => (c.scope.of === "subject" ? (ctx.accountId ?? "") : ctx.tenantId),
-            (c) => reachingBy(c.reachBy, ctx.reach),
-          ),
-        };
+        const counts = await countAll(
+          ctx.db, mine,
+          /* ⚠️ WHOSE ROWS THESE ARE, PER COLLECTION — the workspace's, or the
+             person's. See `countAll`. */
+          (c) => (c.scope.of === "subject" ? (ctx.accountId ?? "") : ctx.tenantId),
+          (c) => reachingBy(c.reachBy, ctx.reach),
+        );
+        /*
+          ⚠️ AND THE SAME NUMBERS AS A LIST OF ONE, WHICH IS WHAT A DECLARED
+          SCREEN CAN BIND. An asked view takes a field holding ROWS (`AskedSpec`)
+          — a record of counts is not one, so a home screen drawn from a
+          declaration could not read this at all and went back to asking three
+          lists for one row each, which is the thing this operation exists to
+          replace. One row whose columns are the collection ids costs nothing and
+          closes that.
+        */
+        return { counts, all: [counts] };
       },
     },
   };

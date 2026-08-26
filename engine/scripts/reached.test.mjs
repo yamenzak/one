@@ -168,6 +168,11 @@ for (const [app, manifest] of appManifests()) {
   const led = new Set([
     ...[...block[1].matchAll(/goes:\s*"([^"]+)"/g)].map((m) => m[1]),
     ...[...block[1].matchAll(/goes:\s*\{[^{}]*to:\s*"([^"]+)"/g)].map((m) => m[1]),
+    /* ⚠️ AND A ROW OF SHORTCUTS LEADS TOO — see `BlockSpec.leads`. Four
+       destinations at once is still four things reached from a screen, and
+       reading only `goes` reported every one of them as an orphan. */
+    ...[...block[1].matchAll(/leads:\s*\[([^\]]*)\]/g)]
+      .flatMap((m) => [...m[1].matchAll(/"([^"]+)"/g)].map((x) => x[1])),
   ]);
   const idOf = new Map(entries
     .map(([whole, route]) => [route, /^\s*\{[^{}]*id:\s*"([^"]+)"/.exec(whole)?.[1] ?? ""]));

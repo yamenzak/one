@@ -58,7 +58,6 @@ const ok = (m) => console.log(`ok   ${m}`);
  * answer that arrives in pieces.
  */
 const NOT_YET = new Map([
-  ["inventory:home", "figures over the whole workspace beside three counts, which is the reports gap on a smaller screen"],
 ]);
 
 const screens = declaredScreens().filter((s) => products().includes(s.app));
