@@ -373,14 +373,20 @@ export function Arranged({ layout, children, aside }: {
 }
 
 /**
- * ⚠️ HOW MANY CELLS ONE THING TAKES, AS A STYLE RATHER THAN A CLASS. Tailwind
- * emits only what it has seen, so `col-span-${n}` is a class that exists in no
- * stylesheet — the silent half of the same fault that left a whole token file
- * inert. A span is a number from a declaration, so it is set as a property.
+ * ONE THING TAKING THE WHOLE ROW OF A GRID — see the kernel's `Wide`.
  *
- * ⚠️ AND IT IS CLAMPED BY THE GRID ITSELF. `auto-fit` has no fixed count, so a
- * span of three in a grid that fits two takes the two — the browser's answer,
- * and the right one at every width including the ones nobody anticipated.
+ * ⚠️ `1 / -1`, NOT `span N`, AND THE DIFFERENCE WAS MEASURED. This read
+ * `gridColumn: span ${cells}` under a comment claiming "auto-fit has no fixed
+ * count, so a span of three in a grid that fits two takes the two — the
+ * browser's answer". That is not the browser's answer: an item asking for three
+ * tracks GETS three, invented if necessary, so a list under three tiles forced a
+ * third column onto a phone that fits two and reached 407px past a 390px
+ * viewport. `1 / -1` names no count, so it can never create one.
+ *
+ * ⚠️ AND IT IS A STYLE RATHER THAN A CLASS BECAUSE TAILWIND EMITS ONLY WHAT IT
+ * HAS SEEN. That half of the old note was right and still is — `col-span-${n}`
+ * is a class that exists in no stylesheet, which is the silent fault that once
+ * left a whole token file inert.
  */
-export const spanning = (cells: number | undefined): React.CSSProperties =>
-  (cells && cells > 1 ? { gridColumn: `span ${cells}` } : {});
+export const spanning = (wide: true | undefined): React.CSSProperties =>
+  (wide ? { gridColumn: "1 / -1" } : {});

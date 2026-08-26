@@ -1,6 +1,6 @@
 import { env } from "cloudflare:test";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
-import type { AppSpec } from "@engine/kernel";
+import { viewsIn, type AppSpec } from "@engine/kernel";
 import {
   DIRECTORY_MODULES, SHARD_MODULES,
   NOBODY, addShard, applySchema, createTenant, found, locator, memberFor,
@@ -118,10 +118,37 @@ describe("a screen drawn from what it declares", () => {
     const [status, said] = await screen("notes");
     expect(status, JSON.stringify(said)).toBe(200);
     const drawn = said as { views: Record<string, { items: { title: string }[]; count: number }> };
-    expect(Object.keys(drawn.views)).toEqual(["every-note"]);
+    /* ⚠️ DERIVED FROM THE BODY RATHER THAN LISTED HERE. A written list is a
+       second copy of the declaration, and it goes stale the moment a screen
+       reads one more view — which is what happened the day this screen gained
+       its supporting figures: the door was right and the assertion was old. */
+    const reads = viewsIn(GROUND.screens!.find((one) => one.id === "notes")!.body!);
+    expect(Object.keys(drawn.views).sort()).toEqual([...new Set(reads)].sort());
     expect(drawn.views["every-note"]?.count).toBe(2);
     expect(drawn.views["every-note"]?.items.map((n) => n.title).sort())
       .toEqual(["Second thing", "Sharpen the saw"]);
+  });
+
+  /*
+    ⚠️ A SUPPORTING FIGURE IS A COUNT OVER A NARROWED VIEW, AND THE NARROWING HAS
+    TO REACH THE DATABASE. Both halves are drawn from one declaration, so a
+    `where` that was carried to the browser and not to the query would put the
+    workspace's TOTAL under three different labels — three figures agreeing with
+    each other, disagreeing with every list behind them, and none of them wrong
+    in a way a screenshot shows.
+  */
+  it("counts a narrowed view over the rows it narrows to, not over all of them", async () => {
+    await write("Sharpen the saw", "Before the tree");
+    await write("Second thing", "After the first");
+
+    const [status, said] = await screen("notes");
+    expect(status, JSON.stringify(said)).toBe(200);
+    const drawn = said as { views: Record<string, { count: number }> };
+    expect(drawn.views["every-note"]?.count).toBe(2);
+    /* ⚠️ Neither was written pinned, so the narrowed count is zero while the
+       total is two — the one shape that proves the filter ran. */
+    expect(drawn.views["pinned-notes"]?.count).toBe(0);
+    expect(drawn.views["open-questions"]?.count).toBe(0);
   });
 
   /*

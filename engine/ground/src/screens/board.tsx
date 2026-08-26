@@ -97,10 +97,22 @@ export function Board({ route }: { readonly route: string }) {
 const rows = (of: readonly object[]) =>
   ready({ items: of as readonly Readonly<Record<string, unknown>>[], count: of.length });
 
+/*
+  ⚠️ THE NARROWED VIEWS ARE NARROWED HERE TOO, RATHER THAN GIVEN A NUMBER. A
+  supporting figure is a `count` over a view, so a board that answered each one
+  with a plausible integer would photograph a screen whose figures agree with
+  nothing — and the one fault this shape exists to prevent is a figure and the
+  list behind it disagreeing. Filtering the same sample the list draws is what
+  makes the picture check the declaration rather than illustrate it.
+*/
 const SEEN: Has = {
   views: {
     "every-note": rows(NOTES),
     "every-person": rows(PEOPLE),
+    "pinned-notes": rows(NOTES.filter((n) => n.pinned)),
+    "open-questions": rows(NOTES.filter((n) => n.kind === "question")),
+    "decisions": rows(NOTES.filter((n) => n.kind === "decision")),
+    "ideas": rows(NOTES.filter((n) => n.kind === "idea")),
   },
 };
 

@@ -478,6 +478,22 @@ export const GROUND: AppSpec = defineApp({
       anyway. What somebody wrote last is what they came back for.
     */
     { id: "every-note", of: "note", limit: 50 },
+    /*
+      ⚠️ THREE VIEWS THAT EXIST TO BE COUNTED, NOT TO BE LISTED, and that is a
+      shape worth having in the reference. A supporting figure is `count` over a
+      NARROWED view — the same mechanism the hero uses, pointed at a subset —
+      so "how many are pinned" needs no field on the collection, no counter for
+      an operation to keep in step, and no arithmetic in a screen.
+
+      ⚠️ AND THEY CARRY NO `limit`, DELIBERATELY, WHERE THE LIST ABOVE DOES. A
+      limit is a ceiling on ROWS; `count` answers the total either way (that is
+      what `Viewed.count` is for), but a limited view whose rows nothing draws is
+      a page of records fetched to be thrown away.
+    */
+    { id: "pinned-notes", of: "note", where: [{ field: "pinned", is: { literal: true } }] },
+    { id: "open-questions", of: "note", where: [{ field: "kind", is: { literal: "question" } }] },
+    { id: "decisions", of: "note", where: [{ field: "kind", is: { literal: "decision" } }] },
+    { id: "ideas", of: "note", where: [{ field: "kind", is: { literal: "idea" } }] },
   ],
   operations: [publish, ask, draft, start, teamCheckIns, share],
 
@@ -510,7 +526,20 @@ export const GROUND: AppSpec = defineApp({
       permission: "note:read", tone: "neutral",
       body: {
         shape: "list",
-        layout: { as: "stack" },
+        /*
+          ⚠️ A GRID, AND WHAT IT IS FOR IS THE THREE FIGURES UNDER THE HERO. A
+          stack would put each of them on a line of its own — three cards, each
+          one number wide, down a third of a phone — and the whole point of a
+          supporting figure is that it is read at a glance BESIDE the others.
+          `least: "tile"` is a narrowest cell rather than a column count, so it
+          is three across on a desk and two on a phone without a breakpoint.
+
+          ⚠️ AND THE LIST TAKES THE WHOLE ROW, WHICH IS WHY IT SPANS. A table in
+          a tile-wide cell is a table with one column of truncated titles beside
+          two figures — the layout would be obeying the declaration and the
+          screen would be unreadable.
+        */
+        layout: { as: "grid", least: "tile" },
         /*
           ⚠️ WHAT SOMEBODY OPENING THIS CAME FOR, AND IT IS NOT THE LIST. The
           rows are there to be scrolled; the question a person asks on arriving
@@ -543,21 +572,94 @@ export const GROUND: AppSpec = defineApp({
              the first thing a row of them collects. */
           leads: ["write", "search", "reports"],
         },
-        blocks: [{
-          block: "Listing",
-          shows: [
-            { field: "title", label: "Note" },
-            { field: "body", label: "What it says" },
-          ],
-          nothing: {
-            says: "No notes yet",
-            under: "Write one and it will be here",
+        /*
+          ⚠️ THE HERO IS ONE NUMBER AND THE SCREEN NEEDS FOUR, WHICH IS THE
+          WHOLE SHAPE THIS SCREEN EXISTS TO PROVE. A person arriving asks how
+          much there is — and then, immediately, how much of it needs them.
+          Answering only the first is a page that opens with a total and a
+          table, where every follow-up question is a scroll and a count.
+
+          ⚠️ AND ONLY ONE OF THE FOUR IS LOUD. The hero is on its own surface in
+          display type; these three are `figure` rank in plain cards. Four
+          numbers at one rank is four numbers nobody reads — the eye has to
+          choose, and whichever it picks was not a decision anybody made. That
+          is `Hero`'s own "two heroes is no hero", one step out.
+
+          ⚠️ FOUR RATHER THAN THREE, AND THE REASON IS ARITHMETIC. A phone fits
+          two tile-wide cells, so an odd count leaves the last one alone on a row
+          beside a gap — which reads as a card that failed to load rather than as
+          the end of a set. Photographed at three, then at four.
+
+          ⚠️ EACH IS A `count` OVER A NARROWED VIEW, so the figure and the list
+          behind it can never disagree: pressing through to the pinned notes
+          shows the rows the number was counted from, by construction, because
+          they are one declaration.
+
+          ⚠️ AND EACH IS A CARD OF ITS OWN (`group: null`) RATHER THAN A BARE
+          BLOCK IN A CELL. A `Stat` is a label and a number with no surface
+          under it; three of them laid on the page ground read as text that has
+          drifted into columns rather than as three things being compared.
+        */
+        blocks: [
+          {
+            group: null,
+            of: [{
+              block: "Stat",
+              bind: {
+                value: { from: { of: "count", view: "pinned-notes" } },
+                label: { from: { of: "words", says: "Pinned" } },
+              },
+            }],
           },
-          bind: {
-            label: { from: { of: "words", says: "Notes" } },
-            of: { from: { of: "view", view: "every-note" } },
+          {
+            group: null,
+            of: [{
+              block: "Stat",
+              bind: {
+                value: { from: { of: "count", view: "open-questions" } },
+                label: { from: { of: "words", says: "Questions open" } },
+              },
+            }],
           },
-        }],
+          {
+            group: null,
+            of: [{
+              block: "Stat",
+              bind: {
+                value: { from: { of: "count", view: "decisions" } },
+                label: { from: { of: "words", says: "Decisions" } },
+              },
+            }],
+          },
+          {
+            group: null,
+            of: [{
+              block: "Stat",
+              bind: {
+                value: { from: { of: "count", view: "ideas" } },
+                label: { from: { of: "words", says: "Ideas" } },
+              },
+            }],
+          },
+          {
+            block: "Listing",
+            /* ⚠️ THE WHOLE ROW — see `Wide`. A table in a tile-wide cell is one
+               column of truncated titles beside two figures. */
+            wide: true,
+            shows: [
+              { field: "title", label: "Note" },
+              { field: "body", label: "What it says" },
+            ],
+            nothing: {
+              says: "No notes yet",
+              under: "Write one and it will be here",
+            },
+            bind: {
+              label: { from: { of: "words", says: "Notes" } },
+              of: { from: { of: "view", view: "every-note" } },
+            },
+          },
+        ],
       } },
     { id: "people", route: "/people", label: "People", nav: "primary", icon: "people",
       permission: "member:read" },

@@ -12,20 +12,39 @@
  * is already in the reference somebody copies from.
  */
 
+import { join } from "node:path";
 import { chromium, type Browser } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
-  DESK, PHONE, geometryOf, mixedHeads, sayHeads, sayTwins, strayTwins, stylesheet, tooSmall,
+  DESK, PHONE, geometryOf, mixedHeads, mounted, sayHeads, sayTwins, strayTwins, stylesheet, tooSmall,
 } from "@engine/design/measuring";
-import { GROUND_ROUTES, GroundScreen } from "../src/screens/index.js";
+import { GROUND_ROUTES } from "../src/screens/index.js";
 
 let browser: Browser;
 let css: string;
-beforeAll(async () => { css = stylesheet(); browser = await chromium.launch(); }, 120_000);
+let code: string;
+beforeAll(async () => {
+  css = stylesheet();
+  code = await mounted(join(import.meta.dirname, "..", "src", "screens", "board-entry.tsx"));
+  browser = await chromium.launch();
+}, 120_000);
 afterAll(async () => { await browser?.close(); });
 
+/**
+ * ⚠️ THE BOARD, NOT THE COMPONENT — the same mount the photographs use, and the
+ * reason is a fault this sweep could not see. It measured `GroundScreen`, which
+ * hands every route to a hand-WRITTEN component; a screen ported to a
+ * declaration is drawn by the renderer instead, so its layout was measured by
+ * nothing at all. A declared body whose grid overflowed a phone passed sixty
+ * green assertions, because the thing being measured was a file that shares its
+ * name.
+ *
+ * ⚠️ AND IT MEASURES THE CHROME WITH IT, which is the other half. A screen that
+ * fits at 390 by itself can still be pushed sideways by the crown, the dock and
+ * the room reserved for the island — none of which is in a screen's own render.
+ */
 const at = (route: string, viewport: { width: number; height: number }) =>
-  geometryOf(browser, <GroundScreen route={route} />, css, viewport);
+  geometryOf(browser, { code, route }, css, viewport);
 
 describe("every screen, at both widths", () => {
   for (const route of GROUND_ROUTES) {

@@ -119,7 +119,7 @@ kind of source it cannot draw · a slot a block does not have · a required slot
 left unbound · a field bound on a screen that is about nothing · a field the
 subject does not have · a formatter that will say `Invalid Date` · a view over a
 collection nobody declares · a view narrowing or sorting on a field that is not
-there · a span wider than its grid · a grid wide enough to be a coordinate
+there · a whole-row block on a layout with no columns · a grid wide enough to be a coordinate
 system · a body with nothing on it · a view no screen reads.
 
 Three things the contract settled that the plan had left open:
@@ -313,6 +313,13 @@ percentage) became `aside: "start" | "end"` — which side it is DRAWN on, with 
 reading order fixed — and through `Span`, whose `cols` became `cells`, bounded by
 `CELLS_MOST = 3`.
 
+⚠️ **AND THE CELL COUNT WAS LATER REMOVED IN FULL — see D98.** It is `wide: true`
+now, meaning the whole row, because a count is a request an `auto-fit` grid
+satisfies by INVENTING tracks: a list asking for three cells forced a third
+column onto a phone that fits two and pushed the page 17px sideways. The reasoning
+above is right about the direction and stopped one step short — a number of cells
+is a coordinate wearing a smaller word.
+
 **`beside: true` is how a block claims the aside**, and both directions refuse:
 a `split` where nothing claims it (or two things do) is `split_without_an_aside`,
 a `beside` on a stack or a grid is `aside_without_a_split`. A split with no aside
@@ -432,7 +439,7 @@ failing rather than by reasoning:
 - **`shows`** — a list's columns. `Listing`'s own header has argued since it was
   written that which fields matter, in what order, under what words, and which
   sort are four decisions a component cannot derive. It is a projection, not a
-  binding, so it sits beside `span` and `when`; every field is checked against
+  binding, so it sits beside `wide` and `when`; every field is checked against
   the collection the view reads. The first three columns also become the narrow
   half's name, second line and end — without which a phone drew the row's id,
   which is `keys.test.mjs`'s fault with the declaration supplying the key.

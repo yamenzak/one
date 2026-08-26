@@ -3638,3 +3638,46 @@ a bar chart whose marks have no names; a row of shortcuts naming nothing, or
 naming a screen the app does not declare; a second copy of a guide's steps
 anywhere; or a platform read added to `SHARED_READS` without its answer's fields
 beside it.
+
+## D98 — A block takes the whole row or one cell, and a count of cells was a request the browser could not refuse
+
+`Span { cells?: number }` is gone. A block that wants more room than one cell
+says `wide: true` and takes the row; there is no number, no `CELLS_MOST`
+ceiling, and no `span_too_wide`.
+
+**The count did not clamp, and the code carried a comment saying it did.**
+`spanning` emitted `grid-column: span N` under the claim that "`auto-fit` has no
+fixed count, so a span of three in a grid that fits two takes the two — the
+browser's answer, and the right one at every width including the ones nobody
+anticipated". That is not the browser's answer. A grid item asking for three
+tracks gets three, invented if the template does not supply them, and the
+invented ones are `auto`-sized. Measured: a list under three tiles on a 390px
+phone reached **407px**, so the page scrolled sideways at the one width every
+screen in this repository is checked at.
+
+**The claim survived because the only screen that could show it was measured by
+nothing.** `span` had exactly one use in the tree — written the same afternoon
+this was found — and the ground's geometry sweep mounted `GroundScreen`, which
+hands every route to a hand-WRITTEN component. A declared body is drawn by the
+renderer instead, so its layout was measured by no sweep at all: sixty green
+assertions about files that share a screen's name. The sweep mounts the board
+now, which is the same mount the photographs use, so a declared screen and the
+chrome around it are measured together.
+
+**`1 / -1` is the only span expression that cannot create a track.** It names no
+count, so it means "every column that exists" at every width — the same promise
+`auto-fit` and `Cell` already make, and the one a number cannot keep. Anything
+between one cell and the whole row would have to know how many columns there
+are, and nothing does: that is the property `least: "tile" | "panel" | "card"`
+was chosen for one stage earlier.
+
+**And a count is not coming back without a screen behind it.** "Two of four on a
+desk" is a real thing to want and nothing in this repository wanted it. The
+feature was declared, bounded at three, refused above it, tested three ways, and
+used once — by the screen that then overflowed. That is the eleven charts and the
+six list shapes again: a capability sized by what the layout could express rather
+than by what a product draws.
+
+**Therefore never:** a grid item given a track count a declaration chose; a
+comment asserting a browser behaviour that no test reproduces; or a measuring
+sweep pointed at the components a product used to be made of.

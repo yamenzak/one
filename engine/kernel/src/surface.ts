@@ -345,25 +345,33 @@ export type Presence =
 /* --------------------------------------------------------------- the body --- */
 
 /**
- * HOW MUCH ROOM A BLOCK ASKS FOR.
+ * ⚠️ THE ROOM A BLOCK ASKS FOR IS "THE WHOLE ROW" OR IT IS NOTHING, AND THE
+ * ALTERNATIVE WAS MEASURED RATHER THAN ARGUED. This was `Span { cells?: number }`
+ * — up to three, refused above that — and a grid here is `auto-fit` with a
+ * narrowest cell, which means NOBODY KNOWS HOW MANY COLUMNS THERE ARE. An item
+ * asking for three of them is a request the browser satisfies by INVENTING
+ * tracks, so a list under three tiles forced a third column onto a phone that
+ * fits two and reached 407px past a 390px viewport. The old code carried a
+ * comment claiming the browser clamps it; it does not, and the claim survived
+ * because the one screen that could have shown it was measured by nothing.
  *
- * ⚠️ A SPAN IS WHAT THE LAYOUT IS TOLD, AND THE BLOCK NEVER SEES IT. That is the
- * one rule in this file most likely to be broken by somebody being helpful: a
- * block that knows it is "in a 2×1" is a block that breaks in the first layout
- * not using that vocabulary, and every layout after this one is a layout nobody
- * has designed yet. A block reflows by measuring its OWN box — a container query
- * — so it works at any width, including widths that arrive from a sidebar
- * opening, a phone rotating or a workspace nobody anticipated.
+ * ⚠️ SO THE ONLY SPAN THAT CANNOT CREATE A TRACK IS THE ONE THAT NAMES NONE.
+ * `grid-column: 1 / -1` means "every column that exists", at every width,
+ * including the widths nobody tested — which is the same promise `auto-fit` and
+ * `Cell` already make, and which a count cannot keep.
+ *
+ * ⚠️ AND A COUNT IS NOT COMING BACK WITHOUT A SCREEN BEHIND IT. "Two of four on
+ * a desk" is a real thing to want and nothing in this repository wanted it: the
+ * feature was declared, refused-above-three, tested three ways, and used once —
+ * by the screen that then overflowed. Same argument as the eleven charts.
+ *
+ * ⚠️ A BLOCK STILL NEVER SEES THIS. That is the rule in this file most likely to
+ * be broken by somebody being helpful: a block that knows it is "in a 2×1" is a
+ * block that breaks in the first layout not using that vocabulary. A block
+ * reflows by measuring its OWN box — a container query — so it works at any
+ * width, including one arriving from a sidebar opening or a phone rotating.
  */
-export interface Span {
-  /**
-   * ⚠️ HOW MANY CELLS, NOT WHICH ONES. A block that names a position is placed
-   * by the author; a block that asks for room is placed by the layout, and only
-   * the second survives a grid that fits a different number of cells on a
-   * different screen.
-   */
-  readonly cells?: number;
-}
+export type Wide = true;
 
 /**
  * WHICH FIELDS OF A LIST BECOME A CHART'S AXES.
@@ -398,14 +406,6 @@ export interface Column {
   readonly field: string;
   readonly label: string;
 }
-
-/**
- * ⚠️ THREE CELLS IS THE CEILING, AND IT IS A DESIGN DECISION RATHER THAN A
- * LIMITATION. A block spanning most of a grid is a block that wanted to be
- * outside the grid — put it above or below, where it is one thing on its own,
- * rather than making the grid pretend to be a page layout.
- */
-export const CELLS_MOST = 3;
 
 /**
  * HOW NARROW A CELL MAY BE — a named width, never a number.
@@ -582,7 +582,7 @@ export interface BlockSpec {
   /** ⚠️ A registered component — see `BlockEntry`. */
   readonly block: string;
   readonly label?: string;
-  readonly span?: Span;
+  readonly wide?: Wide;
   readonly when?: Presence;
   readonly bind?: Readonly<Record<string, Binding>>;
   readonly does?: readonly (string | ActSpec)[];
@@ -677,7 +677,7 @@ export interface GroupSpec {
   readonly group: string | null;
   readonly of: readonly BlockSpec[];
   readonly when?: Presence;
-  readonly span?: Span;
+  readonly wide?: Wide;
   /** ⚠️ See `BlockSpec.beside` — a group can be the aside just as a block can. */
   readonly beside?: true;
 }
@@ -896,7 +896,7 @@ export type SurfaceRefusal =
   | "field_unknown" | "field_without_a_subject" | "format_wrong"
   | "dispatch_not_closed" | "dispatch_unreachable" | "two_kinds_of_screen"
   | "goes_nowhere"
-  | "span_too_wide" | "span_without_a_grid"
+  | "wide_without_a_grid"
   | "shows_without_a_list" | "shows_field_unknown" | "nothing_unsaid"
   /* ⚠️ THE THREE A CHART'S AXES CAN GET WRONG — see `PlotSpec`. Every one of
      them draws an empty box under a correct heading. */
@@ -1515,15 +1515,9 @@ export function refuseSurface(
   */
   for (const placed of body.blocks) {
     const said = isGroup(placed) ? `the "${placed.group ?? "unnamed"}" group` : placed.block;
-    if (placed.span && body.layout.as !== "grid") {
-      at("span_without_a_grid",
-        `${said} asks for ${placed.span.cells ?? 1} cells, and a ${body.layout.as} has none to give`);
-    }
-    if (placed.span?.cells !== undefined
-      && (placed.span.cells < 2 || placed.span.cells > CELLS_MOST)) {
-      at("span_too_wide",
-        `${said} asks for ${placed.span.cells} cells — one is the default and more than `
-        + `${CELLS_MOST} is a block that wanted to be outside the grid`);
+    if (placed.wide && body.layout.as !== "grid") {
+      at("wide_without_a_grid",
+        `${said} asks for the whole row, and a ${body.layout.as} has no columns to give it`);
     }
     if (!isGroup(placed)) continue;
     if (placed.of.length === 0) {
@@ -1531,9 +1525,9 @@ export function refuseSurface(
         `${said} holds no blocks, which draws a heading over an empty card`);
     }
     for (const b of placed.of) {
-      if (b.span) {
-        at("span_without_a_grid",
-          `${b.block} asks for room inside ${said}, whose blocks stack — the span belongs on the group`);
+      if (b.wide) {
+        at("wide_without_a_grid",
+          `${b.block} asks for the whole row inside ${said}, whose blocks stack — it belongs on the group`);
       }
     }
   }

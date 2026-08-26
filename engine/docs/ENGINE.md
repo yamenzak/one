@@ -421,7 +421,7 @@ and a manifest that does not compose refuses to boot.
 | `access` | permissions, roles, and what an app may never claim | 15 | — |
 | `reach` | how far one person works inside a workspace — where, as against what (D45) | 4 | — |
 | `gate` | the eight gates, in the order that decides which sentence somebody reads first | 3 | — |
-| `surface` | a screen declared — its shape, its blocks, and the closed vocabulary they bind through | 22 | — |
+| `surface` | a screen declared — its shape, its blocks, and the closed vocabulary they bind through | 21 | — |
 | `blocks` | which blocks a screen may name at all | 2 | — |
 | `manifest` | the whole app, and the composition that refuses a broken one | 14 | — |
 | `entitlement` | what a plan includes, and the allowance algebra over it | 17 | — |
@@ -445,7 +445,7 @@ and a manifest that does not compose refuses to boot.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**314 of them**, 313 reached by something today.
+**313 of them**, 312 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -1174,6 +1174,7 @@ its own header, cited by other files, and doing nothing.
 | D95 | A reference is a question about which row, and a form has to be able to ask it | 0 |
 | D96 | A screen is read, walked or worked in, and a flow's declaration is checked | 0 |
 | D97 | A screen may be narrowed, may draw marks, and may place the app's own book | 0 |
+| D98 | A block takes the whole row or one cell, and a count of cells was a request the browser could not refuse | 0 |
 <!-- /generated -->
 
 ---

@@ -17,7 +17,7 @@ import { describe, expect, it } from "vitest";
 import { collection } from "../src/collection.js";
 import { field } from "../src/field.js";
 import {
-  CELLS_MOST, actsIn, blocksIn, fieldsIn, fillOf, fillsIn, refuseSurface, refuseView, unreadViews,
+  actsIn, blocksIn, fieldsIn, fillOf, fillsIn, refuseSurface, refuseView, unreadViews,
   viewsIn, type ActSpec, type BlockIndex, type SurfaceSpec, type ViewSpec,
 } from "../src/surface.js";
 import { BLOCKS, HEROES } from "../src/blocks.js";
@@ -442,12 +442,12 @@ describe("blocks sit under one heading, and the nesting stops there", () => {
           group: "Label",
           of: [{
             block: "Heading",
-            span: { cells: 2 },
+            wide: true,
             bind: { says: { from: { of: "words", says: "Note" } } },
           }],
         }],
       }),
-    }))).toContain("span_without_a_grid");
+    }))).toContain("wide_without_a_grid");
   });
 
   it("lets the group itself ask for room", () => {
@@ -650,16 +650,16 @@ describe("a view is checked against the collection it reads", () => {
 /* ---------------------------------------------------------------- layouts --- */
 
 describe("a block asks for room the layout has", () => {
-  it("refuses a span on a stack, which has no cells to give", () => {
+  it("refuses a whole-row block on a stack, which has no columns to give", () => {
     expect(why(screen({
       body: body({
         blocks: [{
           block: "Heading",
-          span: { cells: 2 },
+          wide: true,
           bind: { says: { from: { of: "words", says: "Note" } } },
         }],
       }),
-    }))).toContain("span_without_a_grid");
+    }))).toContain("wide_without_a_grid");
   });
 
   /*
@@ -705,17 +705,25 @@ describe("a block asks for room the layout has", () => {
     }))).toContain("aside_without_a_split");
   });
 
-  it("refuses a span wide enough to be a page layout", () => {
+  /*
+    ⚠️ AND IT IS ACCEPTED ON A GRID, which is the whole of what `wide` now means.
+    This assertion used to be "refuses a span wide enough to be a page layout",
+    over a count that could ask for four cells in a grid that fits two — a
+    request the browser answers by inventing tracks, so the refusal was guarding
+    the wrong end of a mechanism that overflowed at every count above the number
+    of columns nobody knows. See `Wide`.
+  */
+  it("accepts a whole-row block on a grid", () => {
     expect(why(screen({
       body: body({
         layout: { as: "grid", least: "card" },
         blocks: [{
           block: "Heading",
-          span: { cells: CELLS_MOST + 1 },
+          wide: true,
           bind: { says: { from: { of: "words", says: "Note" } } },
         }],
       }),
-    }))).toContain("span_too_wide");
+    }))).toEqual([]);
   });
 
   it("refuses a body with nothing on it", () => {

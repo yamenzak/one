@@ -460,9 +460,10 @@ const wrap = (placed: Placed, has: Has, key: number, layout: Layout) => {
         </Group>
       )
       : <Placed block={placed} has={has} />;
-    /* ⚠️ A SPAN IS ONLY EVER A GRID'S, and the kernel refuses one anywhere else
-       (`span_without_a_grid`) — so this reads the layout rather than trusting it. */
-    const style = layout.as === "grid" ? spanning(placed.span?.cells) : {};
+    /* ⚠️ THE WHOLE ROW IS ONLY EVER A GRID'S, and the kernel refuses it anywhere
+       else (`wide_without_a_grid`) — so this reads the layout rather than
+       trusting it. */
+    const style = layout.as === "grid" ? spanning(placed.wide) : {};
     return <div key={key} style={style}>{inner}</div>;
   }
   return null;
