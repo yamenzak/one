@@ -32,7 +32,7 @@ const TALL = { width: PHONE.width, height: 1_000 } as const;
 
 /* ⚠️ ONE WITH A DOCK AND ONE WITH AN ACT, because a screen has one or the other
    and the two feet are what this is for. */
-const ON = ["/notes", "/reports"] as const;
+const ON = ["/", "/reports"] as const;
 
 let browser: Browser;
 let code: string;
@@ -50,7 +50,7 @@ describe("the chrome, photographed", () => {
   for (const theme of ["light", "dark"] as const) {
     for (const route of ON) {
       it(`${theme}: ${route}`, async () => {
-        const to = join(OUT, `${theme}-${route.slice(1)}.png`);
+        const to = join(OUT, `${theme}-${route === "/" ? "home" : route.slice(1)}.png`);
         await shoot(browser, { code, route }, css, TALL, theme, to);
         expect(statSync(to).size, `${to} is blank`).toBeGreaterThan(5_000);
       }, 60_000);

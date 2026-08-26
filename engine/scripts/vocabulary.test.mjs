@@ -104,7 +104,21 @@ for (const { at, text } of files) {
 
 /* ------------------------------------------------------------ the registry --- */
 
-const registry = readFileSync(join(ENGINE, "kernel/src/blocks.ts"), "utf8");
+const whole = readFileSync(join(ENGINE, "kernel/src/blocks.ts"), "utf8");
+
+/*
+  ⚠️ TWO REGISTRIES IN ONE FILE, AND ONLY THE FIRST IS DRAWN BY A COMPONENT OF
+  ITS OWN NAME. A block names an export of the design package and is placed by
+  looking it up; a HERO KIND is drawn by a BRANCH in the renderer, on purpose —
+  "a lookup table keyed on the kind would be the shape that invites registering
+  six of them; a branch is a place somebody has to write the drawing code, which
+  is the point at which 'does a screen want this' gets asked". So the questions
+  are different and both are asked, below and further down.
+*/
+const cut = whole.indexOf("export const HEROES");
+const registry = cut === -1 ? whole : whole.slice(0, cut);
+const heroes = cut === -1 ? "" : whole.slice(cut);
+
 const declared = new Set();
 for (const m of registry.matchAll(/block\("(\w+)"/g)) declared.add(m[1]);
 
@@ -355,6 +369,40 @@ for (const [why, names] of Object.entries(WHY)) {
   if (!wrong) {
     ok(`bound: every slot is a prop its component takes — `
       + `${[...slotsOf.values()].reduce((n, x) => n + x.length, 0)} across ${slotsOf.size} block(s)`);
+  }
+}
+
+/* ------------------------------------------------- and a hero is drawn too --- */
+
+/**
+ * ⚠️ A HERO KIND IS DRAWN BY A BRANCH, SO WHAT IS CHECKED IS THAT THE BRANCH IS
+ * THERE. A block's claim is "the design package exports a component of this
+ * name"; a hero's is "the renderer knows what to do when a screen says this" —
+ * different claims, and only the second one can be made about a kind that has no
+ * component of its own. The failure both prevent is identical: a declaration
+ * that composes, passes everything, and draws a blank region where the biggest
+ * thing on the screen goes.
+ */
+{
+  const kinds = [...heroes.matchAll(/^  (?:\/\*\*[\s\S]*?\*\/\n\s*)?(\w+): block\("(\w+)"/gm)]
+    .map((m) => m[2]);
+  const led = readFileSync(join(ENGINE, "design/src/rendered/body.tsx"), "utf8");
+  let blind = 0;
+  for (const kind of kinds) {
+    if (!new RegExp(`hero\\.as === "${kind}"`).test(led)) {
+      blind++;
+      fail(`kernel/src/blocks.ts registers the hero kind "${kind}", and the renderer has no `
+        + `branch for it.\n`
+        + `       A screen leading with it composes and draws nothing where the one thing\n`
+        + `       the screen is about was meant to be.`);
+    }
+  }
+  /* ⚠️ AND A FLOOR, for this parser's own sake — see the one above. */
+  if (!kinds.length) {
+    fail("kernel/src/blocks.ts: no hero kinds parsed out of HEROES.\n"
+      + "       Either the registry is empty or this guard has stopped reading it.");
+  } else if (!blind) {
+    ok(`heroes: ${kinds.length} kind(s), every one drawn by the renderer`);
   }
 }
 

@@ -381,11 +381,17 @@ export const HEROES: BlockIndex = {
    * not required, because a figure computed at read time genuinely has no age —
    * but a screen reading a stored total and omitting it is showing a number
    * without saying whether to believe it.
+   *
+   * ⚠️ AND THERE IS NO TREND SLOT, WHICH WAS THE FOURTH ONE SKETCHED. A spark
+   * beside the figure needs a VIEW projected into a series, and the renderer
+   * performs exactly two such projections — the reason six list shapes were
+   * taken out of the block registry. Adding a third here, for a slot no screen
+   * has asked for, would be that mistake made deliberately. It arrives designed
+   * against the screen that wants it, or it does not arrive.
    */
   figure: block("figure", "figure", {
     value: slot("The figure", FIGURE, true),
     of: slot("What it is of", SAID, true),
     fresh: slot("When it was last true", SAID),
-    trend: slot("How it has moved", ["view"], false, true),
   }),
 };

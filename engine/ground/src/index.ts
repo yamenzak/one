@@ -511,6 +511,27 @@ export const GROUND: AppSpec = defineApp({
       body: {
         shape: "list",
         layout: { as: "stack" },
+        /*
+          ⚠️ WHAT SOMEBODY OPENING THIS CAME FOR, AND IT IS NOT THE LIST. The
+          rows are there to be scrolled; the question a person asks on arriving
+          is how much of this there is, which is one number and was previously
+          nowhere on the screen at all — so the page opened with a heading and a
+          table and nothing to land on.
+
+          ⚠️ AND THE EMPTY SENTENCE IS NOT THE LIST'S. A workspace with no notes
+          gets "Nothing written yet" HERE, in the biggest type on the screen,
+          and "No notes yet" in the region below — two different sentences
+          because they answer two different questions: whether anything has
+          happened, and what to do about it.
+        */
+        hero: {
+          as: "figure",
+          nothing: { says: "Nothing yet", under: "Write one and it will be counted here" },
+          bind: {
+            value: { from: { of: "count", view: "every-note" } },
+            of: { from: { of: "words", says: "Notes in this workspace" } },
+          },
+        },
         blocks: [{
           block: "Listing",
           shows: [

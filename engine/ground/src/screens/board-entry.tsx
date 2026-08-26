@@ -10,4 +10,4 @@ import { Board } from "./board.js";
 declare global { interface Window { __ROUTE?: string } }
 
 createRoot(document.getElementById("root") as HTMLElement)
-  .render(<Board route={window.__ROUTE ?? "/notes"} />);
+  .render(<Board route={window.__ROUTE ?? "/"} />);

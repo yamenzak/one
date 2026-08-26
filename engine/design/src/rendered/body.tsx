@@ -42,6 +42,7 @@ import { Num, Size, Unit, When } from "../parts/said.js";
 import { Money } from "../parts/surfaces.js";
 import { Tally } from "../parts/tally.js";
 import { PARTS } from "./parts.js";
+import { Hero } from "../chart/figures.js";
 
 /* ------------------------------------------------------------ what it has --- */
 
@@ -481,6 +482,7 @@ export function Body({ body, has }: BodyProps) {
   const rest = body.blocks.filter((p) => !p.beside);
   return (
     <>
+      <Led body={body} has={has} />
       <Narrowing body={body} has={has} />
       <Arranged
         layout={body.layout}
@@ -490,6 +492,48 @@ export function Body({ body, has }: BodyProps) {
       </Arranged>
     </>
   );
+}
+
+/**
+ * WHAT THE SCREEN LEADS WITH — see `HeroSpec`.
+ *
+ * ⚠️ ABOVE EVERYTHING AND OUTSIDE THE LAYOUT, which is the whole reason the
+ * region is named rather than being the first block. Put through `Arranged` it
+ * would take a grid cell and sit beside the things it is supposed to introduce,
+ * and it could not bleed past the gutter every block obeys.
+ *
+ * ⚠️ AND ITS OWN SENTENCE FOR AN EMPTY WORKSPACE, WHICH IS WHY `nothing` IS
+ * REQUIRED. The hero is the first thing on a new workspace's first screen: a
+ * figure with no value yet has to say that nothing has HAPPENED, in the app's
+ * own words, because a blank space where the biggest number on the screen goes
+ * reads as a page that failed rather than as a workspace that is new.
+ */
+function Led({ body, has }: BodyProps) {
+  const hero = body.hero;
+  if (!hero) return null;
+  /* ⚠️ ONE KIND, AND THE SWITCH IS HOW THE NEXT ONE ARRIVES. A lookup table
+     keyed on the kind would be the shape that invites registering six of them;
+     a branch per kind is a place somebody has to write the drawing code, which
+     is the point at which "does a screen want this" gets asked. */
+  if (hero.as === "figure") {
+    const value = hero.bind?.["value"] ? drawn(hero.bind["value"], has) : undefined;
+    const of = hero.bind?.["of"] ? drawn(hero.bind["of"], has) : undefined;
+    const fresh = hero.bind?.["fresh"] ? drawn(hero.bind["fresh"], has) : undefined;
+    /* ⚠️ `undefined` AND `null` BOTH MEAN NOT YET, AND ZERO DOES NOT. A workspace
+       that has counted nothing has no figure; a workspace that counted and found
+       none has a figure and it is 0. Reading them the same way is how an empty
+       state comes to cover a real answer. */
+    const nothing = value === undefined || value === null;
+    return (
+      <Hero
+        eyebrow={nothing ? undefined : String(of ?? "")}
+        value={nothing ? hero.nothing.says : (value as number | string)}
+        count={!nothing}
+        identifier={nothing ? hero.nothing.under : (fresh as React.ReactNode)}
+      />
+    );
+  }
+  return null;
 }
 
 /**
