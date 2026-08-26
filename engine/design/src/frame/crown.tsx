@@ -54,15 +54,29 @@ export function LeaveChip({
 }) {
   const says = label ?? (leave === "dismiss" ? "Close" : "Back");
   return (
-    /* ⚠️ NO CHIP — the hem behind the crown is what holds it now. It carried
-       `data-chrome` so it stayed findable over whatever scrolled past; a fill
-       on the one control every screen has, purely for contrast, is the shape
-       the hem removes everywhere else too. */
+    /*
+      ⚠️ A PLATE OF THE PAGE'S OWN MATERIAL, AND THIS REVERSES A DECISION THAT
+      WAS WRITTEN HERE. It used to be a ghost over the hem, on the argument that
+      a fill purely for contrast is the shape the hem removes everywhere else —
+      which was right about the CAUSE and wrong about the effect. The hem does
+      hold contrast, so the icon stayed findable; what it cannot do is make the
+      control read as an object. An icon on a gradient smear looks painted onto
+      the page, and the whole crown then reads as a different material from the
+      cards below it, which is most of the difference between a chrome that looks
+      designed and one that looks assembled.
+
+      ⚠️ THE FILL IS NOT DOING CONTRAST WORK, WHICH IS WHY IT IS ALLOWED. It is
+      the same surface, radius and shadow a card has, so the crown is made of the
+      page rather than sitting on top of it — one material, one system. That is a
+      different argument from the one the hem answers, and both hold: the hem
+      still carries legibility over whatever scrolls past, and the plate carries
+      pressability.
+    */
     <Hint says={says}>
       <Button
         isIconOnly
         size={CROWN_SIZE}
-        variant="ghost"
+        variant="tertiary"
         aria-label={says}
         onPress={onDo}
       >
@@ -243,6 +257,37 @@ export interface CrownProps {
     readonly onOpen?: () => void;
     /** ⚠️ A dot, never a count — see `Island`. */
     readonly unread?: boolean;
+    /**
+     * THE TWO LINES BESIDE THE FACE, WHICH SAY WHERE THEY ARE.
+     *
+     * ⚠️ A FACE ON ITS OWN IS DECORATION AND A FACE BESIDE A SENTENCE IS AN
+     * ILLUSTRATION OF IT. A lone plate in the corner is a control somebody has
+     * to press to find out what it does; the same plate next to two lines of
+     * words is the subject of a sentence, and the whole corner stops being an
+     * ornament.
+     *
+     * ⚠️ AND IT IS WHERE, NEVER A GREETING. "Good evening" is filler at six in
+     * the morning, it says the same thing to everybody, and it spends the one
+     * piece of prose the chrome has on something the reader can see out of a
+     * window. What belongs here is the thing somebody would otherwise have to go
+     * and check: which workspace they are in, and which part of it — the two
+     * facts that make every number on the screen mean something different if
+     * they are wrong.
+     *
+     * ⚠️ `label` AND `under`, WHICH IS THE PAIR EVERY ROW IN THIS LIBRARY USES,
+     * and both other names tried were taken by a meaning that would have been
+     * read instead. `at` is the column a moment lives in throughout this tree,
+     * so a checker looking for dates shown in their stored spelling found this
+     * one — correctly, on the evidence. `where` is the jurisdiction a workspace
+     * sits in, a closed set of keys, so the guard that stops a screen showing
+     * somebody a code found the next one. Two collisions in one small addition
+     * is the vocabulary being genuinely closed rather than nearly closed, and
+     * the lesson is cheap: a name that means something specific elsewhere in a
+     * tree will be read that way here, by a person as readily as by a script.
+     */
+    readonly label?: string;
+    /** The second line — see `label`. */
+    readonly under?: string;
   };
   /** ⚠️ Absent means there is nowhere to go, which is a real state — a surface
       opened as the page itself has nothing underneath it. */
@@ -473,6 +518,28 @@ export function Crown({
                 </Pip>
               </Button>
             </Hint>
+          ) : null}
+          {/*
+            ⚠️ THE SENTENCE THE FACE ILLUSTRATES — see `who.where`. It is
+            deliberately NOT inside the button: pressing a face opens an account,
+            and a two-line target that wide would make every reach for the
+            workspace name open somebody's account instead.
+
+            ⚠️ AND IT YIELDS TO A NAME. A screen with its own name in the middle
+            of the crown has no room for this and does not want it — where you
+            are is the ROOT's question, and a sub-page answers a narrower one. So
+            it draws only where the middle is otherwise empty, which is the same
+            condition that makes a screen a root.
+          */}
+          {who?.label && !name && !find ? (
+            <span className="flex min-w-0 flex-col">
+              <span className={`truncate ${TYPE.label}`}>{who.label}</span>
+              {who.under ? (
+                <span className={`truncate text-muted ${TYPE.note}`}>
+                  {who.under}
+                </span>
+              ) : null}
+            </span>
           ) : null}
           {back ? (
             <LeaveChip leave={leave} label={backLabel} onDo={back} />
