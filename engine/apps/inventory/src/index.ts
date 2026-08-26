@@ -6381,6 +6381,24 @@ const manifest = (): AppSpec => defineApp({
               { block: "NoteRow",
                 when: { has: { of: "field", field: "handling" } },
                 bind: { children: { from: { of: "field", field: "handling" } } } },
+              /*
+                ⚠️ THE ONE WAY TO REACH THE MOVE SCREEN, AND IT LIVES HERE
+                BECAUSE THIS IS WHERE SOMEBODY IS STANDING WHEN THEY WANT IT.
+                `/move` is `nav: "none"`, so a screen that offers it is the only
+                thing between it and a typed address — `reached.test.mjs` is what
+                said so, on the commit that deleted this product's container and
+                took the link with it.
+
+                ⚠️ AND `goes` CARRIES THIS RECORD'S ID. The move screen resolves
+                a line id or a product id, which is what makes one link work from
+                the shelf list and from the product page alike.
+              */
+              { block: "NavRow",
+                goes: "move",
+                bind: {
+                  label: { from: { of: "words", says: "Move some of it" } },
+                  under: { from: { of: "words", says: "To another shelf" } },
+                } },
             ],
           },
           /* ⚠️ ONLY FOR A PRODUCT TRACKED ONE BY ONE. A quantity-tracked product

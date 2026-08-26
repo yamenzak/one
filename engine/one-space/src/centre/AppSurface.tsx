@@ -130,7 +130,12 @@ export function AppSurface({ app, route, onGo }: {
             own data land at about the same moment, so a different placeholder
             here would be a second shape flashing in front of the first. */}
         <React.Suspense fallback={<RowsWaiting />}>
-          <Declared screen={declared} at={beneath(declared.route, route)} go={go} />
+          <Declared
+            screen={declared}
+            screens={app.screens}
+            at={beneath(declared.route, route)}
+            go={go}
+          />
         </React.Suspense>
       </Allowed>
     );

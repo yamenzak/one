@@ -31,6 +31,8 @@
  */
 
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname } from "node:path";
 import { declaredScreens } from "./lib/declared.mjs";
 import { products } from "./lib/trees.mjs";
 
@@ -108,6 +110,39 @@ for (const [key] of NOT_YET) {
     fail(`private-ui: ${key} is drawn from a ${kind} now, and NOT_YET still excuses it.\n`
       + `       Delete the entry. A list that keeps its entries after they stop being\n`
       + `       true is how an exemption becomes permanent.`);
+  }
+}
+
+/* ---------------------------------------- and a declared screen has no mount --- */
+
+/**
+ * ⚠️ A DECLARED SCREEN'S CONTAINER IS DEAD CODE THAT LOOKS ALIVE, and it is the
+ * exact residue a port leaves. `AppSurface` draws a body ahead of any mount — the
+ * order is what makes porting a deletion — so a registration for a screen the
+ * manifest declares is a fetcher, a shaper and a component nothing ever reaches.
+ * It typechecks, it is imported, and every reader takes it for the live one.
+ *
+ * ⚠️ AND THE ORDER IS WHY THIS HAS TO BE CHECKED RATHER THAN NOTICED. The
+ * alternative order — a mount winning over the declaration it replaced — is the
+ * failure `AppSurface`'s own header rejects: the screen would go on looking
+ * correct while the manifest said something else. Having chosen the safe order,
+ * nothing anywhere reports that the loser is still there.
+ */
+const MOUNTS = /\[\s*"(\/[^"]*)"\s*,/g;
+for (const app of products()) {
+  let src;
+  try { src = readFileSync(`${dirname(fileURLToPath(import.meta.url))}/../apps/${app}/src/screens/live.tsx`, "utf8"); }
+  catch { continue; }
+  const bodied = new Map(screens
+    .filter((s) => s.app === app && s.kind === "body" && s.route)
+    .map((s) => [s.route, s.id]));
+  for (const m of src.matchAll(MOUNTS)) {
+    const id = bodied.get(m[1]);
+    if (!id) continue;
+    fail(`private-ui: ${app} mounts a component at "${m[1]}", and the manifest draws\n`
+      + `       ${app}:${id} from its own body. A declared body outranks a mount, so that\n`
+      + `       container is a fetcher and a component nothing ever reaches — delete it.\n`
+      + `       Porting a screen IS the deletion; leaving the loser behind is the residue.`);
   }
 }
 

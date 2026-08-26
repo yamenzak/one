@@ -31,29 +31,23 @@ import { hazardsIn, signalIn } from "../hazard.js";
 import { coverage, stuttering } from "../count.js";
 import { Count, type Change, type Counted, type Uncovered } from "./Count.js";
 import { SAID, type Kept } from "./Item.js";
-import { Kit, KIT_SAID, type Member, type Missing } from "./Kit.js";
 import { Receive, keyOf, type Noted } from "./Receive.js";
 import { Ask, type Answer } from "./Ask.js";
-import { Case, type Used } from "./Case.js";
-import { Run, type Covered } from "./Run.js";
-import { Work, type Jobs, type Runs } from "./Work.js";
+import type { Movement } from "./Thing.js";
 import { Scan, type Guess, type Seen } from "./Scan.js";
 import { Stock } from "./Stock.js";
 import { Home, type Moving, type Needs, type Shelf } from "./Home.js";
 import { Due, type Dated } from "./Due.js";
 import { Labels, type Labelled, type Subject, type Template } from "./Labels.js";
 import { Reports, type Reported, type Span } from "./Reports.js";
-import { Thing, type Batch, type Movement, type Piece } from "./Thing.js";
 import { Move } from "./Move.js";
 /* ⚠️ A JSON COLUMN IS WHATEVER IS IN THE COLUMN — see `packing.ts`. */
 import { readLevels } from "../packing.js";
-import { Where } from "./Where.js";
 import { Start } from "./Start.js";
 /* ⚠️ `Seen` IS TAKEN BY THE SCAN SCREEN, so the import's is renamed at the door.
    Two meanings of one word in one file is a rename waiting to pick the wrong
    one — the same reason `Got` is not called `Answer` above. */
 import { Import, MAPPABLE, type Done, type Seen as Seeing } from "./Import.js";
-import { NOBODY, Suppliers, type Supplier as SupplierLine } from "./Suppliers.js";
 import {
   Register, type Guessed, type Match, type Registering,
 } from "./Register.js";
@@ -417,23 +411,6 @@ const pick = (lines: readonly Line[], id: string): Line | undefined =>
   lines.find((l) => l.id === id)
   ?? [...lines.filter((l) => l.product === id)].sort((a, b) => b.quantity - a.quantity)[0];
 
-const movesOf = (rows: readonly Row[], places: readonly Place[]): readonly Movement[] => {
-  const named = new Map(places.map((p) => [p.id, p.name]));
-  return rows.map((row): Movement => ({
-    id: text(row.id),
-    move: (["received", "taken", "adjusted"].includes(text(row.move))
-      ? text(row.move) : "adjusted") as Movement["move"],
-    delta: num(row.delta),
-    at: text(row.at),
-    /* ⚠️ AN ACCOUNT ID IS NOT A NAME, and this is the honest state of it. The
-       roster is the platform's and a movement carries only who wrote it; until a
-       lookup is wired, saying nothing beats printing an identifier at somebody. */
-    who: "",
-    where: named.get(text(row.location)) ?? "",
-    ...(text(row.reason) ? { reason: text(row.reason) } : {}),
-    capture: text(row.capture),
-  }));
-};
 
 /** ⚠️ Everything at or below a place — what a tree row promises when it narrows. */
 const under = (places: readonly Place[], here: string | null): ReadonlySet<string> => {
@@ -513,149 +490,6 @@ const STOCK = (api: Door) => function StockHere({ app, go }: Mounted) {
   );
 };
 
-const THING = (api: Door) => function ThingHere({ go, at }: Mounted) {
-  const id = at[0] ?? "";
-  const world = useWorld(api);
-  /*
-    ⚠️ THE DEVICE'S OWN DAY, SENT WITH THE ASK. A shelf life is counted in local
-    days: the server has no way to know what day it is where somebody is
-    standing, and its own calendar would call a box expired the evening before
-    it is — or, west of Greenwich, current for another few hours after it is not.
-  */
-  const today = dayHere();
-  const dated = useAsked<{ items: readonly Row[] }>(api, "batch.due",{ product: id, today });
-  /* ⚠️ THE WHOLE HISTORY, FILTERED HERE — see the DEFER above. The generated
-     list cannot be asked for one product's movements. */
-  const history = useAsked<{ items: readonly Row[] }>(api, "ledger.list");
-  /* ⚠️ ASKED FOR EVERY PRODUCT AND USED BY TWO RUNGS, for the same reason. Which
-     of them this product has is decided below, from its own rung. */
-  const items = useAsked<{ items: readonly Row[] }>(api, "unit.list");
-  const kits = useAsked<{ items: readonly Row[] }>(api, "kit.list");
-
-  const places = world.places.status === "ready" && world.stock.status === "ready"
-    ? placesOf(world.places.data.items, world.stock.data.items)
-    : [];
-
-  const line = both(world.stock, world.kinds, (stock, kinds) =>
-    pick(linesOf(stock.items, places, kinds.items, api.file), id));
-
-  /* ⚠️ THE MOVEMENTS OF THIS PRODUCT, WHEREVER THEY HAPPENED — not of this
-     LINE. A line is a product on one shelf; a correction made after somebody
-     moved a pallet from A1 to B2 belongs to the product's history, and filtering
-     by shelf would hide the half of the story that explains the number. */
-  const of = line.status === "ready" ? line.data?.product ?? "" : "";
-  const moves: Loaded<readonly Movement[]> = both(history.of, line, (held) =>
-    movesOf(held.items.filter((r) => text(r.product) === of), places));
-
-  /* ⚠️ A LINE THAT IS NOT THERE IS NOT AN EMPTY SCREEN. An address that names a
-     record this workspace does not have is the platform's own refusal, and
-     drawing a blank product would make a wrong link look like a new product. */
-  if (line.status === "ready" && !line.data) {
-    return (
-      <Stock
-        title={nameOf("/stock")}
-        of={ready([])}
-        places={places}
-        here={null}
-        total={0}
-        more={false}
-        onMore={() => undefined}
-        again={world.again}
-        onGo={() => undefined}
-        onOpen={() => undefined}
-        onAdd={() => undefined}
-        /* ⚠️ NOTHING LEADS ANYWHERE FROM A RECORD THAT IS NOT THERE. This is
-           the empty shelf drawn over a wrong address, so its rows would be
-           offers made by a screen that is reporting a mistake. */
-        onImport={() => undefined}
-        held={new Set()}
-      />
-    );
-  }
-
-  /* ⚠️ THE ARITHMETIC IS ALREADY DONE — see `batch.due`. The screen renders what
-     it was told rather than working out which clock won, because the threshold
-     for "soon" is a setting a person on the floor cannot read. */
-  const batches: readonly Batch[] = dated.of.status === "ready"
-    ? dated.of.data.items.map((row): Batch => ({
-      id: text(row.id),
-      lot: text(row.lot),
-      on: text(row.on),
-      by: text(row.by),
-      standing: text(row.standing),
-      days: num(row.days),
-      opened: text(row.by) === "opened",
-    }))
-    : [];
-
-  /*
-    ⚠️ THE NAMED ONES OF THIS PRODUCT, AND WHICH LIST IT IS COMES FROM THE RUNG.
-    An itemised product has objects and an assembled one has kits; nothing is
-    both, so asking for the list a product cannot have would be a request whose
-    answer is always empty.
-  */
-  const tracking = line.status === "ready" ? line.data?.tracking : undefined;
-  const pieces: readonly Piece[] = tracking === "itemised"
-    ? (items.of.status === "ready" ? items.of.data.items : [])
-      .filter((row) => text(row.product) === of)
-      .map((row): Piece => ({
-        id: text(row.id),
-        label: text(row.code) || text(row.serial) || "Unlabelled",
-        under: text(row.holder)
-          ? `With ${text(row.holder)}`
-          : SAID[lifeOf(row.life)],
-      }))
-    : tracking === "assembled"
-      ? (kits.of.status === "ready" ? kits.of.data.items : [])
-        .filter((row) => text(row.product) === of)
-        .map((row): Piece => ({
-          id: text(row.id),
-          label: text(row.code) || "Unlabelled",
-          under: KIT_SAID[stateOf(row.state)],
-        }))
-      : [];
-
-  return (
-    <Thing
-      line={line.status === "ready" && line.data ? line.data : EMPTY_LINE}
-      /* ⚠️ THE LADDER IS THE PRODUCT'S, not the line's. A stock row knows how
-         many and where; how the thing is packaged is a fact about the type. */
-      levels={readLevels(world.kinds.status === "ready"
-        ? world.kinds.data.items.find((row) => text(row.id) === of)?.levels
-        : null)}
-      history={moves}
-      batches={batches}
-      pieces={pieces}
-      onPiece={(id) => go(tracking === "assembled" ? `/kit/${id}` : `/item/${id}`)}
-      onLabel={() => go("/labels")}
-      /* ⚠️ OFFERED ONLY WHERE A KIT IS A THING THIS PRODUCT HAS. The operation
-         refuses a kit of anything not on that rung, so a button anywhere else
-         would be one that can only argue. */
-      onAssemble={tracking === "assembled"
-        ? () => {
-          void api.post<{ id: string }>("kit.assemble", { product: of, day: today })
-            .then((got) => { if (got.ok) go(`/kit/${got.value.id}`); });
-        }
-        : undefined}
-      again={() => { world.again(); history.again(); dated.again(); items.again(); kits.again(); }}
-      back={() => go("/")}
-      /* ⚠️ NOT WIRED YET, AND SAYING SO IS THE HONEST STATE. Taking stock is its
-         own screen with a quantity and a place in it (OI-6). */
-      onTake={() => undefined}
-      /* ⚠️ THE LINE IS THE SUBJECT, so the address carries it and the move
-         screen asks two questions rather than four. */
-      onMove={() => go(`/move/${id}`)}
-      onOpen={(batch) => {
-        void api.post("batch.open", { batch, day: today }).then((got) => {
-          /* ⚠️ RE-READ RATHER THAN PATCHED. Opening moves the clock, and the
-             clock is what the row is about — so what comes back is the new
-             answer rather than this screen's guess at it. */
-          if (got.ok) dated.again();
-        });
-      }}
-    />
-  );
-};
 
 /**
  * ⚠️ WHAT A SCREEN DRAWS WHILE ITS SUBJECT IS STILL ARRIVING. `Thing` takes a
@@ -668,41 +502,6 @@ const EMPTY_LINE: Line = {
   quantity: 0, unit: "", tracking: "counted", seen: "",
 };
 
-const WHERE = (api: Door) => function WhereHere({ go, at }: Mounted) {
-  const id = at[0] ?? "";
-  const world = useWorld(api);
-
-  const places = world.places.status === "ready" && world.stock.status === "ready"
-    ? placesOf(world.places.data.items, world.stock.data.items)
-    : [];
-  /* ⚠️ AN ID OR ONE OF OUR OWN LABELS. A printed shelf label is what the camera
-     reads, and it is the only address a person standing in front of a rack has —
-     so the screen resolves either rather than making the scanner look a row id
-     up first. */
-  const place = places.find((p) => p.id === id || p.code === id);
-
-  const rows = both(world.stock, world.kinds, (stock, kinds) =>
-    linesOf(stock.items, places, kinds.items, api.file).filter((l) => l.where === id));
-
-  return (
-    <Where
-      place={place ?? { id, name: "—", of: null, kind: "shelf", lines: 0 }}
-      places={places}
-      of={rows}
-      again={world.again}
-      back={() => go("/")}
-      onGo={(to) => go(to ? `/where/${to}` : "/")}
-      onOpen={(line) => go(`/thing/${line.id}`)}
-      /* ⚠️ REACHED FROM WHAT IS BEING LABELLED, which is where somebody is
-         standing when they want one — and it stays a SESSION rather than
-         becoming a print button per row, because the job is forty of them at a
-         printer. It was `() => undefined`: a control that took a press and did
-         nothing, on the screen the whole label mechanism exists for. */
-      onLabel={() => go("/labels")}
-      onCopy={(value) => { void navigator.clipboard?.writeText(value); }}
-    />
-  );
-};
 
 /**
  * SCANNING — the one screen that both reads and writes on the same gesture.
@@ -1273,90 +1072,6 @@ const LIVES: readonly Kept["life"][] = ["held", "issued", "retired"];
 const lifeOf = (v: unknown): Kept["life"] =>
   LIVES.includes(v as Kept["life"]) ? (v as Kept["life"]) : "held";
 
-/**
- * ONE KIT — and the check is the server's, not this file's.
- *
- * ⚠️ `kit.check` ANSWERS BOTH THE SCREEN AND THE BUILD, which is what makes the
- * missing list trustworthy. A container that worked out what was short from a
- * member list would be a second implementation of "is this complete", and the
- * two would disagree the first time a recipe line was edited.
- */
-const KIT = (api: Door) => function KitHere({ go, at }: Mounted) {
-  const id = at[0] ?? "";
-  const today = dayHere();
-  const world = useWorld(api);
-  const kits = useAsked<{ items: readonly Row[] }>(api, "kit.list");
-  const checked = useAsked<{ members: readonly Row[]; short: readonly Row[] }>(
-    api, id ? "kit.check" : null, id ? { kit: id } : undefined,
-    { members: [], short: [] });
-
-  const places = world.places.status === "ready" && world.stock.status === "ready"
-    ? placesOf(world.places.data.items, world.stock.data.items)
-    : [];
-  const named = new Map(places.map((p) => [p.id, p.name]));
-  const kinds = new Map(
-    world.kinds.status === "ready"
-      ? world.kinds.data.items.map((row) => [text(row.id), text(row.name)])
-      : [],
-  );
-
-  const row = kits.of.status === "ready"
-    ? kits.of.data.items.find((r) => text(r.id) === id || text(r.code) === id)
-    : undefined;
-
-  const members: Loaded<readonly Member[]> = checked.of.status === "ready"
-    ? ready(checked.of.data.members.map((m): Member => ({
-      id: text(m.id), name: text(m.name), code: text(m.code),
-      stray: m.stray === true,
-    })))
-    : checked.of;
-
-  const missing: readonly Missing[] = checked.of.status === "ready"
-    ? checked.of.data.short.map((s): Missing => ({
-      product: text(s.product), name: text(s.name),
-      want: num(s.want), have: num(s.have),
-    }))
-    : [];
-
-  const after = () => { kits.again(); checked.again(); world.again(); };
-
-  return (
-    <Kit
-      title={nameOf("/kit")}
-      name={row ? kinds.get(text(row.product)) ?? "—" : "—"}
-      code={row ? text(row.code) : ""}
-      state={stateOf(row?.state)}
-      built={row ? text(row.built) : ""}
-      where={row ? named.get(text(row.location)) ?? "" : ""}
-      of={members}
-      missing={missing}
-      again={after}
-      back={() => go("/")}
-      onRead={(raw) => {
-        /* ⚠️ THE SCAN RESOLVES TO ONE OF OUR OWN LABELS AND NOTHING ELSE HERE. A
-           product barcode names a type, and a type cannot be put into a tray —
-           what goes in is one object, which is what our label names. */
-        void api.get<Seen>("code.resolve", { raw, year: String(new Date().getFullYear()) })
-          .then((got) => {
-            if (!got.ok || got.value.ours !== "unit") return;
-            void api.post("kit.put", { kit: id, unit: got.value.value })
-              .then((done) => { if (done.ok) after(); });
-          });
-      }}
-      onOpen={(unit) => go(`/item/${unit}`)}
-      onTake={(unit) => {
-        void api.post("kit.take", { kit: id, unit }).then((got) => { if (got.ok) after(); });
-      }}
-      onBuild={() => {
-        void api.post("kit.build", { kit: id, day: today })
-          .then((got) => { if (got.ok) after(); });
-      }}
-      onBreak={() => {
-        void api.post("kit.break", { kit: id }).then((got) => { if (got.ok) after(); });
-      }}
-    />
-  );
-};
 
 type KitState = "open" | "built" | "broken";
 const STATES: readonly KitState[] = ["open", "built", "broken"];
@@ -1398,218 +1113,10 @@ const ASK = (api: Door) => function AskHere() {
   );
 };
 
-/* ---------------------------------------------------------------- the work --- */
 
-const RUN_STATES: readonly Runs["state"][] =
-  ["open", "ended", "released", "failed", "recalled"];
-const runStateOf = (v: unknown): Runs["state"] =>
-  RUN_STATES.includes(v as Runs["state"]) ? (v as Runs["state"]) : "open";
 
-const VERDICTS: readonly Covered["verdict"][] = ["pending", "released", "failed", "lifted"];
-const verdictOf = (v: unknown): Covered["verdict"] =>
-  VERDICTS.includes(v as Covered["verdict"]) ? (v as Covered["verdict"]) : "pending";
 
-/**
- * RUNS AND JOBS.
- *
- * ⚠️ THE DOUBT ON A JOB ROW IS NOT ASKED FOR HERE, AND THAT IS DELIBERATE.
- * `job.trace` is a join per job; running it for every row of a list would put N
- * queries behind one screen. What the list shows is the job; what the doubt
- * costs is one more read, and it is on the job's own screen where somebody
- * actually needs the answer.
- *
- * ⚠️ AND A LIST DOES NOT AGGREGATE, BY CONSTRUCTION. A generated read answers
- * rows and a total; a count of what each job USED is a group-by, which is a
- * query language arriving through a door that deliberately has none. The row
- * shows the job; the answer is one read away on the job's own screen, where
- * somebody is asking for it.
- */
-const WORK = (api: Door) => function WorkHere({ go }: Mounted) {
-  const today = dayHere();
-  const runs = useAsked<{ items: readonly Row[] }>(api, "process.list");
-  const jobs = useAsked<{ items: readonly Row[] }>(api, "job.list");
-  const items = useAsked<{ items: readonly Row[] }>(api, "process-item.list");
 
-  const inRun = new Map<string, number>();
-  if (items.of.status === "ready") {
-    for (const row of items.of.data.items) {
-      const at = text(row.process);
-      inRun.set(at, (inRun.get(at) ?? 0) + 1);
-    }
-  }
-
-  const rows: Loaded<readonly Runs[]> = runs.of.status === "ready"
-    ? ready(runs.of.data.items.map((row): Runs => ({
-      id: text(row.id),
-      kind: text(row.kind),
-      machine: text(row.machine),
-      state: runStateOf(row.state),
-      started: text(row.started),
-      items: inRun.get(text(row.id)) ?? 0,
-    })))
-    : runs.of;
-
-  const cases: readonly Jobs[] = jobs.of.status === "ready"
-    ? jobs.of.data.items.map((row): Jobs => ({
-      id: text(row.id),
-      ref: text(row.ref),
-      label: text(row.label),
-      state: text(row.state) === "closed" ? "closed" : "open",
-      opened: text(row.opened),
-      /* ⚠️ NOT ASKED FOR — see the DEFER above. Zero here is "not looked at",
-         which the row draws as no note rather than as a clean bill. */
-      doubted: 0,
-    }))
-    : [];
-
-  return (
-    <Work
-      title={nameOf("/work")}
-      of={rows}
-      jobs={cases}
-      again={() => { runs.again(); jobs.again(); items.again(); }}
-      onRun={(id) => go(`/run/${id}`)}
-      onJob={(id) => go(`/case/${id}`)}
-      onStart={() => {
-        /* ⚠️ THE KIND IS THE WORKSPACE'S OWN WORD and the run screen is where it
-           is named — starting one with a placeholder would put "New run" in a
-           record somebody signs against. */
-        void api.post<{ id: string }>("process.open", { kind: "New run", day: today })
-          .then((got) => { if (got.ok) go(`/run/${got.value.id}`); });
-      }}
-    />
-  );
-};
-
-const RUN = (api: Door) => function RunHere({ go, at }: Mounted) {
-  const id = at[0] ?? "";
-  const today = dayHere();
-  const [busy, setBusy] = React.useState(false);
-  const runs = useAsked<{ items: readonly Row[] }>(api, "process.list");
-  const items = useAsked<{ items: readonly Row[] }>(api, "process-item.list");
-  const batches = useAsked<{ items: readonly Row[] }>(api, "batch.list");
-  const world = useWorld(api);
-
-  const row = runs.of.status === "ready"
-    ? runs.of.data.items.find((r) => text(r.id) === id)
-    : undefined;
-
-  const named = new Map(
-    world.kinds.status === "ready"
-      ? world.kinds.data.items.map((k) => [text(k.id), text(k.name)])
-      : [],
-  );
-  const lot = new Map(
-    batches.of.status === "ready"
-      ? batches.of.data.items.map((b) => [text(b.id), b])
-      : [],
-  );
-  const stock = new Map<string, number>();
-  if (world.stock.status === "ready") {
-    for (const line of world.stock.data.items) {
-      const of = text(line.batch);
-      if (of) stock.set(of, (stock.get(of) ?? 0) + num(line.quantity));
-    }
-  }
-
-  const covered: Loaded<readonly Covered[]> = items.of.status === "ready"
-    ? ready(items.of.data.items
-      .filter((r) => text(r.process) === id)
-      .map((r): Covered => {
-        const of = lot.get(text(r.batch));
-        return {
-          batch: text(r.batch),
-          lot: of ? text(of.lot) : "",
-          name: of ? named.get(text(of.product)) ?? "—" : "—",
-          verdict: verdictOf(r.verdict),
-          reason: text(r.reason),
-          quantity: stock.get(text(r.batch)) ?? 0,
-        };
-      }))
-    : items.of;
-
-  const after = () => { runs.again(); items.again(); batches.again(); world.again(); };
-  const did = (op: string, input: unknown) => {
-    setBusy(true);
-    void api.post(op, input).then((got) => { setBusy(false); if (got.ok) after(); });
-  };
-
-  return (
-    <Run
-      of={covered}
-      kind={row ? text(row.kind) : "—"}
-      machine={row ? text(row.machine) : ""}
-      state={runStateOf(row?.state)}
-      started={row ? text(row.started) : ""}
-      ended={row ? text(row.ended) : ""}
-      released={row ? text(row.released) : ""}
-      evidence={row ? text(row.evidence) : ""}
-      busy={busy}
-      again={after}
-      back={() => go("/work")}
-      onEnd={(evidence) => { did("process.end", { process: id, evidence }); }}
-      onRelease={() => { did("process.release", { process: id, day: today }); }}
-      onFail={(reason) => { did("process.fail", { process: id, reason }); }}
-      onRecall={(reason) => { did("process.recall", { process: id, reason }); }}
-      onLift={(batch, reason) => { did("process.lift", { process: id, batch, reason }); }}
-    />
-  );
-};
-
-/**
- * ONE JOB, AND ITS TRACE IS THE SERVER'S.
- *
- * ⚠️ `job.trace` IS ASKED FOR RATHER THAN ASSEMBLED HERE, which is the whole
- * reason it exists. Whether a lot is in doubt is a join across the ledger, the
- * batches and the runs — done in the browser it would be three lists and a
- * guess, and the guess would be about the one question the screen is for.
- */
-const CASE = (api: Door) => function CaseHere({ go, at }: Mounted) {
-  const id = at[0] ?? "";
-  const today = dayHere();
-  const [busy, setBusy] = React.useState(false);
-  const jobs = useAsked<{ items: readonly Row[] }>(api, "job.list");
-  const trace = useAsked<{ items: readonly Row[] }>(
-    api, id ? "job.trace" : null, id ? { job: id } : undefined, { items: [] });
-
-  const row = jobs.of.status === "ready"
-    ? jobs.of.data.items.find((r) => text(r.id) === id)
-    : undefined;
-
-  const used: Loaded<readonly Used[]> = trace.of.status === "ready"
-    ? ready(trace.of.data.items.map((r): Used => ({
-      movement: text(r.movement),
-      product: text(r.product),
-      name: text(r.name),
-      quantity: num(r.quantity),
-      lot: text(r.lot),
-      at: text(r.at),
-      doubt: text(r.doubt),
-    })))
-    : trace.of;
-
-  return (
-    <Case
-      of={used}
-      ref={row ? text(row.ref) : "—"}
-      label={row ? text(row.label) : ""}
-      state={row && text(row.state) === "closed" ? "closed" : "open"}
-      opened={row ? text(row.opened) : ""}
-      closed={row ? text(row.closed) : ""}
-      busy={busy}
-      again={() => { jobs.again(); trace.again(); }}
-      back={() => go("/work")}
-      onClose={() => {
-        setBusy(true);
-        void api.post("job.close", { job: id, day: today }).then((got) => {
-          setBusy(false);
-          if (got.ok) jobs.again();
-        });
-      }}
-      onOpenProduct={(product) => go(`/thing/${product}`)}
-    />
-  );
-};
 
 /**
  * RUNNING OUT — where every note the nightly sweep sends lands.
@@ -1932,84 +1439,6 @@ const IMPORT = (api: Door) => function ImportHere() {
   );
 };
 
-/**
- * SUPPLIERS — who things come from.
- *
- * ⚠️ THE PRODUCT COUNT IS JOINED HERE rather than answered by the door, for the
- * reason this whole file exists: `product.list` is already read by half the
- * product, and a `supplier.count` operation would be a query language with extra
- * steps. It is the one fact that says whether a row is still worth keeping.
- */
-const SUPPLIERS = (api: Door) => function SuppliersHere() {
-  /* ⚠️ THE ONE CHANNEL — see `telling.tsx`. Every write below could fail
-     into nothing before this, and several of them did. */
-  const tell = useTelling();
-
-  const rows = useAsked<{ items: readonly Row[] }>(api, "supplier.list");
-  const kinds = useAsked<{ items: readonly Row[] }>(api, "product.list");
-  const lead = useAsked<{ leadDays: number }>(api, "product.start");
-  const [editing, setEditing] = React.useState<SupplierLine | null>(null);
-  const [busy, setBusy] = React.useState(false);
-
-  const per = new Map<string, number>();
-  if (kinds.of.status === "ready") {
-    for (const one of kinds.of.data.items) {
-      const from = text(one.supplier);
-      if (from) per.set(from, (per.get(from) ?? 0) + 1);
-    }
-  }
-
-  const items: Loaded<readonly SupplierLine[]> = rows.of.status === "ready"
-    ? ready(rows.of.data.items.map((row): SupplierLine => ({
-      id: text(row.id),
-      name: text(row.name),
-      contact: text(row.contact),
-      email: text(row.email),
-      phone: text(row.phone),
-      account: text(row.account),
-      /* ⚠️ `null` RATHER THAN ZERO where nobody said — see `Supplier`. A
-         supplier who has not been asked how long they take is not one who
-         delivers this afternoon. */
-      leadDays: row.leadDays === null || row.leadDays === undefined
-        ? null
-        : num(row.leadDays),
-      note: text(row.note),
-      products: per.get(text(row.id)) ?? 0,
-    })))
-    : rows.of;
-
-  return (
-    <Suppliers
-      title={nameOf("/suppliers")}
-      of={items}
-      standingDays={lead.of.status === "ready" ? num(lead.of.data.leadDays) : 0}
-      editing={editing}
-      busy={busy}
-      again={() => { rows.again(); kinds.again(); }}
-      onOpen={setEditing}
-      onNew={() => { setEditing(NOBODY); }}
-      onClose={() => { setEditing(null); }}
-      onSave={(of) => {
-        setBusy(true);
-        const body = {
-          name: of.name, contact: of.contact, email: of.email, phone: of.phone,
-          account: of.account, note: of.note,
-          /* ⚠️ ABSENT RATHER THAN NULL where nobody said, because an absent
-             field is what the collection writer leaves alone. */
-          ...(of.leadDays === null ? {} : { leadDays: of.leadDays }),
-        };
-        void api.post(of.id ? "supplier.update" : "supplier.create",
-          of.id ? { id: of.id, ...body } : body).then((got) => {
-          setBusy(false);
-          if (!got.ok) { tell.failed(got.problem); return; }
-          setEditing(null);
-          tell.did(of.id ? "Supplier saved" : `${body.name} added`);
-          rows.again();
-        });
-      }}
-    />
-  );
-};
 
 /**
  * ⚠️ THE GUIDE IS TICKED BY EVENTS THIS WORKSPACE HAS ACTUALLY RAISED, never by
@@ -2459,23 +1888,16 @@ export function mount({ register, api }: Mounting): void {
   const screens: readonly [string, React.ComponentType<Mounted>][] = [
     ["/", HOME(api)],
     ["/stock", STOCK(api)],
-    ["/thing", THING(api)],
-    ["/where", WHERE(api)],
     ["/scan", SCAN(api)],
     ["/register", REGISTER(api)],
     ["/receive", RECEIVE(api)],
     ["/move", MOVE(api)],
     ["/count", COUNT(api)],
     ["/ask", ASK(api)],
-    ["/work", WORK(api)],
-    ["/run", RUN(api)],
-    ["/case", CASE(api)],
-    ["/kit", KIT(api)],
     ["/due", DUE(api)],
     ["/labels", LABELS(api)],
     ["/reports", REPORTS(api)],
     ["/import", IMPORT(api)],
-    ["/suppliers", SUPPLIERS(api)],
     ["/start", START(api)],
   ];
   for (const [route, screen] of screens) {

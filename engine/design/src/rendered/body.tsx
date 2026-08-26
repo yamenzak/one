@@ -63,8 +63,19 @@ export interface Has {
    * with the true figure already fetched and thrown away one function earlier.
    */
   readonly views: Readonly<Record<string, Loaded<Viewed>>>;
-  /** Where a `goes` leads. */
-  readonly onGo?: ((screen: string) => void) | undefined;
+  /**
+   * Where a `goes` leads — the screen's ID, and the record it is about.
+   *
+   * ⚠️ AN ID RATHER THAN A ROUTE, because that is what the declaration says and
+   * what the kernel checks. Turning it into an address is the shell's business:
+   * a route written in a manifest would be a second spelling of one the manifest
+   * already holds, and the two drift the first time a screen moves.
+   *
+   * ⚠️ AND THE RECORD IS THE SECOND HALF. A list row leads to the thing the row
+   * is about; without it the destination opens with no subject, which draws its
+   * own empty state over a record that is right there.
+   */
+  readonly onGo?: ((screen: string, record?: string) => void) | undefined;
   /** What a `does` runs. */
   readonly onDo?: ((operation: string) => void) | undefined;
   /**
@@ -263,7 +274,24 @@ function Placed({ block, has }: { readonly block: BlockSpec; readonly has: Has }
       ...(third ? { aside: row[third.field] as React.ReactNode } : {}),
     });
   }
-  if (block.goes && has.onGo) props["onOpen"] = () => has.onGo?.(block.goes as string);
+  /*
+    ⚠️ AND THE ROW TRAVELS WITH IT. `Listing` hands its `onOpen` the row that was
+    pressed, and this threw it away — so every row on every declared list opened
+    the destination screen with no record, which draws the list it was pressed
+    from or a not-found. The row is right there; losing it is the "row that leads
+    nowhere" fault `goes` exists to prevent, one seam further along.
+  */
+  if (block.goes && has.onGo) {
+    props["onOpen"] = (row?: Readonly<Record<string, unknown>>) => {
+      /* ⚠️ THE ROW IF THERE IS ONE, THE SCREEN'S OWN SUBJECT OTHERWISE. A list
+         row leads to the thing the row is about; a row on a detail screen leads
+         to another view of the record already open, and both are "the record
+         this control is about". */
+      const of = row && typeof row === "object" ? row : has.record;
+      const id = of ? String(of["id"] ?? "") : "";
+      has.onGo?.(block.goes as string, id || undefined);
+    };
+  }
   /* ⚠️ `does` IS A LIST AND THE FIRST IS THE ROW'S OWN ACT. A row draws one
      control; the rest of the list is what a screen offers ELSEWHERE about the
      same thing, which is the shape `ActionRow` and the crown share. Handing all

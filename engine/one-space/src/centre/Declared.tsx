@@ -74,8 +74,16 @@ const spread = (
       : waiting<Viewed>(),
 ]));
 
-export function Declared({ screen, at, go, currency }: {
+export function Declared({ screen, screens, at, go, currency }: {
   readonly screen: ScreenSpec;
+  /**
+   * ⚠️ EVERY SCREEN THIS PRODUCT DECLARES, because `goes` names one by ID and an
+   * address is what a browser needs. Turning the id into a route here is what
+   * keeps a route out of the manifest: one written there would be a second
+   * spelling of an address the manifest already holds, and the two drift the
+   * first time a screen moves.
+   */
+  readonly screens: readonly ScreenSpec[];
   /**
    * ⚠️ THE SEGMENTS PAST THE SCREEN'S OWN ROUTE — see `AppScreen.at`. The first
    * is the record this screen is about, which is what makes a detail screen
@@ -155,15 +163,32 @@ export function Declared({ screen, at, go, currency }: {
     void run(id, already);
   }, [acts, filled, run]);
 
+  /**
+   * ⚠️ THE ID BECOMES AN ADDRESS HERE, AND THE RECORD GOES WITH IT. `goes` names
+   * a screen the kernel has already checked exists; handing that string to a
+   * router expecting a route opened `/location` in a product whose route is
+   * `/where`, so every row on a declared list led to the app's own not-found.
+   *
+   * ⚠️ AND A SCREEN THIS PRODUCT DOES NOT DECLARE LEADS NOWHERE RATHER THAN
+   * ANYWHERE. `refuseSurface` refuses a `goes` naming an unknown screen at
+   * composition, so reaching here means a manifest that never composed —
+   * navigating to a guess would be worse than the dead row it replaces.
+   */
+  const onGo = React.useCallback((id: string, record?: string) => {
+    const to = screens.find((s) => s.id === id)?.route;
+    if (!to) return;
+    go(record ? `${to.replace(/\/$/, "")}/${record}` : to);
+  }, [screens, go]);
+
   const has: Has = React.useMemo(() => ({
     ...(got.of.status === "ready" && got.of.data.record
       ? { record: got.of.data.record }
       : {}),
     views: spread(ids, got.of),
-    onGo: go,
+    onGo: onGo,
     onDo,
     ...(currency ? { currency } : {}),
-  }), [got.of, ids, go, onDo, currency]);
+  }), [got.of, ids, onGo, onDo, currency]);
 
   if (!body) return null;
   return (

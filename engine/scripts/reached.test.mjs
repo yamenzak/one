@@ -127,7 +127,24 @@ for (const [app, manifest] of appManifests()) {
     .map((f) => strip(readFileSync(f, "utf8")))
     .join("\n");
 
-  const orphans = folded.filter((route) => !TRAVELS(route).test(from));
+  /*
+    ⚠️ AND A DECLARED BODY LEADS SOMEWHERE TOO, which this could not see. A
+    ported screen's links are `goes: "<screen id>"` in the MANIFEST — the one
+    file this walk deliberately excludes — so every route reached only from a
+    declaration read as an orphan the moment its neighbour was ported. Measured,
+    by porting one: deleting the product container took `/move`'s only link with
+    it, and putting the link back as a `NavRow` did not satisfy this.
+
+    ⚠️ IT IS THE SCREEN'S ID, NOT ITS ROUTE. `goes` names a screen and the shell
+    turns it into an address (`Declared`), which is why a route typed in a
+    manifest would be a second spelling of one it already holds.
+  */
+  const led = new Set([...block[1].matchAll(/goes:\s*"([^"]+)"/g)].map((m) => m[1]));
+  const idOf = new Map([...block[1].matchAll(/\{[^{}]*id:\s*"([^"]+)"[^{}]*route:\s*"([^"]+)"[^{}]*\}/g)]
+    .map((m) => [m[2], m[1]]));
+
+  const orphans = folded.filter((route) =>
+    !TRAVELS(route).test(from) && !led.has(idOf.get(route) ?? ""));
 
   if (orphans.length) {
     fail(`reached: ${app} declares ${orphans.join(", ")} outside the navigation and `
