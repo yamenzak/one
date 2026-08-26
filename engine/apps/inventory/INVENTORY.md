@@ -467,7 +467,7 @@ generated ones) — plus every platform guard in `pnpm engine:gate`.
 
 ## Part III — the screen index
 
-**Six, and every one of them is drawn by the engine from the declaration.** The
+**Seven, and every one of them is drawn by the engine from the declaration.** The
 surface was emptied whole on 2026-08-26 and is being rebuilt one screen at a
 time, each designed from what somebody standing in front of it is trying to do
 rather than ported from what stood there before.
@@ -482,6 +482,7 @@ follows and the shape every screen is drawn to.
 | `/places` | Places | primary | `location:read` | `declared` | `declared` |
 | `/counts` | Being counted | — | `stock:read` | `declared` | `declared` |
 | `/product` | Product | — | `product:read` | `declared` | `declared` |
+| `/add` | Add a product | — | `product:write` | `declared` | `declared` |
 
 ⚠️ **`declared` IN BOTH FILE COLUMNS IS THE ANSWER, NOT A GAP.** A declared body
 has no component and no container — the renderer draws it from `src/index.ts`, and a
@@ -502,6 +503,26 @@ is one on a shelf, so it leads `by: "product"` rather than by its own id. The
 product page leads with WHERE the thing is — the shelves it is on, and the
 quantities under that — because somebody opening it is standing in front of a box
 asking a question about the world rather than about the record.
+
+**Adding a product is a FLOW, and it is the third kind of screen.** A `body` is
+read and drawn; a `story` is walked — one question a screen, a dock that carries
+Back beside Next, and a review at the end where every clause is one press from
+the step that wrote it. `product.register` takes twenty-one inputs, and as one
+page that is a form somebody has to be taught; as five questions it is a thing
+they can do standing at a shelf.
+
+⚠️ **AND THE SAME FLOW ASKS FIVE QUESTIONS OR NONE.** The first step is the
+camera. `product.see` runs over the pictures and answers ten of the twenty-one,
+and every step whose fields arrive that way is not asked — it goes to the review
+as a clause. Reading a paragraph about a box and correcting one word is a job
+people do; confirming twenty fields is one they skip. `tracking` is the one step
+that is asked either way: the rung decides whether a delivery can be expired or
+recalled and it is `settled`, so a model may propose it and a person picks it.
+
+⚠️ **ELEVEN OF THE TWENTY-ONE ARE NOT ASKED HERE AT ALL, deliberately.** Barcodes,
+suppliers, the packing ladder, a reorder rule and the two shelf lives are facts
+somebody adds when they have them, and the product page already draws every one.
+A registration that demanded them is a registration nobody finishes.
 
 **The look is settled, and it is one world on one screen.** `/` names `neon` and
 nothing else names anything. Every other family in the engine is quiet by design,

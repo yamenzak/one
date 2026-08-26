@@ -40,7 +40,16 @@ export interface PickFileProps {
   readonly accept: readonly string[];
   /** The ceiling, in bytes. Reported in kB, because that is what a picker shows. */
   readonly most: number;
-  /** What this file IS, in the words on the screen: "a logo", "a photo". */
+  /**
+   * WHAT THE TARGET SAYS — a whole line, printed as it is written.
+   *
+   * ⚠️ A NOUN IS NOT A LINE, AND THIS DOC USED TO ASK FOR ONE. "a logo", it
+   * said — so a caller following it got a lower-case fragment floating over a
+   * button, and the only caller that read correctly was the one that ignored the
+   * doc and passed a sentence. A prop rendered verbatim has to be documented as
+   * verbatim; anything else is a component and its own contract disagreeing,
+   * with the screen going to whichever the author read.
+   */
   readonly says: string;
   /** One line under it — the shape rules the server will apply. */
   readonly under?: string;

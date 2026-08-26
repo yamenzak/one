@@ -172,11 +172,30 @@ const reachesFor = (app: AppSpec, screen: ScreenSpec) => {
  * touches; two walks of one question is how a picker comes to be served past the
  * grant that governs the rows in it.
  */
+/**
+ * EVERY OPERATION A SCREEN OFFERS, WHATEVER KIND OF SCREEN IT IS.
+ *
+ * ⚠️ THE BODY WAS THE ONLY ANSWER AND A STORY HAS NONE, so a declared flow
+ * reached a browser with an empty `acts` map — and the flow's controls come from
+ * the write's own `input`, so every step drew its question over nothing. The
+ * declaration composed, the door answered 200, and the screen was blank.
+ *
+ * ⚠️ AND A FLOW OFFERS TWO, NOT ONE. The write is what it walks toward; the fill
+ * is what runs before anybody is asked, and it is an operation like any other —
+ * the browser needs its input to send the pictures, and its `ref` choices for the
+ * same reason a form does.
+ */
+const opsOf = (screen: ScreenSpec): readonly string[] => [
+  ...(screen.body ? actsIn(screen.body) : []),
+  ...(screen.story ? [screen.story.writes] : []),
+  ...(screen.story?.fills ? [screen.story.fills.by] : []),
+];
+
 const choosesIn = (
   app: AppSpec, screen: ScreenSpec,
 ): readonly { readonly op: string; readonly field: string; readonly to: string }[] => {
   const out: { op: string; field: string; to: string }[] = [];
-  for (const id of screen.body ? actsIn(screen.body) : []) {
+  for (const id of opsOf(screen)) {
     const spec = (app.operations ?? []).find((o) => o.id === id);
     for (const [field, f] of Object.entries(spec?.input ?? {})) {
       if (f.kind === "ref" && f.to) out.push({ op: id, field, to: f.to });
@@ -297,7 +316,7 @@ export async function drawnFor(
      an unknown here is a manifest that never composed. */
   const acts: Record<string, Act> = {};
   const fills = screen.body ? fillsIn(screen.body) : {};
-  for (const id of screen.body ? actsIn(screen.body) : []) {
+  for (const id of opsOf(screen)) {
     const spec = (app.operations ?? []).find((o) => o.id === id);
     if (!spec) continue;
     const choices: Record<string, readonly Choice[]> = {};

@@ -6322,6 +6322,23 @@ const manifest = (): AppSpec => defineApp({
              would be showing a number without saying whether to believe it. */
         },
         blocks: [
+          /*
+            ⚠️ THE ONE THING SOMEBODY DOES ON THIS SCREEN, ABOVE THE FIGURES THEY
+            READ ON IT. Home answers "what ran out" and the tiles under it answer
+            "how much of everything" — both are READING, and a catalogue that is
+            never added to is a catalogue that stays empty. The first thing
+            anybody does with an inventory product is put something in it, and it
+            was reachable from nowhere.
+
+            ⚠️ A ROW OF SHORTCUTS RATHER THAN A TILE, because a tile is a figure
+            with a door behind it and this has no figure. It is the block for
+            exactly this shape and no manifest had placed one.
+          */
+          {
+            group: null,
+            wide: true,
+            of: [{ block: "QuickActions", leads: ["add-a-product"] }],
+          },
           {
             group: null,
             of: [{
@@ -6687,6 +6704,94 @@ const manifest = (): AppSpec => defineApp({
             of: { from: { of: "view", view: "counting" } },
           },
         }],
+      } },
+
+    /*
+      ADDING A PRODUCT — the first thing anybody does, and the one that decides
+      whether they do the second.
+
+      ⚠️ IT IS A FLOW RATHER THAN A FORM, AND THE COST IT REMOVES IS TRAINING.
+      `product.register` takes twenty-one inputs. As one screen that is a page
+      somebody has to be TAUGHT — what "batched" means, which four of the
+      twenty-one are actually required, why a shelf life is a number of days and
+      not a date — and every product that ships one grows a wiki, an induction
+      and a person who knows. None of those appears in a diff and all of them are
+      paid for forever.
+
+      ⚠️ AND THE SAME FLOW ASKS FIVE QUESTIONS OR NONE, WHICH IS WHAT THE
+      PHOTOGRAPHS BUY. `fills` runs `product.see` over the pictures and answers
+      ten of the twenty-one; every step whose fields arrive that way is not asked
+      — it goes to the review as a clause, one press from the step that corrects
+      it. Reading a paragraph about a box and fixing the one word that is wrong
+      is a job people do. Confirming twenty fields is one they skip.
+
+      ⚠️ THE OTHER ELEVEN ARE NOT ASKED HERE AT ALL, and that is deliberate
+      rather than unfinished. Barcodes, suppliers, the packing ladder, a reorder
+      rule and the two shelf lives are facts about a product somebody adds when
+      they have them — the product page draws every one of those fields already.
+      A registration that demanded them is a registration nobody completes, and
+      an inventory nobody finishes filling is the thing this product is for.
+    */
+    { id: "add-a-product", route: "/add", label: "Add a product",
+      /* ⚠️ NOT IN THE NAV. It is reached from the catalogue and from home —
+         `nav: "primary"` would put a one-way flow beside four destinations, and
+         a destination is somewhere you can stand. */
+      nav: "none", icon: "add",
+      /* ⚠️ THE GRANT THE WRITE DEMANDS, AND `story_permission_wrong` IS WHY IT
+         MATCHES. Offered on `product:read` it would take somebody through every
+         question and refuse them at the last press. */
+      permission: "product:write", tone: "neutral",
+      story: {
+        writes: "product.register",
+        /* ⚠️ THE READER IS HANDED THE PICTURES THE FIRST STEP TOOK — see
+           `FillsSpec.with`. It takes `images` and the write keeps `shots`; two
+           operations written apart name the same thing differently, and without
+           this the bridge is a line inside a screen. */
+        fills: { by: "product.see", with: { images: "shots" } },
+        asks: [
+          /* ⚠️ FIRST, BECAUSE EVERYTHING AFTER IT DEPENDS ON WHETHER IT
+             HAPPENED. Somebody who photographs the box answers four questions;
+             somebody who does not answers all five and the flow reads the same
+             either way. */
+          { id: "shot", ask: "Can you photograph it?",
+            under: "Front, back and the label",
+            block: "Shots" },
+          { id: "named", ask: "What is it?",
+            under: "Called", takes: ["name", "brand"],
+            says: { as: "{name}" } },
+          { id: "counted", ask: "What do you count it in?",
+            under: "Counted in",
+            takes: ["unit"], says: { as: "{unit}" } },
+          /*
+            ⚠️ ASKED EVEN WHEN THE MODEL ANSWERED IT, AND IT IS THE ONLY STEP
+            HERE THAT IS. The rung decides whether a delivery can be expired or
+            recalled and it is `settled` — `product.recount` is the only way back
+            and it refuses once anything has been counted. A model may propose
+            it; a person picks it, and accepting it by not noticing a clause in a
+            paragraph is not picking.
+          */
+          { id: "tracked", ask: "How closely do you follow it?",
+            under: "Tracked so that it is",
+            takes: ["tracking"], always: true,
+            says: { per: {
+              listed: "never counted, just kept somewhere",
+              counted: "counted, so a number is a number",
+              batched: "kept apart per delivery, so one can be expired or recalled",
+              itemised: "followed one by one, each with its own history",
+              assembled: "built from other things, and counted as what it is made of",
+            } } },
+          /*
+            ⚠️ ONLY WHERE A NUMBER MEANS ANYTHING. A `listed` thing has no count,
+            so "tell me when it drops below" is a question about a quantity that
+            does not exist — and a step that does not apply is skipped rather
+            than greyed, out of the flow, out of the progress and out of the
+            review.
+          */
+          { id: "par", ask: "Tell you when it runs low?",
+            under: "Low below", takes: ["par"],
+            when: { field: "tracking", isnt: { literal: "listed" } },
+            says: { as: "{par}" } },
+        ],
       } },
   ],
 

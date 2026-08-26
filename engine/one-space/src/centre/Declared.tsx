@@ -18,12 +18,17 @@
  */
 
 import * as React from "react";
-import { ready, trouble, waiting, type Loaded } from "@engine/design";
+import { ready, trouble, useTelling, waiting, type Loaded } from "@engine/design";
 import { Doing, asks, type Ran } from "@engine/design/doing";
 /* ⚠️ NOT THROUGH THE BARREL, WHICH IS THE RENDERER'S OWN RULE. `@engine/design`
    re-exports thirty components; the entry chunk carries the contract and this
    page is in the product's, so the deep path is what keeps the two apart. */
 import { Body, type Has } from "@engine/design/body";
+/* ⚠️ THE THIRD KIND OF SCREEN, AND ITS OWN CHUNK. A flow carries a camera and a
+   file picker behind it; on the same path as a body every list screen in the
+   product would download them. */
+const Create = React.lazy(() => import("@engine/design/create")
+  .then((m) => ({ default: m.Create })));
 /* ⚠️ THE PATH AND THE ANSWER SHAPE COME FROM THE KERNEL, NOT THE RUNTIME. The
    runtime is the worker's and importing it here would put a D1 client in a
    browser bundle — so what both ends need is declared once, in the layer both
@@ -33,6 +38,7 @@ import {
   type Fields, type Fill, type GuideBook, type MilestoneBook, type Raised, type ScreenSpec,
   type SurfaceSpec, type Viewed,
 } from "@engine/kernel";
+import type { Answers } from "@engine/design/create";
 import { api, forget } from "../api.js";
 import { useLoad } from "./data.js";
 
@@ -330,6 +336,14 @@ export function Declared({ screen, screens, at, go, currency, app }: {
     ...(wantsBook ? { book } : {}),
   }), [got.of, ids, onGo, onDo, currency, picked, named, wantsBook, book]);
 
+  if (screen.story) {
+    return (
+      <React.Suspense fallback={null}>
+        <Flow screen={screen} acts={acts} run={run} go={go} />
+      </React.Suspense>
+    );
+  }
+
   if (!body) return null;
   return (
     <>
@@ -350,5 +364,150 @@ export function Declared({ screen, screens, at, go, currency, app }: {
         />
       ) : null}
     </>
+  );
+}
+
+/**
+ * A DECLARED FLOW, HELD AND RUN.
+ *
+ * ⚠️ THE ANSWERS LIVE HERE RATHER THAN INSIDE `Create`, and that is the point of
+ * the split. A refusal comes back from the door naming three fields; a flow that
+ * owned its own answers would have to be told to keep them, and the shape that
+ * forgets is the one where somebody loses eight screens of typing to a validation
+ * error. Held out here, a refusal is a render with the same draft in it.
+ *
+ * ⚠️ AND THE STEP IS STATE, NOT A ROUTE — see `Story`. A URL per step would make
+ * each one shareable, bookmarkable and reloadable into a form with nothing in it.
+ */
+function Flow({ screen, acts, run, go }: {
+  readonly screen: ScreenSpec;
+  readonly acts: Drawn["acts"];
+  readonly run: (id: string, input: Record<string, unknown>) => Promise<Ran>;
+  readonly go: (route: string) => void;
+}) {
+  const told = screen.story!;
+  const write = acts[told.writes];
+  const [at, setAt] = React.useState(told.asks[0]?.id ?? "review");
+  const [held, setHeld] = React.useState<Answers>({});
+  const [filled, setFilled] = React.useState<ReadonlySet<string>>(new Set());
+  const [refused, setRefused] = React.useState<Readonly<Record<string, string>>>({});
+  const [filling, setFilling] = React.useState(false);
+  const tell = useTelling();
+
+  const onSet = React.useCallback((name: string, value: unknown) => {
+    setHeld((was) => ({ ...was, [name]: value }));
+    /*
+      ⚠️ TYPING OVER AN ARRIVED ANSWER MAKES IT THEIRS. `filled` is what keeps a
+      step out of the questions; left set after somebody edited the value in the
+      review, the step they just corrected would still be skipped — so the
+      correction would stand and the question would never be asked, which is
+      right, and the SECOND correction would have nowhere to happen.
+    */
+    setFilled((was) => {
+      if (!was.has(name)) return was;
+      const next = new Set(was);
+      next.delete(name);
+      return next;
+    });
+    /* ⚠️ AND A REFUSAL IS ABOUT THE VALUE THAT WAS SENT, so editing the value
+       clears it. Left standing it is a sentence about a number nobody is looking
+       at any more. */
+    setRefused((was) => (name in was ? Object.fromEntries(
+      Object.entries(was).filter(([k]) => k !== name),
+    ) : was));
+  }, []);
+
+  /*
+    ⚠️ THE FILL RUNS WHEN WHAT IT IS HANDED IS THERE, AND ONCE PER SET OF IT.
+    `sent` remembers what was last sent rather than a boolean: a person who adds a
+    seventh photograph has given the model something new to look at, and a flag
+    would refuse to ask again. Two runs over the same pictures is a charge for the
+    same answer.
+  */
+  const fills = told.fills;
+  const given = React.useMemo(() => {
+    if (!fills) return null;
+    const out: Record<string, unknown> = {};
+    for (const [wants, from] of Object.entries(fills.with)) {
+      const value = held[from];
+      /* ⚠️ NOTHING TO LOOK AT IS NOT A RUN. An empty list sent to a vision model
+         is a charge for a question about no pictures, answered plausibly. */
+      if (value === undefined || value === null || value === "") return null;
+      if (Array.isArray(value) && !value.length) return null;
+      out[wants] = value;
+    }
+    return out;
+  }, [fills, held]);
+
+  const sent = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    if (!fills || !given) return;
+    const key = JSON.stringify(given);
+    if (sent.current === key) return;
+    sent.current = key;
+    setFilling(true);
+    void (async () => {
+      const said = await api.post(fills.by, given);
+      setFilling(false);
+      /*
+        ⚠️ A READER THAT COULD NOT HELP IS SAID, AND THE FLOW GOES ON. Out of
+        credits, a provider down, a photograph it could make nothing of — none of
+        those stops somebody adding a product, so the steps are simply asked. What
+        must not happen is silence: the screen would go from "reading your
+        pictures" to five questions with nothing saying why, which reads as the
+        app having lost them.
+      */
+      if (!said.ok) { tell.failed(said.problem, "Could not read the pictures"); return; }
+      /*
+        ⚠️ WHAT THE WRITE TAKES AND NOTHING ELSE. A reader answers more than a
+        registration keeps — a pack size, a reason for the rung, whether it looked
+        hazardous — and spreading the whole answer would send the door inputs it
+        never declared, which it drops, having refused nothing.
+
+        ⚠️ AND AN EMPTY ANSWER IS NOT AN ANSWER. A model that could not read the
+        brand answers "", and marking that filled would skip the step that was
+        going to ask for it.
+      */
+      const answers: Record<string, unknown> = {};
+      for (const [name, value] of Object.entries(said.value as Record<string, unknown>)) {
+        if (!write?.input[name]) continue;
+        if (value === undefined || value === null || value === "") continue;
+        answers[name] = value;
+      }
+      setHeld((was) => ({ ...was, ...answers }));
+      setFilled((was) => new Set([...was, ...Object.keys(answers)]));
+    })();
+  }, [fills, given, write, tell]);
+
+  if (!write) return null;
+
+  return (
+    <Create
+      story={told}
+      takes={write.input}
+      at={at}
+      onGo={setAt}
+      title={screen.label}
+      held={held}
+      onSet={onSet}
+      filled={filled}
+      refused={refused}
+      {...(filling ? { filling } : {})}
+      {...(write.choices ? { choices: write.choices } : {})}
+      does={{
+        label: "Add it",
+        op: told.writes,
+        onDo: () => {
+          void (async () => {
+            const said = await run(told.writes, held);
+            /* ⚠️ A REFUSAL KEEPS THE DRAFT AND NAMES THE FIELDS — `Problem.fields`
+               is what puts each sentence under the control it is about, and
+               `Create` carries it to the step that asks for it. */
+            if (said) { setRefused(said.fields ?? {}); return; }
+            go("/products");
+          })();
+        },
+      }}
+    />
   );
 }

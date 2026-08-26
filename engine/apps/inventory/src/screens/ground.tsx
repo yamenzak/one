@@ -20,6 +20,8 @@
 import * as React from "react";
 import { Screen, Shell, ready, whoFace } from "@engine/design";
 import { Body, type Has } from "@engine/design/body";
+import { Create, type Answers } from "@engine/design/create";
+import type { ScreenSpec } from "@engine/kernel";
 import { inventory } from "../index.js";
 import { INVENTORY_SESSIONS, INVENTORY_SURFACES } from "./index.js";
 import { COUNTS, LINES, PLACES, THINGS } from "./sample.js";
@@ -117,9 +119,19 @@ export function InventoryGround({ route, onGo, sky }: {
         the reading width, the crown's collapse and the shape's own skeleton are
         the frame's, and mounting a body bare leaves every one of them off.
       */}
+      {/*
+        ⚠️ A FLOW IS THE THIRD KIND OF SCREEN AND IT BRINGS ITS OWN FRAME. `Story`
+        renders a `Screen` of its own — the progress, the dock's pair, the
+        question as the section — so wrapping it in one here would be two frames,
+        two titles and two gutters. It also holds ANSWERS, which is what makes a
+        board able to photograph it at all: the board supplies the step and a
+        draft, and every state of the flow is one prop away.
+      */}
       {Drawn
         ? <Drawn route={route} onGo={go} />
-        : here?.body
+        : here?.story
+          ? <Walked screen={here} />
+          : here?.body
           ? (
             <Screen shape={here.body.shape} title={here.label}>
               {/*
@@ -246,3 +258,65 @@ const namedIn = (screens: readonly { id: string; label: string; icon?: string }[
     const one = screens.find((s) => s.id === id);
     return one ? { label: one.label, ...(one.icon ? { icon: one.icon } : {}) } : undefined;
   };
+
+/**
+ * A DECLARED FLOW ON THE BOARD, WITH A DRAFT IN IT.
+ *
+ * ⚠️ THE STEP AND THE ANSWERS ARE STATE HERE FOR THE SAME REASON THE RECORD IS
+ * ABOVE: a board has no address bar and no server. What the deployment holds in
+ * `Declared.tsx` and fills from a run, this holds as a starting draft — so the
+ * picture is of a flow part way through rather than of five empty controls, and
+ * the review has clauses in it rather than five rows saying "Nothing set".
+ *
+ * ⚠️ AND THE PICTURES ARE ALREADY TAKEN, WHICH IS THE STATE WORTH DRAWING. The
+ * first step is a camera; photographed empty it is a picker over an empty rail,
+ * which is a real state and not the one that shows what the block is for.
+ */
+function Walked({ screen }: { readonly screen: ScreenSpec }) {
+  const told = screen.story!;
+  const [at, setAt] = React.useState(told.asks[0]?.id ?? "review");
+  const [held, setHeld] = React.useState<Answers>(DRAFT);
+  return (
+    <Create
+      story={told}
+      /* ⚠️ THE WRITE'S OWN INPUT, OUT OF THE MANIFEST. A board handing over a
+         made-up field map would photograph controls the operation does not take
+         — the same fault as a figure that agrees with no list. */
+      takes={inventory().operations?.find((o) => o.id === told.writes)?.input ?? {}}
+      at={at}
+      onGo={setAt}
+      title={screen.label}
+      held={held}
+      onSet={(name, value) => { setHeld((was) => ({ ...was, [name]: value })); }}
+      /* ⚠️ WHAT THE MODEL ANSWERED, SO THE SKIPPING IS VISIBLE. Without it every
+         step is asked and the flow photographs as the form it replaced. */
+      filled={FILLED}
+      does={{ label: "Add it", op: told.writes, onDo: () => undefined }}
+    />
+  );
+}
+
+/**
+ * ⚠️ WHAT SIX PHOTOGRAPHS CAME BACK AS — the shape `product.see` answers, not a
+ * plausible-looking one. A board that invented its own draft would photograph a
+ * review of facts the reader never produces.
+ */
+/**
+ * ⚠️ A REAL PICTURE, NOT A PATH TO ONE. A flow holds `data:` URLs — nothing is
+ * uploaded until the write, so a product abandoned on step three leaves no object
+ * in the bucket. A board pointing at a file would photograph a broken image and
+ * a fixture that reads one from disk would make this suite need a filesystem.
+ * One warm pixel, scaled: what is being looked at is the TILE.
+ */
+const SHOT = "data:image/gif;base64,R0lGODlhAQABAIAAALyeftyefiH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==";
+
+const DRAFT: Answers = {
+  shots: [SHOT],
+  name: "Casting resin, clear",
+  brand: "Smooth-On",
+  unit: "tin",
+  tracking: "batched",
+};
+
+/** ⚠️ Everything above that ARRIVED rather than being typed — see `Create.filled`. */
+const FILLED = new Set(["name", "brand", "unit", "tracking"]);

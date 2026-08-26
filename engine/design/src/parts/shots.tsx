@@ -128,7 +128,11 @@ export function Shots({ held, onSet, busy }: ShotsProps) {
           <PickFile
             accept={["image/*"]}
             most={MOST_BYTES}
-            says="a picture"
+            /* ⚠️ THE ONE FACT THE BUTTON DOES NOT CARRY. What to photograph is
+               said once, on the step; a picker repeating it is the same sentence
+               twice on one screen, and how many more it will take is the thing
+               nobody can work out from anywhere else. */
+            says={held.length ? `${left} more` : `Up to ${MOST_SHOTS}`}
             label={held.length ? "Add another" : "Take a picture"}
             atOnce={left}
             {...(busy ? { busy } : {})}

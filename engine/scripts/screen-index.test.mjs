@@ -134,8 +134,21 @@ for (const one of INDEXED) {
    * it was ported and nothing said so: the files still existed, the lines still
    * held declarations, and this guard was satisfied.
    */
+/*
+    ⚠️ A STORY IS DRAWN FROM ITS DECLARATION TOO, AND THIS ASKED ONLY ABOUT
+    BODIES. `Body` places blocks and `Create` walks steps — two renderers, one
+    claim: the manifest says what is on the screen and there is no file to send a
+    reader to. Asked about bodies alone, the first declared flow was told to name
+    a component that does not exist, which is the exact fault in the other
+    direction and would have put a dead path in the index.
+
+    ⚠️ A SESSION IS NOT HERE, and that is the line. Its shape is declared and its
+    CONTROLS are the app's — a camera, a viewfinder, a packing editor — so a
+    session's row names the file that draws them, and naming one is right.
+  */
   const bodied = new Set(declaredScreens()
-    .filter((s) => s.app === one.app && s.kind === "body" && s.route)
+    .filter((s) => s.app === one.app && s.route
+      && (s.kind === "body" || s.kind === "story"))
     .map((s) => s.route));
 
   let text = readFileSync(doc, "utf8");
