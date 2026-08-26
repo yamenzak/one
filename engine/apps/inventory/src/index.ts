@@ -7425,7 +7425,34 @@ const manifest = (): AppSpec => defineApp({
        and then say what you wanted, which is one step longer from every screen
        in the product. */
     { id: "ask", route: "/ask", label: "Ask", nav: "none", chrome: "assistant", icon: "model",
-      permission: "stock:read", sky: "glow" },
+      permission: "stock:read", sky: "glow",
+      /*
+        ⚠️ A SESSION, AND THE TYPED QUESTION IS WHAT FEEDS IT. This screen
+        replaces navigation rather than decorating it — "do we have blue resin",
+        "what expires this month", "where is the torque wrench" are three screens
+        and a filter each, and one sentence somebody would say out loud — so it is
+        a place people STAY in and ask again, not a page that is read.
+
+        ⚠️ IT WAS EXCUSED FOR "AN ANSWER THAT ARRIVES IN PIECES", WHICH WAS NOT
+        TRUE OF IT. The screen makes one call and draws one answer; the streaming
+        it was waiting for is a thing the engine has and this screen does not use.
+        The reason it could not be declared was the same one four other screens
+        had — that a place where work HAPPENS is a third kind of screen — and
+        `SessionSpec` is that.
+      */
+      session: {
+        by: "hand",
+        writes: ["stock.ask"],
+        keeps: [
+          { id: "question", is: "the words in the box", until: "once" },
+          /* ⚠️ WHAT WAS ASKED, KEPT SEPARATELY FROM WHAT IS BEING TYPED — it is
+             what "ask that again" retries, and reading it off the box would
+             re-ask whatever half-sentence is in there now. */
+          { id: "asked", is: "the question that was actually sent", until: "between" },
+          { id: "answer", is: "what came back, and how many lines it read",
+            until: "between" },
+        ],
+      } },
     /*
       ⚠️ A DESTINATION RATHER THAN A STEP IN A WIZARD, and it is the screen that
       decides whether a workspace ever exists. Nobody types in eight hundred
