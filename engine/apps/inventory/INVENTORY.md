@@ -473,20 +473,20 @@ container in `src/screens/live.tsx`, and rendered over a sample world by
 | `/scan` | Scan | primary | `product:read` | `screens/Scan.tsx:133` | `screens/live.tsx:720` |
 | `/receive` | Receive | primary | `stock:move` | `screens/Receive.tsx:144` | `screens/live.tsx:853` |
 | `/count` | Count | primary | `stock:move` | `screens/Count.tsx:83` | `screens/live.tsx:936` |
-| `/work` | Work | primary | `process:read` | `screens/Work.tsx:65` | `screens/live.tsx:1374` |
+| `/work` | Work | primary | `process:read` | `declared` | `declared` |
 | `/move` | Move it | none | `stock:move` | `screens/Move.tsx:82` | `screens/live.tsx:853` |
-| `/thing` | A product | none | `product:read` | `screens/Thing.tsx:144` | `screens/live.tsx:516` |
-| `/where` | A location | none | `location:read` | `screens/Where.tsx:34` | `screens/live.tsx:671` |
-| `/item` | An item | none | `stock:read` | `screens/Item.tsx:84` | `screens/live.tsx:1105` |
-| `/kit` | A kit | none | `stock:read` | `screens/Kit.tsx:65` | `screens/live.tsx:1284` |
-| `/run` | A run | none | `process:read` | `screens/Run.tsx:73` | `screens/live.tsx:1374` |
-| `/case` | A job | none | `process:read` | `screens/Case.tsx:58` | `screens/live.tsx:1567` |
+| `/thing` | A product | none | `product:read` | `declared` | `declared` |
+| `/where` | A location | none | `location:read` | `declared` | `declared` |
+| `/item` | An item | none | `stock:read` | `declared` | `declared` |
+| `/kit` | A kit | none | `stock:read` | `declared` | `declared` |
+| `/run` | A run | none | `process:read` | `declared` | `declared` |
+| `/case` | A job | none | `process:read` | `declared` | `declared` |
 | `/due` | Running out | secondary | `stock:read` | `screens/Due.tsx:80` | `screens/live.tsx:1567` |
 | `/labels` | Labels | secondary | `location:read` | `screens/Labels.tsx:248` | `screens/live.tsx:1627` |
 | `/reports` | Reports | none | `ledger:read` | `screens/Reports.tsx:84` | `screens/live.tsx:1627` |
 | `/ask` | Ask | secondary | `stock:read` | `screens/Ask.tsx:54` | `screens/live.tsx:1374` |
 | `/import` | Import | secondary | `product:write` | `screens/Import.tsx:131` | `screens/live.tsx:1868` |
-| `/suppliers` | Suppliers | secondary | `product:write` | `screens/Suppliers.tsx:77` | `screens/live.tsx:1868` |
+| `/suppliers` | Suppliers | secondary | `product:write` | `declared` | `declared` |
 | `/register` | Add a product | none | `product:write` | `screens/Register.tsx:205` | `screens/live.tsx:2137` |
 | `/start` | Getting started | secondary | `product:read` | `screens/Start.tsx:70` | `screens/live.tsx:1943` |
 

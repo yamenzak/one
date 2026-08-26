@@ -97,7 +97,13 @@ export const declaredScreens = () => {
       const kind = /\bbody:\s*\{/.test(member) ? "body"
         : /\bstory:\s*\{/.test(member) ? "story"
         : "written";
-      out.push({ app, id: id[1], kind });
+      /* ⚠️ THE ROUTE COMES OUT OF THE SAME MEMBER AS THE KIND, because a reader
+         that took one from here and the other from a second pass over the block
+         would be two readings of one declaration — and they disagree the first
+         time a member is written in an order nothing anticipated. The screen
+         index is keyed by route and this file is keyed by id; they meet here. */
+      const route = member.match(/\broute:\s*"([^"]+)"/);
+      out.push({ app, id: id[1], kind, ...(route ? { route: route[1] } : {}) });
     }
   }
   return out;

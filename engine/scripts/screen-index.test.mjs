@@ -18,6 +18,7 @@
  */
 
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { declaredScreens } from "./lib/declared.mjs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -37,6 +38,13 @@ const ok = (m) => console.log(`ok   ${m}`);
  * decision, and a script inventing one would be the map writing itself.
  */
 const WRITING = process.argv.includes("--write");
+
+/**
+ * ⚠️ WHAT A ROW SAYS WHERE THERE IS NO FILE TO NAME. A screen drawn from its own
+ * declaration has no component and no container, and the honest cell is the word
+ * rather than a blank — a blank reads as a row somebody did not finish.
+ */
+const DRAWN = "`declared`";
 
 /**
  * ⚠️ ONE ENTRY PER PRODUCT, AND A NEW APP MEANS A NEW ENTRY. Deriving the
@@ -63,15 +71,29 @@ const declares = (line) =>
   /^export (function|const) [A-Z]/.test(line) || /^const [A-Z_]+ = \(api: /.test(line);
 
 /**
- * ⚠️ THE NEAREST DECLARATION TO WHERE THE INDEX POINTED, which is what "it
- * moved" means: an edit above a component shifts it by a few lines, and the one
- * it shifted to is the closest one either side. Guessing the FIRST declaration
- * in the file instead would silently repoint every stale row at the same
- * function.
+ * ⚠️ HOW FAR A DECLARATION MAY HAVE MOVED AND STILL BE THE SAME ONE. An edit
+ * above a component shifts it by a few lines; a jump of hundreds means the row
+ * is pointing into a different screen's container, and repairing it there would
+ * be the map agreeing with itself about the wrong file.
+ *
+ * ⚠️ AND THAT IS NOT A HYPOTHETICAL — it happened on the commit that deleted one
+ * container. `--write` repointed five rows at the nearest surviving declaration,
+ * several of them another screen's, and every one of them passed. A repair that
+ * can invent a confident wrong answer is worse than the staleness it fixes,
+ * which is the whole argument this file opens with.
+ */
+const MOVED_MOST = 60;
+
+/**
+ * ⚠️ THE NEAREST DECLARATION TO WHERE THE INDEX POINTED, WITHIN REACH. An edit
+ * above a component shifts it by a few lines, and the one it shifted to is the
+ * closest one either side. Guessing the FIRST declaration in the file instead
+ * would silently repoint every stale row at the same function; guessing one
+ * three hundred lines away does the same thing more slowly.
  */
 const nearest = (lines, at) => {
   const from = Number(at) - 1;
-  for (let step = 0; step < lines.length; step++) {
+  for (let step = 0; step <= MOVED_MOST; step++) {
     for (const i of [from - step, from + step]) {
       if (i >= 0 && i < lines.length && declares(lines[i])) return i;
     }
@@ -104,14 +126,46 @@ for (const one of INDEXED) {
     continue;
   }
 
+  /**
+   * ⚠️ WHICH ROUTES ARE DRAWN FROM THE MANIFEST RATHER THAN FROM A FILE. A
+   * screen with a `body` has no component and no container — the renderer draws
+   * it — so a row naming two files for one is a map sending somebody to code
+   * that is no longer reached. That was true of every ported screen the moment
+   * it was ported and nothing said so: the files still existed, the lines still
+   * held declarations, and this guard was satisfied.
+   */
+  const bodied = new Set(declaredScreens()
+    .filter((s) => s.app === one.app && s.kind === "body" && s.route)
+    .map((s) => s.route));
+
   let text = readFileSync(doc, "utf8");
   /** Every `file:line` this pass wants moved, applied together at the end. */
   const moved = [];
-  /* ⚠️ THE TABLE ROWS ONLY. Prose elsewhere in the document naturally mentions
-     `/labels` and `/import`; a match on the whole file would pass a document
-     whose table had been deleted. */
-  const rows = [...text.matchAll(
-    /^\|\s*`(\/[^`]*)`\s*\|[^|]*\|[^|]*\|[^|]*\|\s*`([^`:]+):(\d+)`\s*\|\s*`([^`:]+):(\d+)`\s*\|/gm,
+  /*
+    ⚠️ ONE TABLE, FOUND BY ITS OWN HEADING. Prose elsewhere in the document
+    naturally mentions `/labels` and `/import`, and the document holds OTHER
+    tables of routes — the sub-surfaces, which are sheets and drawers rather
+    than screens. Matching rows by shape picked those up the moment the shape
+    was loosened, and reported four of them as screens whose cells were wrong.
+
+    ⚠️ AND THE HEADING IS REQUIRED RATHER THAN OPTIONAL, so a document whose
+    table was deleted or renamed fails here instead of reporting no rows and
+    passing — which is the same silence this whole guard exists against.
+  */
+  const HEAD = "| Route | Name | Nav | Needs | Component | Container |";
+  const from = text.indexOf(HEAD);
+  if (from < 0) {
+    fail(`screen-index: ${one.doc} has no screen table — this guard looks for the row\n`
+      + `       "${HEAD}". Renaming a column is fine; say so here in the same commit.`);
+    continue;
+  }
+  /* ⚠️ THE ROWS UNDER IT AND NOTHING PAST THE BLANK LINE THAT ENDS THE TABLE. */
+  const table = text.slice(from).split("\n\n")[0] ?? "";
+  /* ⚠️ THE LAST TWO CELLS ARE TAKEN RAW, because a declared screen names no
+     files in them — see `bodied`. Matching only the `file:line` shape would skip
+     a ported screen's row entirely, which is the silence this pass is closing. */
+  const rows = [...table.matchAll(
+    /^\|\s*`(\/[^`]*)`\s*\|[^|]*\|[^|]*\|[^|]*\|([^|]*)\|([^|]*)\|/gm,
   )];
   const listed = rows.map((r) => r[1]);
 
@@ -134,8 +188,39 @@ for (const one of INDEXED) {
      a reference that still resolves and points at the middle of something else,
      which is the failure a checker exists for and a reader cannot see. */
   let checked = 0;
+  let drawn = 0;
   for (const row of rows) {
-    for (const [ref, at] of [[row[2], row[3]], [row[4], row[5]]]) {
+    const cells = [row[2], row[3]].map((c) => c.trim());
+
+    /*
+      ⚠️ A DECLARED SCREEN SAYS SO IN BOTH CELLS AND NAMES NO FILE. Half a row
+      pointing at a component and half saying "declared" is the state a port
+      leaves behind when only one column is edited, and it reads as a screen
+      whose component is still live.
+    */
+    if (bodied.has(row[1])) {
+      if (cells.some((c) => c !== DRAWN)) {
+        fail(`screen-index: ${one.doc}'s row for \`${row[1]}\` names a file, and the manifest\n`
+          + `       draws that screen from its own declaration. Put \`${DRAWN}\` in both the\n`
+          + `       component and the container cell — the files it points at are not reached.`);
+      }
+      drawn++;
+      continue;
+    }
+    if (cells.some((c) => c === DRAWN)) {
+      fail(`screen-index: ${one.doc}'s row for \`${row[1]}\` says \`${DRAWN}\`, and the manifest\n`
+        + `       gives that screen no body. A row claiming the renderer draws a screen\n`
+        + `       nothing declares is a file nobody goes looking for.`);
+      continue;
+    }
+
+    const named = cells.map((c) => /^`([^`:]+):(\d+)`$/.exec(c));
+    if (named.some((m) => !m)) {
+      fail(`screen-index: ${one.doc}'s row for \`${row[1]}\` does not give a \`file:line\` for\n`
+        + `       both its component and its container. Found: ${cells.join(" | ")}`);
+      continue;
+    }
+    for (const [, ref, at] of named) {
       const path = join(ENGINE, one.under, ref);
       if (!existsSync(path)) {
         fail(`screen-index: ${one.doc} names ${ref}, which does not exist.`);
@@ -175,6 +260,7 @@ for (const one of INDEXED) {
   }
   if (!bad) {
     ok(`screen-index: ${one.doc} — ${declared.length} screen(s), `
+      + `${drawn} drawn from a declaration, `
       + `${checked} file:line reference(s), every one of them true`);
   }
 }
