@@ -14,16 +14,21 @@
 import * as React from "react";
 import { Button } from "@heroui/react";
 import { TYPE } from "../tokens/type.js";
-import { ICON, SPACE } from "../tokens/metrics.js";
+import { ICON, ROW, SPACE } from "../tokens/metrics.js";
 
 /* ⚠️ A SCORE'S MARK IS HALF A ROW'S GLYPH — see `Score`. Derived, because a
    literal here is the second ladder `type.ts` is a whole file about. */
 const MARK_PX = Math.round(ICON.row / 2);
+/* ⚠️ AND A TILE'S PLATE IS TWICE ONE, for the same reason and in the other
+   direction — a circle sized by a `size-*` that happens to look right is a
+   second scale, and it lands a pixel off every row glyph on the screen below. */
+const MARK_PLATE = ICON.row * 2;
 import { Tally } from "../parts/tally.js";
 import { Sparkline } from "./charts.js";
 import { DATA, QUIET } from "./palette.js";
 import { type Point, compactLike } from "./scale.js";
 import { useFigures, useShown } from "../parts/said.js";
+import type { Tone } from "@engine/kernel";
 import { Group } from "../parts/surfaces.js";
 import { Balance } from "../parts/heads.js";
 
@@ -179,7 +184,9 @@ export function Score({ of, out, label }: {
  * loose at display size — a standalone `121` set in tabular figures has a gap
  * either side of the ones. Tabular is for things that must align vertically.
  */
-export function Stat({ label, value, unit = "", suffix = "", delta, trend, upIsGood = true }: {
+export function Stat({
+  label, value, unit = "", suffix = "", delta, trend, upIsGood = true, mark, tone = "neutral", onOpen,
+}: {
   readonly label: string;
   readonly value: number | string;
   /** ⚠️ What goes BEFORE the number, which is a currency and nothing else. */
@@ -196,20 +203,119 @@ export function Stat({ label, value, unit = "", suffix = "", delta, trend, upIsG
   readonly delta?: { readonly value: number; readonly of: string };
   readonly trend?: readonly Point[];
   readonly upIsGood?: boolean;
+  /**
+   * ⚠️ A NODE, NOT A NAME — the caller passes `glyphOf(…)`. See `Group.icon`.
+   * A number with a label is text in a box; the same number with a mark beside
+   * it is a subject. Photographed both ways on one screen.
+   */
+  readonly mark?: React.ReactNode;
+  /**
+   * ⚠️ ONLY WHERE THE NUMBER IS A VERDICT, WHICH IS THE WHOLE RULE FOR COLOUR
+   * HERE. "Notes written: 6" is a count and is neutral; "Out of stock: 8" is a
+   * warning and says so. A tone per tile for variety is how a row of figures
+   * becomes a row of hues that mean nothing — and it costs the one thing colour
+   * is for, because the tile that is genuinely wrong then reads as the third
+   * hue in a set rather than as an alarm.
+   */
+  readonly tone?: Tone;
+  /**
+   * ⚠️ WHERE THE ROWS BEHIND THE NUMBER ARE. A count with no way through to what
+   * was counted is a dead end on the busiest part of a screen — and a supporting
+   * figure always has somewhere to go, because it is a count over a view and the
+   * view is a list of the rows it counted.
+   */
+  readonly onOpen?: () => void;
 }) {
   const say = useFigures();
-  return (
-    <div className={`flex flex-col ${SPACE.tight}`}>
-      <span className={TYPE.note}>{label}</span>
-      <span className={`flex items-baseline ${SPACE.tight}`}>
-        <span className={TYPE.figure} style={{ fontVariantNumeric: "proportional-nums" }}>
-          {unit}{typeof value === "number" ? say.compact(value) : value}{suffix}
+  /*
+    ⚠️ MARK AND ARROW ON ONE ROW, NUMBER UNDER IT, LABEL LAST — and the ORDER is
+    what this rebuild is mostly about. It was label-then-number, which is right
+    for a figure standing in a row of text and wrong for a tile: scanning four of
+    them you read four captions to find four numbers. Mark first, number next,
+    label under is what every tile anybody admires does, and the reason is that
+    the number is the subject and the label is its caption.
+
+    ⚠️ AND THE TWO ENDS OF THE TOP ROW ARE PINNED TO THE CORNERS. A plain column
+    reads as text that has drifted into a box; two things held apart at the top,
+    with the figure beneath them, is most of what makes a tile look composed
+    rather than typed.
+  */
+  const inside = (
+    <>
+      <div className="flex items-start justify-between">
+        {mark
+          ? (
+            /* ⚠️ THE TINT IS ON THE GROUND AND THE GLYPH STAYS NEUTRAL unless the
+               number is a verdict — `QuickActions` states the argument at length:
+               a tinted mark stops reading the moment the ambience behind it
+               moves, so the colour belongs to the plate. */
+            <span
+              aria-hidden="true"
+              className="flex shrink-0 items-center justify-center rounded-full bg-current/10"
+              style={{
+                width: `${MARK_PLATE}px`,
+                height: `${MARK_PLATE}px`,
+                ["--icon" as string]: `${ICON.row}px`,
+              }}
+              {...(tone === "neutral" ? {} : { "data-ink": tone })}
+            >
+              {mark}
+            </span>
+          )
+          : <span />}
+        {/* ⚠️ THE AFFORDANCE IS A MARK, NOT A BUTTON, because the whole tile is
+            the target — a 24px control inside a 167px card somebody is already
+            pressing is a second hit area for one destination, and the smaller
+            one is the one a thumb misses. */}
+        {onOpen ? <span aria-hidden="true" className={`shrink-0 ${TYPE.note}`}>↗</span> : null}
+      </div>
+      <div className={`flex flex-col ${SPACE.hair}`}>
+        <span className={`flex flex-wrap items-baseline ${SPACE.tight}`}>
+          {/* ⚠️ `proportional-nums` HERE AND TABULAR IN A COLUMN. Tabular gives
+              every digit a zero's width, which is exactly right stacked and
+              visibly loose at tile size — a standalone `121` set tabular has a
+              gap either side of the ones. */}
+          <span
+            className={TYPE.tile}
+            style={{ fontVariantNumeric: "proportional-nums" }}
+            {...(tone === "neutral" ? {} : { "data-ink": tone })}
+          >
+            {unit}{typeof value === "number" ? say.compact(value) : value}{suffix}
+          </span>
+          {delta ? <Delta value={delta.value} of={delta.of} upIsGood={upIsGood} unit={unit} /> : null}
         </span>
-        {delta ? <Delta value={delta.value} of={delta.of} upIsGood={upIsGood} unit={unit} /> : null}
-      </span>
+        <span className={TYPE.note}>{label}</span>
+      </div>
       {trend ? <Sparkline points={trend} /> : null}
-    </div>
+    </>
   );
+
+  /*
+    ⚠️ THE WHOLE TILE IS THE TARGET WHERE THERE IS ONE, AND IT IS THE LIBRARY'S
+    `Button` STRIPPED — the same shape `NavRow` uses to make a whole row
+    pressable, and for the same reason. A hand-rolled `<button>` misses the
+    focus ring, the pressed state, the disabled handling and the keyboard
+    behaviour the library already ships; `heroui.test.mjs` refuses one, and it
+    refused this one on the first run.
+
+    ⚠️ AND IT DROPS THE BUTTON'S OWN GEOMETRY RATHER THAN FIGHTING IT. `free`
+    unsets the fixed height, `flush` the horizontal padding, `wrap` the nowrap —
+    because the card around it already supplies all three, and a control that
+    brings its own inside one is the double padding this repository has a whole
+    token file about. `items-start` and `text-start` because a button centres
+    what it holds and every other line on this card starts at the left edge.
+  */
+  return onOpen
+    ? (
+      <Button
+        variant="ghost"
+        onPress={onOpen}
+        className={`flex-col items-start text-start ${ROW.free} ${ROW.wrap} ${ROW.flush} ${SPACE.snug}`}
+      >
+        {inside}
+      </Button>
+    )
+    : <div className={`flex flex-col ${SPACE.snug}`}>{inside}</div>;
 }
 
 /**

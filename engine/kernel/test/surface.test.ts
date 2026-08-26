@@ -726,6 +726,35 @@ describe("a block asks for room the layout has", () => {
     }))).toEqual([]);
   });
 
+  /*
+    ⚠️ A BLOCK THAT LEADS TO ONE PLACE HAS ROOM FOR ONE — see `BlockEntry.leads`.
+    The renderer fills a single `onOpen` from it, so a second destination is one
+    it must silently drop while the declaration reads as though both were
+    reachable. The array form is shared with a row of shortcuts, so nothing about
+    the shape itself says which this is.
+  */
+  it("refuses a one-destination block that names several", () => {
+    const ONE: BlockIndex = {
+      ...INDEX,
+      Tile: { id: "Tile", bones: "figure", takes: {}, leads: "one" },
+    };
+    expect(refuseSurface(
+      screen({ body: { ...body(), blocks: [{ block: "Tile", leads: ["a", "b"] }] } }),
+      ONE, [recent], COLLECTIONS, [], ["a", "b"],
+    ).map((p) => p.why)).toContain("leads_to_several");
+  });
+
+  it("accepts a one-destination block that names one", () => {
+    const ONE: BlockIndex = {
+      ...INDEX,
+      Tile: { id: "Tile", bones: "figure", takes: {}, leads: "one" },
+    };
+    expect(refuseSurface(
+      screen({ body: { ...body(), blocks: [{ block: "Tile", leads: ["a"] }] } }),
+      ONE, [recent], COLLECTIONS, [], ["a"],
+    ).map((p) => p.why)).toEqual([]);
+  });
+
   it("refuses a body with nothing on it", () => {
     expect(why(screen({ body: body({ blocks: [] }) }))).toContain("nothing_on_it");
   });

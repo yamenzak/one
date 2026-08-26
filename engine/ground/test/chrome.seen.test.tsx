@@ -31,8 +31,11 @@ const OUT = join(import.meta.dirname, "..", "shot-out");
 const TALL = { width: PHONE.width, height: 1_000 } as const;
 
 /* ⚠️ ONE WITH A DOCK AND ONE WITH AN ACT, because a screen has one or the other
-   and the two feet are what this is for. */
-const ON = ["/", "/reports"] as const;
+   and the two feet are what this is for — plus WHERE A SUPPORTING FIGURE LEADS,
+   because a tile that opens something is only half a claim until the other half
+   is a picture. A destination photographed alongside the figure is how "the
+   count and the list behind it are one declaration" stops being a sentence. */
+const ON = ["/", "/reports", "/pinned"] as const;
 
 let browser: Browser;
 let code: string;

@@ -136,6 +136,33 @@ if (declared.size < FEWEST) {
     + `       and from a smaller number alone the two are the same.`);
 }
 
+/**
+ * ⚠️ WHICH ENTRIES LEAD SOMEWHERE, AND IN WHICH SHAPE — see `BlockEntry.leads`.
+ * `true` is a row of shortcuts and fills `actions`; `"one"` is a single
+ * destination and fills `onOpen`. They are two different PROPS, so an entry
+ * carrying the wrong one is a press that never arrives.
+ */
+const leadsOf = new Map();
+{
+  /* ⚠️ BRACE-BALANCED PER ENTRY, NOT A LAZY SPAN ACROSS THE FILE. The first
+     draft matched `block("X" … leads:` with a bounded `[\s\S]*?`, which happily
+     ran from one entry's `block(` to a LATER entry's `leads:` — reporting `Hero`
+     as leading somewhere it does not. A parser that is wrong reports the tree as
+     broken and is believed. */
+  for (const m of registry.matchAll(/^ {2}(\w+): /gm)) {
+    let depth = 0, end = m.index;
+    for (let i = m.index; i < registry.length; i++) {
+      const c = registry[i];
+      if (c === "{") depth++;
+      else if (c === "}") { depth--; if (!depth) { end = i; break; } }
+    }
+    const entry = registry.slice(m.index, end + 1);
+    const how = /leads:\s*"one"/.test(entry) ? "one"
+      : /leads:\s*true/.test(entry) ? "many" : null;
+    if (how) leadsOf.set(m[1], how);
+  }
+}
+
 /** ⚠️ Each entry's slot names, which are the props the renderer will fill. */
 const slotsOf = new Map();
 for (const m of registry.matchAll(/block\("(\w+)",\s*"\w+",\s*\{/g)) {
@@ -316,6 +343,38 @@ for (const [why, names] of Object.entries(WHY)) {
   if (!loose && !stale) {
     ok(`candidates: ${exported.size} export(s), every childless one placed or classified`);
   }
+}
+
+/* ------------------------------------------------ and it leads in one shape --- */
+
+/**
+ * ⚠️ `leads` IS TWO PROPS AND THE REGISTRY PICKS ONE, WHICH IS THE SAME SILENT
+ * JOIN THE SLOT CHECK ABOVE EXISTS FOR. A row of shortcuts takes an array of
+ * destinations (`actions`); a tile takes a single `onOpen`. An entry saying
+ * `true` about a component that reads `onOpen` makes the renderer set a prop the
+ * component does not take — React drops it without a word, the manifest
+ * composes, the tile draws, and pressing it does nothing.
+ *
+ * ⚠️ AND THAT IS NOT HYPOTHETICAL. `Stat` was given `leads: true` and a single
+ * `onOpen` in the same afternoon, and the screen photographed perfectly with no
+ * affordance on any of four tiles. Nothing in this file could see it, because
+ * `leads` is not a slot.
+ */
+{
+  let wrong = 0;
+  for (const [id, how] of leadsOf) {
+    const part = exported.get(id);
+    if (!part) continue;
+    const wants = how === "one" ? "onOpen" : "actions";
+    if (part.props.includes(wants)) continue;
+    wrong++;
+    fail(`kernel/src/blocks.ts: \`${id}\` leads ${how === "one" ? "to one screen" : "to several"} `
+      + `and ${part.at}\n       does not take \`${wants}\` `
+      + `(${part.props.join(", ") || "no destructured props"}).\n`
+      + `       The renderer fills that prop; React drops one a component does not read, so\n`
+      + `       the shortcut draws and the press goes nowhere.`);
+  }
+  if (!wrong) ok(`leading: ${leadsOf.size} block(s) that lead, each taking the prop its shape fills`);
 }
 
 /* ------------------------------------------------------- and it can be drawn --- */

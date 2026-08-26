@@ -332,6 +332,11 @@ function Placed({ block, has }: { readonly block: BlockSpec; readonly has: Has }
     }
     const value = drawn(binding, has);
     if (slot === "children") children = value as React.ReactNode;
+    /* ⚠️ A GLYPH SLOT'S WORDS ARE A NAME AND THE PROP IS A DRAWN MARK — see
+       `SlotSpec.glyph`. The registry says which; matching the slot's own name
+       here would put a list of prop names back in the renderer, and the second
+       block to call its mark something else would silently stop converting. */
+    else if (spec?.glyph) props[slot] = value === undefined ? undefined : glyphOf(String(value));
     else props[slot] = value;
   }
   if (block.label !== undefined && !("label" in props)) props["label"] = block.label;
@@ -397,7 +402,7 @@ function Placed({ block, has }: { readonly block: BlockSpec; readonly has: Has }
     nav already asks of itself.
   */
   if (block.leads?.length) {
-    props["actions"] = block.leads
+    const on = block.leads
       .map((to) => {
         const said = has.named?.(to);
         if (!said) return null;
@@ -409,6 +414,16 @@ function Placed({ block, has }: { readonly block: BlockSpec; readonly has: Has }
         };
       })
       .filter((one) => one !== null);
+    /* ⚠️ ONE DESTINATION IS A DIFFERENT PROP, NOT A SHORTER ARRAY — see
+       `BlockEntry.leads`. A tile takes `onOpen`; handing it the array would set a
+       prop it does not take, and React drops an unknown prop without a word. The
+       kernel has already refused a second entry, so `[0]` is the only one. */
+    if (entry.leads === "one") {
+      const one = on[0];
+      if (one) props["onOpen"] = one.onDo;
+    } else {
+      props["actions"] = on;
+    }
   }
 
   /*

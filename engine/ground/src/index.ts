@@ -605,9 +605,14 @@ export const GROUND: AppSpec = defineApp({
             group: null,
             of: [{
               block: "Stat",
+              /* ⚠️ ONE DESTINATION, AND IT IS THE LIST THE NUMBER WAS COUNTED
+                 FROM. Both come off `pinned-notes`, so pressing through can never
+                 show a different set from the one the tile reported. */
+              leads: ["pinned"],
               bind: {
                 value: { from: { of: "count", view: "pinned-notes" } },
                 label: { from: { of: "words", says: "Pinned" } },
+                mark: { from: { of: "words", says: "tag" } },
               },
             }],
           },
@@ -615,9 +620,16 @@ export const GROUND: AppSpec = defineApp({
             group: null,
             of: [{
               block: "Stat",
+              leads: ["questions"],
               bind: {
                 value: { from: { of: "count", view: "open-questions" } },
                 label: { from: { of: "words", says: "Questions open" } },
+                mark: { from: { of: "words", says: "alert" } },
+                /* ⚠️ THE ONE TONE ON THIS SCREEN, AND IT IS A VERDICT RATHER THAN
+                   A HUE. An open question is the only one of the four that is
+                   waiting on somebody; a tone on all of them would make this
+                   the third colour in a set instead of the one thing to look at. */
+                tone: { from: { of: "words", says: "warning" } },
               },
             }],
           },
@@ -625,9 +637,11 @@ export const GROUND: AppSpec = defineApp({
             group: null,
             of: [{
               block: "Stat",
+              leads: ["decisions"],
               bind: {
                 value: { from: { of: "count", view: "decisions" } },
                 label: { from: { of: "words", says: "Decisions" } },
+                mark: { from: { of: "words", says: "check" } },
               },
             }],
           },
@@ -635,9 +649,11 @@ export const GROUND: AppSpec = defineApp({
             group: null,
             of: [{
               block: "Stat",
+              leads: ["ideas"],
               bind: {
                 value: { from: { of: "count", view: "ideas" } },
                 label: { from: { of: "words", says: "Ideas" } },
+                mark: { from: { of: "words", says: "model" } },
               },
             }],
           },
@@ -660,6 +676,82 @@ export const GROUND: AppSpec = defineApp({
             },
           },
         ],
+      } },
+    /*
+      ⚠️ FOUR SCREENS THAT ARE THE SAME LIST NARROWED FOUR WAYS, AND THEY EXIST
+      BECAUSE THE FIGURES ABOVE THEM DO. A supporting figure is a count over a
+      narrowed view; without somewhere to press through to, each of those tiles
+      is a dead end on the busiest part of the home screen — and the mechanism
+      that opens them would be declared here and reached by nothing, which is the
+      exact shape this repository's guards exist to catch.
+
+      ⚠️ AND EACH DRAWS THE VIEW ITS OWN TILE COUNTED. One declaration behind
+      both halves is what makes "4 pinned" and the four rows underneath the same
+      answer rather than two queries that agree today.
+
+      ⚠️ `nav: "none"` ON ALL FOUR. They are reached from the figure that is about
+      them, which is where somebody is already looking; four more items in a bar
+      of five would be a nav that is a table of contents for one screen.
+    */
+    { id: "pinned", route: "/pinned", label: "Pinned", nav: "none", icon: "tag",
+      permission: "note:read",
+      body: {
+        shape: "list",
+        layout: { as: "stack" },
+        blocks: [{
+          block: "Listing",
+          shows: [{ field: "title", label: "Note" }, { field: "body", label: "What it says" }],
+          nothing: { says: "Nothing pinned", under: "Pin a note and it will be here" },
+          bind: {
+            label: { from: { of: "words", says: "Pinned" } },
+            of: { from: { of: "view", view: "pinned-notes" } },
+          },
+        }],
+      } },
+    { id: "questions", route: "/questions", label: "Questions open", nav: "none", icon: "alert",
+      permission: "note:read",
+      body: {
+        shape: "list",
+        layout: { as: "stack" },
+        blocks: [{
+          block: "Listing",
+          shows: [{ field: "title", label: "Note" }, { field: "body", label: "What it says" }],
+          nothing: { says: "Nothing open", under: "A note written as a question will be here" },
+          bind: {
+            label: { from: { of: "words", says: "Questions open" } },
+            of: { from: { of: "view", view: "open-questions" } },
+          },
+        }],
+      } },
+    { id: "decisions", route: "/decisions", label: "Decisions", nav: "none", icon: "check",
+      permission: "note:read",
+      body: {
+        shape: "list",
+        layout: { as: "stack" },
+        blocks: [{
+          block: "Listing",
+          shows: [{ field: "title", label: "Note" }, { field: "body", label: "What it says" }],
+          nothing: { says: "Nothing decided yet", under: "A note written as a decision will be here" },
+          bind: {
+            label: { from: { of: "words", says: "Decisions" } },
+            of: { from: { of: "view", view: "decisions" } },
+          },
+        }],
+      } },
+    { id: "ideas", route: "/ideas", label: "Ideas", nav: "none", icon: "model",
+      permission: "note:read",
+      body: {
+        shape: "list",
+        layout: { as: "stack" },
+        blocks: [{
+          block: "Listing",
+          shows: [{ field: "title", label: "Note" }, { field: "body", label: "What it says" }],
+          nothing: { says: "Nothing yet", under: "A note written as an idea will be here" },
+          bind: {
+            label: { from: { of: "words", says: "Ideas" } },
+            of: { from: { of: "view", view: "ideas" } },
+          },
+        }],
       } },
     { id: "people", route: "/people", label: "People", nav: "primary", icon: "people",
       permission: "member:read" },

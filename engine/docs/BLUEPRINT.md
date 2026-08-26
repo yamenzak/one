@@ -182,6 +182,53 @@ A kind is not finished when it looks right with real data. It owes, every time:
 
 ---
 
+## 3a · A supporting figure is a tile, and a tile is five things
+
+**The hero is one number and a screen needs several.** A person arriving asks how
+much there is, and then immediately how much of it needs them. Answering only the
+first is a page that opens with a total and a table, where every follow-up
+question is a scroll and a count.
+
+⚠️ **ONLY ONE OF THEM IS LOUD.** The hero is on its own surface in display type;
+the supporting figures are a rung down, on plain cards. Four numbers at one rank
+is four numbers nobody reads — the eye has to choose, and whichever it picks was
+not a decision anybody made. That is the hero's own "two heroes is no hero", one
+step out.
+
+**What a tile owes, and every one of these was found by comparing a screen of
+ours against a screen we admired:**
+
+1. **A mark.** A number with a label is text in a box; the same number beside a
+   mark is a subject. The tint goes on the mark's GROUND and the glyph stays
+   neutral — a tinted glyph stops reading the moment the ambience behind it
+   moves.
+2. **The number above the label, not under it.** Scanning four tiles you should
+   get four numbers and glance down for what they are; label-first makes you read
+   four captions to find four numbers. Label-first is right for a figure standing
+   in a row of text and wrong for a tile, which is why they are different roles.
+3. **A rank of its own** — under the hero, above a figure in a row. Ours sat at
+   the in-a-row rank and read as the hero's caption.
+4. **Somewhere to press.** A supporting figure is a count over a narrowed view,
+   so the rows behind it ARE a screen. A count with no way through to what was
+   counted is a dead end on the busiest part of the page — and declaring both
+   halves from one view is what makes the number and the list agree by
+   construction rather than by two queries that happen to match today.
+5. **Two things pinned to the top corners.** The mark at one end, the affordance
+   at the other, the number beneath. A plain column reads as text that drifted
+   into a box; the corner-pinning is most of what makes a tile look composed.
+
+### Colour is a verdict, never variety
+
+⚠️ **A TONE PER TILE FOR VARIETY IS HOW A ROW OF FIGURES BECOMES A ROW OF HUES
+THAT MEAN NOTHING** — and it costs the one thing colour is for. In the reference
+this section was written against, four tiles carry four hues; one of them is red
+on a genuine problem, and because it sits in a rainbow it reads as the third
+colour in a set rather than as an alarm.
+
+So: a tone where the number is a VERDICT — something is out, something is
+waiting, something is over — and neutral where it is a count. One coloured thing
+on a screen is louder than four.
+
 ## 4 · Designing one screen
 
 Before anything is declared, answer these four in order. They are not a

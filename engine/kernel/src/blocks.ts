@@ -34,6 +34,14 @@ const slot = (
   label, takes, ...(required ? { required: true } : {}), ...(whole ? { whole: true } : {}),
 });
 
+/**
+ * ⚠️ A SLOT WHOSE WORDS NAME A GLYPH — see `SlotSpec.glyph`. A declaration can
+ * only carry a string and the component takes a drawn mark, so the renderer has
+ * to be told which of the two this is; without it the word lands inside the
+ * circle and the screen composes, passes and looks typed-into.
+ */
+const glyph = (label: string): SlotSpec => ({ label, takes: ["words"], glyph: true });
+
 /** A value off the record the screen is about, or a fixed word. */
 const SAID = ["field", "words"] as const;
 /** A value, a count, or a fixed word — anything that renders as one figure. */
@@ -198,11 +206,32 @@ const FIGURES: BlockIndex = {
     under: slot("What that means", SAID),
   }),
 
-  /** A number among several. */
-  Stat: block("Stat", "figure", {
+  /**
+   * A NUMBER AMONG SEVERAL, ON ITS OWN TILE.
+   *
+   * ⚠️ THE MARK AND THE TONE ARE SLOTS BECAUSE THE COMPONENT CANNOT DERIVE
+   * EITHER. Which glyph a count wears is a fact about the SUBJECT — a pin, a
+   * question, a box — and which tone it wears is a fact about whether the number
+   * is a verdict. A component guessing the first draws a neutral circle on every
+   * tile in the product; a component guessing the second paints a tile per hue,
+   * and then the tile that is genuinely wrong reads as the third colour in a set
+   * rather than as an alarm.
+   *
+   * ⚠️ AND IT LEADS SOMEWHERE, WHICH IS `leads` WITH EXACTLY ONE ENTRY. A
+   * supporting figure is a count over a narrowed view, so the rows behind it are
+   * a screen — and a count with no way through to what was counted is a dead end
+   * on the busiest part of a page. It takes the same list every row of shortcuts
+   * does, so the words and the mark come from the manifest rather than from a
+   * label typed twice.
+   */
+  Stat: { ...block("Stat", "figure", {
     value: slot("The figure", FIGURE, true),
     label: slot("What it counts", SAID, true),
-  }),
+    /* ⚠️ A name from `GLYPH_NAMES` — see `figure`'s own `mark`. */
+    mark: glyph("The mark beside it"),
+    /* ⚠️ One of the four inks, and only where the number is a verdict. */
+    tone: slot("What it means, where it means something", ["words"]),
+  }), leads: "one" },
 
   /** How far along something is. */
   Meter: block("Meter", "figure", {
@@ -402,6 +431,6 @@ export const HEROES: BlockIndex = {
        A number alone is read as arithmetic; the same number beside a mark is
        read as a subject, and it is the cheapest character a screen can have.
        `words` only: it is a property of the screen, not of a record. */
-    mark: slot("The mark beside it", ["words"]),
+    mark: glyph("The mark beside it"),
   }),
 };

@@ -1,5 +1,5 @@
 /**
- * TYPOGRAPHY AS SEVEN ROLES AND ONE FACE, AND A SCREEN PICKS A ROLE RATHER THAN
+ * TYPOGRAPHY AS EIGHT ROLES AND ONE FACE, AND A SCREEN PICKS A ROLE RATHER THAN
  * A SIZE.
  *
  * ⚠️ THE PROBLEM IS NOT THAT `text-2xl` IS WRONG. It is that one screen picks
@@ -11,8 +11,9 @@
  * ⚠️ AND THE ROLES ARE ABOUT THE READER, NOT THE PAGE. `display` is the one
  * thing a screen exists to show; `title` is what this screen is; `section` is
  * what this part of it is; `body` is prose; `label` names a control; `note` is
- * secondary; `figure` is a number in a row or a stat. An eighth is a decision
- * somebody makes on purpose, in review.
+ * secondary; `figure` is a number in a row; `tile` is a number that is the whole
+ * subject of its own card. A ninth is a decision somebody makes on purpose, in
+ * review — `tile` was the eighth and its own note is what that looks like.
  *
  * ⚠️ THE SCALE HAD NO TOP, AND THAT WAS THE WHOLE PROBLEM WITH IT. `title` and
  * `figure` were both 24px, so the number a whole screen was built around came
@@ -349,6 +350,24 @@ export const TYPE = {
    * block; the one a screen is built around is `display`.
    */
   figure: `font-mark ${at("part")} font-bold tabular-nums tracking-[-0.025em] text-foreground`,
+  /**
+   * THE NUMBER A TILE IS ABOUT — 31px, one rung under a hero and one above a
+   * figure in a row.
+   *
+   * ⚠️ THE EIGHTH ROLE, AND IT IS THE DECISION THIS FILE'S HEADER ASKS FOR. The
+   * ladder had two figure roles and a screen leading with several numbers needs
+   * three: `display` is the ONE thing a screen exists to show, `figure` is a
+   * number standing in a row of text, and this is a number that is the whole
+   * subject of its own card. Photographed at `figure`: a 25px number under a
+   * 39px hero, in a 167px-wide card, reads as the hero's caption — four tiles
+   * that look like four labels somebody forgot to finish.
+   *
+   * ⚠️ AND IT IS `page` RATHER THAN `hero`, WHICH IS THE WHOLE POINT OF A
+   * SUPPORTING FIGURE. At the hero's own rank there would be five heroes on the
+   * screen, and five heroes is none — the eye chooses, and whichever it picks was
+   * not a decision anybody made.
+   */
+  tile: `font-mark ${at("page")} font-bold tabular-nums tracking-[-0.03em] text-foreground`,
   /**
    * ⚠️ THE NUMERALS WITHOUT THE SIZE — for a figure that lands INSIDE a row, a
    * heading or a sentence, and takes whatever size it lands in. `figure` is a

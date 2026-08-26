@@ -831,6 +831,20 @@ export interface SlotSpec {
    * list of component names is the join this whole registry exists to remove.
    */
   whole?: boolean;
+  /**
+   * ⚠️ THIS SLOT'S WORDS ARE A GLYPH'S NAME, AND THE PROP IS A DRAWN MARK. A
+   * declaration can only ever carry a STRING, and the component takes a node —
+   * so without this the renderer hands `"note"` to a prop expecting a mark and
+   * React renders the word inside the circle, on a screen that composes, passes
+   * every check and looks like somebody typed into an icon.
+   *
+   * ⚠️ AND IT IS A FLAG ON THE SLOT RATHER THAN A NAME THE RENDERER KNOWS.
+   * Converting by matching the slot's NAME would put a list of prop names back
+   * inside the renderer, which is the join this registry exists to remove — and
+   * the second block to call its mark something else would silently stop
+   * converting.
+   */
+  glyph?: boolean;
 }
 
 /**
@@ -866,8 +880,17 @@ export interface BlockEntry {
    * a row of shortcuts leads to four, and the whole point of it is that they sit
    * beside each other. Without this the one block in the registry for that shape
    * was placeable and drew nothing.
+   *
+   * ⚠️ `"one"` IS THE SAME MECHANISM WITH ONE DESTINATION, and it is a second
+   * value rather than a second field because the DECLARATION is identical — a
+   * list of screen ids, resolved through the manifest, dropped where the person
+   * may not open it. What differs is the PROP: a row of shortcuts takes an array
+   * and a tile takes a single `onOpen`, so a renderer handing the array to both
+   * would set a prop the tile does not take and React would drop it without a
+   * word. The kernel refuses a second entry, so "which one did it mean" is never
+   * a question anybody has to answer at runtime.
    */
-  readonly leads?: true;
+  readonly leads?: true | "one";
   /**
    * THIS BLOCK IS FED BY THE APP'S OWN BOOK, NOT BY A BINDING.
    *
@@ -904,7 +927,7 @@ export type SurfaceRefusal =
   /* ⚠️ THE TWO A ROW OF SHORTCUTS CAN GET WRONG — see `BlockSpec.leads`. An
      unknown destination is `goes_nowhere`, which is the same fault one tile at a
      time and deserves the same name. */
-  | "leads_missing" | "leads_on_a_block_that_takes_none"
+  | "leads_missing" | "leads_on_a_block_that_takes_none" | "leads_to_several"
   /* ⚠️ THE FOUR A NARROWING CAN GET WRONG — see `PickSpec`. A control drawn over
      rows nothing narrows is the sharpest: it moves, and the screen does not. */
   | "pick_name_taken" | "pick_says_nothing" | "pick_two_ways" | "pick_narrows_nothing"
@@ -1733,6 +1756,14 @@ export function refuseSurface(
       at("leads_on_a_block_that_takes_none",
         `${where} names screens to lead to and is not a row of shortcuts — `
         + "nothing would draw them");
+    }
+    /* ⚠️ ONE MEANS ONE — see `BlockEntry.leads`. A tile has a single `onOpen`, so
+       a second destination here is one the renderer must silently drop, and the
+       declaration would read as though both were reachable. */
+    if (entry.leads === "one" && (b.leads?.length ?? 0) > 1) {
+      at("leads_to_several",
+        `${where} names ${b.leads?.length} screens and has room for one — `
+        + "the rest would be declared and unreachable");
     }
     for (const to of b.leads ?? []) {
       if (!screens.includes(to)) {
