@@ -126,3 +126,36 @@ describe("worlds", () => {
     }, 90_000);
   }
 });
+
+/**
+ * THE PROPOSAL, AS FOUR PICTURES INSTEAD OF A PARAGRAPH.
+ *
+ * ⚠️ A LOOK IS NOT ONE SCREEN, WHICH IS WHY THE ARRIVAL IS NOT ALONE HERE. The
+ * whole argument for a lit home is that everything after it is quiet — so a
+ * proposal showing only the lit one is a proposal for a product where every
+ * screen looks like that, which is the opposite of what is being proposed.
+ *
+ * ⚠️ AND BOTH THEMES, BECAUSE A GROUND IS A PAIR. The dark ladder and the light
+ * one are chosen together or one of them is chosen by nobody.
+ */
+const PICKED = {
+  dark: LOOKS.find((k) => k.id === "d3-lifted")!,
+  light: LOOKS.find((k) => k.id === "l3-linen")!,
+} as const;
+
+const BEST = [
+  { id: "home-dark", theme: "dark", route: "/", sky: "neon" },
+  { id: "home-light", theme: "light", route: "/", sky: "neon" },
+  { id: "products-dark", theme: "dark", route: "/products", sky: "plain" },
+  { id: "product-light", theme: "light", route: "/product", sky: "plain" },
+] as const;
+
+describe("best", () => {
+  for (const k of BEST) {
+    it(k.id, async () => {
+      await shoot(browser, { code, route: k.route, sky: k.sky },
+        `${css}\n${over(PICKED[k.theme])}`, TALL, k.theme, join(OUT, `best-${k.id}.png`));
+      expect(1).toBe(1);
+    }, 90_000);
+  }
+});
