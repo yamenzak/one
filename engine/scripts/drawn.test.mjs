@@ -76,6 +76,14 @@ const NOT_PLACED = new Map([
     + "in both apps is a count, a total or a weight, none of which has a ceiling "
     + "that means anything — this is waiting on a subject that is genuinely "
     + "marked rather than measured"],
+  ["Hero", "the figure a screen LEADS with is the hero REGION, which is drawn "
+    + "from `HEROES` and placed above the layout so it can bleed past the gutter "
+    + "— this is the same figure in a grid CELL, and no screen has wanted a "
+    + "second display number under the one already leading it"],
+  ["StepRow", "one step of something being explained, and neither app explains "
+    + "anything in a body: a flow's progress is the story frame's (`Steps`, "
+    + "excused above for the same reason) and a checklist is the guide's — this "
+    + "waits on a screen that walks somebody through a procedure it does not run"],
   ["Gauge", "a dial reads a single figure against a range somebody already knows, "
     + "which is a shape a warehouse and a notebook have no instance of — it waits "
     + "on a subject with a normal band and an alarming one, and neither app has a "

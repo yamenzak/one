@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { refuseApp } from "@engine/kernel";
+import { CRUD, actsIn, refuseApp, verbId } from "@engine/kernel";
 import { inventory } from "../src/index.js";
 
 /** ⚠️ Built once here — the manifest is a thunk so that a cold isolate is not. */
@@ -19,6 +19,43 @@ import { PROFILES, WORDS, wordsFor } from "../src/words.js";
 describe("the manifest", () => {
   it("composes with nothing outstanding", () => {
     expect(refuseApp(INVENTORY)).toEqual([]);
+  });
+
+  /**
+   * ⚠️ AN ACT NAMES THE OPERATION IT CALLS, AND THE CHECK MOVED WITH THE SURFACE.
+   * This was asserted against a screen FILE, which was deleted whole when the
+   * surface was emptied — so the guard went on being listed as live while its
+   * implementation had ceased to exist, which is the one thing a guard ledger
+   * must never say. What it protects is unchanged: a control whose operation is
+   * a typo renders, presses, and does nothing at all.
+   *
+   * ⚠️ AND IT IS ASSERTED THROUGH THE COMPOSER RATHER THAN BY WALKING BLOCKS,
+   * because `refuseSurface` is what actually enforces it — a second walk here
+   * would be a second opinion about the same rule, and the one that drifts is
+   * always the copy.
+   */
+  it("refuses an act naming an operation this app does not declare", () => {
+    const screens = INVENTORY.screens!.map((one) => (one.id !== "places" ? one : {
+      ...one,
+      body: { ...one.body!, blocks: one.body!.blocks.map((placed) => ("group" in placed
+        ? { ...placed, of: placed.of.map((b) => ({ ...b, does: ["location.invented"] })) }
+        : placed)) },
+    }));
+    expect(JSON.stringify(refuseApp({ ...INVENTORY, screens }))).toContain("operation_unknown");
+  });
+
+  /* ⚠️ AND EVERY ACT THE PRODUCT ACTUALLY DECLARES IS ONE — the assertion above
+     proves the check bites, and this proves the manifest passes it with acts on
+     it rather than by having none. */
+  it("declares acts, and every one of them names a real operation", () => {
+    const ids = new Set([
+      ...INVENTORY.operations.map((o) => o.id),
+      ...INVENTORY.collections.flatMap((c) => CRUD.map((v) => verbId(c.id, v))),
+    ]);
+    const acts = (INVENTORY.screens ?? [])
+      .flatMap((one) => (one.body ? actsIn(one.body) : []));
+    expect(acts.length).toBeGreaterThan(0);
+    for (const id of acts) expect(ids).toContain(id);
   });
 
   /*

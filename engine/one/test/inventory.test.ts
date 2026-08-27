@@ -24,6 +24,7 @@ import {
   MEMBERSHIP, addShard, compPlan, createTenant, found, noteBelonging, noteShardApp,
   startSession, upsertAccount, type Db,
 } from "@engine/runtime";
+import { inventory } from "@engine/inventory";
 import worker, { APPS, LEGAL } from "../src/index.js";
 import { warm } from "./warm.js";
 
@@ -514,19 +515,31 @@ describe("what the plan opens", () => {
     return mine!.screens;
   };
 
-  it("withholds the run rail, which this tier did not buy", async () => {
-    const ids = (await screensOf()).map((s) => s.id);
-    expect(ids).not.toContain("run");
-  });
+  /*
+    ⚠️ DERIVED FROM WHAT THE MANIFEST GATES, NOT FROM SCREEN IDS TYPED HERE. This
+    named `run`, `case` and `work` — three screens that left with the twenty-one
+    the surface rewrite emptied — so the suite went on asserting a claim about a
+    product that had changed underneath it, and the failure said "expected to
+    include 'run'" about a screen nobody had removed by mistake.
 
-  /* ⚠️ AND WITHHOLDS NEITHER OF THE TWO IT DID. `/work` is about runs AND jobs,
-     so gating it on runs alone would have taken the work orders with it — which
-     is the whole reason a screen names a LIST rather than a key. */
-  it("keeps the work orders, and the page that lists them", async () => {
+    ⚠️ AND IT IS CORRECT IN BOTH WORLDS, which is the point of deriving it. Today
+    OneInventory gates no screen on a flag, so the assertion is that this tier
+    sees every screen its grants allow; the day a gated screen returns, the same
+    walk asserts it is withheld here — with no edit, and no silence in between.
+  */
+  const GATED = (inventory().screens ?? []).flatMap((one) => (one.flag ? [one.id] : []));
+
+  it("withholds exactly what this tier did not buy, and nothing else", async () => {
     const ids = (await screensOf()).map((s) => s.id);
-    expect(ids).toContain("case");
-    expect(ids).toContain("work");
-    expect(ids).toContain("import");
+    for (const id of GATED) expect(ids).not.toContain(id);
+    /* ⚠️ AND KEEPS EVERY UNGATED ONE. Half of this claim is that the filter is
+       not over-reaching: a screen withheld because a NEIGHBOUR was gated is the
+       failure `/work` was designed against — it is about runs AND jobs, so
+       gating it on runs alone would take the work orders with it. */
+    const open = (inventory().screens ?? [])
+      .filter((one) => !one.flag && one.nav !== "none")
+      .map((one) => one.id);
+    for (const id of open) expect(ids).toContain(id);
   });
 
   /*
@@ -600,9 +613,22 @@ describe("how far this workspace has got", () => {
     expect(counts["location.created"]).toBeGreaterThan(0);
     expect(counts["product.created"]).toBeGreaterThan(0);
     expect(counts["stock.received"]).toBeGreaterThan(0);
-    /* ⚠️ AND `steps` IS WHAT IS LEFT, so all three done is an empty list. */
-    expect(said.body.steps).toEqual([]);
-    expect(said.body.done).toHaveLength(3);
+    /*
+      ⚠️ AND `steps` IS WHAT IS LEFT, DERIVED FROM THE GUIDE RATHER THAN COUNTED
+      HERE. This asserted `[]` and a `done` of three, which was true of a guide
+      with three steps in it — a fourth was added and the assertion went on
+      describing the old book. What the test is FOR is that an ordinary operation
+      ticks a step; naming the number of steps as well makes editing the guide
+      break a test about something else.
+    */
+    const raised = ["location.created", "product.created", "stock.received"];
+    const guide = inventory().guide ?? {};
+    const owed = Object.values(guide)
+      .filter((step) => !raised.includes(step.done))
+      .map((step) => step.id)
+      .sort();
+    expect((said.body.steps as { id: string }[]).map((s) => s.id).sort()).toEqual(owed);
+    expect(said.body.done).toHaveLength(raised.length);
   });
 
   /* ⚠️ A MILESTONE IS SAID ONCE, and the record of having said it is what stops

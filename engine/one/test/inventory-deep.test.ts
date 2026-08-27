@@ -18,6 +18,7 @@ import {
   MEMBERSHIP, addShard, compPlan, createTenant, found, noteBelonging, noteShardApp,
   startSession, upsertAccount, type Db,
 } from "@engine/runtime";
+import { inventory } from "@engine/inventory";
 import worker, { APPS, LEGAL } from "../src/index.js";
 import { warm } from "./warm.js";
 
@@ -510,13 +511,22 @@ describe("what the night tells somebody", () => {
   was bought, which is the whole claim.
 */
 describe("what the plan opens", () => {
-  it("hands the run rail to a workspace that bought it", async () => {
+  /*
+    ⚠️ DERIVED, FOR THE REASON THE FREE TIER'S IS — see `inventory.test`. This
+    named three screens the surface rewrite emptied, so it asserted a claim about
+    a product that no longer had them and failed with a message that reads like a
+    regression. What it is FOR is that a paid tier is handed what a free one is
+    withheld, and that survives every screen coming and going.
+  */
+  it("hands a workspace that bought it every screen the free tier is withheld", async () => {
     const res = await at("/api/centre.view", { headers: { cookie } });
     expect(res.status).toBe(200);
     const body = await res.json() as { apps: { id: string; screens: { id: string }[] }[] };
     const ids = (body.apps.find((a) => a.id === "inventory")?.screens ?? []).map((s) => s.id);
-    expect(ids).toContain("run");
-    expect(ids).toContain("work");
-    expect(ids).toContain("case");
+    const gated = (inventory().screens ?? []).flatMap((one) => (one.flag ? [one.id] : []));
+    for (const id of gated) expect(ids).toContain(id);
+    /* ⚠️ AND IT SEES THE ORDINARY ONES TOO, so a tier that opened the gated set
+       by breaking the filter altogether does not pass this. */
+    expect(ids).toContain("products");
   });
 });

@@ -514,6 +514,24 @@
         "kind": "read",
         "method": "GET",
         "path": "/api/totals.read"
+      },
+      {
+        "id": "bin.list",
+        "kind": "read",
+        "method": "GET",
+        "path": "/api/bin.list"
+      },
+      {
+        "id": "bin.freeze",
+        "kind": "write",
+        "method": "POST",
+        "path": "/api/bin.freeze"
+      },
+      {
+        "id": "bin.restore",
+        "kind": "write",
+        "method": "POST",
+        "path": "/api/bin.restore"
       }
     ],
     "withMediaField": [

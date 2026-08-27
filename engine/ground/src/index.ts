@@ -671,6 +671,45 @@ export const GROUND: AppSpec = defineApp({
               },
             }],
           },
+          /*
+            ⚠️ THE TWO CHARTS, AND THIS SCREEN'S OWN HEADER PROMISED THEM. It says
+            it was declared "so the chart vocabulary has a home in a real app" —
+            and then declared four figures and a table, so both charts sat in the
+            registry with the pairing of their slots to their props a static claim
+            no render had ever made good.
+
+            ⚠️ ONE MEASURE, TWO QUESTIONS. A bar compares NAMED things, so it
+            takes the title down its side; a line draws a RUN, in the order the
+            view answered, and asks for no names at all. The same column read two
+            ways is the honest pair to prove, because it is what makes the
+            difference between the blocks visible rather than notional.
+          */
+          {
+            block: "BarChart",
+            wide: true,
+            plots: { of: "minutes", along: "title" },
+            nothing: {
+              says: "Nothing timed yet",
+              under: "Say how long a note took and it will be here",
+            },
+            bind: {
+              describes: { from: { of: "words", says: "How long each one took" } },
+              data: { from: { of: "view", view: "every-note" } },
+            },
+          },
+          {
+            block: "LineChart",
+            wide: true,
+            plots: { of: "minutes" },
+            nothing: {
+              says: "Nothing timed yet",
+              under: "Say how long a note took and it will be here",
+            },
+            bind: {
+              describes: { from: { of: "words", says: "Time spent, note by note" } },
+              series: { from: { of: "view", view: "every-note" } },
+            },
+          },
           {
             block: "Listing",
             /* ⚠️ THE WHOLE ROW — see `Wide`. A table in a tile-wide cell is one
@@ -688,6 +727,14 @@ export const GROUND: AppSpec = defineApp({
               label: { from: { of: "words", says: "Notes" } },
               of: { from: { of: "view", view: "every-note" } },
             },
+          },
+          /* ⚠️ THE WAY OUT OF A LIST THAT WAS CUT SHORT. The view above is
+             bounded, so the table ends without saying that there is more — and a
+             list that stops is indistinguishable from a list that ended. */
+          {
+            block: "SeeAll",
+            goes: "notes",
+            bind: { label: { from: { of: "words", says: "All notes" } } },
           },
         ],
       } },
@@ -894,11 +941,17 @@ export const GROUND: AppSpec = defineApp({
                  about something that happened, not a setting — and a pencil on
                  it would offer to change the record of a charge. The row under
                  it says so in words for the same reason. */
-              { block: "FieldRow",
+              /* ⚠️ AN `AmountRow` RATHER THAN A `FieldRow`, WHICH IS WHAT IT
+                 IS. The rows above are facts read as words; this is a FIGURE,
+                 and a figure set at body weight in a column of them is a number
+                 the eye has to hunt for. The block that gives a number room is
+                 the one to use for a number. */
+              { block: "AmountRow",
                 when: { has: { of: "field", field: "cost" } },
                 bind: {
                   label: { from: { of: "words", says: "What it cost" } },
-                  value: { from: { of: "field", field: "cost" }, as: "money" },
+                  amount: { from: { of: "field", field: "cost" }, as: "money" },
+                  under: { from: { of: "words", says: "Credits a draft spent" } },
                 } },
               /* ⚠️ THE CREDITS A DRAFT SPENT, said where somebody would
                  otherwise read the row above as somebody's fee. */

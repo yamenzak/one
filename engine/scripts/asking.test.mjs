@@ -173,9 +173,16 @@ const seedsFromStore = (src) => {
     it — which is the symptom, whatever the door does underneath. Every read hook
     has to seed from `known` in its INITIALISER, synchronously.
   */
+  /*
+    ⚠️ ONE, AND THAT IS THE HONEST STATE RATHER THAN A NARROWING. A product's own
+    reads go through the centre's `useLoad`: `useAsked` was OneInventory's second
+    copy of it, and it left with the twenty-one hand-written screens when the
+    surface was emptied. The guard went on naming it, found no hook, and reported
+    "does not seed" about a function that does not exist — a finding nobody could
+    act on, and the reason this file said the same thing on every run for a week.
+  */
   const hooks = [
     ["one-space/src/centre/data.tsx", "useLoad"],
-    ["apps/inventory/src/screens/live.tsx", "useAsked"],
   ];
   let blind = 0;
   for (const [where, name] of hooks) {
@@ -191,7 +198,18 @@ const seedsFromStore = (src) => {
        on hands every pattern below the whole module to match in — which is how
        the seed check came to find `known` in a different hook and report the
        mutation it exists to catch as green. */
+    /* ⚠️ A HOOK THAT IS NOT THERE IS ITS OWN FINDING, and it has to be, because
+       the fall-through is worse than useless: `indexOf` answers -1, the slice
+       becomes the whole file, and the seed check reports the hook as unseeded.
+       That is a guard describing a defect in code that does not exist. */
     const from = src.indexOf(`function ${name}`);
+    if (from < 0) {
+      blind++;
+      fail(`${where}: \`${name}\` is not in this file, so this guard covers nothing.\n` +
+           "       Point it at the hook that reads today, or drop the entry — a check\n" +
+           "       against a function nobody wrote is a finding nobody can act on.");
+      continue;
+    }
     const rest = src.slice(from + 1);
     const ends = [rest.indexOf("\n/**"), rest.indexOf("\nexport "), rest.indexOf("\nfunction ")]
       .filter((i) => i >= 0);

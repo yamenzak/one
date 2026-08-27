@@ -27,7 +27,7 @@
 import * as React from "react";
 import {
   DEFAULT_PRESENTATION, MACHINE, byDay, dayIn, instant, readAmount, sayAmount, sayBytes,
-  sayDate, sayMoment, sayMoney, sayNumber, sayTime, sayWhen, shownAs,
+  sayDate, sayList, sayMoment, sayMoney, sayNumber, sayTime, sayWhen, shownAs,
   type Bucket, type DateLength, type Day, type Instant, type Machine, type Measure,
   type Presentation, type Shown,
 } from "@engine/kernel";
@@ -236,6 +236,27 @@ export function useFigures(): {
 
 /** ⚠️ The reader's own calendar day — for a key, never for a label. */
 export const useDay = (at: Instant | string): Day => dayIn(useShown(), at as Instant);
+
+/**
+ * SEVERAL THINGS, SAID AS A PERSON WOULD SAY THEM — "gloves, masks and gowns".
+ *
+ * ⚠️ A SENTENCE THAT NAMES THINGS NEEDS THIS OR IT IS NOT A SENTENCE — see
+ * `sayList`. Joined with commas throughout, a clause reads as a database field
+ * printed out: "Shared with: Cloudflare, Stripe, Resend" is a row from a table,
+ * and the whole point of saying something back to somebody is that they read it
+ * without deciding to.
+ *
+ * ⚠️ AND THE JOINING WORD IS THE READER'S, WHICH IS WHY THIS IS A COMPONENT AND
+ * NOT A `join`. "and" is "und" in German and the separator moves in Japanese;
+ * every hand-rolled join in this package was hardcoded English inside a string
+ * somebody assembled, which is the shape that survives translation review.
+ */
+export function Listed({ of, joining = "and" }: {
+  readonly of: readonly string[];
+  readonly joining?: "and" | "or";
+}) {
+  return <>{sayList(useShown(), of, joining)}</>;
+}
 
 /* ---------------------------------------------------------------- numbers --- */
 

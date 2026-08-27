@@ -102,13 +102,16 @@ remembered.
 | `thing.update` | write | `thing:write` |
 | `thing.delete` | write | `thing:write` |
 
-**+1 once, however many collections there are** — the
+**+4 once, however many collections there are** — the
 counts a screen leads with. Asking a list for one row to read its total is
 three round trips for three numbers, and it was the only thing on offer.
 
 | Operation | | Permission |
 |---|---|---|
 | `totals.read` | read | *the session* |
+| `bin.list` | read | *the session* |
+| `bin.freeze` | write | *the session* |
+| `bin.restore` | write | *the session* |
 
 **+4 the moment one field is a file.** Not before: three
 routes about files on a product that holds none answer "no bucket" for ever,

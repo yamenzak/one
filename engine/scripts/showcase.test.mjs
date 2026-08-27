@@ -138,9 +138,40 @@ const ELSEWHERE = {
   ConsentSheet: "a purpose grant — spawned by an app that holds a sensitive field, and none does",
   Ropa: "the processing record — OneSpace's Trust area, unmounted",
 
+  /* --- the label sheet, and all four are waiting on the same screen --- */
+  /*
+    ⚠️ ONE REASON, FOUR ENTRIES, AND THEY LEAVE TOGETHER. Printing a label needs
+    a record that CARRIES a scannable identifier, and the proving ground's
+    subject is a note — a notebook has nothing to stick a barcode on. The app
+    that mints them is OneInventory, whose label screen was a session written by
+    hand and went with the twenty-one screens the surface rewrite emptied. All
+    four come back on the day it does; none of them comes back alone, because a
+    sheet with no labels on it and a label with no sheet under it are each half a
+    thing to look at.
+  */
+  Bars: "a barcode symbol — waiting on OneInventory's label screen, which mints "
+    + "the codes; the proving ground's subject is a note and has none",
+  Code: "a barcode with its digits under it, sized in millimetres for paper — "
+    + "waiting on the same screen as `Bars`",
+  LabelSheet: "the sheet several labels are laid out on for a printer — waiting "
+    + "on the same screen as `Bars`",
+  LabelText: "text sized in millimetres so it survives a thermal printer — "
+    + "waiting on the same screen as `Bars`",
+
   /* --- arguments, not gaps --- */
   SecretInput: "nothing an APP stores is a credential — the kernel has no `secret` " +
     "field kind, and the keys an operator pastes are the console's, which is OneSpace's",
+  Steps: "where a flow has got to, and the write screen took one OUT on purpose — "
+    + "its own header records why: a progress row over a single form is a bar "
+    + "that goes from nothing to everything in one press. The flow that has real "
+    + "steps is a `story`, and the story frame narrates its own",
+  Fills: "the sentence with the blank in it, which `Create` draws for a step "
+    + "whose answer belongs IN its question — so it is reached through a declared "
+    + "story rather than placed, and the guard cannot see through the renderer",
+  Tree: "a nested list somebody walks down, and neither app has a nesting "
+    + "SUBJECT a screen wants drawn: a note belongs to no note, and "
+    + "OneInventory's places do nest but its Places screen draws the parent's "
+    + "name on each row rather than the tree — a decision recorded there",
 
 };
 

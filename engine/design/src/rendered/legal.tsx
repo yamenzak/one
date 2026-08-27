@@ -13,12 +13,12 @@
 
 import * as React from "react";
 import type { DocumentDef, Instant, NeedBook, RopaEntry, SubProcessorBook } from "@engine/kernel";
-import { sayDate } from "@engine/kernel";
+import { sayDate, sayList } from "@engine/kernel";
 import { Button, Card, Chip } from "@heroui/react";
 import { ControlRow, FieldRow, Group, NavRow } from "../parts/surfaces.js";
 import { glyphOf } from "../frame/shell.js";
 import { AgreedMark } from "../parts/marks.js";
-import { useShown } from "../parts/said.js";
+import { Listed, useShown } from "../parts/said.js";
 import { TableWaiting } from "../parts/state.js";
 import { BOX, ROOM, SPACE } from "../tokens/metrics.js";
 import { TYPE } from "../tokens/type.js";
@@ -52,7 +52,7 @@ export function Ropa({ rows }: { readonly rows: readonly RopaEntry[] }) {
               </span>
               {/* ⚠️ Named with their country — see the header. */}
               {row.recipients.length
-                ? <span>Shared with: {row.recipients.join(", ")}</span>
+                ? <span>Shared with <Listed of={row.recipients} /></span>
                 : <span>Not shared with anybody outside this deployment</span>}
             </div>
         </Group>
@@ -152,6 +152,7 @@ export function Documents({ documents, outstanding = [], signed, onOpen }: Docum
 
 export function SubProcessors({ book }: { readonly book: SubProcessorBook }) {
   const all = Object.values(book);
+  const shown = useShown();
   return (
     /* ⚠️ ITS OWN BOX, NOT THE SCREEN'S — see `BOX`. This is the same collapse
        `Listing` makes, and it was making it on the viewport: a disclosure drawn
@@ -172,7 +173,7 @@ export function SubProcessors({ book }: { readonly book: SubProcessorBook }) {
           <Group key={p.id} label={p.name}>
             <FieldRow label="What they do" value={p.role} />
             <FieldRow label="Where" value={p.country} />
-            <FieldRow label="What they receive" value={p.receives.join(", ")} />
+            <FieldRow label="What they receive" value={<Listed of={p.receives} />} />
           </Group>
         ))}
       </div>
@@ -201,7 +202,10 @@ export function SubProcessors({ book }: { readonly book: SubProcessorBook }) {
             ]}
             rows={all.map((p) => ({
               key: p.id,
-              cells: [p.name, p.role, p.country, p.receives.join(", ")],
+              /* ⚠️ A CELL IS A STRING, so this is the one of the three that
+                 cannot be `Listed` — the same sentence, said by the same
+                 function, one layer down. */
+              cells: [p.name, p.role, p.country, sayList(shown, p.receives)],
             }))}
           />
         </React.Suspense>

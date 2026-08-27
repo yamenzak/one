@@ -1,6 +1,6 @@
 {
   "$comment": [
-    "THE GUARD REGISTRY — every enforcement promise OneEngine makes.",
+    "THE GUARD REGISTRY \u2014 every enforcement promise OneEngine makes.",
     "",
     "`scripts/guards.test.mjs` reads this file. Four rules make it more than a",
     "list:",
@@ -8,7 +8,7 @@
     "  1. A `live` guard names an implementation AND a literal string that",
     "     implementation contains. Rename the assertion and the registry fails,",
     "     so a guard cannot quietly stop existing.",
-    "  2. A `live` guard must actually RUN — reached by `pnpm engine:gate`,",
+    "  2. A `live` guard must actually RUN \u2014 reached by `pnpm engine:gate`,",
     "     `engine:test` or `engine:typecheck`. A check nobody invokes is no check.",
     "     A guard whose implementation is a `*.seen.test.*` file launches a",
     "     browser, so it runs in `pnpm engine:seen` and NOT in CI; it declares",
@@ -16,7 +16,7 @@
     "  3. Every guard names the DECISION it protects. A guard defending nothing",
     "     recorded is one whose reason is forgotten and which is then deleted as",
     "     noise by somebody who cannot see what it was for.",
-    "  4. An `owed` guard names a stage, and a SHIPPED stage may owe nothing —",
+    "  4. An `owed` guard names a stage, and a SHIPPED stage may owe nothing \u2014",
     "     which is what makes `docs/stages.json` mean anything.",
     "",
     "`fails` is a consequence in the world, never a restatement of the assertion:",
@@ -40,7 +40,7 @@
       "status": "live",
       "impl": "scripts/heroui.test.mjs",
       "proves": "hints:",
-      "fails": "forty-four glyphs with an aria-label each and no tooltip anywhere, so the product reads correctly aloud and shows everybody else a shape — sharpest on the crown's trail, whose icons are the app's own and whose row is on every screen"
+      "fails": "forty-four glyphs with an aria-label each and no tooltip anywhere, so the product reads correctly aloud and shows everybody else a shape \u2014 sharpest on the crown's trail, whose icons are the app's own and whose row is on every screen"
     },
     {
       "id": "every-tailwind-source-path-resolves",
@@ -49,7 +49,7 @@
       "status": "live",
       "impl": "scripts/heroui.test.mjs",
       "proves": "sources:",
-      "fails": "a @source naming a directory that no longer exists, which is not an error but a smaller stylesheet — 185 utility classes the design package alone used were never emitted, .md:hidden and .absolute among them, with every component still mounting and every test still green"
+      "fails": "a @source naming a directory that no longer exists, which is not an error but a smaller stylesheet \u2014 185 utility classes the design package alone used were never emitted, .md:hidden and .absolute among them, with every component still mounting and every test still green"
     },
     {
       "id": "no-screen-assembles-a-control-the-package-ships",
@@ -67,7 +67,7 @@
       "status": "live",
       "impl": "scripts/heroui.test.mjs",
       "proves": "furniture:",
-      "fails": "a ui.tsx inside an app, which is where a second app's components accumulate one at a time — the one that existed had already lost two of its three exports to the package and recorded that in its own header"
+      "fails": "a ui.tsx inside an app, which is where a second app's components accumulate one at a time \u2014 the one that existed had already lost two of its three exports to the package and recorded that in its own header"
     },
     {
       "id": "no-source-holds-a-character-nothing-renders",
@@ -76,7 +76,7 @@
       "status": "live",
       "impl": "scripts/guards.test.mjs",
       "proves": "legible:",
-      "fails": "a literal backspace inside a guard's regex, which makes the pattern unmatchable while diff, grep and review all render the line as correct — the check then reports green about the one defect it was written to catch",
+      "fails": "a literal backspace inside a guard's regex, which makes the pattern unmatchable while diff, grep and review all render the line as correct \u2014 the check then reports green about the one defect it was written to catch",
       "becomes": "elsewhere: this registry and the commands that run it"
     },
     {
@@ -104,7 +104,7 @@
       "status": "live",
       "impl": "scripts/heroui.test.mjs",
       "proves": "travel: the nav names one destination",
-      "fails": "the nav's fill and its label come from two expressions, so it highlights one destination and names another — or a closed label is removed rather than narrowed, which is five unnamed buttons to the one group the icon carries nothing for"
+      "fails": "the nav's fill and its label come from two expressions, so it highlights one destination and names another \u2014 or a closed label is removed rather than narrowed, which is five unnamed buttons to the one group the icon carries nothing for"
     },
     {
       "id": "the-type-scale-has-a-top",
@@ -159,7 +159,7 @@
       "status": "live",
       "impl": "runtime/test/placement.test.ts",
       "proves": "keeps counting a disabled app when deciding where a tenant may go",
-      "fails": "records stranded by a move, readable again the day the product is switched back on — in a database that cannot read them"
+      "fails": "records stranded by a move, readable again the day the product is switched back on \u2014 in a database that cannot read them"
     },
     {
       "id": "every-document-declares-what-it-is",
@@ -248,7 +248,7 @@
       "protects": "D12",
       "stage": "5",
       "status": "live",
-      "fails": "a mechanism built, tested and wired with nowhere a person can look — every suite green",
+      "fails": "a mechanism built, tested and wired with nowhere a person can look \u2014 every suite green",
       "impl": "scripts/surface.test.mjs",
       "proves": "surfaced:",
       "becomes": "elsewhere: the field declarations and whether every kind has a control"
@@ -276,7 +276,7 @@
       "protects": "D12",
       "stage": "3",
       "status": "live",
-      "fails": "a concern an app can forget, forgotten invisibly — no error, no failing test, a capability that silently does not apply",
+      "fails": "a concern an app can forget, forgotten invisibly \u2014 no error, no failing test, a capability that silently does not apply",
       "impl": "scripts/apps.test.mjs",
       "proves": "concerns:",
       "becomes": "elsewhere: the manifest's own shape, which a body is a part of rather than a replacement for"
@@ -333,7 +333,7 @@
       "protects": "D7",
       "stage": "5",
       "status": "live",
-      "fails": "a confident zero on the first paint — a badge, an all-caught-up, a no-media-yet — every one of them a wrong answer wearing a loading state's excuse",
+      "fails": "a confident zero on the first paint \u2014 a badge, an all-caught-up, a no-media-yet \u2014 every one of them a wrong answer wearing a loading state's excuse",
       "impl": "scripts/states.test.mjs",
       "proves": "seeds:"
     },
@@ -360,7 +360,7 @@
       "protects": "D7",
       "stage": "5",
       "status": "live",
-      "fails": "an effect that is exported, imported, and never injected — so it has never once run, and looks exactly like a design decision",
+      "fails": "an effect that is exported, imported, and never injected \u2014 so it has never once run, and looks exactly like a design decision",
       "impl": "scripts/states.test.mjs",
       "proves": "mounted:"
     },
@@ -378,10 +378,10 @@
       "protects": "D7",
       "stage": "5",
       "status": "live",
-      "fails": "an accent that is the button, the link, the nav pill and the ramp all at once — present on every screen, meaning nothing, and needing a second colour before anything can stand out",
+      "fails": "an accent that is the button, the link, the nav pill and the ramp all at once \u2014 present on every screen, meaning nothing, and needing a second colour before anything can stand out",
       "impl": "scripts/ground.test.mjs",
       "proves": "mono:",
-      "becomes": "unrepresentable: a body writes no colour, no border and no shadow — it names blocks"
+      "becomes": "unrepresentable: a body writes no colour, no border and no shadow \u2014 it names blocks"
     },
     {
       "id": "a-control-clears-every-ground-it-sits-on",
@@ -428,7 +428,7 @@
       "status": "live",
       "impl": "scripts/declarations.test.mjs",
       "proves": "read:",
-      "fails": "a manifest sets a field, the type accepts it, and the capability it names does not exist — no route to mount and no schema to apply, so nothing anywhere goes red"
+      "fails": "a manifest sets a field, the type accepts it, and the capability it names does not exist \u2014 no route to mount and no schema to apply, so nothing anywhere goes red"
     },
     {
       "id": "a-held-write-is-one-a-replay-can-recognise",
@@ -491,7 +491,7 @@
       "status": "live",
       "impl": "one-space/test/outcome.test.ts",
       "proves": "says nothing when it did not work",
-      "fails": "\"Published.\" over a refusal — the worst sentence this seam can produce, and one `if` away in every hand-written version"
+      "fails": "\"Published.\" over a refusal \u2014 the worst sentence this seam can produce, and one `if` away in every hand-written version"
     },
     {
       "id": "a-write-names-the-reads-it-made-stale",
@@ -580,7 +580,7 @@
       "status": "live",
       "impl": "scripts/apps.test.mjs",
       "proves": "unbuilt: ${appDirs.length} product(s), none builds its manifest at startup",
-      "fails": "every product's manifest constructed and put through the whole refusal suite on every cold isolate, over declarations that have not changed since the deploy — a cost that grows with the catalogue and is charged to whichever request happens to be first"
+      "fails": "every product's manifest constructed and put through the whole refusal suite on every cold isolate, over declarations that have not changed since the deploy \u2014 a cost that grows with the catalogue and is charged to whichever request happens to be first"
     },
     {
       "id": "a-workspace-never-holds-an-infrastructure-label",
@@ -1191,7 +1191,7 @@
       "stage": "9",
       "status": "live",
       "impl": "ground/test/identity.test.ts",
-      "proves": "counts an unanswered invitation against the seats — and customers never",
+      "proves": "counts an unanswered invitation against the seats \u2014 and customers never",
       "fails": "a workspace on the smallest plan unable to add the customers it exists to serve, refused for staff seats it was not asking for"
     },
     {
@@ -1201,7 +1201,7 @@
       "status": "live",
       "impl": "ground/test/workspace.test.ts",
       "proves": "cannot be undone",
-      "fails": "a business quietly rolled back to personal — its brand gone one morning with no event that removed it, and its records due to move off a shard it was promised"
+      "fails": "a business quietly rolled back to personal \u2014 its brand gone one morning with no event that removed it, and its records due to move off a shard it was promised"
     },
     {
       "id": "no-plan-a-personal-workspace-buys-unlocks-a-business-capability",
@@ -1283,7 +1283,7 @@
       "status": "live",
       "impl": "scripts/ground.test.mjs",
       "proves": "fills: every painted surface names the tier it belongs to",
-      "fails": "a control that exists, is focusable, and cannot be seen until somebody types into it — in both themes, with no border anywhere to draw its edge"
+      "fails": "a control that exists, is focusable, and cannot be seen until somebody types into it \u2014 in both themes, with no border anywhere to draw its edge"
     },
     {
       "id": "a-business-only-screen-is-not-offered-to-a-workspace-that-is-not-one",
@@ -1292,7 +1292,7 @@
       "status": "live",
       "impl": "design/test/surface.test.tsx",
       "proves": "hides a business-only screen from a personal workspace",
-      "fails": "a destination drawn in the nav, navigable and reachable by URL, whose every action refuses — the declaration correct, the manifest composing, and no mechanism behind it"
+      "fails": "a destination drawn in the nav, navigable and reachable by URL, whose every action refuses \u2014 the declaration correct, the manifest composing, and no mechanism behind it"
     },
     {
       "id": "the-space-has-one-door-to-the-api",
@@ -1301,7 +1301,7 @@
       "status": "live",
       "impl": "scripts/space.test.mjs",
       "proves": "one API door:",
-      "fails": "an expired session that does not look expired — every screen showing the empty state its failed load produced, and every save failing into a toast",
+      "fails": "an expired session that does not look expired \u2014 every screen showing the empty state its failed load produced, and every save failing into a toast",
       "becomes": "elsewhere: the SPA's one API door and its door classifier"
     },
     {
@@ -1320,7 +1320,7 @@
       "status": "live",
       "impl": "scripts/space.test.mjs",
       "proves": "screens: every one the picker can name has a branch",
-      "fails": "a blank page, which is the same picture as a page that failed to load — so somebody reloads for a minute and then gives up"
+      "fails": "a blank page, which is the same picture as a page that failed to load \u2014 so somebody reloads for a minute and then gives up"
     },
     {
       "id": "a-code-that-could-not-be-sent-holds-no-cooldown",
@@ -1338,7 +1338,7 @@
       "status": "live",
       "impl": "one/test/boot.test.ts",
       "proves": "answers /health on every door",
-      "fails": "a deploy reporting green while the isolate throws in its first middleware — the page still loads, because static assets never reach the worker"
+      "fails": "a deploy reporting green while the isolate throws in its first middleware \u2014 the page still loads, because static assets never reach the worker"
     },
     {
       "id": "engine-is-off-the-production-deploy-path",
@@ -1356,7 +1356,7 @@
       "status": "live",
       "impl": "scripts/inert.test.mjs",
       "proves": "collide with none of",
-      "fails": "one product reading another's rows, or a deploy replacing a live worker — a worker name is account-wide and provisioning finds a database by name"
+      "fails": "one product reading another's rows, or a deploy replacing a live worker \u2014 a worker name is account-wide and provisioning finds a database by name"
     },
     {
       "id": "ones-wildcard-never-covers-a-live-tenants-address",
@@ -1383,7 +1383,7 @@
       "status": "live",
       "impl": "scripts/motion.test.mjs",
       "proves": "curves: no screen writes its own easing or duration",
-      "fails": "a product where a drawer, a toast and a card each decelerate differently — nothing broken, nothing nameable, and it reads as cheap"
+      "fails": "a product where a drawer, a toast and a card each decelerate differently \u2014 nothing broken, nothing nameable, and it reads as cheap"
     },
     {
       "id": "motion-answers-to-the-reduced-motion-setting",
@@ -1419,7 +1419,7 @@
       "status": "live",
       "impl": "scripts/provenance.test.mjs",
       "proves": "update: the generated edit goes through",
-      "fails": "an edit that passes the gate, writes an audit entry saying it happened, answers 200 — and changes nothing"
+      "fails": "an edit that passes the gate, writes an audit entry saying it happened, answers 200 \u2014 and changes nothing"
     },
     {
       "id": "an-edit-cannot-land-on-somebody-elses-record",
@@ -1437,8 +1437,8 @@
       "status": "live",
       "impl": "scripts/tone.test.mjs",
       "proves": "written string(s), all in one voice",
-      "fails": "a product that sounds like several products — a caption with a full stop beside four without one, a control that says Submit, an error that says Oops",
-      "becomes": "elsewhere: the manifest, which this guard already sweeps — a body's `label` and `says` land in a file it reads today"
+      "fails": "a product that sounds like several products \u2014 a caption with a full stop beside four without one, a control that says Submit, an error that says Oops",
+      "becomes": "elsewhere: the manifest, which this guard already sweeps \u2014 a body's `label` and `says` land in a file it reads today"
     },
     {
       "id": "the-tone-rules-still-fire",
@@ -1501,7 +1501,7 @@
       "status": "live",
       "impl": "scripts/agent.test.mjs",
       "proves": "optout:",
-      "fails": "a tool hidden from the list and still callable — or a distinct refusal that confirms the name to the model that was refused it"
+      "fails": "a tool hidden from the list and still callable \u2014 or a distinct refusal that confirms the name to the model that was refused it"
     },
     {
       "id": "the-tool-catalogue-means-callable",
@@ -1528,7 +1528,7 @@
       "status": "live",
       "impl": "scripts/access.test.mjs",
       "proves": "context:",
-      "fails": "a role in the second product grants nothing, silently, for everybody — every suite green because every suite has one app"
+      "fails": "a role in the second product grants nothing, silently, for everybody \u2014 every suite green because every suite has one app"
     },
     {
       "id": "every-assignment-is-bounded-per-authority",
@@ -1673,7 +1673,7 @@
       "status": "live",
       "impl": "scripts/ai-action.test.mjs",
       "proves": "lane:",
-      "fails": "a deployment decision shipped through a product release — wrong the day the provider retires the row, and different in every app, with nothing failing",
+      "fails": "a deployment decision shipped through a product release \u2014 wrong the day the provider retires the row, and different in every app, with nothing failing",
       "becomes": "elsewhere: the manifest's AI action declarations, which a body neither adds to nor removes from"
     },
     {
@@ -1709,7 +1709,7 @@
       "status": "live",
       "impl": "scripts/shape.test.mjs",
       "proves": "primary: every screen has at most one",
-      "fails": "the one thing a screen is for lands somewhere different on every screen — buried at the foot of a long list on one, pinned on the next — so somebody has to hunt for it and the product reads as assembled by different people; and a block comment written between two tags ships four lines of design rationale to production as body text",
+      "fails": "the one thing a screen is for lands somewhere different on every screen \u2014 buried at the foot of a long list on one, pinned on the next \u2014 so somebody has to hunt for it and the product reads as assembled by different people; and a block comment written between two tags ships four lines of design rationale to production as body text",
       "becomes": "refused: two_kinds_of_screen"
     },
     {
@@ -1719,7 +1719,7 @@
       "status": "live",
       "impl": "scripts/face.test.mjs",
       "proves": "plate: ",
-      "fails": "the same person is a picture in the crown, a letter in the roster and a different letter in a table — because each surface seeded a face from whatever field it happened to hold, and every one of them looks correct on its own",
+      "fails": "the same person is a picture in the crown, a letter in the roster and a different letter in a table \u2014 because each surface seeded a face from whatever field it happened to hold, and every one of them looks correct on its own",
       "becomes": "unrepresentable: a face arrives through a block that takes a subject, never through fields a screen picked"
     },
     {
@@ -1729,7 +1729,7 @@
       "status": "live",
       "impl": "scripts/face.test.mjs",
       "proves": "seed: ",
-      "fails": "somebody gets a new face the day they correct the spelling of their name, and a workspace gets a new one the day it is renamed — so a picture people had learned to recognise means nothing; and a face fetched from api.dicebear.com puts a third party in the request path of every roster, unnamed on the trust screen"
+      "fails": "somebody gets a new face the day they correct the spelling of their name, and a workspace gets a new one the day it is renamed \u2014 so a picture people had learned to recognise means nothing; and a face fetched from api.dicebear.com puts a third party in the request path of every roster, unnamed on the trust screen"
     },
     {
       "id": "a-products-mark-wears-the-plate-every-face-wears",
@@ -1738,7 +1738,7 @@
       "status": "live",
       "impl": "scripts/face.test.mjs",
       "proves": "mark: ",
-      "fails": "a product appears beside a person as a bare character somebody typed — no ground under it, a different optical weight from every face in the same bar — so a workspace with six products is six identical glyphs and the label does all the work"
+      "fails": "a product appears beside a person as a bare character somebody typed \u2014 no ground under it, a different optical weight from every face in the same bar \u2014 so a workspace with six products is six identical glyphs and the label does all the work"
     },
     {
       "id": "a-workspaces-sky-is-its-planets-own-colours",
@@ -1747,7 +1747,7 @@
       "status": "live",
       "impl": "scripts/face.test.mjs",
       "proves": "palette: ",
-      "fails": "the ground somebody lands on is a different world from the planet in the row they pressed — because the sky's colours were re-derived by a hash of ours instead of read out of the picture, and the two agreed until one of them was edited"
+      "fails": "the ground somebody lands on is a different world from the planet in the row they pressed \u2014 because the sky's colours were re-derived by a hash of ours instead of read out of the picture, and the two agreed until one of them was edited"
     },
     {
       "id": "a-world-is-the-same-world-twice",
@@ -1766,7 +1766,7 @@
       "status": "live",
       "impl": "scripts/scene.test.mjs",
       "proves": "motion: ",
-      "fails": "a full-viewport layer repaints every frame for ever on a phone — invisible on the laptop it was written on, and the first thing a reviewer blames on the device"
+      "fails": "a full-viewport layer repaints every frame for ever on a phone \u2014 invisible on the laptop it was written on, and the first thing a reviewer blames on the device"
     },
     {
       "id": "a-ground-is-masked-rather-than-washed",
@@ -1802,7 +1802,7 @@
       "status": "live",
       "impl": "design/test/scene.test.ts",
       "proves": "resolves every mark it references",
-      "fails": "a soft mark fills with a gradient id nothing defines — a valid SVG, a rendered page, and a family's whole atmosphere silently absent"
+      "fails": "a soft mark fills with a gradient id nothing defines \u2014 a valid SVG, a rendered page, and a family's whole atmosphere silently absent"
     },
     {
       "id": "a-family-fills-every-slot-it-declares",
@@ -1820,7 +1820,7 @@
       "status": "live",
       "impl": "design/test/scene.test.ts",
       "proves": "has both skies",
-      "fails": "one sky registered twice is the made-up rule coming back — a night ground turned down for light mode, which is grey every time"
+      "fails": "one sky registered twice is the made-up rule coming back \u2014 a night ground turned down for light mode, which is grey every time"
     },
     {
       "id": "a-fixed-ink-family-bakes-no-custom-property",
@@ -1829,7 +1829,7 @@
       "status": "live",
       "impl": "design/test/scene.test.ts",
       "proves": "keeps a CSS custom property out of any mark",
-      "fails": "`var(--brand)` inside an SVG is a string rather than a colour — the mark is painted with nothing and the whole field is absent, with a valid document and no error anywhere"
+      "fails": "`var(--brand)` inside an SVG is a string rather than a colour \u2014 the mark is painted with nothing and the whole field is absent, with a valid document and no error anywhere"
     },
     {
       "id": "a-lattice-repeats-on-whole-cells",
@@ -1838,7 +1838,7 @@
       "status": "live",
       "impl": "design/test/scene.test.ts",
       "proves": "lays a lattice on whole cells",
-      "fails": "a cell that does not divide the tile leaves half-cells down every seam — a ruled line across the page at the one pitch the eye is best at finding, and invisible in the source"
+      "fails": "a cell that does not divide the tile leaves half-cells down every seam \u2014 a ruled line across the page at the one pitch the eye is best at finding, and invisible in the source"
     },
     {
       "id": "one-door-into-the-design-system",
@@ -1856,7 +1856,7 @@
       "status": "live",
       "impl": "scripts/heroui.test.mjs",
       "proves": "dock: ",
-      "fails": "a hand-rolled dock skips the rules the declaration carries — a primary over a skeleton, over a refusal, or duplicated inside an empty state"
+      "fails": "a hand-rolled dock skips the rules the declaration carries \u2014 a primary over a skeleton, over a refusal, or duplicated inside an empty state"
     },
     {
       "id": "one-source-for-every-measurement",
@@ -1865,8 +1865,8 @@
       "status": "live",
       "impl": "scripts/metrics.test.mjs",
       "proves": "spacing:",
-      "fails": "a component picking its own padding or gap, so a list ends up with three rhythms and no wrong line to point at — the check existed and ran nowhere, with sixteen findings accumulated behind it",
-      "becomes": "unrepresentable: a body names no padding, no gap and no tap target — the layout and the block own all three"
+      "fails": "a component picking its own padding or gap, so a list ends up with three rhythms and no wrong line to point at \u2014 the check existed and ran nowhere, with sixteen findings accumulated behind it",
+      "becomes": "unrepresentable: a body names no padding, no gap and no tap target \u2014 the layout and the block own all three"
     },
     {
       "id": "a-pressable-row-clears-the-touch-floor",
@@ -1893,7 +1893,7 @@
       "status": "live",
       "impl": "scripts/metrics.test.mjs",
       "proves": "chrome:",
-      "fails": "a sticky island floating over the last card on every screen — the island cannot fix it, since by the time it lays out the content above is already sized"
+      "fails": "a sticky island floating over the last card on every screen \u2014 the island cannot fix it, since by the time it lays out the content above is already sized"
     },
     {
       "id": "every-component-shipped-is-drawn-somewhere",
@@ -1902,7 +1902,7 @@
       "status": "live",
       "impl": "scripts/showcase.test.mjs",
       "proves": "drawn:",
-      "fails": "a component exported, tested, documented and rendered by nobody — an absence, which typechecks and has no failing test, and whose first caller is the one who finds out it nests a button, draws its arc in a monochrome accent, or prints \"min120\"",
+      "fails": "a component exported, tested, documented and rendered by nobody \u2014 an absence, which typechecks and has no failing test, and whose first caller is the one who finds out it nests a button, draws its arc in a monochrome accent, or prints \"min120\"",
       "becomes": "elsewhere: what @engine/design exports and where each export is drawn"
     },
     {
@@ -1921,7 +1921,7 @@
       "status": "live",
       "impl": "scripts/edit.test.mjs",
       "proves": "inline:",
-      "fails": "a settings card that is a column of live inputs — nothing saying which row is dirty, a stray tap on a phone editing a setting somebody was scrolling past, and a failure reported in a toast beside a control already showing the value the server threw away",
+      "fails": "a settings card that is a column of live inputs \u2014 nothing saying which row is dirty, a stray tap on a phone editing a setting somebody was scrolling past, and a failure reported in a toast beside a control already showing the value the server threw away",
       "becomes": "unrepresentable: a body places blocks from a closed registry, and an editing control is not one of them"
     },
     {
@@ -1940,7 +1940,7 @@
       "status": "live",
       "impl": "scripts/problem.test.mjs",
       "proves": "catalogue:",
-      "fails": "one code meaning three things — three screens stamping platform.invalid on three sentences they wrote themselves, so a client switching on the code cannot, and the wording of a refusal lives wherever it was last edited",
+      "fails": "one code meaning three things \u2014 three screens stamping platform.invalid on three sentences they wrote themselves, so a client switching on the code cannot, and the wording of a refusal lives wherever it was last edited",
       "becomes": "unrepresentable: a body dispatches an operation by name and never handles the refusal that comes back"
     },
     {
@@ -1959,7 +1959,7 @@
       "status": "live",
       "impl": "scripts/problem.test.mjs",
       "proves": "values:",
-      "fails": "a person hitting a seat limit reading \"your plan includes {limit}\" — the sentence survives because leaving an unknown token visible is deliberately correct, which is exactly what lets an unsupplied one reach a screen"
+      "fails": "a person hitting a seat limit reading \"your plan includes {limit}\" \u2014 the sentence survives because leaving an unknown token visible is deliberately correct, which is exactly what lets an unsupplied one reach a screen"
     },
     {
       "id": "a-settings-page-is-a-declared-destination",
@@ -1968,7 +1968,7 @@
       "status": "live",
       "impl": "scripts/descend.test.mjs",
       "proves": "declared:",
-      "fails": "a settings screen carded by a free-text heading again — a page nobody can link to, with no mark to find it by, no line saying what is behind it, and an order that shifts every time a setting is added",
+      "fails": "a settings screen carded by a free-text heading again \u2014 a page nobody can link to, with no mark to find it by, no line saying what is behind it, and an order that shifts every time a setting is added",
       "becomes": "elsewhere: the manifest's settings destinations, which are declarations already"
     },
     {
@@ -1978,7 +1978,7 @@
       "status": "live",
       "impl": "scripts/descend.test.mjs",
       "proves": "descend:",
-      "fails": "one scroll holding a switch, a colour and an email address — three kinds of consequence on one screen, which is the filing cabinet DESIGN.md §3 exists to refuse"
+      "fails": "one scroll holding a switch, a colour and an email address \u2014 three kinds of consequence on one screen, which is the filing cabinet DESIGN.md \u00a73 exists to refuse"
     },
     {
       "id": "an-authority-is-a-screen-not-a-tab",
@@ -1996,7 +1996,7 @@
       "status": "live",
       "impl": "scripts/face.test.mjs",
       "proves": "glyph:",
-      "fails": "a neutral circle sitting in a list where every other row has a shape — an icon is a STRING in a manifest so no compiler sees the typo, and this map has now been out of step with its callers twice, both times described in full by its own header"
+      "fails": "a neutral circle sitting in a list where every other row has a shape \u2014 an icon is a STRING in a manifest so no compiler sees the typo, and this map has now been out of step with its callers twice, both times described in full by its own header"
     },
     {
       "id": "every-rule-the-kernel-states-is-one-something-runs",
@@ -2005,7 +2005,7 @@
       "status": "live",
       "impl": "scripts/rules.test.mjs",
       "proves": "rules:",
-      "fails": "a rule written down, argued for in its own header, unit-tested and cited elsewhere as though it were in force, with no caller anywhere — which is how an API came to silence a notification whose whole point is that it cannot be silenced"
+      "fails": "a rule written down, argued for in its own header, unit-tested and cited elsewhere as though it were in force, with no caller anywhere \u2014 which is how an API came to silence a notification whose whole point is that it cannot be silenced"
     },
     {
       "id": "no-lane-re-derives-what-the-kernel-decides",
@@ -2014,7 +2014,7 @@
       "status": "live",
       "impl": "scripts/rules.test.mjs",
       "proves": "no lane works out for itself",
-      "fails": "two answers to one question — a runtime that works out for itself whether two colours can be read, and diverges from the kernel in whichever direction nobody tests"
+      "fails": "two answers to one question \u2014 a runtime that works out for itself whether two colours can be read, and diverges from the kernel in whichever direction nobody tests"
     },
     {
       "id": "no-page-imports-a-product",
@@ -2023,7 +2023,7 @@
       "status": "live",
       "impl": "scripts/bundle.test.mjs",
       "proves": "none importing a product",
-      "fails": "one product's whole manifest and every screen shipped to every customer of every other one — measured in the built bundle, behind a dev-only branch that reads as dev-only and is not, because a module graph is decided before a branch is",
+      "fails": "one product's whole manifest and every screen shipped to every customer of every other one \u2014 measured in the built bundle, behind a dev-only branch that reads as dev-only and is not, because a module graph is decided before a branch is",
       "becomes": "elsewhere: how the build splits chunks and which provider lanes exist"
     },
     {
@@ -2033,7 +2033,7 @@
       "status": "live",
       "impl": "scripts/bundle.test.mjs",
       "proves": "bundle: the ground is unreachable",
-      "fails": "a chunk emitted for a screen nobody in production requests, which pins every symbol that chunk could reach as an export of the shared one and stops the design system tree-shaking — measured at +147 KB"
+      "fails": "a chunk emitted for a screen nobody in production requests, which pins every symbol that chunk could reach as an export of the shared one and stops the design system tree-shaking \u2014 measured at +147 KB"
     },
     {
       "id": "every-provider-call-goes-through-one-lane",
@@ -2051,7 +2051,7 @@
       "status": "live",
       "impl": "scripts/docs.test.mjs",
       "proves": "paths:",
-      "fails": "an instruction that sends a reader somewhere empty — the standards document told people deferrals were found by a script that does not exist, so anybody who followed it found nothing and could reasonably conclude they are not tracked"
+      "fails": "an instruction that sends a reader somewhere empty \u2014 the standards document told people deferrals were found by a script that does not exist, so anybody who followed it found nothing and could reasonably conclude they are not tracked"
     },
     {
       "id": "the-layering-check-can-actually-match",
@@ -2060,7 +2060,7 @@
       "status": "live",
       "impl": "scripts/kernel.test.mjs",
       "proves": "boundary:",
-      "fails": "a green run asserting nothing — the pattern named a package scope the tree stopped using at the rename, so eighty cross-package imports went unexamined while the check printed a confident sentence about all of them"
+      "fails": "a green run asserting nothing \u2014 the pattern named a package scope the tree stopped using at the rename, so eighty cross-package imports went unexamined while the check printed a confident sentence about all of them"
     },
     {
       "id": "the-design-system-navigates-nothing",
@@ -2069,7 +2069,7 @@
       "status": "live",
       "impl": "scripts/kernel.test.mjs",
       "proves": "router:",
-      "fails": "the package deciding navigation for every app that uses it — and OneSpace, which is not one app, having two routers in one page"
+      "fails": "the package deciding navigation for every app that uses it \u2014 and OneSpace, which is not one app, having two routers in one page"
     },
     {
       "id": "a-guard-that-walks-reports-what-it-walked",
@@ -2078,7 +2078,7 @@
       "status": "live",
       "impl": "scripts/gate.mjs",
       "proves": "corpus:",
-      "fails": "a green run over an empty corpus reading exactly like a green run over a full one — three checks in this tree printed a confident sentence for months while examining nothing, and each was found by accident rather than by the gate"
+      "fails": "a green run over an empty corpus reading exactly like a green run over a full one \u2014 three checks in this tree printed a confident sentence for months while examining nothing, and each was found by accident rather than by the gate"
     },
     {
       "id": "a-build-edge-names-a-package-that-exists",
@@ -2087,7 +2087,7 @@
       "status": "live",
       "impl": "scripts/inert.test.mjs",
       "proves": "turbo:",
-      "fails": "a worker's integration suite running against whichever SPA build happened to be lying around — turbo ignores a task key for a package it does not have, in silence, and the edge that connects a suite to its own build is exactly the one nothing else in the graph can express"
+      "fails": "a worker's integration suite running against whichever SPA build happened to be lying around \u2014 turbo ignores a task key for a package it does not have, in silence, and the edge that connects a suite to its own build is exactly the one nothing else in the graph can express"
     },
     {
       "id": "a-runtime-capability-is-mounted-or-is-waiting-on-a-named-stage",
@@ -2096,7 +2096,7 @@
       "status": "live",
       "impl": "scripts/capability.test.mjs",
       "proves": "and nothing imports it",
-      "fails": "a capability with tables, tests and a document describing it, that no route reaches — the whole vault, the AI lane and the inbox's one write were all in that state at once, and every signal a reader has said they were there"
+      "fails": "a capability with tables, tests and a document describing it, that no route reaches \u2014 the whole vault, the AI lane and the inbox's one write were all in that state at once, and every signal a reader has said they were there"
     },
     {
       "id": "a-deferral-names-a-stage-that-exists",
@@ -2114,7 +2114,7 @@
       "status": "live",
       "impl": "scripts/docs.test.mjs",
       "proves": "refused to generate",
-      "fails": "a generated index missing a module — the one page whose job is answering “does this already exist” telling a reader, in a table, that it does not"
+      "fails": "a generated index missing a module \u2014 the one page whose job is answering \u201cdoes this already exist\u201d telling a reader, in a table, that it does not"
     },
     {
       "id": "a-scheduled-handler-has-a-trigger",
@@ -2123,7 +2123,7 @@
       "status": "live",
       "impl": "scripts/inert.test.mjs",
       "proves": "declares no triggers.crons and the worker has a scheduled handler",
-      "fails": "a sweep that compiles, typechecks, passes its own tests and is called by Cloudflare exactly never — so nothing is ever erased, behind a green run"
+      "fails": "a sweep that compiles, typechecks, passes its own tests and is called by Cloudflare exactly never \u2014 so nothing is ever erased, behind a green run"
     },
     {
       "id": "a-special-category-never-reaches-a-product-column",
@@ -2132,7 +2132,7 @@
       "status": "live",
       "impl": "ground/test/identity.test.ts",
       "proves": "keeps a special category out of its own column and in the vault",
-      "fails": "health data in plaintext beside the ordinary fields, outside consent, outside the record of who looked and outside erasure — with the manifest's refusal satisfied and every other test green"
+      "fails": "health data in plaintext beside the ordinary fields, outside consent, outside the record of who looked and outside erasure \u2014 with the manifest's refusal satisfied and every other test green"
     },
     {
       "id": "a-vault-field-names-a-person",
@@ -2141,7 +2141,7 @@
       "status": "live",
       "impl": "kernel/src/collection.ts",
       "proves": "vault_without_a_subject",
-      "fails": "a vault fact on a row that names nobody — the write would invent a subject, and whatever it invented is who the consent, the grants and the erasure belonged to"
+      "fails": "a vault fact on a row that names nobody \u2014 the write would invent a subject, and whatever it invented is who the consent, the grants and the erasure belonged to"
     },
     {
       "id": "every-table-is-in-the-erasure-ledger",
@@ -2150,7 +2150,7 @@
       "status": "live",
       "impl": "scripts/dossier.test.mjs",
       "proves": "HOLDINGS has no row for it",
-      "fails": "a platform table an export never reads and an erasure never deletes from — both answering \"here is everything we hold\" and \"it is all gone\" over rows nobody walked"
+      "fails": "a platform table an export never reads and an erasure never deletes from \u2014 both answering \"here is everything we hold\" and \"it is all gone\" over rows nobody walked"
     },
     {
       "id": "a-ledger-row-says-who-is-in-it",
@@ -2168,7 +2168,7 @@
       "status": "live",
       "impl": "scripts/dossier.test.mjs",
       "proves": "the deletion this ledger exists to perform",
-      "fails": "a complete ledger walked by no operation — the third whole mechanism in this repository to ship with no address"
+      "fails": "a complete ledger walked by no operation \u2014 the third whole mechanism in this repository to ship with no address"
     },
     {
       "id": "agreed-before-the-product-opens",
@@ -2258,7 +2258,7 @@
       "status": "live",
       "impl": "kernel/src/tenancy.ts",
       "proves": "storage, backups and every",
-      "fails": "promising a jurisdiction for logs the vendor offers no residency control over — broken by the first request"
+      "fails": "promising a jurisdiction for logs the vendor offers no residency control over \u2014 broken by the first request"
     },
     {
       "id": "a-file-goes-when-its-row-does",
@@ -2285,7 +2285,7 @@
       "status": "live",
       "impl": "runtime/src/locate.ts",
       "proves": "tenant.movingTo",
-      "fails": "a copy taken from a live database losing every row written after the table was read — silently, and only for whoever happened to be working"
+      "fails": "a copy taken from a live database losing every row written after the table was read \u2014 silently, and only for whoever happened to be working"
     },
     {
       "id": "a-move-verifies-both-sides-before-it-flips",
@@ -2321,7 +2321,7 @@
       "status": "live",
       "impl": "runtime/src/resources.ts",
       "proves": "bindingKey(row.appId, row.needId, row.residency)",
-      "fails": "two per-residency resources collapsing onto one key, so a workspace resolves another jurisdiction's store — both working, and nothing reporting it"
+      "fails": "two per-residency resources collapsing onto one key, so a workspace resolves another jurisdiction's store \u2014 both working, and nothing reporting it"
     },
     {
       "id": "a-sealed-push-body-comes-back-out-as-what-went-in",
@@ -2330,7 +2330,7 @@
       "status": "live",
       "impl": "runtime/test/webpush.test.ts",
       "proves": "comes back out as what went in",
-      "fails": "a swapped HKDF salt or a padding byte of 0x00 — bytes every push service accepts, forwards and 201s on, that no browser can decrypt and nobody ever sees"
+      "fails": "a swapped HKDF salt or a padding byte of 0x00 \u2014 bytes every push service accepts, forwards and 201s on, that no browser can decrypt and nobody ever sees"
     },
     {
       "id": "a-vapid-header-is-raw-r-s-scoped-to-an-origin",
@@ -2348,7 +2348,7 @@
       "status": "live",
       "impl": "runtime/test/push.test.ts",
       "proves": "never carries another workspace's door",
-      "fails": "one business's notification arriving on a device wearing another business's logo and opening a link into the wrong workspace — with the send reporting success"
+      "fails": "one business's notification arriving on a device wearing another business's logo and opening a link into the wrong workspace \u2014 with the send reporting success"
     },
     {
       "id": "a-gone-device-is-pruned-where-the-answer-is",
@@ -2384,7 +2384,7 @@
       "status": "live",
       "impl": "ground/test/services.test.ts",
       "proves": "sends only what the notification type offers a channel for",
-      "fails": "a phone lighting up for a type that declared inbox and email, and for a person who switched push off — the setting saved, read by nothing"
+      "fails": "a phone lighting up for a type that declared inbox and email, and for a person who switched push off \u2014 the setting saved, read by nothing"
     },
     {
       "id": "what-the-engine-offers-is-emitted-by-the-engine",
@@ -2393,7 +2393,7 @@
       "status": "live",
       "impl": "ground/test/surface.screens.test.tsx",
       "proves": "no longer describes what the engine composes",
-      "fails": "an index of what an app gets for free, typed by hand and wrong within a week — so the same capability is written twice by somebody who read that it did not exist"
+      "fails": "an index of what an app gets for free, typed by hand and wrong within a week \u2014 so the same capability is written twice by somebody who read that it did not exist"
     },
     {
       "id": "an-app-that-declares-nothing-still-has-a-roster-and-a-bill",
@@ -2411,7 +2411,7 @@
       "status": "live",
       "impl": "scripts/guards.test.mjs",
       "proves": "appears twice, so one of the two is a row nothing can see",
-      "fails": "four checks parsing one markdown table four ways, so a reformatted row is a stage nothing can be deferred against and a guard that can be owed for ever — silently, because each check reports green about a row it never saw"
+      "fails": "four checks parsing one markdown table four ways, so a reformatted row is a stage nothing can be deferred against and a guard that can be owed for ever \u2014 silently, because each check reports green about a row it never saw"
     },
     {
       "id": "a-product-reaches-the-page-through-one-dynamic-lane",
@@ -2420,7 +2420,7 @@
       "status": "live",
       "impl": "scripts/bundle.test.mjs",
       "proves": "the registry is the one file that may name a product",
-      "fails": "one product's whole browser half in the bundle every other product's customers download — invisible, because the registry is the one file where naming an app looks right"
+      "fails": "one product's whole browser half in the bundle every other product's customers download \u2014 invisible, because the registry is the one file where naming an app looks right"
     },
     {
       "id": "the-product-entry-is-never-the-test-ground",
@@ -2438,7 +2438,7 @@
       "status": "live",
       "impl": "ground/test/workspace.test.ts",
       "proves": "answers the declared fallback before anybody has chosen",
-      "fails": "a switch that persists, is drawn back, and changes nothing — or a handler inventing its own default, so a screen and the code disagree about what a workspace switched on"
+      "fails": "a switch that persists, is drawn back, and changes nothing \u2014 or a handler inventing its own default, so a screen and the code disagree about what a workspace switched on"
     },
     {
       "id": "a-session-can-be-withdrawn-everywhere-at-once",
@@ -2447,7 +2447,7 @@
       "status": "live",
       "impl": "ground/test/identity.test.ts",
       "proves": "ends every session, including the one that asked",
-      "fails": "the laptop somebody lost staying signed in for thirty days, because a signed claim cannot be withdrawn before it expires — which is the whole reason a session is a row"
+      "fails": "the laptop somebody lost staying signed in for thirty days, because a signed claim cannot be withdrawn before it expires \u2014 which is the whole reason a session is a row"
     },
     {
       "id": "the-proof-window-can-be-re-opened-without-a-new-session",
@@ -2474,7 +2474,7 @@
       "status": "live",
       "impl": "ground/test/surface.screens.test.tsx",
       "proves": "composes two declarations under one id separately",
-      "fails": "one product being served another's routes, permissions and quotas — a wrong ANSWER rather than an error, which is why an invalidation call somebody has to remember cannot be the fix"
+      "fails": "one product being served another's routes, permissions and quotas \u2014 a wrong ANSWER rather than an error, which is why an invalidation call somebody has to remember cannot be the fix"
     },
     {
       "id": "a-manifest-is-built-once-per-isolate",
@@ -2492,7 +2492,7 @@
       "status": "live",
       "impl": "one/test/boot.test.ts",
       "proves": "stops answering the product's routes, and starts again",
-      "fails": "a switch that writes a row and changes nothing else — every route of the product still answering while the console reports it off"
+      "fails": "a switch that writes a row and changes nothing else \u2014 every route of the product still answering while the console reports it off"
     },
     {
       "id": "a-product-switched-off-keeps-its-records",
@@ -2501,7 +2501,7 @@
       "status": "live",
       "impl": "one/test/boot.test.ts",
       "proves": "THE RECORDS CAME BACK WITH IT",
-      "fails": "a downgrade that erases — indistinguishable from a working switch until somebody turns the product back on and finds an empty workspace"
+      "fails": "a downgrade that erases \u2014 indistinguishable from a working switch until somebody turns the product back on and finds an empty workspace"
     },
     {
       "id": "a-switched-off-product-is-still-on-the-console",
@@ -2519,7 +2519,7 @@
       "status": "live",
       "impl": "scripts/settings.test.mjs",
       "proves": "declared, rendered, saved, and read by nothing",
-      "fails": "a switch somebody turns on, believes, and stops watching for the problem it claimed to solve — with every signal saying it worked: the control saved, the value came back, the screen redrew",
+      "fails": "a switch somebody turns on, believes, and stops watching for the problem it claimed to solve \u2014 with every signal saying it worked: the control saved, the value came back, the screen redrew",
       "becomes": "elsewhere: the settings declarations and whether anything reads them"
     },
     {
@@ -2528,7 +2528,7 @@
       "stage": "33",
       "status": "live",
       "impl": "scripts/settings.test.mjs",
-      "proves": "no app declares one — a check that cannot fail",
+      "proves": "no app declares one \u2014 a check that cannot fail",
       "fails": "a guard that walks a moved or renamed declaration block, finds nothing, and prints a confident green line for months"
     },
     {
@@ -2547,7 +2547,7 @@
       "status": "live",
       "impl": "runtime/test/config.test.ts",
       "proves": "is not in the database, and comes back anyway",
-      "fails": "a backup, an export or a query somebody should not have been able to run handing out a live Stripe key — which no amount of access control on the console can take back"
+      "fails": "a backup, an export or a query somebody should not have been able to run handing out a live Stripe key \u2014 which no amount of access control on the console can take back"
     },
     {
       "id": "a-credential-under-an-old-secret-is-not-reported-absent",
@@ -2565,7 +2565,7 @@
       "status": "live",
       "impl": "runtime/test/config.test.ts",
       "proves": "refuses to store a key on a deployment with nothing to encrypt it with",
-      "fails": "a Stripe secret key written to D1 in the clear because the deployment forgot to bind a secret — indistinguishable from an ordinary successful save"
+      "fails": "a Stripe secret key written to D1 in the clear because the deployment forgot to bind a secret \u2014 indistinguishable from an ordinary successful save"
     },
     {
       "id": "a-console-cannot-read-a-secret-back",
@@ -2583,7 +2583,7 @@
       "status": "live",
       "impl": "runtime/test/mail.test.ts",
       "proves": "refuses rather than pretending when nothing is configured",
-      "fails": "a sign-in that answers \"check your email\" with nothing sent, and a code written into a retained log — the shape a previous platform shipped three times, because every suite runs where mocking is correct"
+      "fails": "a sign-in that answers \"check your email\" with nothing sent, and a code written into a retained log \u2014 the shape a previous platform shipped three times, because every suite runs where mocking is correct"
     },
     {
       "id": "a-letter-survives-not-being-english",
@@ -2610,7 +2610,7 @@
       "status": "live",
       "impl": "runtime/test/stripe.test.ts",
       "proves": "refuses everything where no secret is stored",
-      "fails": "a public endpoint anybody can POST to marking any workspace paid — the whole of the payment design turned inside out by a row somebody had not filled in"
+      "fails": "a public endpoint anybody can POST to marking any workspace paid \u2014 the whole of the payment design turned inside out by a row somebody had not filled in"
     },
     {
       "id": "a-signature-covers-the-body",
@@ -2646,7 +2646,7 @@
       "status": "live",
       "impl": "runtime/test/stripe.test.ts",
       "proves": "is attributed by its customer when it carries nothing else",
-      "fails": "every month after the first going unplaced — the workspace pays and goes past due anyway, because a renewal invoice carries no metadata of ours"
+      "fails": "every month after the first going unplaced \u2014 the workspace pays and goes past due anyway, because a renewal invoice carries no metadata of ours"
     },
     {
       "id": "a-payment-that-cannot-be-placed-is-recorded",
@@ -2655,7 +2655,7 @@
       "status": "live",
       "impl": "runtime/test/stripe.test.ts",
       "proves": "parks what it cannot place, where somebody can read it",
-      "fails": "money captured, nothing granted, and no trace anywhere — the event answered 200 with its id already claimed, so Stripe never sends it again"
+      "fails": "money captured, nothing granted, and no trace anywhere \u2014 the event answered 200 with its id already claimed, so Stripe never sends it again"
     },
     {
       "id": "cancelling-is-not-arrears",
@@ -2673,7 +2673,7 @@
       "status": "live",
       "impl": "runtime/test/grandfather.test.ts",
       "proves": "names the narrowings and nothing else",
-      "fails": "every early customer frozen at the numbers the tier had on the day they joined — a later raise reaches everybody except the people who have been paying longest, and nothing anywhere reports it"
+      "fails": "every early customer frozen at the numbers the tier had on the day they joined \u2014 a later raise reaches everybody except the people who have been paying longest, and nothing anywhere reports it"
     },
     {
       "id": "a-plan-edited-down-holds-everybody-on-it",
@@ -2700,7 +2700,7 @@
       "status": "live",
       "impl": "runtime/test/grandfather.test.ts",
       "proves": "keeps the highest number it ever promised",
-      "fails": "a tier cut in two steps losing everything the first step protected — the second snapshot overwrites the first, so narrowing twice is a way to take back what was held"
+      "fails": "a tier cut in two steps losing everything the first step protected \u2014 the second snapshot overwrites the first, so narrowing twice is a way to take back what was held"
     },
     {
       "id": "an-edit-reaches-only-the-plan-it-edits",
@@ -2718,7 +2718,7 @@
       "status": "live",
       "impl": "runtime/test/catalogue.test.ts",
       "proves": "refuses an edit that puts a price on the lobby",
-      "fails": "a lapsed workspace charged for a plan it never chose, or not paying buying more than the cheapest tier does — every rule the build checks, reachable through a form that checks none of them"
+      "fails": "a lapsed workspace charged for a plan it never chose, or not paying buying more than the cheapest tier does \u2014 every rule the build checks, reachable through a form that checks none of them"
     },
     {
       "id": "an-edit-may-not-invent-an-entitlement",
@@ -2736,7 +2736,7 @@
       "status": "live",
       "impl": "runtime/test/catalogue.test.ts",
       "proves": "serves the declaration rather than a catalogue that would be refused",
-      "fails": "one stale row taking the whole deployment down — every gate, price and standing resolves against this list, and an edit written against last month's declaration can stop merging into a valid one with nobody having done anything"
+      "fails": "one stale row taking the whole deployment down \u2014 every gate, price and standing resolves against this list, and an edit written against last month's declaration can stop merging into a valid one with nobody having done anything"
     },
     {
       "id": "an-edit-is-a-diff-not-a-copy",
@@ -2745,7 +2745,7 @@
       "status": "live",
       "impl": "runtime/test/catalogue.test.ts",
       "proves": "can set a trial to zero",
-      "fails": "a plan whose trial cannot be turned off, and untouched fields frozen at whatever they were on the day somebody edited the price — a zero read as an absence is the whole difference between a diff and a copy"
+      "fails": "a plan whose trial cannot be turned off, and untouched fields frozen at whatever they were on the day somebody edited the price \u2014 a zero read as an absence is the whole difference between a diff and a copy"
     },
     {
       "id": "an-edited-price-reaches-the-whole-product",
@@ -2754,7 +2754,7 @@
       "status": "live",
       "impl": "ground/test/operator.test.ts",
       "proves": "edits a plan, holds everybody on it, and puts it back",
-      "fails": "the price list edited on one screen and read from the code everywhere else — the gate, the bill and the checkout resolving against a catalogue nobody can see, which is a screen promising what a route refuses"
+      "fails": "the price list edited on one screen and read from the code everywhere else \u2014 the gate, the bill and the checkout resolving against a catalogue nobody can see, which is a screen promising what a route refuses"
     },
     {
       "id": "every-design-guard-is-named-in-the-design-language",
@@ -2763,7 +2763,7 @@
       "status": "live",
       "impl": "scripts/enforced.mjs",
       "proves": "draws the interface and carries no",
-      "fails": "DESIGN.md §8 typed by hand and five guards missing from it — the sharpest being `metrics`, which holds card padding, the spacing scale, the page gutter and the floor under a pressable row, so the section answering “is spacing enforced?” did not mention the guard enforcing spacing"
+      "fails": "DESIGN.md \u00a78 typed by hand and five guards missing from it \u2014 the sharpest being `metrics`, which holds card padding, the spacing scale, the page gutter and the floor under a pressable row, so the section answering \u201cis spacing enforced?\u201d did not mention the guard enforcing spacing"
     },
     {
       "id": "a-gate-is-never-handed-a-constant",
@@ -2772,7 +2772,7 @@
       "status": "live",
       "impl": "scripts/gates.test.mjs",
       "proves": "never fills",
-      "fails": "a gate whose input nothing supplies — `flags: located.flags ?? {}` where no deployment ever set it, so every request carried an empty map, the console wrote rows only the console read back, and switching a flag changed nothing anywhere with every suite green"
+      "fails": "a gate whose input nothing supplies \u2014 `flags: located.flags ?? {}` where no deployment ever set it, so every request carried an empty map, the console wrote rows only the console read back, and switching a flag changed nothing anywhere with every suite green"
     },
     {
       "id": "a-balance-moves-in-one-place-and-the-history-moves-with-it",
@@ -2781,7 +2781,7 @@
       "status": "live",
       "impl": "scripts/ledger-chokepoint.test.mjs",
       "proves": "outside the chokepoint",
-      "fails": "a number the ledger cannot rebuild — the balance is plausible, the screen redraws, and every report over that line stops adding up, permanently"
+      "fails": "a number the ledger cannot rebuild \u2014 the balance is plausible, the screen redraws, and every report over that line stops adding up, permanently"
     },
     {
       "id": "a-narrowed-collection-is-narrowed-by-every-statement",
@@ -2790,7 +2790,7 @@
       "status": "live",
       "impl": "scripts/reach.test.mjs",
       "proves": "without narrowing to the caller's own",
-      "fails": "the generated CRUD narrows and the app's own forty statements do not — the list a person opens shows one site, every route under it answers for all of them, and nothing fails anywhere"
+      "fails": "the generated CRUD narrows and the app's own forty statements do not \u2014 the list a person opens shows one site, every route under it answers for all of them, and nothing fails anywhere"
     },
     {
       "id": "an-objects-standing-changes-only-where-the-shelf-changes-with-it",
@@ -2808,8 +2808,8 @@
       "status": "live",
       "impl": "scripts/ai-commits.test.mjs",
       "proves": "generates AND writes",
-      "fails": "an expiry read off a blurred label committed as a fact — a perfectly valid date that nothing anywhere will ever question",
-      "becomes": "elsewhere: the runtime's write path — what a model may commit is decided before any screen draws"
+      "fails": "an expiry read off a blurred label committed as a fact \u2014 a perfectly valid date that nothing anywhere will ever question",
+      "becomes": "elsewhere: the runtime's write path \u2014 what a model may commit is decided before any screen draws"
     },
     {
       "id": "what-a-count-found-missing-is-still-counted-as-gone",
@@ -2818,7 +2818,7 @@
       "status": "live",
       "impl": "scripts/inferred-consumption.test.mjs",
       "proves": "recognises",
-      "fails": "a recorded share that reads a hundred per cent for ever — the flattering direction, with every test green, because nothing else connects the id a count mints to the prefix the report reads",
+      "fails": "a recorded share that reads a hundred per cent for ever \u2014 the flattering direction, with every test green, because nothing else connects the id a count mints to the prefix the report reads",
       "becomes": "elsewhere: the ledger, where a count's missing quantity is linked to its consumption"
     },
     {
@@ -2827,7 +2827,7 @@
       "stage": "69",
       "status": "live",
       "impl": "scripts/label-once.test.mjs",
-      "proves": "UPDATE … SET code",
+      "proves": "UPDATE \u2026 SET code",
       "fails": "the sticker somebody put on a shelf in March resolves to nothing, and the count that walks past it finds an unlabelled place",
       "becomes": "elsewhere: the minting path on the server"
     },
@@ -2867,7 +2867,7 @@
       "status": "live",
       "impl": "apps/inventory/test/ledger.test.ts",
       "proves": "counts a shelf life in local days",
-      "fails": "stock expires a day late west of Greenwich — the direction that matters, on medicine and food"
+      "fails": "stock expires a day late west of Greenwich \u2014 the direction that matters, on medicine and food"
     },
     {
       "id": "an-expiry-says-which-clock-ended-it",
@@ -2876,7 +2876,7 @@
       "status": "live",
       "impl": "apps/inventory/test/ledger.test.ts",
       "proves": "takes the earliest clock, and says which it was",
-      "fails": "a shelf that says “expires Tuesday” and cannot say why, which is a shelf nobody acts on"
+      "fails": "a shelf that says \u201cexpires Tuesday\u201d and cannot say why, which is a shelf nobody acts on"
     },
     {
       "id": "the-preview-and-the-commit-are-the-same-function",
@@ -2885,7 +2885,7 @@
       "status": "live",
       "impl": "scripts/one-planner.test.mjs",
       "proves": "does not call",
-      "fails": "a screen that says “412 new, 3 updated” over a write that walks the same spreadsheet a second time and does something else — identical until the day it is not, and on that day nothing throws",
+      "fails": "a screen that says \u201c412 new, 3 updated\u201d over a write that walks the same spreadsheet a second time and does something else \u2014 identical until the day it is not, and on that day nothing throws",
       "becomes": "elsewhere: the planner, where the preview and the commit are one function"
     },
     {
@@ -2895,7 +2895,7 @@
       "status": "live",
       "impl": "scripts/input-checked.test.mjs",
       "proves": "checkAll(op.spec.input",
-      "fails": "a required field arriving as `undefined`, reaching a statement, and the caller being told “Type 'undefined' not supported” in a 503 that names a value rather than a field"
+      "fails": "a required field arriving as `undefined`, reaching a statement, and the caller being told \u201cType 'undefined' not supported\u201d in a 503 that names a value rather than a field"
     },
     {
       "id": "the-screen-index-names-every-screen-and-every-line-it-gives-is-real",
@@ -2904,7 +2904,7 @@
       "status": "live",
       "impl": "scripts/screen-index.test.mjs",
       "proves": "which is not a declaration",
-      "fails": "“looking for the file that draws a screen? Part III” sending somebody to the wrong file with confidence, which costs more than grepping would have"
+      "fails": "\u201clooking for the file that draws a screen? Part III\u201d sending somebody to the wrong file with confidence, which costs more than grepping would have"
     },
     {
       "id": "a-screen-is-offered-only-on-a-plan-that-includes-it",
@@ -2912,8 +2912,8 @@
       "stage": "67",
       "status": "live",
       "impl": "one/test/inventory.test.ts",
-      "proves": "withholds the run rail, which this tier did not buy",
-      "fails": "a nav slot spent on a destination the plan does not include, whose only answer when pressed is the refusal its own operations raise — and there are five of them"
+      "proves": "withholds exactly what this tier did not buy, and nothing else",
+      "fails": "a nav slot spent on a destination the plan does not include, whose only answer when pressed is the refusal its own operations raise \u2014 and there are five of them"
     },
     {
       "id": "a-screen-cannot-be-gated-on-a-key-no-plan-sells",
@@ -2940,7 +2940,7 @@
       "status": "live",
       "impl": "one/test/inventory.test.ts",
       "proves": "ticks a step from the operation that did it",
-      "fails": "three unticked steps for ever, shown to a workspace that finished all three last week — and a screen ticking them instead would leave them undone for anybody who did the same thing from the API or from a second screen"
+      "fails": "three unticked steps for ever, shown to a workspace that finished all three last week \u2014 and a screen ticking them instead would leave them undone for anybody who did the same thing from the API or from a second screen"
     },
     {
       "id": "a-congratulation-is-said-once",
@@ -2949,7 +2949,7 @@
       "status": "live",
       "impl": "one/test/inventory.test.ts",
       "proves": "congratulates once and then stops",
-      "fails": "recognition repeated on every load, which is not recognition but furniture — and then the one that matters is not read either"
+      "fails": "recognition repeated on every load, which is not recognition but furniture \u2014 and then the one that matters is not read either"
     },
     {
       "id": "a-step-only-the-clock-can-complete-is-refused",
@@ -2958,7 +2958,7 @@
       "status": "live",
       "impl": "kernel/test/declarations.test.ts",
       "proves": "refuses a step only a job can complete",
-      "fails": "a checklist item nobody can take, passing composition because a nightly sweep does raise the event — the tally counts what people did, so the step sits unticked with nothing anywhere saying why"
+      "fails": "a checklist item nobody can take, passing composition because a nightly sweep does raise the event \u2014 the tally counts what people did, so the step sits unticked with nothing anywhere saying why"
     },
     {
       "id": "a-row-capability-reaches-both-shapes",
@@ -3086,7 +3086,7 @@
       "impl": "apps/inventory/test/geometry.seen.test.tsx",
       "lane": "seen",
       "proves": "does not push the page sideways",
-      "fails": "a screen a phone scrolls horizontally, which no source-reading check can see — the width is a computed value produced by a stylesheet, a flex container and four components that each did something defensible"
+      "fails": "a screen a phone scrolls horizontally, which no source-reading check can see \u2014 the width is a computed value produced by a stylesheet, a flex container and four components that each did something defensible"
     },
     {
       "id": "every-control-is-big-enough-for-a-finger",
@@ -3096,7 +3096,7 @@
       "impl": "apps/inventory/test/geometry.seen.test.tsx",
       "lane": "seen",
       "proves": "is big enough for a finger",
-      "fails": "`ROW.tap` calling 44px non-negotiable while every button ships 40, 36 above the breakpoint and 32 for `sm` — the rule true of the rows and false of the things people press, in a product used one-handed"
+      "fails": "`ROW.tap` calling 44px non-negotiable while every button ships 40, 36 above the breakpoint and 32 for `sm` \u2014 the rule true of the rows and false of the things people press, in a product used one-handed"
     },
     {
       "id": "the-reference-app-is-measured-too",
@@ -3116,7 +3116,7 @@
       "impl": "one-space/test/geometry.seen.test.tsx",
       "lane": "seen",
       "proves": "does not push the page sideways on ${name}",
-      "fails": "the half of every screen a product cannot opt out of — the world, the hem, the nav, the crown, the room reserved for the island — measured by nothing, so a screen that fits on its own is still pushed sideways by the chrome around it"
+      "fails": "the half of every screen a product cannot opt out of \u2014 the world, the hem, the nav, the crown, the room reserved for the island \u2014 measured by nothing, so a screen that fits on its own is still pushed sideways by the chrome around it"
     },
     {
       "id": "the-gate-answers-before-a-control-is-drawn",
@@ -3125,7 +3125,7 @@
       "status": "live",
       "impl": "one/test/inventory.test.ts",
       "proves": "says which gate would stop a control, before it is drawn",
-      "fails": "a primary action drawn, pressed and answered 402 — the refusal landing as a toast over whatever the person just filled in, and the work gone"
+      "fails": "a primary action drawn, pressed and answered 402 \u2014 the refusal landing as a toast over whatever the person just filled in, and the work gone"
     },
     {
       "id": "the-read-the-curtain-waits-for-has-a-depth",
@@ -3133,7 +3133,7 @@
       "status": "live",
       "impl": "one/test/request-cost.test.ts",
       "proves": "answers me.who four round trips deep",
-      "fails": "the one read nothing can be drawn before quietly gaining a wave, and a wave is a fifth of a second of blank screen on every visit — the source says nothing about it, because `await` reads the same whether a query waited or ran beside another"
+      "fails": "the one read nothing can be drawn before quietly gaining a wave, and a wave is a fifth of a second of blank screen on every visit \u2014 the source says nothing about it, because `await` reads the same whether a query waited or ran beside another"
     },
     {
       "id": "a-generated-collection-read-has-a-depth",
@@ -3141,7 +3141,7 @@
       "status": "live",
       "impl": "one/test/request-cost.test.ts",
       "proves": "answers a generated collection read five round trips deep",
-      "fails": "a round trip added to the one function every collection in every app is read through — so every list in the deployment gets slower at once, and no single screen's test is the one that notices"
+      "fails": "a round trip added to the one function every collection in every app is read through \u2014 so every list in the deployment gets slower at once, and no single screen's test is the one that notices"
     },
     {
       "id": "the-consoles-workspace-list-has-a-depth",
@@ -3156,8 +3156,8 @@
       "protects": "D15",
       "stage": "42",
       "status": "live",
-      "impl": "apps/inventory/test/acts.screens.test.tsx",
-      "proves": "is named on every act",
+      "impl": "apps/inventory/test/manifest.test.ts",
+      "proves": "every one of them names a real operation",
       "fails": "one act with no `op`, which renders and works on every tier that happens to be allowed and gives the one that is not the old behaviour with nothing saying so"
     },
     {
@@ -3167,7 +3167,7 @@
       "status": "live",
       "impl": "design/test/surface.test.tsx",
       "proves": "says something else when a different gate stopped it",
-      "fails": "one sentence for all nine gates, which is a boolean wearing a name — \"you cannot yet\" and \"your plan does not include this\" are different controls"
+      "fails": "one sentence for all nine gates, which is a boolean wearing a name \u2014 \"you cannot yet\" and \"your plan does not include this\" are different controls"
     },
     {
       "id": "a-brand-reaches-only-the-surfaces-it-was-asked-to",
@@ -3176,7 +3176,7 @@
       "status": "live",
       "impl": "ground/test/workspace.test.ts",
       "proves": "leaves the tile ours where the workspace did not ask for it",
-      "fails": "every switch on the branding screen saving and changing nothing — the tile painted from the entitlement alone, so a business that turned its icon off still installed as itself"
+      "fails": "every switch on the branding screen saving and changing nothing \u2014 the tile painted from the entitlement alone, so a business that turned its icon off still installed as itself"
     },
     {
       "id": "no-workspace-colour-reaches-a-screen",
@@ -3185,7 +3185,7 @@
       "status": "live",
       "impl": "ground/test/workspace.test.ts",
       "proves": "puts no colour of theirs on a screen, whatever they picked",
-      "fails": "a workspace's brand painting the interface again — which is what it did, and what stopped any screen being designable"
+      "fails": "a workspace's brand painting the interface again \u2014 which is what it did, and what stopped any screen being designable"
     },
     {
       "id": "a-browser-suite-is-named-for-its-lane",
@@ -3194,7 +3194,7 @@
       "status": "live",
       "impl": "scripts/seen.test.mjs",
       "proves": "suite(s) launch a browser without the",
-      "fails": "a geometry suite back in the lane a deploy waits for — the tests pass, the run is simply minutes longer, and CI gets slow again by a route nobody chose"
+      "fails": "a geometry suite back in the lane a deploy waits for \u2014 the tests pass, the run is simply minutes longer, and CI gets slow again by a route nobody chose"
     },
     {
       "id": "a-slow-lane-has-a-command-that-runs-it",
@@ -3203,7 +3203,7 @@
       "status": "live",
       "impl": "scripts/seen.test.mjs",
       "proves": "cannot run the lane they were put in",
-      "fails": "a `.seen.` file excluded from `test` by name and reachable by no command — a deleted test wearing a filename, green for ever"
+      "fails": "a `.seen.` file excluded from `test` by name and reachable by no command \u2014 a deleted test wearing a filename, green for ever"
     },
     {
       "id": "the-fast-lane-does-not-pick-up-a-browser-suite",
@@ -3230,7 +3230,7 @@
       "status": "live",
       "impl": "runtime/src/compose.ts",
       "proves": "would replace an operation this app",
-      "fails": "a product's own route answering the platform's handler at the same address — the merge wins silently, so the list of things on a workspace's shelves becomes the list of products it has switched on, with no error anywhere"
+      "fails": "a product's own route answering the platform's handler at the same address \u2014 the merge wins silently, so the list of things on a workspace's shelves becomes the list of products it has switched on, with no error anywhere"
     },
     {
       "id": "a-workspace-is-never-founded-empty",
@@ -3239,7 +3239,7 @@
       "status": "live",
       "impl": "runtime/src/personal.ts",
       "proves": "Choose at least one",
-      "fails": "a name and an address with nothing to open — reachable, payable and empty for ever, because the screen that would add a product is inside the workspace"
+      "fails": "a name and an address with nothing to open \u2014 reachable, payable and empty for ever, because the screen that would add a product is inside the workspace"
     },
     {
       "id": "the-last-product-cannot-be-switched-off",
@@ -3248,7 +3248,7 @@
       "status": "live",
       "impl": "runtime/src/member-ops.ts",
       "proves": "NEVER THE LAST ONE",
-      "fails": "a workspace its own owner cannot reach, with the bill still running — nothing is on, so the screen that would switch something back on is not drawn"
+      "fails": "a workspace its own owner cannot reach, with the bill still running \u2014 nothing is on, so the screen that would switch something back on is not drawn"
     },
     {
       "id": "a-field-never-exceeds-its-mark-budget",
@@ -3257,7 +3257,7 @@
       "status": "live",
       "impl": "design/src/scene/scene.ts",
       "proves": "MARKS",
-      "fails": "half a megabyte of markup parsed before the first paint of every screen, on the device least able to afford it — a cost a motion setting cannot reach, because it is there whether anything moves or not"
+      "fails": "half a megabyte of markup parsed before the first paint of every screen, on the device least able to afford it \u2014 a cost a motion setting cannot reach, because it is there whether anything moves or not"
     },
     {
       "id": "the-world-moves-only-where-it-was-earned",
@@ -3339,7 +3339,7 @@
       "status": "live",
       "impl": "scripts/reached.test.mjs",
       "proves": "reached from its subject",
-      "fails": "a screen nothing in the product leads to — declared, mounted, rendering perfectly at an address only a person who types it can open, with every other lane green",
+      "fails": "a screen nothing in the product leads to \u2014 declared, mounted, rendering perfectly at an address only a person who types it can open, with every other lane green",
       "becomes": "elsewhere: the manifest's screen graph, which a port fills in rather than empties"
     },
     {
@@ -3358,7 +3358,7 @@
       "status": "live",
       "impl": "kernel/src/manifest.ts",
       "proves": "home is the app's own root",
-      "fails": "a product whose bar opens on its second screen — two answers to where it starts, and the one somebody lands on is unmarked"
+      "fails": "a product whose bar opens on its second screen \u2014 two answers to where it starts, and the one somebody lands on is unmarked"
     },
     {
       "id": "nothing-outside-the-frame-pins-to-an-edge",
@@ -3367,8 +3367,8 @@
       "status": "live",
       "impl": "scripts/chrome.test.mjs",
       "proves": "pinned to a viewport edge outside",
-      "fails": "a second chrome — a screen's own bar stuck to an edge, wearing no hem, so the page is sliced by it and the product has two answers to where its controls live",
-      "becomes": "unrepresentable: a body has no crown and no foot — the frame draws both, around it"
+      "fails": "a second chrome \u2014 a screen's own bar stuck to an edge, wearing no hem, so the page is sliced by it and the product has two answers to where its controls live",
+      "becomes": "unrepresentable: a body has no crown and no foot \u2014 the frame draws both, around it"
     },
     {
       "id": "the-head-is-the-crown-and-there-is-one",
@@ -3377,7 +3377,7 @@
       "status": "live",
       "impl": "scripts/chrome.test.mjs",
       "proves": "header in the product, and it is the crown",
-      "fails": "a hand-rolled header beside the one that has slots — which is what the Shell's own was for months, and why it scrolled away, wore a separator and drew its controls at three heights"
+      "fails": "a hand-rolled header beside the one that has slots \u2014 which is what the Shell's own was for months, and why it scrolled away, wore a separator and drew its controls at three heights"
     },
     {
       "id": "the-foot-is-a-navigation-or-an-act",
@@ -3386,7 +3386,7 @@
       "status": "live",
       "impl": "scripts/chrome.test.mjs",
       "proves": "drawn only where nothing above it has taken the act",
-      "fails": "180px of an 844px phone in two objects with a gap between them, and a content column reserving room for one — so the last row sits under the other at every scroll position"
+      "fails": "180px of an 844px phone in two objects with a gap between them, and a content column reserving room for one \u2014 so the last row sits under the other at every scroll position"
     },
     {
       "id": "a-screens-actions-are-capped-where-the-row-is",
@@ -3395,7 +3395,7 @@
       "status": "live",
       "impl": "scripts/chrome.test.mjs",
       "proves": "capped where the crown's row is, once",
-      "fails": "a third action dropped by whichever component runs out of room first — a control somebody put there on purpose, gone with nothing said"
+      "fails": "a third action dropped by whichever component runs out of room first \u2014 a control somebody put there on purpose, gone with nothing said"
     },
     {
       "id": "every-screens-type-is-a-scale-with-a-top",
@@ -3405,7 +3405,7 @@
       "impl": "apps/inventory/test/geometry.seen.test.tsx",
       "lane": "seen",
       "proves": "is a scale with a top",
-      "fails": "a screen assembled out of locally defensible type choices — nine sizes, none of them wrong, and no scale; or a page whose largest type is the size of everything else, where the reader's eye has nowhere to land"
+      "fails": "a screen assembled out of locally defensible type choices \u2014 nine sizes, none of them wrong, and no scale; or a page whose largest type is the size of everything else, where the reader's eye has nowhere to land"
     },
     {
       "id": "everything-on-a-screen-can-be-read",
@@ -3415,7 +3415,7 @@
       "impl": "apps/inventory/test/geometry.seen.test.tsx",
       "lane": "seen",
       "proves": "everything on a screen can be read",
-      "fails": "ink under the contrast floor — a status colour tuned as a fill used as text, at 1.94:1 on the sentence naming a chemical hazard; a de-emphasis grey on a number; a quiet line on the one surface it does not clear. None of it visible from the palette, and none of it visible to anybody working in dark"
+      "fails": "ink under the contrast floor \u2014 a status colour tuned as a fill used as text, at 1.94:1 on the sentence naming a chemical hazard; a de-emphasis grey on a number; a quiet line on the one surface it does not clear. None of it visible from the palette, and none of it visible to anybody working in dark"
     },
     {
       "id": "everything-in-the-frame-can-be-read",
@@ -3425,7 +3425,7 @@
       "impl": "one-space/test/geometry.seen.test.tsx",
       "lane": "seen",
       "proves": "everything in the frame can be read",
-      "fails": "a shortfall in the crown, the hem or the bar — the half of every screen a product cannot opt out of, so one fault there is a fault on every screen in every product at once"
+      "fails": "a shortfall in the crown, the hem or the bar \u2014 the half of every screen a product cannot opt out of, so one fault there is a fault on every screen in every product at once"
     },
     {
       "id": "no-screen-paints-a-tone-with-a-utility",
@@ -3434,7 +3434,7 @@
       "status": "live",
       "impl": "scripts/problem.test.mjs",
       "proves": "paint a tone with a utility class",
-      "fails": "`text-danger` on a screen — the library's FILL colour used as ink, measured at 3.39:1 in light and 3.65 in dark, and a second way of saying danger that is a different red from the one the tone channel carries"
+      "fails": "`text-danger` on a screen \u2014 the library's FILL colour used as ink, measured at 3.39:1 in light and 3.65 in dark, and a second way of saying danger that is a different red from the one the tone channel carries"
     },
     {
       "id": "one-renderer-draws-every-refusal",
@@ -3443,7 +3443,7 @@
       "status": "live",
       "impl": "scripts/problem.test.mjs",
       "proves": "draw an Alert of their own",
-      "fails": "a control drawing its own refusal — re-deciding the tone, whether a retry is offered and whether the reference is shown, so the same failure reads differently depending on which screen you hit it from"
+      "fails": "a control drawing its own refusal \u2014 re-deciding the tone, whether a retry is offered and whether the reference is shown, so the same failure reads differently depending on which screen you hit it from"
     },
     {
       "id": "every-write-reports-or-says-why-not",
@@ -3452,7 +3452,7 @@
       "status": "live",
       "impl": "kernel/test/manifest.test.ts",
       "proves": "refuses a write that neither reports nor says why not",
-      "fails": "a button pressed, a round trip waited for, and a screen that looks exactly the same — fifteen of fifty writes, none of them silent on purpose, because a field nobody has to fill is a field that stays empty"
+      "fails": "a button pressed, a round trip waited for, and a screen that looks exactly the same \u2014 fifteen of fifty writes, none of them silent on purpose, because a field nobody has to fill is a field that stays empty"
     },
     {
       "id": "no-vague-transition",
@@ -3462,7 +3462,7 @@
       "impl": "scripts/hand.test.mjs",
       "lane": "gate",
       "proves": "name the properties",
-      "fails": "a transition written for one property animating whatever a later commit happens to add — a colour, a size, a shadow easing into place because nobody named what was meant to move",
+      "fails": "a transition written for one property animating whatever a later commit happens to add \u2014 a colour, a size, a shadow easing into place because nobody named what was meant to move",
       "becomes": "unrepresentable: a body writes no CSS, so there is no keyframe or hover rule in it to get wrong"
     },
     {
@@ -3483,7 +3483,7 @@
       "impl": "scripts/hand.test.mjs",
       "lane": "gate",
       "proves": "easing: no keyword timing function",
-      "fails": "`ease` and `linear` beside a vocabulary of tuned curves — motion that is individually defensible and collectively arrhythmic, because half of it never asked what the product moves like"
+      "fails": "`ease` and `linear` beside a vocabulary of tuned curves \u2014 motion that is individually defensible and collectively arrhythmic, because half of it never asked what the product moves like"
     },
     {
       "id": "a-trigger-names-no-slot",
@@ -3503,7 +3503,7 @@
       "impl": "one-space/test/space.seen.test.tsx",
       "lane": "seen",
       "proves": "every screen the space draws itself",
-      "fails": "the twenty operator-console screens and the nineteen in the account centre — the surfaces with the most controls per page in this deployment — shipping with every rule about pixels true of them only by luck, which is how one of them came to render a blank page"
+      "fails": "the twenty operator-console screens and the nineteen in the account centre \u2014 the surfaces with the most controls per page in this deployment \u2014 shipping with every rule about pixels true of them only by luck, which is how one of them came to render a blank page"
     },
     {
       "id": "every-control-the-space-asks-for-is-reachable",
@@ -3533,7 +3533,7 @@
       "impl": "one-space/test/space.seen.test.tsx",
       "lane": "seen",
       "proves": "everything the space says can be read",
-      "fails": "ink under the contrast floor on the screens that carry a refusal, an arrears and a deletion — measured in both themes, because a palette that clears in one can fail in the other"
+      "fails": "ink under the contrast floor on the screens that carry a refusal, an arrears and a deletion \u2014 measured in both themes, because a palette that clears in one can fail in the other"
     },
     {
       "id": "no-name-is-used-twice",
@@ -3543,7 +3543,7 @@
       "impl": "one-space/test/space.seen.test.tsx",
       "lane": "seen",
       "proves": "calls each of them one thing",
-      "fails": "a control rendered as two — a wrapper pressable around the real one, sharing its `id`, so a screen reader is handed the wrong element and the keyboard stops on a div that looks like nothing. Every other reading passes over it: the box is the right size, the ink clears the floor, the page does not spill"
+      "fails": "a control rendered as two \u2014 a wrapper pressable around the real one, sharing its `id`, so a screen reader is handed the wrong element and the keyboard stops on a div that looks like nothing. Every other reading passes over it: the box is the right size, the ink clears the floor, the page does not spill"
     },
     {
       "id": "the-bar-keeps-its-pitch",
@@ -3553,7 +3553,7 @@
       "impl": "design/test/bar.seen.test.tsx",
       "lane": "seen",
       "proves": "never lets a closed item sprawl",
-      "fails": "a nav drawn for five destinations that reads as five-minus-one whenever a product has four — the closed items are `grow basis-0`, so without a ceiling they divide whatever is left and the marks sit half again as far apart on one plan as on another"
+      "fails": "a nav drawn for five destinations that reads as five-minus-one whenever a product has four \u2014 the closed items are `grow basis-0`, so without a ceiling they divide whatever is left and the marks sit half again as far apart on one plan as on another"
     },
     {
       "id": "the-bar-centres-what-it-has",
@@ -3573,7 +3573,7 @@
       "impl": "design/test/bar.seen.test.tsx",
       "lane": "seen",
       "proves": "lights the destination somebody is on",
-      "fails": "the one place a product's colour touches the chrome, silently not painted — the light is a `color-mix` on the declared hue, so a manifest carrying an OKLCH triple instead of a colour makes the whole declaration invalid and nothing else about the bar changes"
+      "fails": "the one place a product's colour touches the chrome, silently not painted \u2014 the light is a `color-mix` on the declared hue, so a manifest carrying an OKLCH triple instead of a colour makes the whole declaration invalid and nothing else about the bar changes"
     },
     {
       "id": "only-the-router-and-the-flow-write-history",
@@ -3582,7 +3582,7 @@
       "status": "live",
       "impl": "scripts/story.test.mjs",
       "proves": "only the router and the flow write history",
-      "fails": "a history entry pushed with no step number on it, so the next back gesture cannot tell forward from back and one bad call corrupts every direction after it — and the existing history guard reads only the browser halves with a `main.tsx`, so every screen in every product was outside it",
+      "fails": "a history entry pushed with no step number on it, so the next back gesture cannot tell forward from back and one bad call corrupts every direction after it \u2014 and the existing history guard reads only the browser halves with a `main.tsx`, so every screen in every product was outside it",
       "becomes": "story"
     },
     {
@@ -3592,7 +3592,7 @@
       "status": "live",
       "impl": "scripts/story.test.mjs",
       "proves": "every declared step asks a question",
-      "fails": "a flow that reads as a form again — a heading names the area of the record being written and leaves the person to work out what is wanted of them, which is the difference between a screen anybody can answer and one that needs an induction"
+      "fails": "a flow that reads as a form again \u2014 a heading names the area of the record being written and leaves the person to work out what is wanted of them, which is the difference between a screen anybody can answer and one that needs an induction"
     },
     {
       "id": "every-step-carries-its-clause",
@@ -3601,7 +3601,7 @@
       "status": "live",
       "impl": "scripts/story.test.mjs",
       "proves": "every step with fields carries its clause",
-      "fails": "a review row reading \"Nothing set\" over an answer somebody gave — a step joins the recap's paragraph only where it says something, so one with fields and no clause reports what was entered as an omission, on the one screen whose whole job is to show one"
+      "fails": "a review row reading \"Nothing set\" over an answer somebody gave \u2014 a step joins the recap's paragraph only where it says something, so one with fields and no clause reports what was entered as an omission, on the one screen whose whole job is to show one"
     },
     {
       "id": "the-docks-pair-belongs-to-the-flow",
@@ -3610,7 +3610,7 @@
       "status": "live",
       "impl": "scripts/story.test.mjs",
       "proves": "the dock's second control is the flow's, not a screen's",
-      "fails": "a Back button over none of the wiring it implies — no recap, no per-step refusal, and no answer to the phone's own back gesture, which is the one that loses five screens of typing"
+      "fails": "a Back button over none of the wiring it implies \u2014 no recap, no per-step refusal, and no answer to the phone's own back gesture, which is the one that loses five screens of typing"
     },
     {
       "id": "every-asking-block-is-declared-and-drawn",
@@ -3619,7 +3619,7 @@
       "status": "live",
       "impl": "scripts/story.test.mjs",
       "proves": "every asking block is declared and drawn",
-      "fails": "a step drawing its question with no control at all — the kernel refuses a step naming an unregistered block and then draws nothing, so it cannot ask whether the registered one has a component, and a missing one resolves to `undefined` and falls through to the fields branch, which for a block step is empty"
+      "fails": "a step drawing its question with no control at all \u2014 the kernel refuses a step naming an unregistered block and then draws nothing, so it cannot ask whether the registered one has a component, and a missing one resolves to `undefined` and falls through to the fields branch, which for a block step is empty"
     },
     {
       "id": "the-declared-flow-has-one-renderer",
@@ -3628,7 +3628,7 @@
       "status": "live",
       "impl": "scripts/story.test.mjs",
       "proves": "the declared flow has exactly one renderer",
-      "fails": "a hand-written wizard growing back beside the declared one — a file inside one product holding that product's questions, controls and clauses, which is what left the flow orphaned last time and what a surface rewrite deletes"
+      "fails": "a hand-written wizard growing back beside the declared one \u2014 a file inside one product holding that product's questions, controls and clauses, which is what left the flow orphaned last time and what a surface rewrite deletes"
     },
     {
       "id": "a-destructive-statement-never-reaches-a-live-database",
@@ -3636,7 +3636,7 @@
       "status": "live",
       "impl": "scripts/deploy.test.mjs",
       "proves": "additive: a destructive statement is refused, before any of the batch runs",
-      "fails": "a schema step that drops or rewrites a column on a database that is already serving — and the fault it was written after answered 503 on every door for an hour behind a green gate, because `boot` threw and static assets kept loading"
+      "fails": "a schema step that drops or rewrites a column on a database that is already serving \u2014 and the fault it was written after answered 503 on every door for an hour behind a green gate, because `boot` threw and static assets kept loading"
     },
     {
       "id": "no-unbounded-loop-waits-on-anything",
@@ -3644,7 +3644,7 @@
       "status": "live",
       "impl": "scripts/runaway.test.mjs",
       "proves": "retries: no unbounded loop awaits anything without a way out",
-      "fails": "a loop that is wrong until somebody notices, which is the one class of bug that does not degrade — a wrong answer is wrong once, and what a runaway costs is a function of how long it goes unseen",
+      "fails": "a loop that is wrong until somebody notices, which is the one class of bug that does not degrade \u2014 a wrong answer is wrong once, and what a runaway costs is a function of how long it goes unseen",
       "becomes": "elsewhere: the worker configuration"
     },
     {
@@ -3653,7 +3653,7 @@
       "status": "live",
       "impl": "scripts/runaway.test.mjs",
       "proves": "count: ${touches.size} function(s) reach the database",
-      "fails": "a screen whose subrequest count is set by how many rows a customer has — `Promise.all` fixes the waiting and leaves the count, so the sequential check above it reports green right up to the request that stops answering"
+      "fails": "a screen whose subrequest count is set by how many rows a customer has \u2014 `Promise.all` fixes the waiting and leaves the count, so the sequential check above it reports green right up to the request that stops answering"
     },
     {
       "id": "one-function-holds-the-reserve-and-the-charge",
@@ -3661,7 +3661,7 @@
       "status": "live",
       "impl": "scripts/metering.test.mjs",
       "proves": "chain: one function holds the reserve, the run, the charge and the row",
-      "fails": "a model call that reaches a provider and not the meter — settlement charges `min(held, actual)`, so every unit an estimate fails to anticipate is a unit the platform pays for and the customer does not, silently, on every call"
+      "fails": "a model call that reaches a provider and not the meter \u2014 settlement charges `min(held, actual)`, so every unit an estimate fails to anticipate is a unit the platform pays for and the customer does not, silently, on every call"
     },
     {
       "id": "a-price-is-discovered-and-a-decision-is-not",
@@ -3685,7 +3685,7 @@
       "status": "live",
       "impl": "scripts/metering.test.mjs",
       "proves": "margin: at-cost is refused at the write and reported in the catalogue",
-      "fails": "a workspace free to pick the row that breaks even at best, as often as it likes — the reserve caps the charge, so a margin of nothing can only ever lose"
+      "fails": "a workspace free to pick the row that breaks even at best, as often as it likes \u2014 the reserve caps the charge, so a margin of nothing can only ever lose"
     },
     {
       "id": "something-outside-our-arithmetic-checks-the-charge",
@@ -3717,7 +3717,7 @@
       "status": "live",
       "impl": "scripts/metering.test.mjs",
       "proves": "stream: the same hold, charge and row, and the charge rides the last token",
-      "fails": "perfect output arriving beautifully and billed to nobody — the settle caps the charge, so a streaming lane that never settles is an error nowhere"
+      "fails": "perfect output arriving beautifully and billed to nobody \u2014 the settle caps the charge, so a streaming lane that never settles is an error nowhere"
     },
     {
       "id": "a-stream-asks-for-its-own-usage",
@@ -3733,7 +3733,7 @@
       "status": "live",
       "impl": "scripts/searching.test.mjs",
       "proves": "vault: a special category cannot be named searchable",
-      "fails": "a search index holding data the vault exists to keep out of one — and every failure in this area looks like an empty result, which is indistinguishable from the working state"
+      "fails": "a search index holding data the vault exists to keep out of one \u2014 and every failure in this area looks like an empty result, which is indistinguishable from the working state"
     },
     {
       "id": "a-screens-rhythm-is-the-doms",
@@ -3741,7 +3741,7 @@
       "status": "live",
       "impl": "scripts/rhythm.test.mjs",
       "proves": "blocks: the screen's rhythm is the DOM's, so composition cannot defeat it",
-      "fails": "two spacings inside one container, which reads as a page assembled by hand — and measured over React children rather than the DOM it is a check a wrapper component defeats without anybody editing a screen",
+      "fails": "two spacings inside one container, which reads as a page assembled by hand \u2014 and measured over React children rather than the DOM it is a check a wrapper component defeats without anybody editing a screen",
       "becomes": "unrepresentable: a body declares a layout, and the layout owns every gap inside it"
     },
     {
@@ -3750,7 +3750,7 @@
       "status": "live",
       "impl": "scripts/travel.test.mjs",
       "proves": "ways: both directions and both worlds are drawn, and neither runs when asked",
-      "fails": "a page that changes with no transition, or one that animates for somebody who asked for less motion — and the direction read from anywhere but the route is a back gesture that plays as a push"
+      "fails": "a page that changes with no transition, or one that animates for somebody who asked for less motion \u2014 and the direction read from anywhere but the route is a back gesture that plays as a push"
     },
     {
       "id": "only-one-file-builds-a-card",
@@ -3767,7 +3767,7 @@
       "status": "live",
       "impl": "scripts/glyphs.test.mjs",
       "proves": "resting: no glyph animation holds its last frame",
-      "fails": "a mark left holding its last frame, which reads as a screen that froze — and a glyph drawn straight from the library is a still icon in a product where every other one moves as its purpose",
+      "fails": "a mark left holding its last frame, which reads as a screen that froze \u2014 and a glyph drawn straight from the library is a still icon in a product where every other one moves as its purpose",
       "becomes": "unrepresentable: a block draws its own mark; a body has no clause that names one"
     },
     {
@@ -3776,7 +3776,7 @@
       "status": "live",
       "impl": "scripts/attrs.test.mjs",
       "proves": "attributes: ${set.size} stamped, every one of them read",
-      "fails": "a `data-` attribute the markup sets and no selector, variant or query reads — a decision written into the DOM that reaches no screen, and the only kind of dead code CSS cannot report",
+      "fails": "a `data-` attribute the markup sets and no selector, variant or query reads \u2014 a decision written into the DOM that reaches no screen, and the only kind of dead code CSS cannot report",
       "becomes": "unrepresentable: a block has no attribute to stamp; the frame stamps what the frame styles"
     },
     {
@@ -3785,7 +3785,7 @@
       "status": "live",
       "impl": "scripts/spoken.test.mjs",
       "proves": "refusal branch(es) across ${FILES.length} file(s), every one reaches so",
-      "fails": "a mutation that fails into silence, so a person presses a control, nothing happens, and the app has told them nothing — the fault is invisible in review because the correct code and the silent code differ by one line",
+      "fails": "a mutation that fails into silence, so a person presses a control, nothing happens, and the app has told them nothing \u2014 the fault is invisible in review because the correct code and the silent code differ by one line",
       "becomes": "unrepresentable: a body names an operation; whether its refusal reaches a person is the frame's answer, not the screen's"
     },
     {
@@ -3794,7 +3794,7 @@
       "status": "live",
       "impl": "scripts/present.test.mjs",
       "proves": "slices: no instant is cut into a day by hand",
-      "fails": "a date, time or number formatted in the machine's conventions rather than the reader's — and an instant sliced into a day by hand is off by a whole day for anybody east or west of the server",
+      "fails": "a date, time or number formatted in the machine's conventions rather than the reader's \u2014 and an instant sliced into a day by hand is off by a whole day for anybody east or west of the server",
       "becomes": "refused: format_wrong"
     },
     {
@@ -3803,7 +3803,7 @@
       "status": "live",
       "impl": "scripts/keys.test.mjs",
       "proves": "surface file(s), no closed-set value drawn as words",
-      "fails": "a screen printing the code instead of the name — a shard called \"eu\", a store called \"d1\", a payment parked because \"no_tenant\": every one passes typecheck, renders, and shows somebody the inside of the program",
+      "fails": "a screen printing the code instead of the name \u2014 a shard called \"eu\", a store called \"d1\", a payment parked because \"no_tenant\": every one passes typecheck, renders, and shows somebody the inside of the program",
       "becomes": "elsewhere: the field's own `labels`, where a key a person would read is named once for every screen that draws it"
     },
     {
@@ -3812,7 +3812,7 @@
       "status": "live",
       "impl": "scripts/doors.test.mjs",
       "proves": "every account-door screen that reaches a member op asks the door first",
-      "fails": "a screen on the account door calling an operation that needs a tenancy, which 404s there — and it looks identical to a screen that works, because the door it is on is not visible in the file that draws it",
+      "fails": "a screen on the account door calling an operation that needs a tenancy, which 404s there \u2014 and it looks identical to a screen that works, because the door it is on is not visible in the file that draws it",
       "becomes": "elsewhere: OneSpace's own account doors, which belong to the deployment rather than to a product"
     },
     {
@@ -3820,8 +3820,8 @@
       "protects": "D12",
       "status": "live",
       "impl": "scripts/jobs.test.mjs",
-      "proves": "book: one composed book — the platform's own and every app's",
-      "fails": "a job declared in a manifest, validated for its cron and its floor, drawn on a screen an operator opens — and run by nothing; it held for three stages and every suite was green throughout",
+      "proves": "book: one composed book \u2014 the platform's own and every app's",
+      "fails": "a job declared in a manifest, validated for its cron and its floor, drawn on a screen an operator opens \u2014 and run by nothing; it held for three stages and every suite was green throughout",
       "becomes": "elsewhere: the job runner and the cron behind it"
     },
     {
@@ -3830,7 +3830,7 @@
       "status": "live",
       "impl": "scripts/packing.test.mjs",
       "proves": "refused: no unresolved rung is read as a single",
-      "fails": "a quantity multiplied twice or not at all — the fault that put nine hundred tablets on a shelf, where both halves of the arithmetic were individually correct and the number the person expected showed the whole time",
+      "fails": "a quantity multiplied twice or not at all \u2014 the fault that put nine hundred tablets on a shelf, where both halves of the arithmetic were individually correct and the number the person expected showed the whole time",
       "becomes": "elsewhere: the server's arithmetic, where a quantity meets exactly one packing factor"
     },
     {
@@ -3839,7 +3839,7 @@
       "status": "live",
       "impl": "scripts/settled.test.mjs",
       "proves": "named: the refusal carries the fields, so the sentence lands under one",
-      "fails": "a generated update changing the unit every other number is counted in — twenty boxes on a shelf become twenty sheets, every balance reinterpreted, with no write anywhere near a quantity"
+      "fails": "a generated update changing the unit every other number is counted in \u2014 twenty boxes on a shelf become twenty sheets, every balance reinterpreted, with no write anywhere near a quantity"
     },
     {
       "id": "one-answer-per-question-through-one-door",
@@ -3847,8 +3847,8 @@
       "status": "live",
       "impl": "scripts/asking.test.mjs",
       "proves": "door: one answer store, keyed by operation and input, shared while in flight",
-      "fails": "the same question asked several times for one screen, which is round trips a person waits through — and a read outside the door is one nothing can dedupe, cache or count against a budget",
-      "becomes": "unrepresentable: a body says WHAT it reads and never how — there is no clause in it for a fetch"
+      "fails": "the same question asked several times for one screen, which is round trips a person waits through \u2014 and a read outside the door is one nothing can dedupe, cache or count against a budget",
+      "becomes": "unrepresentable: a body says WHAT it reads and never how \u2014 there is no clause in it for a fetch"
     },
     {
       "id": "a-total-is-asked-for-and-never-counted-by-hand",
@@ -3864,7 +3864,7 @@
       "status": "live",
       "impl": "scripts/renewal.test.mjs",
       "proves": "served: the version is the entry bundle's own name, read back through the asset",
-      "fails": "a tab left running a build that no longer exists, calling a surface that has moved under it — and a version stamped from anywhere but the entry bundle's own name is one that says a deploy happened when it did not",
+      "fails": "a tab left running a build that no longer exists, calling a surface that has moved under it \u2014 and a version stamped from anywhere but the entry bundle's own name is one that says a deploy happened when it did not",
       "becomes": "elsewhere: the service worker and how a deploy reaches an open browser"
     },
     {
@@ -3898,7 +3898,7 @@
       "status": "live",
       "impl": "scripts/placed.test.mjs",
       "proves": "rebind: a relocated database's name is written beside its id",
-      "fails": "records made in a jurisdiction nobody chose, because the place was a default in a script rather than a declaration — and it cannot be corrected afterwards without moving data that is already there"
+      "fails": "records made in a jurisdiction nobody chose, because the place was a default in a script rather than a declaration \u2014 and it cannot be corrected afterwards without moving data that is already there"
     },
     {
       "id": "a-copy-is-verified-by-counting",
@@ -3914,7 +3914,7 @@
       "status": "live",
       "impl": "scripts/d1.test.mjs",
       "proves": "tables: sqlite's own are left out too",
-      "fails": "a provisioning or reconciliation step that asks a live database something impossible and reads the failure as an answer — the class where the automation reports success and the resource is not there"
+      "fails": "a provisioning or reconciliation step that asks a live database something impossible and reads the failure as an answer \u2014 the class where the automation reports success and the resource is not there"
     },
     {
       "id": "the-workflow-builds-what-the-worker-serves",
@@ -3930,7 +3930,7 @@
       "status": "live",
       "impl": "scripts/awaited.test.mjs",
       "proves": "asked: ${asked.length} preflight question(s), each budgeted or free of the database",
-      "fails": "a question added to the preflight with no budget on it, so the first thing a person waits for grows a round trip nobody measured — and D62 puts that wait before the bundle, which is time spent looking at nothing"
+      "fails": "a question added to the preflight with no budget on it, so the first thing a person waits for grows a round trip nobody measured \u2014 and D62 puts that wait before the bundle, which is time spent looking at nothing"
     },
     {
       "id": "a-tab-switch-is-not-a-journey",
@@ -3938,7 +3938,7 @@
       "status": "live",
       "impl": "scripts/moving.test.mjs",
       "proves": "way: a lateral move has an answer of its own",
-      "fails": "a tab switch animated as a page transition, and an abandoned journey landing on top of the one that replaced it — the more somebody presses, the worse it gets, which is exactly how it was reported",
+      "fails": "a tab switch animated as a page transition, and an abandoned journey landing on top of the one that replaced it \u2014 the more somebody presses, the worse it gets, which is exactly how it was reported",
       "becomes": "elsewhere: `travel.ts`, which owns every move between screens however a screen is expressed"
     },
     {
@@ -3947,7 +3947,7 @@
       "status": "live",
       "impl": "scripts/reading.test.mjs",
       "proves": "pacing: ${decoders.length} decode loop(s), each at a cadence somebody chose",
-      "fails": "a camera loop spending the one thread that answers a tap, so the screen stops responding while it is reading — and an unpaced decode is a phone that runs hot and a battery a person notices",
+      "fails": "a camera loop spending the one thread that answers a tap, so the screen stops responding while it is reading \u2014 and an unpaced decode is a phone that runs hot and a battery a person notices",
       "becomes": "elsewhere: the decode loop in @engine/design, which no screen writes"
     },
     {
@@ -3973,7 +3973,7 @@
       "status": "live",
       "impl": "scripts/ground.test.mjs",
       "proves": "warm:",
-      "fails": "a colourless grey ladder, which is neutrality nobody chose and the house style three people independently named a competitor from — and which every provenance check passes, because `grey()` returning zero chroma is still the same function called from the same places"
+      "fails": "a colourless grey ladder, which is neutrality nobody chose and the house style three people independently named a competitor from \u2014 and which every provenance check passes, because `grey()` returning zero chroma is still the same function called from the same places"
     },
     {
       "id": "one-corner-reaches-every-component",
@@ -3982,7 +3982,7 @@
       "status": "live",
       "impl": "scripts/metrics.test.mjs",
       "proves": "corner:",
-      "fails": "a radius override compiled into the stylesheet instead of appended after it, so the library's `:root` wins on source order and every corner in the product silently stays 0.5rem — or a `RADIUS` past 1rem, where three ranks of surface all clamp to 32px and the ladder stops being one"
+      "fails": "a radius override compiled into the stylesheet instead of appended after it, so the library's `:root` wins on source order and every corner in the product silently stays 0.5rem \u2014 or a `RADIUS` past 1rem, where three ranks of surface all clamp to 32px and the ladder stops being one"
     },
     {
       "id": "a-heading-outranks-what-it-heads",
@@ -4000,7 +4000,7 @@
       "status": "live",
       "impl": "scripts/scene.test.mjs",
       "proves": "dock:",
-      "fails": "a dock painted from a card tier — a white slab in the light theme — or one that states a fill and no ink, which is a near-black glyph on a near-black plate that every contrast check here passes because they all measure ink against the PAGE"
+      "fails": "a dock painted from a card tier \u2014 a white slab in the light theme \u2014 or one that states a fill and no ink, which is a near-black glyph on a near-black plate that every contrast check here passes because they all measure ink against the PAGE"
     },
     {
       "id": "every-block-is-real-and-everything-that-could-be-one-is-placed",
@@ -4065,7 +4065,7 @@
       "stage": "95",
       "status": "live",
       "impl": "scripts/census.test.mjs",
-      "becomes": "elsewhere: this registry and the manifests behind it — the one guard whose subject is the port itself",
+      "becomes": "elsewhere: this registry and the manifests behind it \u2014 the one guard whose subject is the port itself",
       "proves": "every guard that sweeps a product says what its question becomes",
       "fails": "a guard that narrows in silence as screens are ported - a `.tsx` question asked of a `body:` that cannot contain a className, a bare fetch or a catch that answers a failure with a fact, so the check goes unanswered rather than red and the corpus shrinks one screen at a time behind an unchanged `ok`; plus a refusal claimed as the replacement that the kernel does not emit or that no test asserts, and a bare `unrepresentable` with no clause saying what the grammar has no room for"
     },
@@ -4124,7 +4124,7 @@
       "status": "live",
       "impl": "runtime/test/screen.test.ts",
       "proves": "refuses a screen whose body reads past its own permission",
-      "fails": "a `stock` screen with a supplier listing on it handing supplier rows to somebody holding `stock` alone — a manifest anybody could write, which composes, and which every other check is green on"
+      "fails": "a `stock` screen with a supplier listing on it handing supplier rows to somebody holding `stock` alone \u2014 a manifest anybody could write, which composes, and which every other check is green on"
     },
     {
       "id": "a-view-is-run-only-through-what-the-collection-declares",
@@ -4151,7 +4151,7 @@
       "status": "live",
       "impl": "scripts/census.test.mjs",
       "proves": "ratchet:",
-      "fails": "a port that stalls at one declared screen, and a product mid-port growing new hand-written ones — both of which read exactly like progress from outside"
+      "fails": "a port that stalls at one declared screen, and a product mid-port growing new hand-written ones \u2014 both of which read exactly like progress from outside"
     },
     {
       "id": "a-body-may-reach-one-reference-and-no-further",
@@ -4160,7 +4160,7 @@
       "status": "live",
       "impl": "kernel/test/surface.test.ts",
       "proves": "refuses two hops",
-      "fails": "`product.supplier.name` in a manifest, which is where a declaration stops being one and starts needing a query planner — the same line `Match` draws at the first comparison operator"
+      "fails": "`product.supplier.name` in a manifest, which is where a declaration stops being one and starts needing a query planner \u2014 the same line `Match` draws at the first comparison operator"
     },
     {
       "id": "a-join-asks-once-per-reference-not-once-per-row",
@@ -4169,7 +4169,7 @@
       "status": "live",
       "impl": "runtime/test/joined.test.ts",
       "proves": "asks once per reference, never once per row",
-      "fails": "fifty stock lines costing fifty subrequests on a warehouse phone — the right names at fifty times the price, which every value-only assertion in the file passes over"
+      "fails": "fifty stock lines costing fifty subrequests on a warehouse phone \u2014 the right names at fifty times the price, which every value-only assertion in the file passes over"
     },
     {
       "id": "a-reference-is-resolved-inside-the-callers-own-scope",
@@ -4187,7 +4187,7 @@
       "status": "live",
       "impl": "kernel/test/surface.test.ts",
       "proves": "refuses a count by a reference that points somewhere else",
-      "fails": "a tally whose `of` and `by` are both real and unrelated — it answers zero for every row, which reads as an empty shelf rather than as a manifest naming the wrong pair"
+      "fails": "a tally whose `of` and `by` are both real and unrelated \u2014 it answers zero for every row, which reads as an empty shelf rather than as a manifest naming the wrong pair"
     },
     {
       "id": "a-tally-is-one-grouped-statement",
@@ -4196,7 +4196,7 @@
       "status": "live",
       "impl": "runtime/test/joined.test.ts",
       "proves": "asks once per tally, never once per row",
-      "fails": "the shape OneInventory built five times by hand — a whole second collection fetched to a phone so a `Map` and a loop could count it"
+      "fails": "the shape OneInventory built five times by hand \u2014 a whole second collection fetched to a phone so a `Map` and a loop could count it"
     },
     {
       "id": "a-screen-carries-the-acts-it-offers-and-no-others",
@@ -4205,7 +4205,7 @@
       "status": "live",
       "impl": "runtime/test/screen.test.ts",
       "proves": "sends the acts the body names, with the input each one takes",
-      "fails": "the whole operation catalogue on the wire for a screen with one button on it — or none of it, which leaves the browser unable to draw a form without downloading the product's own manifest"
+      "fails": "the whole operation catalogue on the wire for a screen with one button on it \u2014 or none of it, which leaves the browser unable to draw a form without downloading the product's own manifest"
     }
   ]
 }

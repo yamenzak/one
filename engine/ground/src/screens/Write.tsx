@@ -23,7 +23,7 @@
 
 import * as React from "react";
 import {
-  Agree, Choice, DateInput, Dial, Field, Grid, Lookup, LongText, MoneyInput,
+  Agree, Choice, DateInput, Dial, Field, Grid, Lookup, LongText, MoneyInput, Words, Written,
   NumberInput, OneOf, Reveal, Screen, Section, Stack, Tags, TextInput, TimeInput,
   Viewfinder, notice,
 } from "@engine/design";
@@ -31,6 +31,17 @@ import { GROUND } from "../index.js";
 import { NOTES } from "./sample.js";
 
 /** ⚠️ Options carry the word a person reads; the id is what crosses the wire. */
+/* ⚠️ WHAT THIS WORKBOOK ALREADY FILES THINGS UNDER — see `Words.known`. A
+   vocabulary rather than a free-text box: two notes under "meeting" and
+   "meetings" are two topics, and search then finds neither reliably. */
+const KNOWN_TOPICS = [
+  { id: "meeting", label: "meeting" },
+  { id: "decision", label: "decision" },
+  { id: "pricing", label: "pricing" },
+  { id: "hiring", label: "hiring" },
+  { id: "roadmap", label: "roadmap" },
+];
+
 const KINDS = [
   { id: "idea", label: "Idea", help: "Something to come back to" },
   { id: "decision", label: "Decision", help: "What was settled, and why" },
@@ -102,7 +113,15 @@ export function Write({ title, onBack, onSave }: {
               autoFocus
               name="title"
             />
-            <LongText
+            {/*
+              ⚠️ `Written` RATHER THAN `LongText`, BECAUSE A NOTE'S BODY IS PROSE.
+              What somebody types here has paragraphs in it and is read back on
+              the note's own screen through `Prose` — so a control that can only
+              be typed into shows the writing side of a field whose reading side
+              is the point. The preview arrives with the first character and
+              opens on the reading side when the field arrives full.
+            */}
+            <Written
               label="Body"
               value={body}
               onChange={setBody}
@@ -118,11 +137,28 @@ export function Write({ title, onBack, onSave }: {
               options={KINDS}
               placeholder="Choose one"
             />
-            <Tags
+            {/*
+              ⚠️ `Words` IS THE CONTROL AND `Tags` IS THE READBACK, which is the
+              pair this screen was missing half of. A `Tags` row shows what has
+              been chosen and offers a way to remove one; adding is the other
+              half, and without a control for it this form could only ever take
+              topics away. `known` is what the workbook already files things
+              under — a vocabulary rather than a free-text box, because two
+              notes filed under "meeting" and "meetings" are two topics.
+            */}
+            <Words
               label="Topics"
+              value={topics}
+              onChange={(next) => setTopics([...next])}
+              known={KNOWN_TOPICS}
+              placeholder="Type a word"
+              help="How search finds a note that does not say the word"
+            />
+            <Tags
+              label="Filed under"
               items={topics.map((t) => ({ id: t, label: t }))}
               onRemove={(id) => setTopics((was) => was.filter((t) => t !== id))}
-              help="How search finds a note that does not say the word"
+              help="Press the cross to take one off"
             />
           </Stack>
         </Section>

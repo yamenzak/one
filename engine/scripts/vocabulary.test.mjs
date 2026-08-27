@@ -202,7 +202,12 @@ for (const m of registry.matchAll(/block\("(\w+)",\s*"\w+",\s*\{/g)) {
  */
 const WHY = {
   /* Named in `Format`. A binding picks one; it is not placed on its own. */
-  formatter: ["Num", "Money", "When", "Size", "Unit", "Tally", "Dated", "Clock", "Amount", "Code"],
+  formatter: [
+    /* ⚠️ SEVERAL THINGS SAID AS A PERSON WOULD SAY THEM — see `sayList`. It is
+       the same kind of thing as `Num` and `When`: a value put into the reader's
+       own language, where the language is the joining word. A block would mean a
+       declaration binding a LIST of strings, and no `Read` answers one. */
+    "Listed","Num", "Money", "When", "Size", "Unit", "Tally", "Dated", "Clock", "Amount", "Code"],
   /*
     What the frame draws AROUND a block. Never placed by a declaration.
 
