@@ -581,7 +581,17 @@ would 403 the product page for every floor worker in the building.
 **The count session can be opened, worked and closed from the product, which for
 a long time it could not.** Four operations were built, gated, audited and
 reachable through the API and through an agent, and `/counts` listed the open
-sessions and gave nobody a way into one. `/count` is the shelf somebody is
+sessions and gave nobody a way into one.
+
+⚠️ **AND THE VERB THAT BEGINS ONE WAS THE LAST TO GET A CONTROL, ONE ROUND
+AFTER THE OTHER THREE.** Wiring `/count` gave `count.tally` and `count.close`
+their surfaces and left `count.open` called by nothing — so the product had a
+list of counts, a way to work one, a way to settle one, and no way to start one,
+under an empty state that said "Open a count on a shelf". It is an `ActionRow` on
+`/counts` now, asking the two questions a person has an answer to (which shelf,
+and whether the expected number is hidden) with the day filled from the device.
+This is exactly the fault `reached.test.mjs` was widened to catch, and it caught
+this one the day it was written. `/count` is the shelf somebody is
 standing at with a phone, and its order is the order of the job: count one more
 (the thing done forty times), what you have counted (the running check), what
 closing would change (read once, near the end), and the close.

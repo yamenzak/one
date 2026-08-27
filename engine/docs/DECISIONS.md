@@ -4246,3 +4246,50 @@ back that reverses in the browser; a control whose input is resolved from
 anything but the answer that produced it; or an absence that nothing asserts —
 "no undo here" is a decision, and a decision no test pins is indistinguishable
 from an oversight.
+
+## D110 — A verb of a subject the app has drawn is called from somewhere, and the remainder is a countdown
+
+**Two guards asked about reach and neither asked this.**
+`capability.test.mjs` asks whether a PACKAGE's exports are imported;
+`unreachable` in the kernel asks whether an operation's permission is one some
+role can hold. Between them, nobody was asking whether an APP's operation has an
+address anybody could reach it at — which is how `stock.undo` shipped
+rule-complete and callable by nothing for a month with every lane green (D109).
+`reached.test.mjs` already asks the same question one level up, of screens; the
+operation half belongs beside it rather than in a third file.
+
+⚠️ **AND IT IS ASKED ONLY OF A SUBJECT THAT ALREADY HAS A SCREEN, which is the
+whole of what makes it answerable.** Every screen in OneInventory was emptied on
+purpose (RW-0) and they are returning one at a time; asked of everything, the
+check reports thirty-odd verbs whose surfaces are not written yet — a guard
+nobody can act on, which is a guard everybody learns to scroll past. A collection
+the app HAS drawn is one whose verbs it has already decided about, so what is
+left is the sharp case: **a screen ships, wires two of its subject's three verbs,
+and leaves the third addressable by nobody.**
+
+**It found exactly that the day it was written.** `/count` wired `count.tally`
+and `count.close`, `/counts` listed the sessions — and `count.open` was called
+from nothing. The product had a way to work a count, a way to settle one, and no
+way to begin one, under a list whose own empty state read "Open a count on a
+shelf". Its `location` was also the one shelf field in the product declared as
+bare text rather than a `ref`, so the form generated over it would have asked
+somebody to type a location id.
+
+**`WAITING` IS A COUNTDOWN, NOT AN EXEMPTION, AND THE DIFFERENCE IS MECHANICAL.**
+`capability.test.mjs` argues a list inside a guard is a waiver, and it is right
+about the case it governs: an unplanned gap should be marked at the site, where
+whoever touches the code sees it. This list is the visible remainder of a
+deliberate teardown, so it is a work item rather than an excuse — and it is held
+to that by failing three ways. A name that becomes reached fails until it is
+deleted; a name for an operation that is no longer there fails; and a corpus that
+found nothing to ask about fails rather than reporting a clean sweep. A waiver is
+permanent by construction; this stops being true the moment the tree moves.
+
+**The summary says the number out loud.** It reported "every one of them called"
+over a corpus with seven waiting before that was fixed — a line that reads better
+than the tree does, which is the failure every guard in this directory exists to
+refuse.
+
+**Therefore never:** a capability whose only address is an operation id; a check
+whose corpus can quietly go to nought; a list in a guard that cannot fail; or a
+summary that counts the ones that passed and not the ones that were skipped.

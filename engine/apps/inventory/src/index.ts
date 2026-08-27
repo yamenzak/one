@@ -2849,7 +2849,11 @@ const openCount = operation<
   kind: "write",
   summary: "Start counting a shelf",
   input: {
-    location: field.text({ label: "Where", required: true, holds: "none" }),
+    /* ⚠️ A REFERENCE, WHICH IS WHAT DRAWS A PLACE PICKER. Declared as bare text
+       it was the only shelf field in the product that was not a `ref`, so the
+       form generated over it asked somebody to type a location id — and the one
+       screen that offers this is a list of shelves being counted. */
+    location: field.ref({ label: "Where", required: true, holds: "none", to: "location" }),
     blind: field.bool({ label: "Blind", holds: "none" }),
     day: field.day({ label: "On", required: true, holds: "none" }),
   },
@@ -7740,6 +7744,28 @@ const manifest = (): AppSpec => defineApp({
         shape: "list",
         layout: { as: "stack" },
         blocks: [{
+          /*
+            ⚠️ THE EMPTY STATE BELOW SAYS "OPEN A COUNT ON A SHELF" AND NOTHING
+            ON THE SCREEN COULD — the same fault `/places` records one screen
+            over, shipped again in the very next round. Two of `count`'s three
+            verbs were wired to the session screen and the one that BEGINS a
+            count was wired to nothing, so the product had a list of counts, a
+            way to work one, a way to settle one, and no way to start one.
+
+            ⚠️ THE FORM IS THE OPERATION'S OWN. `count.open` takes the shelf, the
+            day, and whether the expected number is hidden; the day is a fact the
+            screen is standing on, so it is filled rather than asked, and what is
+            left is the two questions a person actually has an answer to.
+          */
+          block: "ActionRow",
+          does: [{ op: "count.open", fills: { day: "today" } }],
+          bind: {
+            icon: { from: { of: "words", says: "tally" } },
+            label: { from: { of: "words", says: "Count a shelf" } },
+            under: { from: { of: "words",
+              says: "Blind hides the expected number until you settle" } },
+          },
+        }, {
           block: "Listing",
           shows: [
             { field: "location.name", label: "Where" },
