@@ -24,6 +24,7 @@
  */
 
 import { CHART_MOTION } from "../chart/charts.js";
+import { NOTICE_CSS } from "./notice.js";
 import { TRAVEL_MOTION } from "./travel.js";
 import { ambienceStylesheet } from "../tokens/ambience.js";
 import { GROUND_CSS } from "../tokens/ground.js";
@@ -36,6 +37,7 @@ import { FACE_CSS, LIBRARY_TYPE_CSS, TYPE_CSS } from "../tokens/type.js";
 
 export const runtimeCss = (): string => [
   FACE_CSS, SHAPE_CSS, TYPE_CSS, LIBRARY_TYPE_CSS, GROUND_CSS, ambienceStylesheet(), TONE_CSS,
+  NOTICE_CSS,
   ARRIVE_MOTION, BLOCK_MOTION, DOOR_MOTION, CHART_MOTION,
   GLYPH_MOTION, TRAVEL_MOTION, OPENING_MOTION, READER_MOTION,
 ].join("\n");

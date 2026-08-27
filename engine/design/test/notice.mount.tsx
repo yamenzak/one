@@ -26,6 +26,19 @@ function Board() {
         Take it
       </Button>
       <Button onPress={() => notice.ok("Corrected.")}>Correct it</Button>
+      {/* ⚠️ A SENTENCE LONGER THAN THE ROW, WHICH IS THE CASE THE SIZING RULES
+          EXIST FOR. With a short one the row alone puts the control where it
+          belongs, so a fixture holding only that passes with `min-width` and
+          both `flex` values deleted — measured, by deleting them. A real
+          movement names a product AND a shelf and runs past the width easily. */}
+      <Button onPress={() => notice.ok(
+        "Carried 240 of Nitrile examination gloves, powder-free, blue, "
+        + "medium out of A3 — flammables and into Bench two",
+        { says: "Undo", run: () => { document.title = "undone"; } },
+      )}
+      >
+        Take a lot
+      </Button>
     </>
   );
 }
