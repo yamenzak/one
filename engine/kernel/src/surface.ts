@@ -670,6 +670,28 @@ export interface BlockSpec {
    */
   readonly nothing?: { readonly says: string; readonly under?: string };
   /**
+   * WHICH FIELD OF THE SCREEN'S SUBJECT THIS ROW CHANGES.
+   *
+   * ⚠️ A DETAIL SCREEN IS A LIST OF FACTS, AND EVERY ONE OF THEM IS SOMETHING
+   * SOMEBODY GOT WRONG ONCE. Without this the only way to correct a typo in a
+   * product's name is a screen that draws the whole record as a form — which is
+   * a second surface saying the same things in a different order, and the two
+   * drift the first time a field is added. The fact and the way to change it
+   * belong in one place, and that place is the row already showing it.
+   *
+   * ⚠️ IT NAMES A FIELD AND NOT AN OPERATION, and the operation is DERIVED:
+   * `<collection>.update`, the same generated write the API and an agent reach.
+   * A declaration naming its own operation would be free to name one that does
+   * something else to a field the row is not about — and the row's pencil would
+   * then be a button whose label is somebody else's word for what it does.
+   *
+   * ⚠️ AND A `settled` FIELD IS REFUSED HERE RATHER THAN AT THE DOOR. The update
+   * does not advertise one, so a row offering it would open a sheet whose Save
+   * cannot land — a dead end with a pencil on it, which is the shape
+   * `FieldRow.onEdit` is documented as never taking.
+   */
+  readonly edits?: string;
+  /**
    * ⚠️ THIS IS THE ASIDE OF A SPLIT, AND EXACTLY ONE THING MAY SAY SO. The
    * alternative is positional — "the last block is the sidebar" — which reads as
    * an accident the first time somebody reorders a body, and reordering a body
@@ -933,6 +955,22 @@ export interface BlockEntry {
    */
   readonly leads?: true | "one";
   /**
+   * THIS BLOCK CAN CARRY A WAY TO CHANGE THE FACT IT SHOWS — see
+   * `BlockSpec.edits`.
+   *
+   * ⚠️ IT IS ON THE ENTRY BECAUSE IT IS A FACT ABOUT THE COMPONENT: a row that
+   * draws a label and a value has somewhere to put a pencil and something for
+   * the pencil to be about. A figure does not, and a chart has thirty values and
+   * no one of them. Without this an `edits` on either would compose, mount and
+   * silently draw no way in — the prop is dropped, and the declaration reads as
+   * though the field were editable.
+   *
+   * ⚠️ AND ONE ENTRY HAS IT, WHICH IS THE HONEST STATE. `FieldRow` is the block
+   * a detail screen is made of; the others arrive when a screen wants one, not
+   * ahead of it.
+   */
+  readonly edits?: true;
+  /**
    * THIS BLOCK IS FED BY THE APP'S OWN BOOK, NOT BY A BINDING.
    *
    * ⚠️ THE ONLY SOURCE IN THE VOCABULARY THAT IS NOT A VIEW OR A FIELD, and it
@@ -969,6 +1007,11 @@ export type SurfaceRefusal =
      unknown destination is `goes_nowhere`, which is the same fault one tile at a
      time and deserves the same name. */
   | "leads_missing" | "leads_on_a_block_that_takes_none" | "leads_to_several"
+  /* ⚠️ THE FOUR A FIELD'S EDIT CAN GET WRONG — see `BlockSpec.edits`. Each ends
+     as a pencil that opens onto a Save which cannot land, which is worse than no
+     pencil: somebody types the correction and is told nothing happened. */
+  | "edits_on_a_block_that_takes_none" | "edits_without_a_subject"
+  | "edits_unknown" | "edits_settled"
   /* ⚠️ THE FOUR A NARROWING CAN GET WRONG — see `PickSpec`. A control drawn over
      rows nothing narrows is the sharpest: it moves, and the screen does not. */
   | "pick_name_taken" | "pick_says_nothing" | "pick_two_ways" | "pick_narrows_nothing"
@@ -1063,6 +1106,27 @@ export const actsIn = (body: SurfaceSpec): readonly string[] => {
       const id = opOf(one);
       if (!out.includes(id)) out.push(id);
     }
+  }
+  return out;
+};
+
+/**
+ * EVERY FIELD A BODY OFFERS TO CHANGE IN PLACE — see `BlockSpec.edits`.
+ *
+ * ⚠️ THE FIELDS RATHER THAN THE OPERATION, BECAUSE THE OPERATION IS DERIVED.
+ * There is exactly one write behind all of them — `<collection>.update` — and
+ * the caller already knows which collection the screen is about, so returning
+ * an id here would be this file spelling out a join the runtime holds. What the
+ * runtime cannot work out is which of the record's fields the screen offered.
+ *
+ * ⚠️ AND IT IS WALKED RATHER THAN LISTED, for the reason `readsIn` is: a field
+ * offered inside a group is still offered, and a check that read the top level
+ * would report a screen as having none while a card of them sat in the middle.
+ */
+export const editsIn = (body: SurfaceSpec): readonly string[] => {
+  const out: string[] = [];
+  for (const { block } of blocksIn(body)) {
+    if (block.edits && !out.includes(block.edits)) out.push(block.edits);
   }
   return out;
 };
@@ -1849,6 +1913,38 @@ export function refuseSurface(
       if (!screens.includes(to)) {
         at("goes_nowhere",
           `${where} leads to "${to}", which is not a screen this app declares`);
+      }
+    }
+
+    /*
+      ⚠️ A ROW THAT OFFERS A CHANGE HAS TO HAVE SOMETHING TO CHANGE IT ON — see
+      `BlockSpec.edits`. All four of these end in the same place at runtime: a
+      pencil that opens a sheet whose Save cannot land, and somebody typing a
+      correction into it and being told nothing happened. None of them fails
+      anywhere else — React drops a prop a component does not take, and the door
+      refuses a field the update does not advertise long after the screen drew
+      it as changeable.
+    */
+    if (b.edits !== undefined) {
+      if (!entry.edits) {
+        at("edits_on_a_block_that_takes_none",
+          `${where} offers to change "${b.edits}" and is not a row that shows one fact — `
+          + "there is nowhere on it for the control to go");
+      } else if (!subject) {
+        at("edits_without_a_subject",
+          `${where} offers to change "${b.edits}" on a screen that is not about a record, `
+          + "so there is nothing for the change to be written to");
+      } else if (!(b.edits in subject)) {
+        at("edits_unknown",
+          `${where} offers to change "${b.edits}", which ${screen.of} does not have`);
+      } else if (subject[b.edits]?.settled) {
+        /* ⚠️ AND THE UPDATE DOES NOT ADVERTISE IT — see `FieldSpec.settled`. The
+           refusal is the door's and it is correct; what is wrong is a screen
+           offering the change at all, which is a promise made a whole sheet
+           before it is broken. */
+        at("edits_settled",
+          `${where} offers to change "${b.edits}", which is set when the record is made — `
+          + "changing it is an operation that knows what else has to be true first");
       }
     }
 

@@ -49,6 +49,57 @@ const drawn = (body: SurfaceSpec, over: Partial<Has> = {}) =>
 const one = (block: SurfaceSpec["blocks"][number]): SurfaceSpec =>
   ({ shape: "detail", layout: { as: "stack" }, blocks: [block] });
 
+/* ------------------------------------------------------ changing a fact --- */
+
+/**
+ * ⚠️ THE PENCIL IS NOT A SLOT AND NOTHING BINDS IT — see `BlockSpec.edits`. It
+ * is added to the row's props by the renderer when the door says this person may
+ * write the field, so what has to be checked is the same thing every other
+ * assertion in this file checks: that a decision made in the declaration comes
+ * out the far end as something a person can press.
+ *
+ * ⚠️ AND THE SHEET IS A DRAWER, so a string render sees the trigger and not its
+ * body — the same limit `create.test` states about `Story`. What the control
+ * SAYS is `FieldRow`'s own words, which is why the label is what is asserted.
+ */
+describe("a row that offers to change what it says", () => {
+  const row = (over: Record<string, unknown> = {}) => one({
+    block: "FieldRow", edits: "name",
+    bind: {
+      label: { from: { of: "words", says: "What it is" } },
+      value: { from: { of: "field", field: "name" } },
+    },
+    ...over,
+  } as SurfaceSpec["blocks"][number]);
+
+  const OFFERED = {
+    fields: { name: { kind: "text" as const, label: "Name", holds: "none" as const } },
+    onSave: async () => undefined,
+  };
+
+  it("draws a way in when the field is one this person may write", () => {
+    expect(drawn(row(), { edits: OFFERED })).toContain("Change what it is");
+  });
+
+  /* ⚠️ AND NOTHING WHEN IT IS NOT. The door leaves the fields empty for somebody
+     whose role cannot write, and what they meet is a row that states the fact —
+     never a disabled pencil, which invites them to go looking for how to enable
+     it. */
+  it("draws no way in when the door offered none", () => {
+    const said = drawn(row());
+    expect(said).toContain("Sodium chloride");
+    expect(said).not.toContain("Change what it is");
+  });
+
+  /* ⚠️ AND NONE OVER A RECORD THAT HAS NOT ARRIVED. A sheet opened on nothing
+     draws a control with nothing in it and saves that nothing over what is
+     stored — which is the shape `Shown` refuses one level down. */
+  it("draws no way in before the record is there", () => {
+    expect(drawn(row(), { edits: OFFERED, record: undefined }))
+      .not.toContain("Change what it is");
+  });
+});
+
 /* ------------------------------------------------------------ the binding --- */
 
 describe("a binding reaches the prop it names", () => {

@@ -172,7 +172,20 @@ export type Offline = "cache" | "queue" | "none";
  * themselves to a workspace they were never invited to.
  */
 export const operationsFor = (spec: CollectionSpec): readonly string[] =>
-  CRUD.filter((verb) => !(spec.without ?? []).includes(verb)).map((verb) => `${spec.id}.${verb}`);
+  CRUD.filter((verb) => !(spec.without ?? []).includes(verb)).map((verb) => verbId(spec.id, verb));
+
+/**
+ * ONE GENERATED VERB'S ID, FROM A COLLECTION'S ID ALONE.
+ *
+ * ⚠️ THE BROWSER NEEDS IT AND HAS NO `CollectionSpec` — which is the whole
+ * reason this takes a string. A row that offers to change a fact
+ * (`BlockSpec.edits`) writes through `<collection>.update`, and the screen the
+ * door answered carries the collection's id and nothing else. Spelled at that
+ * call site instead, the browser would hold a second copy of a name the kernel
+ * already owns, and the two would disagree the day a verb is renamed.
+ */
+export const verbId = (collection: string, verb: CrudVerb): string =>
+  `${collection}.${verb}`;
 
 /**
  * ⚠️ THE NAME OF THE EVENT A CRUD WRITE RAISES, IN ONE PLACE. The runtime emits

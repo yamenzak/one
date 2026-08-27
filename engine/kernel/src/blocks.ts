@@ -76,12 +76,20 @@ const block = (
  * and where a missing entry costs the most.
  */
 const ROWS: BlockIndex = {
-  /** A label and a fact. The commonest thing on a detail screen. */
-  FieldRow: block("FieldRow", "rows", {
+  /**
+   * A label and a fact. The commonest thing on a detail screen.
+   *
+   * ⚠️ AND THE ONE BLOCK THAT MAY CARRY A WAY TO CHANGE THE FACT — see
+   * `BlockSpec.edits`. It is the only shape in the vocabulary where the question
+   * has one answer: a row shows one field, so a pencil on it is about that field
+   * and nothing else. A figure draws a number with no field behind it and a
+   * chart draws thirty.
+   */
+  FieldRow: { ...block("FieldRow", "rows", {
     label: slot("What it is", SAID, true),
     value: slot("The fact", TOLD, true),
     under: slot("Why it is that way", SAID),
-  }),
+  }), edits: true },
 
   /** A label and a number, with the number given room. */
   AmountRow: block("AmountRow", "rows", {

@@ -859,18 +859,28 @@ export const GROUND: AppSpec = defineApp({
           {
             group: "This note",
             of: [
-              { block: "FieldRow",
+              /* ⚠️ AND THE ROW IS WHERE IT IS CHANGED — see `BlockSpec.edits`.
+                 The alternative is a second screen drawing the whole record as
+                 a form, which says the same things in a different order and
+                 drifts from this one the first time a field is added. Three of
+                 these carry it and the fourth deliberately does not; the
+                 argument is on `cost`. */
+              { block: "FieldRow", edits: "kind",
                 bind: {
                   label: { from: { of: "words", says: "Kind" } },
                   value: { from: { of: "field", field: "kind" } },
                 } },
-              { block: "FieldRow",
+              /* ⚠️ THE ROW IS CONDITIONAL AND THE EDIT IS NOT, WHICH IS THE
+                 LIMIT WORTH KNOWING: a field nobody has answered has no row, so
+                 there is nothing to press. Answering it for the first time is
+                 what the record's own write is for. */
+              { block: "FieldRow", edits: "happened",
                 when: { has: { of: "field", field: "happened" } },
                 bind: {
                   label: { from: { of: "words", says: "Happened on" } },
                   value: { from: { of: "field", field: "happened" } },
                 } },
-              { block: "FieldRow",
+              { block: "FieldRow", edits: "minutes",
                 when: { has: { of: "field", field: "minutes" } },
                 bind: {
                   label: { from: { of: "words", says: "Time it took" } },
@@ -879,6 +889,11 @@ export const GROUND: AppSpec = defineApp({
               /* ⚠️ MINOR UNITS, AND THE FORMATTER IS WHAT KNOWS. A screen
                  formatting its own money is a screen that rounds differently
                  from the bill — see `Money`. */
+              /* ⚠️ AND NO `edits` HERE, WHICH IS THE DECISION AND NOT AN
+                 OVERSIGHT. What this row shows is what a draft SPENT — a fact
+                 about something that happened, not a setting — and a pencil on
+                 it would offer to change the record of a charge. The row under
+                 it says so in words for the same reason. */
               { block: "FieldRow",
                 when: { has: { of: "field", field: "cost" } },
                 bind: {

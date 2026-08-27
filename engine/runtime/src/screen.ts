@@ -22,9 +22,10 @@
  * nothing — it is the same answer as a record with empty columns.
  */
 
-import type { AppSpec, Fields, Fill, Reach, ScreenSpec } from "@engine/kernel";
+import type { AppSpec, FieldSpec, Fields, Fill, Reach, ScreenSpec } from "@engine/kernel";
 import {
-  SCREEN_PATH, actsIn, columnsIn, eraseBy, fieldsIn, fillsIn, permissionFor, reachFor, viewsIn,
+  SCREEN_PATH, actsIn, columnsIn, editsIn, eraseBy, fieldsIn, fillsIn, permissionFor, reachFor,
+  viewsIn,
 } from "@engine/kernel";
 import { joinRows } from "./joined.js";
 import { readOne } from "./records.js";
@@ -59,6 +60,22 @@ export interface Drawn {
    * be the manifest arriving twice, and the two could disagree.
    */
   readonly picks: Readonly<Record<string, readonly Choice[]>>;
+  /**
+   * WHICH OF THE SUBJECT'S FIELDS THIS SCREEN OFFERS TO CHANGE, WITH THE
+   * DECLARATION EACH ONE IS — see `BlockSpec.edits`.
+   *
+   * ⚠️ THE SPEC AND NOT A FLAG, because the sheet that opens is drawn FROM the
+   * declaration: the control, the help under it, the option names, the bounds.
+   * A boolean here would leave the browser holding a pencil and no way to draw
+   * what it opens, which is the manifest-in-every-browser weight D17 refuses.
+   *
+   * ⚠️ AND IT IS EMPTY WHERE THE CALLER MAY NOT WRITE, so the pencil is not
+   * drawn at all. A disabled one invites somebody to go looking for how to
+   * enable it — `FieldRow.onEdit` has said so since it was written — and one
+   * that opens onto a Save the door refuses is worse: they type the correction
+   * first.
+   */
+  readonly edits: Fields;
 }
 
 export interface Act {
@@ -338,7 +355,26 @@ export async function drawnFor(
     if (rows?.length) picks[one.id] = rows;
   }
 
-  return { record: held ?? null, views, acts, picks };
+  /*
+    ⚠️ THE FIELDS THE BODY OFFERS TO CHANGE, AND ONLY IF THEY MAY — see
+    `Drawn.edits`. The write behind every one of them is the generated
+    `<collection>.update`, so the grant asked for here is the one the door will
+    ask for when the sheet saves: a screen drawing a pencil somebody's role
+    cannot follow through is a promise broken a whole sheet after it is made.
+
+    ⚠️ AND A FIELD THE COLLECTION HAS NOT GOT IS DROPPED RATHER THAN SENT AS A
+    STUB. `refuseSurface` refuses one at composition, so an unknown here is a
+    manifest that never composed.
+  */
+  const edits: Record<string, FieldSpec> = {};
+  if (of && screen.body && holds(permissionFor(of, "update"))) {
+    for (const name of editsIn(screen.body)) {
+      const one = of.fields[name];
+      if (one) edits[name] = one;
+    }
+  }
+
+  return { record: held ?? null, views, acts, picks, edits };
 }
 
 /**

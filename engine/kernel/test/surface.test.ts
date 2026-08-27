@@ -17,7 +17,8 @@ import { describe, expect, it } from "vitest";
 import { collection } from "../src/collection.js";
 import { field } from "../src/field.js";
 import {
-  actsIn, askedOf, blocksIn, fieldsIn, fillOf, fillsIn, refuseStory, refuseSurface, refuseView,
+  actsIn, askedOf, blocksIn, editsIn, fieldsIn, fillOf, fillsIn, refuseStory, refuseSurface,
+  refuseView,
   saidWhen, stepApplies, unreadViews,
   viewsIn, type ActSpec, type BlockIndex, type SurfaceSpec, type ViewSpec,
 } from "../src/surface.js";
@@ -1247,6 +1248,95 @@ describe("what a chart plots", () => {
   it("refuses axes on something that is not a chart", () => {
     expect(drawn("Listing", { of: "words" }, "rows"))
       .toContain("plots_on_a_block_that_draws_none");
+  });
+});
+
+/* ------------------------------------------------------- changing a fact --- */
+
+/**
+ * ⚠️ EVERY ONE OF THESE ENDS AS A PENCIL OVER A SAVE THAT CANNOT LAND — see
+ * `BlockSpec.edits`. That is the expensive shape: somebody presses it, reads the
+ * sheet, types the correction, presses Save, and is told nothing happened. None
+ * of the four fails anywhere else — React drops a prop a component does not
+ * take, and the door refuses a field the update does not advertise long after
+ * the screen offered it.
+ */
+describe("a row that offers to change what it says", () => {
+  /* ⚠️ ITS OWN COLLECTION, BECAUSE ONE FIELD HERE IS `settled` AND THE FIXTURE
+     ABOVE IS SHARED. A `settled` added to `note` would be a fact about a world
+     forty other assertions are written against. */
+  const kit = collection({
+    id: "kit",
+    label: { one: "Kit", many: "Kits" },
+    scope: { of: "tenant" },
+    permission: "kit",
+    retention: null,
+    onClose: { then: "purge" },
+    fields: {
+      title: field.text({ label: "Title", required: true, holds: "none" }),
+      /* ⚠️ THE UNIT EVERY OTHER NUMBER IS IN — see `FieldSpec.settled`. */
+      unit: field.text({ label: "Counted in", holds: "none", settled: true }),
+    },
+  });
+
+  const ROWS: BlockIndex = {
+    ...INDEX,
+    Fact: { id: "Fact", bones: "rows", edits: true, takes: {
+      says: { label: "The words", takes: ["field", "words"], required: true },
+    } },
+  };
+
+  /* ⚠️ `null` FOR "NO SUBJECT", NOT `undefined` — an omitted argument and an
+     explicit `undefined` are the same value to a default parameter, so the one
+     case this helper exists to reach would silently be the ordinary one. */
+  const edited = (block: string, edits: string, of: string | null = "kit") => refuseSurface(
+    { id: "one-kit", ...(of ? { of } : {}), body: body({
+      blocks: [{
+        block, edits,
+        bind: { says: { from: { of: "words", says: "x" } } },
+      }],
+    }) } as Parameters<typeof refuseSurface>[0],
+    ROWS, [], [kit], [],
+  ).map((p) => p.why);
+
+  it("accepts a field the subject has and the update will take", () => {
+    expect(edited("Fact", "title")).toEqual([]);
+  });
+
+  /* ⚠️ A BLOCK WITH NOWHERE TO PUT IT. A figure draws a number with no field
+     behind it; the prop is dropped and the declaration reads as though the
+     value were changeable. */
+  it("refuses an edit on a block that is not a row of one fact", () => {
+    expect(edited("Heading", "title")).toContain("edits_on_a_block_that_takes_none");
+  });
+
+  /* ⚠️ NOTHING TO WRITE IT TO. A screen that is not about a record has no id
+     for the update to name, so the sheet would save into the void. */
+  it("refuses an edit on a screen that is about no record", () => {
+    expect(edited("Fact", "title", null)).toContain("edits_without_a_subject");
+  });
+
+  it("refuses a field the collection has not got", () => {
+    expect(edited("Fact", "nope")).toContain("edits_unknown");
+  });
+
+  /* ⚠️ AND THE ONE THE DOOR WOULD REFUSE. `settled` is not advertised by the
+     generated update, so this row's sheet is a dead end with a pencil on it. */
+  it("refuses a field that is set when the record is made", () => {
+    expect(edited("Fact", "unit")).toContain("edits_settled");
+  });
+
+  /* ⚠️ AND THE RUNTIME NEEDS THE LIST, ONCE, WALKED THROUGH GROUPS. A screen
+     with a card of editable rows has none at its top level. */
+  it("reports every field a body offers to change, however deeply placed", () => {
+    expect(editsIn(body({
+      blocks: [
+        { block: "Fact", edits: "title", bind: {} },
+        { group: "More", of: [{ block: "Fact", edits: "unit", bind: {} }] },
+        /* ⚠️ ONCE EACH — two rows over one field is one thing to change. */
+        { block: "Fact", edits: "title", bind: {} },
+      ],
+    }))).toEqual(["title", "unit"]);
   });
 });
 

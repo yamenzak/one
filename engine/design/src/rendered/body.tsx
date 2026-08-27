@@ -29,8 +29,8 @@
 
 import * as React from "react";
 import type {
-  Binding, BlockSpec, Format, GroupSpec, GuideBook, Layout, MilestoneBook, Placed, Presence, Raised,
-  Read, SurfaceSpec, Viewed,
+  Binding, BlockSpec, Fields, Format, GroupSpec, GuideBook, Layout, MilestoneBook, Placed, Presence,
+  Raised, Read, SurfaceSpec, Viewed,
 } from "@engine/kernel";
 import { BLOCKS, goOf, isGroup, opOf, reached, remaining } from "@engine/kernel";
 import { Arranged, spanning } from "../parts/arrange.js";
@@ -42,6 +42,7 @@ import { Num, Size, Unit, When } from "../parts/said.js";
 import { Money } from "../parts/surfaces.js";
 import { Tally } from "../parts/tally.js";
 import { PARTS } from "./parts.js";
+import { Edit, type Refusal } from "./edit.js";
 import { Lead, Resuming } from "../chart/figures.js";
 import { glyphOf } from "../frame/shell.js";
 
@@ -99,6 +100,24 @@ export interface Has {
    * where they were — which is the "control that narrows nothing" the kernel
    * refuses one shape earlier.
    */
+  /**
+   * CHANGING ONE FACT FROM THE ROW SHOWING IT — see `BlockSpec.edits`.
+   *
+   * ⚠️ THE DECLARATION AND THE WRITE, WHICH IS EVERYTHING `Edit` NEEDS AND
+   * NOTHING MORE. The sheet is drawn from the field's own spec — its control,
+   * its help, its option names, its bounds — so a flag saying "this is editable"
+   * would leave the renderer holding a pencil and no way to draw what it opens.
+   *
+   * ⚠️ AND ITS ABSENCE IS THE ANSWER TO "MAY THEY". The door leaves `fields`
+   * empty for somebody whose role cannot write, so no pencil is drawn — never a
+   * disabled one, which invites somebody to go looking for how to enable it, and
+   * never one that opens onto a Save the door refuses, which is worse because
+   * they type the correction first.
+   */
+  readonly edits?: {
+    readonly fields: Fields;
+    readonly onSave: (field: string, value: unknown) => Promise<Refusal>;
+  } | undefined;
   readonly picked?: Readonly<Record<string, string>> | undefined;
   /** ⚠️ The rows a collection-backed narrowing offers — see `Drawn.picks`. */
   readonly picks?: Readonly<Record<string, readonly { id: string; label: string }[]>> | undefined;
@@ -282,6 +301,51 @@ const isNothing = (block: BlockSpec, has: Has): boolean => {
   }
   return false;
 };
+
+/**
+ * A ROW WITH A WAY TO CHANGE WHAT IT SAYS — the pencil, and the sheet behind it.
+ *
+ * ⚠️ THE OPEN STATE IS PER ROW AND HAS TO BE, which is the whole reason this is
+ * a component rather than three lines in `Placed`. A screen has eight of these
+ * on it; one flag held above them would open eight sheets, or — worse — one
+ * sheet about whichever field the shared state was last set to, which is the
+ * "confirmation about whichever row they think is selected" fault one drawer
+ * over.
+ *
+ * ⚠️ AND IT WRAPS RATHER THAN REPLACES, so the row is still the registry's
+ * component drawn from the registry's slots. Drawing a `FieldRow` here would be
+ * a second answer to what a row looks like, living in the renderer, and the two
+ * would drift the first time one of them was styled.
+ */
+function Editable({ field, has, then }: {
+  readonly field: string;
+  readonly has: Has;
+  readonly then: (onEdit: (() => void) | undefined) => React.ReactNode;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const spec = has.edits?.fields[field];
+  const value = has.record?.[field];
+
+  /* ⚠️ NO SPEC, NO RECORD, NO PENCIL — and each absence is a different true
+     thing. The field may not be one this person can write, or the record may not
+     have arrived: opening a sheet over either draws a control with nothing in it
+     and saves that nothing over what is stored. */
+  if (!spec || !has.record) return <>{then(undefined)}</>;
+
+  return (
+    <>
+      {then(() => setOpen(true))}
+      <Edit
+        spec={spec}
+        name={field}
+        value={value}
+        open={open}
+        onOpen={setOpen}
+        onSave={(next) => has.edits!.onSave(field, next)}
+      />
+    </>
+  );
+}
 
 function Placed({ block, has }: { readonly block: BlockSpec; readonly has: Has }) {
   const entry = BLOCKS[block.block];
@@ -510,6 +574,13 @@ function Placed({ block, has }: { readonly block: BlockSpec; readonly has: Has }
   const id = act === undefined ? undefined : opOf(act);
   if (id && has.onDo) props["onPress"] = () => has.onDo?.(id);
 
+  /* ⚠️ THE PENCIL IS ADDED TO THE ROW'S OWN PROPS — see `Editable`. It is not a
+     slot: nothing in the declaration binds it, and the registry's guard would
+     refuse a slot no component takes. */
+  const drawPart = (onEdit?: () => void) => (
+    <Part {...props} {...(onEdit ? { onEdit } : {})}>{children}</Part>
+  );
+
   return (
     <Region
       bones={entry.bones}
@@ -519,7 +590,9 @@ function Placed({ block, has }: { readonly block: BlockSpec; readonly has: Has }
          does not carry one (`nothing_unsaid`), so the fallback here is only ever
          reached by a block that cannot be empty. */
       nothing={block.nothing ?? { says: block.label ?? "" }}
-      then={() => <Part {...props}>{children}</Part>}
+      then={() => (block.edits
+        ? <Editable field={block.edits} has={has} then={drawPart} />
+        : drawPart())}
     />
   );
 }

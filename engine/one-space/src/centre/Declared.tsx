@@ -34,7 +34,7 @@ const Create = React.lazy(() => import("@engine/design/create")
    browser bundle — so what both ends need is declared once, in the layer both
    are allowed to reach. */
 import {
-  BLOCKS, SCREEN_PATH, askedOf, fillOf, isGroup, viewsIn,
+  BLOCKS, SCREEN_PATH, askedOf, fillOf, isGroup, verbId, viewsIn,
   type Fields, type Fill, type GuideBook, type MilestoneBook, type Raised, type ScreenSpec,
   type SurfaceSpec, type Viewed,
 } from "@engine/kernel";
@@ -70,6 +70,8 @@ interface Drawn {
     /** ⚠️ What a `ref` input may be — see `Act.choices`. */
     choices?: Readonly<Record<string, readonly { id: string; label: string }[]>>;
   }>>;
+  /** ⚠️ Which of the subject's fields this screen may change — see `Drawn.edits`. */
+  readonly edits: Fields;
 }
 
 /**
@@ -324,6 +326,32 @@ export function Declared({ screen, screens, at, go, currency, app }: {
     return { label: one.label, ...(one.icon ? { icon: one.icon } : {}) };
   }, [screens, holds]);
 
+  /*
+    ⚠️ ONE FACT AT A TIME, THROUGH THE COLLECTION'S OWN UPDATE — see
+    `BlockSpec.edits`. The write is derived rather than declared, so a row's
+    pencil can only ever change the field the row is about; and it goes through
+    `run`, so it re-reads afterwards for the reason every other write does — the
+    moment somebody is most certain the screen should have changed is the moment
+    they just changed it.
+
+    ⚠️ AND IT IS ABSENT WHERE THE DOOR SENT NO FIELDS. That is the answer to both
+    "this screen offers none" and "this person may not write", which are one
+    thing on the screen: no pencil.
+  */
+  const edits = got.of.status === "ready" ? got.of.data.edits : undefined;
+  const subject = got.of.status === "ready" ? got.of.data.record : null;
+  const editing = React.useMemo(() => (
+    edits && Object.keys(edits).length && screen.of && subject
+      ? {
+        fields: edits,
+        onSave: (field: string, value: unknown) =>
+          /* ⚠️ THE KERNEL'S SPELLING OF THE VERB — see `verbId`. Written out
+             here it would be a second copy of a name the kernel owns. */
+          run(verbId(screen.of!, "update"), { id: String(subject["id"] ?? ""), [field]: value }),
+      }
+      : undefined
+  ), [edits, screen.of, subject, run]);
+
   const has: Has = React.useMemo(() => ({
     ...(got.of.status === "ready" && got.of.data.record
       ? { record: got.of.data.record }
@@ -337,8 +365,9 @@ export function Declared({ screen, screens, at, go, currency, app }: {
     ...(got.of.status === "ready" ? { picks: got.of.data.picks } : {}),
     ...(currency ? { currency } : {}),
     named,
+    ...(editing ? { edits: editing } : {}),
     ...(wantsBook ? { book } : {}),
-  }), [got.of, ids, onGo, onDo, currency, picked, named, wantsBook, book]);
+  }), [got.of, ids, onGo, onDo, currency, picked, named, wantsBook, book, editing]);
 
   if (screen.story) {
     return (
