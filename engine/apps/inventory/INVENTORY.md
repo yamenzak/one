@@ -467,7 +467,7 @@ generated ones) — plus every platform guard in `pnpm engine:gate`.
 
 ## Part III — the screen index
 
-**Seven, and every one of them is drawn by the engine from the declaration.** The
+**Eight, and every one of them is drawn by the engine from the declaration.** The
 surface was emptied whole on 2026-08-26 and is being rebuilt one screen at a
 time, each designed from what somebody standing in front of it is trying to do
 rather than ported from what stood there before.
@@ -478,6 +478,7 @@ follows and the shape every screen is drawn to.
 |---|---|---|---|---|---|
 | `/` | Stock | primary | `stock:read` | `declared` | `declared` |
 | `/out` | What ran out | — | `stock:read` | `declared` | `declared` |
+| `/expiring` | Going out of date | — | `stock:read` | `declared` | `declared` |
 | `/products` | Products | primary | `product:read` | `declared` | `declared` |
 | `/places` | Places | primary | `location:read` | `declared` | `declared` |
 | `/counts` | Being counted | — | `stock:read` | `declared` | `declared` |
@@ -511,6 +512,25 @@ product page leads with WHERE the thing is — the shelves it is on, and the
 quantities under that — because somebody opening it is standing in front of a box
 asking a question about the world rather than about the record.
 
+**What is going out of date is the second question an inventory is opened with,
+and it had no screen.** `/expiring` is two asked views over one operation
+(`ViewSpec.asked`) — the figure counts what has already gone, the list draws
+everything that is going, and neither can disagree with the other because they
+are one declaration read twice. The list carries WHICH CLOCK decided, because
+four of them compose and the earliest wins: a box with a 2029 date that somebody
+opened last month is out next week, and "expires Tuesday" with no reason beside
+it is a shelf nobody trusts. The nightly sweep's two notifications finally lead
+here — they have been raised since the job was written and carried by nothing,
+which from the console is indistinguishable from a night on which nothing
+crossed.
+
+⚠️ **AND `batch.due`'S DEFAULT ANSWER NOW MATCHES ITS OWN NAME.** It returned
+every delivery with a clock on it, including the ones fine for two years, so the
+list it backs was a page somebody scrolls past a hundred cartons of gloves to
+find the one carton of anything that matters. `standing` narrows it, absent means
+what runs out, and `fine` is still askable — a change to what it says by default
+rather than to what it can say.
+
 **And it is where a product is CORRECTED and where it is FINISHED, not only where
 it is read.** Two of its facts carry a pencil — the brand and the reorder line,
 which are the two people actually change; the row opens the field's own sheet,
@@ -521,6 +541,16 @@ figure is the receiving — the hero says "Receive some and it will be here", an
 until 2026-08-27 nothing on the screen could. At the foot is the way out, which
 no screen declares: every detail screen in every product gets Delete and the
 thirty-day sheet behind it from the frame.
+
+⚠️ **AND ALL FOUR WAYS STOCK MOVES ARE HERE, WHICH FOR A DAY WAS ONE.** Only
+`receive` was reachable anywhere in the product — an inventory where stock goes
+up and never comes down, in which every balance is the sum of what arrived. Take,
+receive, carry and correct are one card, ordered by frequency rather than by the
+story of a box; each supplies the three facts the screen is already standing on,
+so what is left is the two questions a person has. Correcting is behind a
+different grant from the other three, which is what forced the engine half: a
+block's `does` asks the gate before it draws now, so the row a floor worker may
+not press says so instead of refusing after the sheet is filled in.
 
 **A flow ends here, on the product it just made.** Registration used to land on
 the catalogue, which asks somebody to find in eight hundred rows the thing they

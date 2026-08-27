@@ -20,7 +20,7 @@ import {
 } from "@engine/kernel";
 import {
   LADDER, MOVES, applyMove, crossedOn, daysLeft, effectiveExpiry, promotes, refuseMove,
-  standingOf,
+  saysDue, standingOf,
   type Move, type Tracking,
 } from "./ledger.js";
 /* ⚠️ ONLY THE TWO WORDS, BECAUSE THE MANIFEST DECLARES AND DOES NOT DECIDE. The
@@ -2162,9 +2162,14 @@ const open = operation<{ batch: string; day: string }, { on: string }>({
 interface Due {
   id: string; product: string; name: string; lot: string;
   on: string; by: string; standing: string; days: number;
+  /** ⚠️ The countdown as a sentence, with the clock — see `saysDue`. */
+  says: string;
 }
 
-const due = operation<{ product?: string; today: string }, { items: readonly Due[] }>({
+const due = operation<
+  { product?: string; today: string; standing?: string },
+  { items: readonly Due[] }
+>({
   id: "batch.due",
   kind: "read",
   summary: "What runs out, and which clock says so",
@@ -2172,6 +2177,26 @@ const due = operation<{ product?: string; today: string }, { items: readonly Due
     product: field.text({ label: "Product", holds: "none" }),
     /* ⚠️ THE DEVICE'S OWN DAY — see `standingOf`. */
     today: field.day({ label: "Today", required: true, holds: "none" }),
+    /*
+      ⚠️ ONE STANDING, AND ABSENT IS "WHAT RUNS OUT" RATHER THAN "EVERYTHING".
+      This answered every delivery with a clock on it — including the ones fine
+      for two years — under the name `batch.due`, so the operation's default
+      answer contradicted the operation's own name. As a list that is a page
+      somebody scrolls past a hundred cartons of gloves to find the one carton of
+      anything that matters, which is a list nobody opens twice.
+
+      ⚠️ AND `fine` IS STILL ASKABLE, because "show me the ones with plenty of
+      time" is a real question and refusing it would make the fix a narrowing of
+      what the product can say rather than of what it says by default.
+
+      ⚠️ IT IS A FILTER HERE RATHER THAN IN THE BROWSER BECAUSE A VIEW IS
+      BOUNDED. Narrowed on arrival, the rows a phone is sent are the SOONEST
+      ones and the count beside them is the true one; filtered after the fact,
+      both are wrong in the flattering direction.
+    */
+    standing: field.enum({
+      label: "Standing", values: ["gone", "soon", "fine"], holds: "none",
+    }),
   },
   /* ⚠️ `json`, BECAUSE A ROW HERE IS A SHAPE RATHER THAN A SENTENCE. Declared as
      text it would typecheck, serialise, and describe the wrong thing to the
@@ -2218,13 +2243,23 @@ const due = operation<{ product?: string; today: string }, { items: readonly Due
         on: ends.on, by: ends.by,
         standing: standingOf(ends.on, input.today, warn),
         days: daysLeft(ends.on, input.today),
+        /* ⚠️ THE ROW'S OWN SENTENCE — see `saysDue`. A date and a clock name are
+           not a verdict, and the row that has already gone looked exactly like
+           the three that had not on the first photograph of this list. */
+        says: saysDue(daysLeft(ends.on, input.today), ends.by),
       });
     }
 
     /* ⚠️ SOONEST FIRST, WHICH IS THE ONLY ORDER THIS LIST HAS. Anything else
        makes somebody scan it for the number that matters. */
     items.sort((a, b) => a.days - b.days);
-    return { items };
+
+    return {
+      items: items.filter((one) => (input.standing
+        ? one.standing === input.standing
+        /* ⚠️ WHAT RUNS OUT, WHICH IS THIS OPERATION'S NAME. */
+        : one.standing !== "fine")),
+    };
   },
 });
 
@@ -6244,6 +6279,34 @@ const manifest = (): AppSpec => defineApp({
     */
     { id: "lines-of-this", of: "stock", where: [{ field: "product", is: { here: "record" } }] },
     { id: "every-place", of: "location", limit: 50 },
+    /*
+      ⚠️ ASKED, BECAUSE THIS SCREEN'S SUBJECT IS ARITHMETIC AND A `Match` IS
+      EQUALITY — see `ViewSpec.asked`. When a delivery runs out is the earliest
+      of four clocks resolved against a threshold the workspace sets, none of
+      which is a column and none of which should be: a stored `expires` would be
+      a value that has to be rewritten every time somebody opens a box, corrects
+      a date, or changes what "soon" means, and would be silently wrong in
+      between.
+
+      ⚠️ AND THE DAY COMES FROM THE DEVICE. A shelf life is counted where the
+      shelf is; a server's own calendar calls a box expired the evening before it
+      is east of Greenwich and current for a few more hours west of it.
+    */
+    { id: "running-out", of: "batch",
+      asked: { operation: "batch.due", take: "items", fills: { today: "today" } } },
+    /*
+      ⚠️ THE SAME OPERATION NARROWED TO THE VERDICT, AND IT IS A SECOND VIEW
+      RATHER THAN A NUMBER DERIVED IN THE BROWSER. The figure and the rows are
+      then one declaration read twice, which is the property the home screen has
+      and the reason a count can never disagree with the list behind it — and
+      "how many are already out of date" is not a slice of the list below, which
+      deliberately holds both what has gone and what is going.
+    */
+    { id: "out-of-date", of: "batch",
+      asked: {
+        operation: "batch.due", take: "items",
+        fills: { today: "today", standing: { says: "gone" } },
+      } },
   ],
 
   /*
@@ -6435,16 +6498,33 @@ const manifest = (): AppSpec => defineApp({
           {
             group: null,
             of: [{
-              /* ⚠️ THE TRUE TOTAL, WHICH IS WHY IT IS NOT REDUNDANT WITH THE LIST
-                 UNDER IT. `shelf-lines` is capped at fifty rows; `count` answers
-                 how many there are either way, so the tile is where the size of
-                 the workspace is READ and the table is where the top of it is
-                 looked through. */
+              /*
+                ⚠️ THIS TILE WAS THE WORKSPACE'S TOTAL LINE COUNT AND IT WAS THE
+                ONE DEAD END ON THE SCREEN. A supporting figure is a count over a
+                narrowed view, so the rows behind it ARE a page — and that one
+                had no `leads`, on the busiest part of the home. The total is not
+                lost with it: `Listing` says "50 of 9,140" over the table
+                directly below, which is where the size of a workspace is
+                actually read.
+
+                ⚠️ AND WHAT REPLACES IT IS THE SECOND QUESTION AN INVENTORY IS
+                OPENED WITH. The hero answers what has run out; this answers what
+                is about to, which is the difference between walking to the store
+                room today and ordering on Thursday.
+
+                ⚠️ STILL NO TONE, AND THAT IS THE SCREEN'S STANDING DECISION
+                RATHER THAN AN OVERSIGHT — see the count tile above. A tone in a
+                declaration is a constant, and "running out" is a warning at
+                twelve and a reassurance at zero; a static amber over a zero
+                would be the renderer stating a verdict the number contradicts.
+                The screen that IS about the verdict leads with it in words.
+              */
               block: "Stat",
+              leads: ["expiring"],
               bind: {
-                value: { from: { of: "count", view: "shelf-lines" } },
-                label: { from: { of: "words", says: "On the shelves" } },
-                mark: { from: { of: "words", says: "box" } },
+                value: { from: { of: "count", view: "running-out" } },
+                label: { from: { of: "words", says: "Running out" } },
+                mark: { from: { of: "words", says: "calendar" } },
               },
             }],
           },
@@ -6519,6 +6599,92 @@ const manifest = (): AppSpec => defineApp({
           bind: {
             label: { from: { of: "words", says: "What ran out" } },
             of: { from: { of: "view", view: "run-out" } },
+          },
+        }],
+      } },
+    /*
+      WHAT IS GOING OUT OF DATE — the second question an inventory is opened
+      with, and the one it could not answer.
+
+      ⚠️ IT LEADS WITH WHAT HAS ALREADY GONE, WHICH IS THE ONLY VERDICT ON THIS
+      SCREEN. Everything else here is a countdown; a box past its date is on a
+      shelf now, in a room somebody is standing in, and it has to come off. That
+      is what earns the `alert` mark and the danger tone — and it is why the
+      figure is not "how many are on the list", which is a number that says
+      nothing about whether to walk anywhere.
+
+      ⚠️ AND ZERO IS THE ANSWER SOMEBODY OPENED THIS FOR. `nothing` fires on an
+      ABSENT figure; a workspace with a dozen boxes going off and none of them
+      gone yet has a figure and it is 0, which is the reassurance. Reading the
+      two the same way is how an empty state comes to cover a real answer.
+
+      ⚠️ NO WORLD, LIKE EVERY OTHER PAGE BEHIND THE HOME. AMBIENCE's rule is that
+      what earns one is a screen somebody ARRIVES at; this is one they were sent
+      to, by a tile or by a notification at seven in the morning.
+    */
+    { id: "expiring", route: "/expiring", label: "Going out of date", nav: "none",
+      icon: "calendar", permission: "stock:read",
+      body: {
+        shape: "list",
+        layout: { as: "stack" },
+        hero: {
+          as: "figure",
+          nothing: {
+            says: "Nothing is dated yet",
+            under: "Record a delivery with a date on it and its clock starts here",
+          },
+          bind: {
+            value: { from: { of: "count", view: "out-of-date" } },
+            of: { from: { of: "words", says: "Already out of date" } },
+            /*
+              ⚠️ NO `unit`, AND THE PRODUCT PAGE'S OWN NOTE IS WHY. A declaration
+              holds a CONSTANT and English does not: this read "1 deliveries" the
+              first time it was photographed, on the day the number is 1, which is
+              most days. The noun lives in the eyebrow, where it is a heading
+              rather than a plural.
+            */
+            mark: { from: { of: "words", says: "alert" } },
+          },
+        },
+        blocks: [{
+          block: "Listing",
+          /*
+            ⚠️ THE SECOND COLUMN IS THE VERDICT AND THE CLOCK TOGETHER — see
+            `saysDue`. It was the clock alone, and photographed, the row that had
+            ALREADY GONE read exactly like the three that had not: "Nitrile
+            gloves · printed · August 25" beside "Casting resin · opened ·
+            September 3", on the one screen whose entire job is telling those
+            apart. A `Listing` has three slots and none of them is a colour, so
+            the verdict has to be in the words.
+
+            ⚠️ AND WHICH CLOCK DECIDED STAYS IN THEM, because it is what makes
+            the date believable: four clocks compose and the earliest wins, so a
+            box with a 2029 date that somebody opened last month is out next week
+            — genuinely surprising, and "expires Tuesday" with no reason is a
+            shelf nobody trusts.
+
+            ⚠️ AND THE THREE COLUMNS ARE ALSO THE PHONE'S THREE SLOTS — see
+            `Listing`. The name is the row, the sentence is its second line, and
+            the date is at the end: what, how long, when. The days remaining are
+            not a fourth column because they are the SORT, and a number that is
+            only ever "the order this list is already in" is a column of noise.
+          */
+          shows: [
+            { field: "name", label: "Product" },
+            { field: "says", label: "How long" },
+            { field: "on", label: "Goes off", as: "when" },
+          ],
+          /* ⚠️ THE PRODUCT, NOT THE DELIVERY. A batch has no page — what somebody
+             seeing an expiring lot wants is the thing it is a lot OF, where the
+             shelves it sits on and every way of moving it already are. */
+          goes: { to: "product", by: "product" },
+          nothing: {
+            says: "Nothing is running out",
+            under: "Every dated delivery has time left on it",
+          },
+          bind: {
+            label: { from: { of: "words", says: "Running out" } },
+            of: { from: { of: "view", view: "running-out" } },
           },
         }],
       } },
@@ -6675,7 +6841,7 @@ const manifest = (): AppSpec => defineApp({
                   fills: { product: "record", day: "today", capture: { says: "typed" } },
                 }],
                 bind: {
-                  icon: { from: { of: "words", says: "remove" } },
+                  icon: { from: { of: "words", says: "take" } },
                   label: { from: { of: "words", says: "Take some off a shelf" } },
                   under: { from: { of: "words", says: "Say which shelf and how many" } },
                 },
@@ -7376,7 +7542,68 @@ const manifest = (): AppSpec => defineApp({
     What is gone is the claim that there is somewhere to send a person about it.
     Each comes back with the screen that answers it.
   */
+  /*
+    WHAT THE NIGHT FOUND, AND IT IS TWO TYPES RATHER THAN ONE.
+
+    ⚠️ THE SWEEP HAS RAISED THESE SINCE IT WAS WRITTEN AND NOTHING CARRIED THEM.
+    `ctx.tell` names a type; a type nothing declares is a night's work that tells
+    nobody, and it looks identical from the console to a night on which nothing
+    crossed. The screen is what made them declarable: a notification carries
+    where the row GOES, so a type could not exist before the page it leads to.
+
+    ⚠️ GOING AND GONE ARE DIFFERENT MESSAGES BECAUSE THEY ASK FOR DIFFERENT
+    THINGS. One is "order some"; the other is "walk to the shelf and take it
+    off". Folded into one type with a count they would share a tone, and the
+    tone would be wrong for whichever of the two was not the reason it fired.
+
+    ⚠️ AND `stock:read` IS THE AUDIENCE RATHER THAN A ROLE — see
+    `NotificationDef.needs`. Everybody who can see a shelf can be told what is on
+    it going off; naming a role instead would tell the keeper and not the person
+    who is actually standing in the cold room at six.
+
+    ⚠️ NO PUSH ON EITHER. Both are raised by a sweep that runs once overnight, so
+    the earliest anybody could act is the morning — and a phone buzzing at 3am
+    about a carton of cream is how somebody turns off every notification this
+    product will ever send them. The inbox is where a nightly answer belongs, and
+    the email is the one an owner may want because they are not in the building.
+  */
   notifications: {
+    "batch.expiring": {
+      id: "batch.expiring",
+      label: "Something is going out of date",
+      /* ⚠️ THE FIRST ONE BY NAME, AND THE COUNT BESIDE IT. "12 things are going
+         out of date" is a number somebody has to open the app to act on; naming
+         the soonest makes the row itself useful to a person who already knows
+         their shelves. */
+      summary: "{count} going out of date — {name} on {on}",
+      category: "action",
+      author: "theirs",
+      tone: "warning",
+      icon: "calendar",
+      needs: "stock:read",
+      on: "batch.expiring",
+      link: "/expiring",
+      variables: ["count", "name", "on", "days"],
+      channels: ["inbox", "email"],
+    },
+    "batch.expired": {
+      id: "batch.expired",
+      label: "Something is out of date",
+      summary: "{count} out of date — {name} went on {on}",
+      category: "action",
+      author: "theirs",
+      /* ⚠️ `danger`, AND IT IS THE ONE NOTIFICATION IN THIS PRODUCT THAT EARNS
+         IT. Everything else here is a countdown; this is stock on a shelf, in a
+         room, that must not be used — which is the difference between a thing to
+         plan for and a thing to do now. */
+      tone: "danger",
+      icon: "alert",
+      needs: "stock:read",
+      on: "batch.expired",
+      link: "/expiring",
+      variables: ["count", "name", "on"],
+      channels: ["inbox", "email"],
+    },
   },
 
   /*

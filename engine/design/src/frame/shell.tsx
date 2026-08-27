@@ -35,7 +35,8 @@ import {
    the outside, and lucide's path order is not something to build on. */
 import {
   BellMark, CalendarMark, CheckMark, FlagMark, InboxMark, KeyMark, LayersMark, LeaveMark,
-  MoveMark, RefreshMark, ScanMark, SearchMark, ShareMark, ShieldMark, TallyMark,
+  MoveMark, RefreshMark, ScanMark, SearchMark, ShareMark, ShieldMark, TakeMark,
+  TallyMark,
 } from "../parts/marks.js";
 import { Page } from "./page.js";
 import { TellingProvider } from "./telling.js";
@@ -62,7 +63,11 @@ const GLYPHS: Readonly<Record<string, React.ReactNode>> = {
      means somebody looking for a thing they cannot see; a double-check is the
      mark on a delivered message. Both were on a bottom bar, one apart, against
      destinations that mean the opposite. See `marks.tsx`. */
-  scan: <ScanMark />, tally: <TallyMark />, move: <MoveMark />,
+  scan: <ScanMark />, tally: <TallyMark />,
+  /* ⚠️ TAKING SOMETHING OFF A SHELF IS NOT THROWING IT AWAY — see
+     `TakeMark`. This was `remove`, which is a waste bin, on the control a
+     warehouse presses forty times a day. */
+  take: <TakeMark />, move: <MoveMark />,
   people: <Users />, users: <Users />,
   /* ⚠️ A WORKSPACE IS A BUSINESS AND A PERSON IS ONE PERSON, and both were
      landing on the neutral mark — an anonymous circle in a menu, which is the
@@ -198,6 +203,8 @@ export const LIVELY: Readonly<Record<string, string>> = {
   /* ⚠️ THE ARROW CROSSES AND COMES BACK — see `MoveMark`. A carry is not an
      exit, so the character that leaves and returns is the right one. */
   move: "depart",
+  /* ⚠️ AND A THING LIFTED OFF A SHELF IS LIFTED — see `TakeMark`. */
+  take: "lift",
   /* The whole mark moving IS the purpose. */
   settings: "turn", cog: "turn", clock: "turn",
   money: "flip", coins: "flip", bank: "flip", card: "flip",

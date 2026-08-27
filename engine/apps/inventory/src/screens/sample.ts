@@ -12,6 +12,11 @@
  * way to find out whether a figure column shares a right edge.
  */
 
+/* ⚠️ THE SAME FUNCTION THE OPERATION USES, NOT A PHRASE TYPED HERE. A fixture
+   with its own wording photographs a sentence the product does not say — which
+   is the one failure a picture cannot reveal, because it looks correct. */
+import { saysDue } from "../ledger.js";
+
 export type Tracking = "listed" | "counted" | "batched" | "itemised" | "assembled";
 
 export interface Place {
@@ -161,3 +166,52 @@ export const COUNTS: readonly Counting[] = [
     an omission. A shelf somebody labelled and has not filled yet is the second
     screen anybody sees. */
 export const EMPTY_PLACE = "p-a2";
+
+/**
+ * DELIVERIES WITH A CLOCK ON THEM, AND ONE OF THEM HAS ALREADY GONE.
+ *
+ * ⚠️ THE SHAPE IS `batch.due`'S ANSWER, NOT THE `batch` TABLE'S. This view is
+ * ASKED — an operation resolves four clocks against the workspace's own warning
+ * window and hands back rows that exist nowhere in the database — so a fixture
+ * built out of columns would draw the right headings over six blank cells.
+ *
+ * ⚠️ AND `by` IS THE FIELD THE PICTURE IS FOR. Which clock decided is genuinely
+ * surprising often enough to matter: the resin is out next week because somebody
+ * OPENED it, on a tin whose printed date is years away. A sample where every row
+ * said `printed` would photograph a screen whose most interesting column is a
+ * constant.
+ *
+ * ⚠️ ONE IS ALREADY PAST, BECAUSE THE FIGURE ABOVE THE LIST COUNTS EXACTLY
+ * THOSE. A fixture with none would photograph a hero reading 0 over a list of
+ * twelve — a true state, and the one that shows least about whether the screen
+ * works.
+ */
+export interface Running {
+  readonly id: string;
+  readonly product: string;
+  readonly name: string;
+  readonly lot: string;
+  readonly on: string;
+  /** ⚠️ Which of the four clocks decided — `printed`, `made`, `opened`, `used`. */
+  readonly by: string;
+  readonly standing: "gone" | "soon" | "fine";
+  /** ⚠️ Signed: "four days ago" and "in four days" are one question. */
+  readonly days: number;
+  /** ⚠️ The countdown as a sentence, with the clock — see `saysDue`. */
+  readonly says: string;
+}
+
+export const RUNNING: readonly Running[] = [
+  { id: "b-glove-1", product: "t-glove", name: "Nitrile gloves, blue", lot: "4471",
+    on: "2026-08-25", by: "printed", standing: "gone", days: -2,
+    says: saysDue(-2, "printed") },
+  { id: "b-resin-1", product: "t-resin", name: "Casting resin, clear", lot: "R-19",
+    on: "2026-09-03", by: "opened", standing: "soon", days: 7,
+    says: saysDue(7, "opened") },
+  { id: "b-glove-2", product: "t-glove", name: "Nitrile gloves, blue", lot: "4472",
+    on: "2026-09-14", by: "printed", standing: "soon", days: 18,
+    says: saysDue(18, "printed") },
+  { id: "b-resin-2", product: "t-resin", name: "Casting resin, clear", lot: "R-22",
+    on: "2026-09-20", by: "made", standing: "soon", days: 24,
+    says: saysDue(24, "made") },
+];

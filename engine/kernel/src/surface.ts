@@ -1060,6 +1060,26 @@ const insidePresence = (p: Presence, take: (r: Read) => void): void => {
 export const readsIn = (body: SurfaceSpec): readonly Read[] => {
   const out: Read[] = [];
   const take = (r: Read) => out.push(r);
+  /*
+    ⚠️ THE HERO FIRST, AND IT WAS WALKED BY NOTHING AT ALL. This read
+    `body.blocks` alone — so the loudest binding on every screen in every product
+    was invisible to the one function that decides which views to RUN. The
+    consequence is not a missing check: `viewsIn` is what the door reads to
+    choose the queries, so a figure bound to a view no block also happens to name
+    was never fetched, and the hero drew its "nothing has happened yet" state for
+    ever, on a workspace with the number right there in the table underneath.
+
+    ⚠️ AND IT SURVIVED BECAUSE THE FIRST ONE SHARED ITS VIEW WITH A LIST. The
+    home screen's figure counts the same declaration the page behind it draws, so
+    the view was run for the LIST and the figure worked by coincidence — which is
+    the whole argument for that pairing and, here, exactly what hid the fault. It
+    surfaced on the second hero to be written, whose view is genuinely its own.
+
+    ⚠️ THE COMPOSER SEES IT NOW TOO, which is the half worth having: a hero
+    naming a view or a field that does not exist used to compose, because every
+    refusal in `refuseSurface` reads this walk.
+  */
+  if (body.hero?.bind) for (const bind of Object.values(body.hero.bind)) take(bind.from);
   for (const placed of body.blocks) {
     /* ⚠️ A GROUP'S OWN CONDITION, THEN ITS BLOCKS' — never the same one twice.
        Walking `placed.when` and then walking it again as one of the blocks

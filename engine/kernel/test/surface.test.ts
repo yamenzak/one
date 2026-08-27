@@ -629,6 +629,36 @@ describe("a view is checked against the collection it reads", () => {
     expect(viewsIn(conditional)).toEqual(["recent-notes"]);
   });
 
+  /*
+    ⚠️ AND THE HERO, WHICH WAS WALKED BY NOTHING AT ALL. `readsIn` read
+    `body.blocks` alone, so the loudest binding on every screen in every product
+    was invisible to the one function that decides which views to RUN — the door
+    reads `viewsIn` to choose its queries, so a figure bound to a view no block
+    also happened to name was never fetched and the hero drew "nothing has
+    happened yet" for ever, over a workspace with the number in the table
+    underneath.
+
+    ⚠️ IT SURVIVED BECAUSE THE FIRST HERO EVER WRITTEN SHARED ITS VIEW WITH A
+    LIST. The figure counted the same declaration the page behind it drew, so the
+    view was run for the LIST and the figure worked by coincidence — which is the
+    whole argument for that pairing and, here, exactly what hid the fault. This
+    fixture deliberately gives the hero a view no block names.
+  */
+  it("finds a view named only by the hero", () => {
+    const led = body({
+      hero: {
+        as: "figure",
+        nothing: { says: "Nothing yet" },
+        bind: { value: { from: { of: "count", view: "gone-off" } } },
+      },
+      blocks: [{
+        block: "Heading",
+        bind: { says: { from: { of: "words", says: "Recent" } } },
+      }],
+    });
+    expect(viewsIn(led)).toEqual(["gone-off"]);
+  });
+
   it("finds a field named only in a condition", () => {
     const conditional = body({
       blocks: [{
@@ -1415,11 +1445,17 @@ describe("the hero", () => {
     INDEX, [recent], COLLECTIONS, [], [], HEROES,
   ).map((p) => p.why);
 
+  /* ⚠️ `recent-notes`, WHICH IS THE VIEW THIS FILE DECLARES — and this fixture
+     said `recent` for as long as nothing walked a hero's bindings. It passed
+     every assertion below it, because the one function every refusal in
+     `refuseSurface` reads walked `body.blocks` alone. A fixture naming a view
+     that does not exist is the fault the check exists for, written into the
+     check's own subject. */
   const figure = {
     as: "figure",
     nothing: { says: "Nothing counted yet" },
     bind: {
-      value: { from: { of: "count", view: "recent" } },
+      value: { from: { of: "count", view: "recent-notes" } },
       of: { from: { of: "words", says: "Notes" } },
     },
   };
@@ -1438,13 +1474,29 @@ describe("the hero", () => {
   });
 
   it("refuses a slot the kind does not take", () => {
-    expect(leading({ ...figure, bind: { ...figure.bind, rows: { from: { of: "view", view: "recent" } } } }))
+    expect(leading({ ...figure, bind: { ...figure.bind, rows: { from: { of: "view", view: "recent-notes" } } } }))
       .toContain("slot_unknown");
   });
 
   it("refuses a source the slot cannot be given", () => {
-    expect(leading({ ...figure, bind: { ...figure.bind, of: { from: { of: "view", view: "recent" } } } }))
+    expect(leading({ ...figure, bind: { ...figure.bind, of: { from: { of: "view", view: "recent-notes" } } } }))
       .toContain("slot_kind_wrong");
+  });
+
+  /*
+    ⚠️ AND A HERO NAMING A VIEW THE APP DOES NOT DECLARE IS REFUSED, WHICH IT WAS
+    NOT. Every refusal in `refuseSurface` reads one walk of the body's sources,
+    and that walk skipped the hero — so the loudest binding on the screen was the
+    one thing nothing checked. It is not only a missing check: the door reads the
+    same walk to decide which views to RUN, so the figure was never fetched
+    either, and it drew "nothing has happened yet" over a workspace that had the
+    number.
+  */
+  it("refuses a hero bound to a view nothing declares", () => {
+    expect(leading({
+      ...figure,
+      bind: { ...figure.bind, value: { from: { of: "count", view: "ghost" } } },
+    })).toContain("view_unknown");
   });
 
   /*

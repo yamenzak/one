@@ -149,10 +149,40 @@ describe("a delivery and the day it runs out", () => {
 
     const due = ok(await read("batch.due", { today: TODAY })).items as
       { on: string; standing: string; days: number }[];
-    expect(due.length).toBeGreaterThanOrEqual(2);
     /* ⚠️ SOONEST FIRST, WHICH IS THE ORDER SOMEBODY WALKS THE SHELF IN. */
     expect(due[0]?.on).toBe("2026-08-23");
     expect(due[0]?.days).toBe(2);
+
+    /*
+      ⚠️ AND THE ONE WITH FOURTEEN WEEKS ON IT IS NOT ON THIS LIST, WHICH IS THE
+      OPERATION'S OWN NAME BEING KEPT. It answered every delivery with a clock
+      under the heading "what runs out", so the screen drawing it was a page
+      somebody scrolls past a hundred cartons of gloves to find the one carton of
+      anything that matters — a list nobody opens twice. This assertion used to
+      say `length >= 2`, which passed either way and was the thing that let it
+      ship.
+    */
+    expect(due.map((one) => one.on)).not.toContain("2026-12-01");
+    expect(due.every((one) => one.standing !== "fine")).toBe(true);
+  });
+
+  /* ⚠️ AND "SHOW ME THE ONES WITH PLENTY OF TIME" IS STILL ASKABLE, so the
+     narrowing above is a change to what the operation says by DEFAULT rather
+     than to what the product can say at all. */
+  it("still answers the ones with time left, when asked for those", async () => {
+    const place = await placeOf("Dry store");
+    const product = await kindOf("Flour", "batched");
+    const code = String((ok(await write("product.label", { ids: [product] }))
+      .items as { code: string }[])[0]?.code);
+    ok(await write("stock.arrive", {
+      raw: code, location: place, quantity: 2, day: TODAY, year: 2026,
+      lot: "C", expiry: "2027-06-01",
+    }));
+
+    expect(ok(await read("batch.due", { today: TODAY })).items).toEqual([]);
+    const later = ok(await read("batch.due", { today: TODAY, standing: "fine" })).items as
+      { on: string }[];
+    expect(later.map((one) => one.on)).toContain("2027-06-01");
   });
 
   /*

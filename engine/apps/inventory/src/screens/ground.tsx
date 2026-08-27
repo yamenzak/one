@@ -22,10 +22,10 @@ import { Screen, Shell, ready, whoFace } from "@engine/design";
 import { Body, type Has } from "@engine/design/body";
 import { Create, type Answers } from "@engine/design/create";
 import type { ScreenSpec } from "@engine/kernel";
-import { editsIn, meteredIds, namesIn } from "@engine/kernel";
+import { editsIn, meteredIds, namesIn, upFrom } from "@engine/kernel";
 import { inventory } from "../index.js";
 import { INVENTORY_SESSIONS, INVENTORY_SURFACES } from "./index.js";
-import { COUNTS, LINES, PLACES, THINGS } from "./sample.js";
+import { COUNTS, LINES, PLACES, RUNNING, THINGS } from "./sample.js";
 
 /** ⚠️ Every permission a screen names, so none of them is undrawable here. */
 const EVERYTHING = new Set([
@@ -144,7 +144,34 @@ export function InventoryGround({ route, onGo, sky, step }: {
           ? <Walked screen={here} {...(step ? { step } : {})} />
           : here?.body
           ? (
-            <Screen shape={here.body.shape} title={here.label}>
+            /*
+              ⚠️ THE WAY BACK IS PART OF THE SCREEN AND THE BOARD HAS TO SUPPLY
+              IT — see `upFrom`. `nav: "none"` says this is somewhere somebody
+              WENT, so the deployment puts an arrow where the avatar is and the
+              crown takes the page's name on scroll (D106). Left out here, every
+              sub-page in the product photographs with the workspace's face and
+              the workspace's name over it: a picture of the destination chrome,
+              filed under the id of a screen no customer ever sees wearing it.
+
+              ⚠️ IT GOES NOWHERE, WHICH IS THE FIXTURE'S OWN LIMIT AND IS FINE. A
+              board has no router; what the photograph is of is the CHROME the
+              presence of a way out produces, and that is decided by whether one
+              was handed over rather than by where it leads.
+            */
+            /*
+              ⚠️ THE RECORD'S OWN NAME, RESOLVED THE WAY THE DOOR RESOLVES IT
+              (D106). `label` is the word for the KIND, and photographed here it
+              headed a page about the clear casting resin with the word "Product"
+              — which is the exact heading the whole change removed, preserved in
+              the pictures the change is reviewed from. `namesIn` is the one
+              resolver; `Drawn.name` is what the deployment sends.
+            */
+            <Screen
+              shape={here.body.shape}
+              title={titledBy(here) ?? here.label}
+              {...(titledBy(here) ? { under: here.label } : {})}
+              {...(upFrom(inventory().screens ?? [], here) ? { back: () => undefined } : {})}
+            >
               {/*
                 ⚠️ A DETAIL SCREEN IS ABOUT A RECORD AND A BOARD HAS NO ADDRESS
                 BAR, so it opens the first one. Without it `has.record` is
@@ -267,6 +294,24 @@ const firstOf = (collection: string): Readonly<Record<string, unknown>> | undefi
   collection === "product" ? FIRST : undefined;
 
 /**
+ * ⚠️ WHAT THE DOOR WOULD TITLE THIS SCREEN — see `Drawn.name` and D106. A screen
+ * about one record is named by that record, and `ScreenSpec.label` is the word
+ * for the KIND: photographed from the label, the product page was headed
+ * "Product" over a page about the clear casting resin, which is the heading the
+ * change removed preserved in the pictures the change is reviewed from.
+ *
+ * ⚠️ AND `null` WHERE THE COLLECTION NAMES NO FIELD, which is the door's answer
+ * too — a heading falls back to the screen's own label rather than to an
+ * identifier.
+ */
+const titledBy = (screen: ScreenSpec): string | null => {
+  const of = (inventory().collections ?? []).find((c) => c.id === screen.of);
+  const record = screen.of ? firstOf(screen.of) : undefined;
+  const named = of ? namesIn(of) : null;
+  return named && record ? String(record[named] ?? "") || null : null;
+};
+
+/**
  * WHAT THE DOOR WOULD SAY ABOUT CHANGING AND REMOVING THIS RECORD.
  *
  * ⚠️ DERIVED FROM THE MANIFEST, NEVER WRITTEN OUT. Both are the deployment's
@@ -326,6 +371,13 @@ const SEEN: Has = {
     "counting": rows(COUNTS.map((one) => ({
       id: one.id, "location.name": one.whereName, day: one.day, blind: one.blind,
     }))),
+    /* ⚠️ AN ASKED VIEW'S ROWS ARE ITS OPERATION'S, NOT A TABLE'S — see `RUNNING`.
+       And the narrowed one is narrowed HERE rather than given a number, for the
+       reason every other figure on this board is: the fault this shape exists to
+       prevent is a count and the list behind it disagreeing, and a plausible
+       integer would photograph exactly that. */
+    "running-out": rows(RUNNING.map((one) => ({ ...one }))),
+    "out-of-date": rows(RUNNING.filter((one) => one.standing === "gone").map((one) => ({ ...one }))),
   },
 };
 

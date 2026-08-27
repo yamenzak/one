@@ -11,7 +11,8 @@
 import { describe, expect, it } from "vitest";
 import { dayPlus, type Day } from "@engine/kernel";
 import {
-  applyMove, crossedOn, daysLeft, effectiveExpiry, promotes, refuseMove, standingOf,
+  applyMove, crossedOn, daysLeft, effectiveExpiry, promotes, refuseMove, saysDue,
+  standingOf,
 } from "../src/ledger.js";
 
 /* ⚠️ The kernel's day arithmetic, asserted here because this app is the reason
@@ -286,5 +287,32 @@ describe("what crossed a line today", () => {
   it("answers the same both times, because it remembers nothing", () => {
     const asked = { on: "2026-09-20", since: "2026-01-04" };
     expect(crossedOn(asked, "2026-08-21", 30)).toBe(crossedOn(asked, "2026-08-21", 30));
+  });
+});
+
+/**
+ * ⚠️ THE ROW'S OWN SENTENCE, AND IT EXISTS BECAUSE A PHOTOGRAPH SHOWED THE LIST
+ * WITHOUT IT. Four rows read "product · clock · date", and the one that had
+ * already gone looked exactly like the three that had not — on the one screen
+ * whose entire job is telling those apart.
+ */
+describe("what a countdown reads as", () => {
+  it("names the verdict before the clock, and counts the plural", () => {
+    expect(saysDue(7, "opened")).toBe("7 days left · opened");
+    /* ⚠️ THE ONE A DECLARATION CANNOT GET RIGHT. A constant unit beside a number
+       reads "1 days left" on the day it matters, which is why this is a function
+       rather than a `unit` slot. */
+    expect(saysDue(1, "printed")).toBe("1 day left · printed");
+  });
+
+  it("says a thing already gone has gone, and how long ago", () => {
+    expect(saysDue(-2, "printed")).toBe("Out of date, 2 days ago · printed");
+    expect(saysDue(-1, "made")).toBe("Out of date, 1 day ago · made");
+  });
+
+  /* ⚠️ TODAY IS ITS OWN SENTENCE. "0 days left" is arithmetic; "Goes off today"
+     is the thing somebody has to act on before they go home. */
+  it("gives today a sentence of its own rather than a zero", () => {
+    expect(saysDue(0, "opened")).toBe("Goes off today · opened");
   });
 });

@@ -995,6 +995,14 @@ export const GLYPH_MOTION = [
   `[data-glyph="lift"] [data-part="cloth"] { transform-origin: left center }`,
   `[data-glyph="lift"][data-lively="true"] [data-part="cloth"] {`,
   `  animation: glyph-lift ${DURATION.stately} ${EASE.settle} backwards }`,
+  /* ⚠️ AND THE SAME CHARACTER ON A DIFFERENT PART, because a thing lifted off a
+     shelf is lifted — see `TakeMark`. The shelf holds still; the arrow is what
+     leaves, which is the same split the flag makes between its pole and its
+     cloth. Reusing the keyframe rather than writing a twentieth is the whole
+     discipline of this file: a character is a MOVEMENT, and two marks may
+     legitimately make the same one. */
+  `[data-glyph="lift"][data-lively="true"] [data-part="arrow"] {`,
+  `  animation: glyph-lift ${DURATION.stately} ${EASE.settle} backwards }`,
   `@media (prefers-reduced-motion: reduce) {`,
   `  [data-glyph], [data-glyph] [data-part] { animation: none !important }`,
   `}`,

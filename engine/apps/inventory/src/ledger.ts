@@ -253,3 +253,36 @@ export const crossedOn = (
   const entered = of.since && of.since > opens ? of.since : opens;
   return today === entered ? "soon" : null;
 };
+
+/**
+ * WHAT A COUNTDOWN READS AS, IN WORDS, WITH THE CLOCK THAT DECIDED IT.
+ *
+ * ⚠️ A DATE AND A CLOCK NAME ARE NOT A SENTENCE, WHICH IS WHAT THE FIRST
+ * PHOTOGRAPH OF THIS LIST SHOWED. Four rows read "Nitrile gloves · printed ·
+ * August 25" and "Casting resin · opened · September 3", and the row that had
+ * ALREADY GONE looked exactly like the three that had not — on the one screen
+ * whose entire job is telling those apart. The verdict has to be in the words,
+ * because a `Listing` has three slots and none of them is a colour.
+ *
+ * ⚠️ IT IS HERE RATHER THAN IN THE SCREEN BECAUSE A SECOND SURFACE WANTS THE
+ * SAME ANSWER. The nightly note, a printed pull-list and this row are three
+ * readers of one question, and a phrase assembled in whichever one was written
+ * first is a phrase the other two get slightly differently.
+ *
+ * ⚠️ AND THE PLURAL IS COUNTED RATHER THAN SUFFIXED. "1 days left" is the fault
+ * a declaration cannot avoid — a constant unit beside a number — and it is
+ * exactly why this is a function: English has no constant for "day".
+ */
+export const saysDue = (days: number, by: string): string => {
+  const many = (n: number) => (n === 1 ? "1 day" : `${n} days`);
+  /* ⚠️ TODAY IS ITS OWN SENTENCE. "0 days left" is arithmetic; "Goes off today"
+     is the thing somebody has to act on before they go home. */
+  const when = days < 0
+    ? `Out of date, ${many(-days)} ago`
+    : days === 0 ? "Goes off today" : `${many(days)} left`;
+  /* ⚠️ THE CLOCK IS THE SECOND HALF AND NEVER THE FIRST. Which of the four
+     decided is what makes the date believable, and it is genuinely surprising —
+     but it is the ANSWER to "why", and somebody scanning this list is asking
+     "how long". */
+  return `${when} · ${by}`;
+};

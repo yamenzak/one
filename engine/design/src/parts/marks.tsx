@@ -411,6 +411,37 @@ export const TallyMark = () => (
 );
 
 /**
+ * A SHELF, AND SOMETHING COMING OFF IT.
+ *
+ * ⚠️ TAKING STOCK WAS A WASTE BIN, WHICH IS THE WORST MARK IN THE SET FOR IT. In
+ * an inventory the difference between "this was used" and "this was thrown away"
+ * is the difference between a consumption figure and a shrinkage figure —
+ * exactly the distinction the product keeps five separate verbs to preserve —
+ * and a bin on the button people press forty times a day says the wrong one of
+ * the two, all day, to the person entering the data.
+ *
+ * ⚠️ IT IS THE MATE OF `MoveMark`, DELIBERATELY. One shelf against two, an arrow
+ * that leaves against an arrow that crosses: put side by side in a card of four
+ * verbs — which is where they live — the pair reads as a family rather than as
+ * two icons that happen to be adjacent.
+ *
+ * ⚠️ AND THE ARROW POINTS UP, WHICH IS THE HAND'S DIRECTION. Down is putting
+ * something on; the same mark flipped would be `receive`, and having them differ
+ * by rotation is what makes the pair unmistakable at 20px without a label.
+ */
+export const TakeMark = () => (
+  <Mark>
+    <g data-part="shelf">
+      <path d="M3 20h18" />
+    </g>
+    <g data-part="arrow">
+      <path d="M12 16V5" />
+      <path d="m7.5 9.5 4.5-4.5 4.5 4.5" />
+    </g>
+  </Mark>
+);
+
+/**
  * TWO SHELVES AND SOMETHING GOING FROM ONE TO THE OTHER.
  *
  * ⚠️ A TRANSFER HAD NO MARK, AND THE THREE NEAREST ALL SAY SOMETHING ELSE. A
@@ -434,15 +465,19 @@ export const TallyMark = () => (
 export const MoveMark = () => (
   <Mark>
     <g data-part="shelves">
-      <path d="M3 19h5" />
-      <path d="M16 19h5" />
+      <path d="M3 20h6" />
+      <path d="M15 20h6" />
     </g>
     <g data-part="arrow">
-      {/* ⚠️ AN ARC RATHER THAN A STRAIGHT LINE, because a box carried between two
-          shelves is lifted and set down. A horizontal arrow at the same height
-          as the bars reads as a ruler. */}
-      <path d="M6 14a6.5 6.5 0 0 1 12 0" />
-      <path d="m15 11.5 3 3 3-3" />
+      {/* ⚠️ A STRAIGHT ARROW, AND THE ARC IT REPLACED IS WHY THIS IS WRITTEN
+          DOWN. A carry IS a lift and a set-down, so an arc was the truer
+          drawing — and at the size a row actually renders one (20px) the curve
+          plus its chevron came out as a tilde with a speck on it: a mark that is
+          more accurate about the act and illegible as a mark. Photographed
+          beside the three verbs it sits with, it was the only one nobody could
+          name. */}
+      <path d="M4 12h14" />
+      <path d="m14 8 4 4-4 4" />
     </g>
   </Mark>
 );

@@ -280,7 +280,7 @@ const WHY = {
   mark: [
     "BellMark", "CalendarMark", "LeaveMark", "ShareMark", "InboxMark", "ShieldMark",
     "CheckMark", "SearchMark", "KeyMark", "LayersMark", "AgreedMark", "RefreshMark",
-    "FlagMark", "ScanMark", "TallyMark", "MoveMark",
+    "FlagMark", "ScanMark", "TallyMark", "MoveMark", "TakeMark",
   ],
   /*
     PLUMBING. It arranges, provides or chooses — it draws nothing of its own, so
