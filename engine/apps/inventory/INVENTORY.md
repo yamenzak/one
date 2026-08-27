@@ -253,6 +253,38 @@ unnamed, and whoever looks after the catalogue names it afterwards. The worst
 outcome in this product is somebody not recording something because a form
 demanded a field they did not have.
 
+### The codes, and the labels that make scanning possible
+
+⚠️ **EVERY CAMERA PATH IN THIS PRODUCT RESOLVES AGAINST `code`, AND NOTHING DREW
+IT.** A product wears as many codes as the world has printed on it — the GTIN on
+the box, the wholesaler's part number, the national code — and until the product
+page listed them, "the scanner says unknown" was a dead end: no way to see what
+a product already answers to, no way to tell a missing code from a mistyped one,
+and no way to give a thing that arrived with no barcode one of its own.
+
+⚠️ **AND A SHELF HAD NO LABEL AT ALL.** `location.code` is what makes the single
+highest-leverage behaviour in counting possible — point a phone at a shelf and
+the session moves to it — and `location.label`, the only thing that has ever
+minted one, was callable by nobody. Every workspace's shelves were unlabelled and
+the count session asked for a place by name all day. `/place` is where a shelf is
+labelled, and it is also the first screen a row on `/places` has ever led to.
+
+⚠️ **PRINTING IS THE ACT OF LABELLING, WHICH IS WHY THE CODE IS NOT MINTED WITH
+THE ROW.** A workspace with four hundred locations has not printed four hundred
+labels, and a code on a shelf nothing is stuck to resolves to a place nobody can
+find. It is derived when somebody asks for it, once, and never re-issued — a
+re-used label is two places with one history, and a re-numbered one is a sticker
+on a wall that now points at nothing. So the act is offered only while there is
+no code; a second press would find the same string and write nothing, which is a
+control that has stopped doing anything and does not say so.
+
+⚠️ **AND THE CODE IS A ROW SOMEBODY CAN COPY, BECAUSE THE NEXT STEP IS OUTSIDE
+THIS PRODUCT.** What a person does with a label is write it on tape or paste it
+into a printer we do not own. A confirmation toast saying "Labelled." over a
+string the screen never shows is an act that reports success and delivers
+nothing — and a code re-typed off a screen is a code that will be typed wrong
+onto a shelf and resolve to nothing forever.
+
 ### The way back is beside the act, not in the log
 
 ⚠️ **AND FOR A MONTH THERE WAS NO WAY BACK AT ALL.** `undo` was built,
@@ -546,6 +578,7 @@ follows and the shape every screen is drawn to.
 | `/counts` | Being counted | — | `stock:read` | `declared` | `declared` |
 | `/count` | Count | — | `stock:read` | `declared` | `declared` |
 | `/product` | Product | — | `product:read` | `declared` | `declared` |
+| `/place` | Place | — | `location:read` | `declared` | `declared` |
 | `/add` | Add a product | — | `product:write` | `declared` | `declared` |
 
 ⚠️ **`declared` IN BOTH FILE COLUMNS IS THE ANSWER, NOT A GAP.** A declared body

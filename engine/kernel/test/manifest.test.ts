@@ -339,6 +339,56 @@ describe("what would fail on the first request", () => {
     expect(whyOf(app({ screens: [acting] as never }))).toContain("fills_field_unknown");
   });
 
+  /*
+    ⚠️ AND A LIST OF ONE INTO A FIELD THAT DOES NOT TAKE A LIST — see `Fill`.
+    `each` exists so a detail page can reach a write that works on many; used
+    against a scalar it is an array arriving where the door validates a string,
+    which is a refusal on the press with the field marked and nothing a person
+    can do about it. Same class as `fills_field_unknown`, one type down: the
+    input is real and the SHAPE going into it is not.
+  */
+  it("refuses a list of one filled into an input that takes a scalar", () => {
+    const acting = {
+      id: "one", route: "/one", label: "One", permission: "note:read", of: "note",
+      body: {
+        shape: "detail", layout: { as: "stack" },
+        blocks: [{
+          block: "NoteRow",
+          does: [{ op: stub.id, fills: { id: { each: "record" } } }],
+          bind: { children: { from: { of: "words", says: "One" } } },
+        }],
+      },
+    };
+    expect(whyOf(app({ screens: [acting] as never }))).toContain("fill_each_not_a_list");
+  });
+
+  /* ⚠️ AND THE SAME FILL AGAINST A `json` INPUT COMPOSES, because that is the
+     one kind that holds a list — without this the check above would pass for
+     the uninteresting reason that nothing anywhere may use `each`. */
+  it("allows a list of one into an input that takes a list", () => {
+    const many = operation({
+      id: "note.tag", kind: "write", summary: "Tag some.",
+      input: { ids: field.json({ label: "Which", required: true, holds: "none" }) },
+      output: { ids: field.json({ label: "Which", holds: "none" }) },
+      permission: "note:write", idempotency: { mode: "none" },
+      outcome: { message: "Tagged.", tone: "success" },
+      async handler() { return { ids: [] }; },
+    }) as unknown as AnyOperation;
+    const acting = {
+      id: "one", route: "/one", label: "One", permission: "note:read", of: "note",
+      body: {
+        shape: "detail", layout: { as: "stack" },
+        blocks: [{
+          block: "NoteRow",
+          does: [{ op: many.id, fills: { ids: { each: "record" } } }],
+          bind: { children: { from: { of: "words", says: "One" } } },
+        }],
+      },
+    };
+    expect(whyOf(app({ operations: [stub, many], screens: [acting] as never })))
+      .not.toContain("fill_each_not_a_list");
+  });
+
   /* ⚠️ AND A SCREEN THAT IS ABOUT NOTHING HAS NO RECORD TO FILL FROM. The value
      would be undefined, the field would arrive empty, and the act would refuse
      for want of a thing the screen was supposed to know. */

@@ -1096,19 +1096,31 @@ describe("where a row leads", () => {
  */
 describe("what the screen fills in", () => {
   it("reads the bare forms unchanged", () => {
-    expect(fillOf("record")).toEqual({ of: "record" });
-    expect(fillOf("today")).toEqual({ of: "today" });
+    expect(fillOf("record")).toEqual({ of: "record", every: false });
+    expect(fillOf("today")).toEqual({ of: "today", every: false });
   });
 
   it("reads a column off the record", () => {
-    expect(fillOf({ field: "author" })).toEqual({ of: "field", field: "author" });
+    expect(fillOf({ field: "author" })).toEqual({ of: "field", field: "author", every: false });
   });
 
   /* ⚠️ A CONSTANT THE SCREEN SUPPLIES, and it is a literal in a manifest rather
      than a value from anywhere a caller could reach. */
   it("reads a literal", () => {
-    expect(fillOf({ says: "typed" })).toEqual({ of: "says", says: "typed" });
-    expect(fillOf({ says: 1 })).toEqual({ of: "says", says: 1 });
+    expect(fillOf({ says: "typed" })).toEqual({ of: "says", says: "typed", every: false });
+    expect(fillOf({ says: 1 })).toEqual({ of: "says", says: 1, every: false });
+  });
+
+  /*
+    ⚠️ AND THE SIXTH IS ARITY RATHER THAN A SOURCE — see `Fill`. `each` says the
+    input wants a list; where the value comes from is the same question with the
+    same answer, which is why every caller asking WHERE reads `of` unchanged and
+    only the two resolvers read `every`.
+  */
+  it("reads a list of one as the same source, with its arity beside it", () => {
+    expect(fillOf({ each: "record" })).toEqual({ of: "record", every: true });
+    expect(fillOf({ each: { field: "product" } }))
+      .toEqual({ of: "field", field: "product", every: true });
   });
 
   /*
@@ -1141,6 +1153,19 @@ describe("what the screen fills in", () => {
     /* ⚠️ AND NOTHING IS SENT EMPTY. A screen whose address has not resolved has
        no record, and an empty string in a required field is a refusal that says
        the field is missing when the screen is merely not ready. */
+    /* ⚠️ WRAPPED, AND ONLY WHERE THERE IS SOMETHING TO WRAP — see `fillWith`.
+       `[]` is not "nothing supplied": a list-taking operation reads an empty
+       list as "you named no rows" and refuses saying so, which is a worse answer
+       than the required-field refusal a missing key gives — and a wrong one when
+       the truth is that the screen has not resolved its record yet. */
+    it("wraps a list of one, and sends no list at all when it has nothing", () => {
+      expect(fillWith({ ids: { each: "record" } }, { record: "loc_4", today: "2026-08-27" }))
+        .toEqual({ ids: ["loc_4"] });
+      expect(fillWith({ ids: { each: "record" } }, { today: "2026-08-27" })).toEqual({});
+      expect(fillWith({ ids: { each: { field: "brand" } } },
+        { record: "prd_1", today: "2026-08-27", held: HELD })).toEqual({});
+    });
+
     it("leaves out what it has nothing for", () => {
       expect(fillWith(
         { count: "record", brand: { field: "brand" }, gone: { field: "nope" } },
@@ -1212,7 +1237,7 @@ describe("what a screen can be narrowed to", () => {
   });
 
   it("reads a narrowing as a source of its own", () => {
-    expect(fillOf({ picked: "span" })).toEqual({ of: "picked", picked: "span" });
+    expect(fillOf({ picked: "span" })).toEqual({ of: "picked", picked: "span", every: false });
   });
 
   /*

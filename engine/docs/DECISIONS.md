@@ -4293,3 +4293,55 @@ refuse.
 **Therefore never:** a capability whose only address is an operation id; a check
 whose corpus can quietly go to nought; a list in a guard that cannot fail; or a
 summary that counts the ones that passed and not the ones that were skipped.
+
+## D111 — A page about one thing can call a write that works on many, and a condition inside a card is a condition
+
+**Status:** shipped · **Date:** 2026-08-27
+
+**`Fill` GAINS `each`, AND IT IS ARITY RATHER THAN A SIXTH SOURCE.** An operation
+that labels rows takes a list, because a workspace labels forty shelves in a
+sitting — and the place a person actually asks for a label is the page about the
+one shelf they are standing at. There was no fill that produced a list, so the
+only routes to a labelling control were an operation taking a single id beside
+the one taking many (two implementations of one act, therefore two places for the
+scoping loop to be wrong) or no control at all. `{ each: <source> }` wraps
+whatever the source resolves to in a list of one; `fillOf` returns `every`
+alongside the same `of` it always did, so every caller asking WHERE a value comes
+from is unchanged and only the two resolvers read it.
+
+**IT WRAPS AND IT DOES NOT COLLECT.** `each` says what shape the input wants, not
+that a screen may gather several records. A body has no selection and this does
+not give it one; bulk labelling is a different surface with a different question.
+It cannot nest, by type — a list of lists is a shape nothing here takes and
+nobody could read at either end of the wire.
+
+**AND `[]` IS NEVER SENT.** A list-taking operation reads an empty list as "you
+named no rows" and refuses saying so, which is a worse answer than the
+required-field refusal a missing key gives — and a wrong one when the truth is
+that the screen has not resolved its record yet. The same rule the other five
+sources already follow, for the same reason.
+
+**`fill_each_not_a_list` IS THE REFUSAL THAT COMES WITH IT.** Every field kind in
+this vocabulary except `json` is a scalar the door validates as one, so an array
+arriving at a `text` is a refusal on the press with the field marked and nothing
+a person can do about it. Same class as `fills_field_unknown`, one type down: the
+input is real and the shape going into it is not.
+
+**AND A `when` INSIDE A GROUP WAS INERT, WHICH IS WHERE NEARLY ALL OF THEM ARE.**
+The renderer read the condition only where a group or a top-level block is
+wrapped; a row within a group was drawn unconditionally. What that produced is
+the failure this vocabulary is most careful about everywhere else — an empty
+labelled row presented as a fact, and a control offered against a state it had
+already been used on. Every test of the feature passed, because every one of them
+placed the block at the top level; every photograph looked right, because each was
+taken of a record that happened to have the field.
+
+**A GROUP WITH NOTHING LEFT IN IT IS NOT DRAWN.** `silent` could not answer that
+— it asks whether a checklist has anything left and knows nothing about
+conditions — so the fix carries its own second half. A card with a heading and no
+rows is the same empty promise as the row it was there to hold.
+
+**Therefore never:** an operation duplicated to change the arity of its input; a
+one-element list sent where a scalar is taken; an empty list standing in for a
+value the screen does not have; a condition evaluated at one nesting depth and
+not another; or a card drawn around nothing.

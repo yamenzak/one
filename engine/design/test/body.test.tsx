@@ -296,6 +296,53 @@ describe("a block is drawn only when its condition holds", () => {
     expect(drawn(conditional({ not: { has: { of: "field", field: "name" } } })))
       .not.toContain("Only sometimes");
   });
+
+  /*
+    ⚠️ AND INSIDE A GROUP, WHICH IS WHERE NEARLY EVERY CONDITION IN THIS
+    REPOSITORY ACTUALLY IS. The check was read only where a group or a top-level
+    block is wrapped, so a `when` on a row within one was inert — every test
+    above passed, because every one of them puts the block at the top level.
+    What shipped was an empty labelled row drawn as a fact, and a control offered
+    against a state it had already been used on.
+  */
+  const inside = (when: NonNullable<SurfaceSpec["blocks"][number]["when"]>) => ({
+    shape: "detail" as const, layout: { as: "stack" as const },
+    blocks: [{
+      group: "What it is",
+      of: [
+        { block: "NoteRow", when,
+          bind: { children: { from: { of: "words" as const, says: "Only sometimes" } } } },
+        { block: "NoteRow",
+          bind: { children: { from: { of: "words" as const, says: "Always" } } } },
+      ],
+    }],
+  } as SurfaceSpec);
+
+  it("leaves out a row inside a group whose condition does not hold", () => {
+    const html = drawn(inside({ has: { of: "field", field: "nothing" } }));
+    expect(html).not.toContain("Only sometimes");
+    expect(html).toContain("Always");
+  });
+
+  it("draws a row inside a group whose condition does hold", () => {
+    expect(drawn(inside({ has: { of: "field", field: "name" } }))).toContain("Only sometimes");
+  });
+
+  /* ⚠️ AND A GROUP WITH NOTHING LEFT IN IT IS NOT DRAWN AT ALL. A card with a
+     heading and no rows is the same empty promise as the row it was there to
+     hold — and `silent` cannot answer it, because it asks about a checklist with
+     nothing left rather than about a condition. */
+  it("draws no card at all when every row in the group is withheld", () => {
+    const html = drawn({
+      shape: "detail", layout: { as: "stack" },
+      blocks: [{
+        group: "Nothing to say",
+        of: [{ block: "NoteRow", when: { has: { of: "field", field: "nothing" } },
+          bind: { children: { from: { of: "words", says: "Only sometimes" } } } }],
+      }],
+    } as SurfaceSpec);
+    expect(html).not.toContain("Nothing to say");
+  });
 });
 
 /* ------------------------------------------------------------ the outcomes --- */

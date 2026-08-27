@@ -697,13 +697,31 @@ const silent = (placed: Placed, has: Has): boolean => {
     : !reached(has.book.milestones, has.book.counts, has.book.already).length;
 };
 
+/**
+ * ⚠️ WHETHER THIS ONE IS DRAWN AT ALL, AND IT IS ASKED OF A BLOCK INSIDE A GROUP
+ * TOO. The condition was read only where a group or a top-level block is
+ * wrapped, so every `when` on a row INSIDE a group was inert — and that is where
+ * nearly all of them are. The failure it produced is the one this vocabulary is
+ * most careful about elsewhere: an empty labelled row drawn as a fact ("Brand"
+ * over nothing), and a shelf already carrying a printed label still offering to
+ * mint one, which is a control that has stopped doing anything and does not say
+ * so. Both looked right in every photograph taken of a record that happened to
+ * have the field.
+ */
+const shown = (block: Placed, has: Has): boolean => !silent(block, has)
+  && (!("when" in block) || !block.when || holds(block.when, has));
+
 const wrap = (placed: Placed, has: Has, key: number, layout: Layout) => {
-  if (silent(placed, has)) return null;
-  if (!("when" in placed) || !placed.when || holds(placed.when, has)) {
+  /* ⚠️ AND A GROUP WHOSE EVERY ROW IS WITHHELD IS NOT A GROUP, which `silent`
+     alone cannot answer — it asks about a checklist with nothing left in it and
+     knows nothing about conditions. A card drawn with a heading and no rows is
+     the same empty promise as the row it was there to hold. */
+  const kids = isGroup(placed) ? placed.of.filter((b) => shown(b, has)) : [];
+  if (shown(placed, has) && (!isGroup(placed) || kids.length)) {
     const inner = isGroup(placed)
       ? (
         <Group label={placed.group ?? undefined}>
-          {placed.of.map((b, i) => <Placed key={i} block={b} has={has} />)}
+          {kids.map((b, i) => <Placed key={i} block={b} has={has} />)}
         </Group>
       )
       : <Placed block={placed} has={has} />;

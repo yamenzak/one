@@ -1395,6 +1395,18 @@ export function refuseApp(spec: AppSpec): readonly Refusal[] {
             + "the value would be dropped at the door and the act would refuse for want of it");
         }
         const source = fillOf(from);
+        /* ⚠️ A LIST OF ONE INTO A FIELD THAT DOES NOT TAKE A LIST — see `Fill`.
+           `each` says the input wants an array, and every other field kind in
+           this vocabulary is a scalar the door validates as one: an array
+           arriving at a `text` is refused as the wrong type, on a press, with
+           the field marked and nothing a person can do about it. `json` is the
+           only kind that holds one, so it is the only kind this may fill. */
+        if (source.every && takes && takes[name] && takes[name].kind !== "json") {
+          at(`screen ${s.id}`,
+            `fill_each_not_a_list: fills "${name}" for ${id} with \`each\`, and that input `
+            + `is \`${takes[name].kind}\` — the door takes a scalar there and would refuse `
+            + "the one-element list the screen sends");
+        }
         /* ⚠️ BOTH SOURCES THAT READ THE RECORD NEED ONE — see `Fill`. The id and
            a column on it are the same requirement: without `of` there is no row,
            and the value would arrive undefined at a required field. */

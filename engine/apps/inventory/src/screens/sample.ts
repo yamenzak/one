@@ -140,6 +140,38 @@ export const THINGS: readonly Thing[] = [
 ];
 
 /**
+ * WHAT A SCAN WILL FIND — the code book, which is the table every camera path in
+ * this product resolves against.
+ *
+ * ⚠️ ONE PRODUCT WEARS SEVERAL, AND THAT IS THE WHOLE REASON IT IS A TABLE. The
+ * resin has the GTIN off its tin, the wholesaler's part number, and one of ours
+ * minted for the decanted bottle — three strings, one thing, and a screen that
+ * showed only the first would be a screen somebody uses to conclude the other
+ * two are missing.
+ *
+ * ⚠️ AND THE PACK SIZE VARIES ACROSS THEM, WHICH IS THE FIGURE THE PICTURE HAS TO
+ * MAKE VISIBLE. The carton barcode on the gloves means a hundred; the one on the
+ * box means one. Scanning the wrong one is a hundred-fold error in a quantity
+ * nobody questions, so a sample where every `pack` were `1` would photograph the
+ * column as noise.
+ */
+export interface Coded {
+  readonly id: string;
+  readonly product: string;
+  readonly value: string;
+  readonly kind: "gtin" | "gs1" | "national" | "part" | "ours" | "other";
+  readonly pack: number;
+}
+
+export const CODES: readonly Coded[] = [
+  { id: "c1", product: "t-resin", value: "5060123456789", kind: "gtin", pack: 1 },
+  { id: "c2", product: "t-resin", value: "SM-RES-CLR-1L", kind: "part", pack: 1 },
+  { id: "c3", product: "t-resin", value: "ONE-P-7T4M", kind: "ours", pack: 1 },
+  { id: "c4", product: "t-glove", value: "4022234567891", kind: "gtin", pack: 1 },
+  { id: "c5", product: "t-glove", value: "14022234567898", kind: "gtin", pack: 100 },
+];
+
+/**
  * A SHELF SOMEBODY IS PART WAY THROUGH COUNTING.
  *
  * ⚠️ OPEN SESSIONS ONLY, WHICH IS THE STATE THE PRODUCT SHOWS. A closed count is

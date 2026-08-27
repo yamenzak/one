@@ -6510,6 +6510,19 @@ const manifest = (): AppSpec => defineApp({
     { id: "lines-of-this", of: "stock", where: [{ field: "product", is: { here: "record" } }] },
     { id: "every-place", of: "location", limit: 50 },
     /*
+      ⚠️ EVERY CODE THAT RESOLVES TO THIS PRODUCT, WHICH IS THE ONE TABLE THE
+      CAMERA READS. A product wears as many codes as the world has printed on it
+      — the GTIN on the box, the wholesaler's part number, the national code, and
+      ours — and until this view there was no surface anywhere that showed a
+      person which of them a scan would find. A code book nobody can read is a
+      catalogue where "unknown code" is unanswerable.
+    */
+    { id: "codes-of-this", of: "code", where: [{ field: "product", is: { here: "record" } }] },
+    /* ⚠️ THE MIRROR OF `lines-of-this` — the same `stock` read from the other
+       end. A product page asks where the thing is; a place page asks what is on
+       the shelf, and they are one table with the term swapped. */
+    { id: "on-this-shelf", of: "stock", where: [{ field: "location", is: { here: "record" } }] },
+    /*
       ⚠️ ASKED, BECAUSE THIS SCREEN'S SUBJECT IS ARITHMETIC AND A `Match` IS
       EQUALITY — see `ViewSpec.asked`. When a delivery runs out is the earliest
       of four clocks resolved against a threshold the workspace sets, none of
@@ -7520,6 +7533,67 @@ const manifest = (): AppSpec => defineApp({
             the second as the first is the class of mistake this product exists
             to prevent.
           */
+          /*
+            ⚠️ THE CODE BOOK, AND IT IS WHAT MAKES SCANNING POSSIBLE AT ALL. Every
+            camera path in this product resolves against `code` and nothing drew
+            it, so "the scanner says unknown" was a dead end: a person could not
+            see which codes a product already answers to, could not tell a
+            missing one from a mistyped one, and had no way to give a thing that
+            arrives with no barcode a code of its own.
+
+            ⚠️ AND OURS IS MINTED HERE BECAUSE PRINTING IS THE ACT OF LABELLING —
+            see `product.label`. A code on a box nothing is stuck to resolves to
+            a product nobody can find, so the string is not derived when the row
+            is created; it is derived when somebody asks for it, once, and never
+            re-issued.
+
+            ⚠️ THE ACT IS ABOVE THE LIST RATHER THAN UNDER IT, WHICH IS THE
+            OPPOSITE OF EVERY OTHER GROUP ON THIS SCREEN. The list is the answer
+            to "what does this already have"; the act is the answer to "it has
+            nothing" — and the case that brought somebody here is the second, on
+            a product with an empty book, where a control below an empty state is
+            a control below the sentence telling them it is empty.
+          */
+          {
+            group: "Its codes",
+            of: [
+              {
+                block: "ActionRow",
+                /* ⚠️ A LIST OF ONE, FROM THE PAGE ABOUT THE ONE — see `Fill`.
+                   The write takes `ids` because a workspace labels forty things
+                   in a sitting; the place a person asks for a label is the page
+                   about the thing in their hand. */
+                does: [{ op: "product.label", fills: { ids: { each: "record" } } }],
+                bind: {
+                  icon: { from: { of: "words", says: "scan" } },
+                  label: { from: { of: "words", says: "Give it a code of ours" } },
+                  under: { from: { of: "words",
+                    says: "For something that arrived with no barcode on it" } },
+                },
+              },
+              {
+                block: "Listing",
+                /* ⚠️ THE PACK SIZE IS THE THIRD COLUMN AND THEREFORE THE END OF A
+                   PHONE ROW, which is right: a code that means "a carton of
+                   thirty" and one that means "one" are the same string to a
+                   reader who cannot see the number, and scanning the wrong one
+                   is a thirty-fold error in a quantity nobody questions. */
+                shows: [
+                  { field: "value", label: "Code" },
+                  { field: "kind", label: "Kind" },
+                  { field: "pack", label: "Holds" },
+                ],
+                nothing: {
+                  says: "No codes yet",
+                  under: "Scanning finds nothing until this product has one",
+                },
+                bind: {
+                  label: { from: { of: "words", says: "What a scan will find" } },
+                  of: { from: { of: "view", view: "codes-of-this" } },
+                },
+              },
+            ],
+          },
           {
             group: "How to store it",
             when: { has: { of: "field", field: "storage" } },
@@ -7578,6 +7652,10 @@ const manifest = (): AppSpec => defineApp({
             { field: "within.name", label: "Inside" },
             { field: "kind", label: "Kind" },
           ],
+          /* ⚠️ AND THE ROWS LEAD SOMEWHERE NOW — see `/place`. This list shipped
+             with no destination, which is the shape the product page's own
+             header calls a list that lies about being a list. */
+          goes: "place",
           nothing: {
             says: "Nowhere to put anything yet",
             under: "Add a room, an aisle or a shelf and it will be here",
@@ -7587,6 +7665,113 @@ const manifest = (): AppSpec => defineApp({
             of: { from: { of: "view", view: "every-place" } },
           },
         }],
+      } },
+    /*
+      ONE SHELF: WHAT IS ON IT, AND THE CODE STUCK TO ITS FRONT.
+
+      ⚠️ THE LABEL IS THE REASON THIS SCREEN EXISTS. `location.code` is the
+      column the camera resolves a place against, and it is what makes the single
+      highest-leverage behaviour in counting possible — point the phone at a
+      shelf and the session moves to it. Nothing minted one, nothing displayed
+      one, and `location.label` was callable by nobody, so every workspace's
+      shelves were unlabelled and the count session asked for a place by name all
+      day.
+
+      ⚠️ AND THE CODE IS DRAWN AS A ROW SOMEBODY CAN COPY, because what a person
+      does with it is write it on tape or type it into a label printer this
+      product does not own. A confirmation toast saying "Labelled." over a string
+      the screen never shows is an act that reports success and delivers nothing.
+
+      ⚠️ NO WORLD, for the reason the product page states: this is a screen
+      somebody was SENT to from a row they pressed, not one they arrived at.
+    */
+    { id: "place", route: "/place", label: "Place", nav: "none", icon: "workspace",
+      permission: "location:read", of: "location",
+      body: {
+        shape: "detail",
+        layout: { as: "stack" },
+        hero: {
+          as: "figure",
+          nothing: { says: "Nothing on it", under: "Put something here and it will be here" },
+          bind: {
+            value: { from: { of: "count", view: "on-this-shelf" } },
+            of: { from: { of: "words", says: "Products on it" } },
+            mark: { from: { of: "words", says: "workspace" } },
+          },
+        },
+        blocks: [
+          {
+            block: "Listing",
+            shows: [
+              { field: "product.name", label: "What" },
+              { field: "seen", label: "Last seen", as: "when" },
+              { field: "quantity", label: "How many" },
+            ],
+            /* ⚠️ A LINE IS A PRODUCT ON A SHELF, AND THE SHELF IS THIS SCREEN —
+               so the row opens the other half. */
+            goes: "product",
+            nothing: {
+              says: "Nothing on it",
+              under: "Put something here and the lines will be here",
+            },
+            bind: {
+              label: { from: { of: "words", says: "What is on it" } },
+              of: { from: { of: "view", view: "on-this-shelf" } },
+            },
+          },
+          {
+            group: "Its label",
+            of: [
+              /* ⚠️ THE ACT FIRST, AND ONLY WHILE THERE IS NO CODE. A label is
+                 minted once and never re-issued — a second press would find the
+                 same string and write nothing, so offering it forever is a
+                 control that stops doing anything and never says so. */
+              {
+                block: "ActionRow",
+                when: { empty: { of: "field", field: "code" } },
+                does: [{ op: "location.label", fills: { ids: { each: "record" } } }],
+                bind: {
+                  icon: { from: { of: "words", says: "scan" } },
+                  label: { from: { of: "words", says: "Give it a label" } },
+                  under: { from: { of: "words",
+                    says: "Then a phone pointed at the shelf knows where it is" } },
+                },
+              },
+              /* ⚠️ COPYABLE, BECAUSE THE NEXT STEP HAPPENS OUTSIDE THIS PRODUCT.
+                 Somebody writes it on tape or pastes it into a label printer;
+                 a string they have to re-type off a screen is a string that will
+                 be typed wrong onto a shelf and resolve to nothing forever. */
+              { block: "CopyRow",
+                when: { has: { of: "field", field: "code" } },
+                bind: {
+                  label: { from: { of: "words", says: "Label" } },
+                  value: { from: { of: "field", field: "code" } },
+                } },
+            ],
+          },
+          {
+            group: "What it is",
+            of: [
+              { block: "FieldRow", edits: "kind",
+                bind: {
+                  label: { from: { of: "words", says: "Kind" } },
+                  value: { from: { of: "field", field: "kind" } },
+                } },
+              { block: "FieldRow", edits: "within",
+                when: { has: { of: "field", field: "within" } },
+                bind: {
+                  label: { from: { of: "words", says: "Inside" } },
+                  value: { from: { of: "field", field: "within.name" } },
+                } },
+            ],
+          },
+          {
+            group: "Note",
+            when: { has: { of: "field", field: "note" } },
+            of: [{ block: "Markdown",
+              bind: { of: { from: { of: "field", field: "note" } } } }],
+          },
+        ],
       } },
     /*
       ⚠️ OPEN COUNTS ONLY, AND THE VIEW ASKS FOR AN ABSENCE. A session that has

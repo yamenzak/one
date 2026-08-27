@@ -1273,6 +1273,7 @@ yet, not a rule that cannot have one.
 |---|---|---|
 | **The Accretion** | Nine sizes of type on one page. Every one named a role; together they are not a scale. | `motion`, and the type reading in the browser sweeps |
 | **The Flat** | The largest thing on the screen is the size of everything else, so the eye has nowhere to land. | the type reading |
+| **The Deaf Condition** | A `when` on a row inside a card, ignored. The row is drawn whatever the record holds — an empty labelled field presented as a fact, or a control offered against a state it has already been used on. It looks right in every picture taken of a record that happens to have the field. | `body.test.tsx` — "a block is drawn only when its condition holds", inside a group and out |
 | **The Faint** | Ink nobody can read: a status colour tuned to be a fill used as text, a de-emphasis grey on a number, a quiet line on the one surface it does not clear. | `geometry.seen` |
 | **The Sprawl** | A card whose first row sits twice as far down as every other card's; two sections that run together. | `rhythm`, `metrics` |
 | **The Second Answer** | Two components that both build a card, two files that both decide a colour, two places that decide which way a move goes. | `cards`, `ground`, `moving`, `travel` |

@@ -109,7 +109,11 @@ export async function runView(
                  asked view runs before any record is joined, so this source has
                  nothing to read and is left out rather than guessed at. */
               : undefined;
-      if (value !== undefined && value !== "") input[name] = value;
+      /* ⚠️ AND THE ARITY IS THE SAME READING AS THE BROWSER'S — see `Fill`. Two
+         resolvers of one contract is how a source comes to mean different things
+         at the two ends of one wire, so `every` is applied here in the same
+         place and on the same condition `fillWith` applies it. */
+      if (value !== undefined && value !== "") input[name] = source.every ? [value] : value;
     }
     const said = await ask(view.asked.operation, input);
     const rows = said?.[view.asked.take];

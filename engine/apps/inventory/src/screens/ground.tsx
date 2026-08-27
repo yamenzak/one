@@ -28,7 +28,7 @@ import {
 import { inventory } from "../index.js";
 import { INVENTORY_SESSIONS, INVENTORY_SURFACES } from "./index.js";
 import {
-  BUYING, COUNTED, COUNTS, DAILY, DISAGREES, LEFT, LINES, MOVING, PLACES, RUNNING, THINGS,
+  BUYING, CODES, COUNTED, COUNTS, DAILY, DISAGREES, LEFT, LINES, MOVING, PLACES, RUNNING, THINGS,
   TOLD, WRONG,
 } from "./sample.js";
 
@@ -309,8 +309,30 @@ const COUNTING = {
   blind: COUNTS[0]!.blind,
 };
 
+/**
+ * ⚠️ AND THE SHELF THE PLACE PAGE OPENS ON, PICKED THE SAME WAY THE PRODUCT IS:
+ * the first shelf that has been LABELLED, because a code is the one thing on
+ * this screen a picture can get wrong in both directions. What it therefore does
+ * not photograph is the labelling act, which is `when`-guarded on a shelf with
+ * no code — the same trade the product page makes with its brand and par rows,
+ * and the reason the withheld half of a `when` is proved by a test.
+ */
+const SHELF_FIRST = (() => {
+  const one = PLACES.find((p) => p.code && p.kind === "shelf") ?? PLACES[0]!;
+  return {
+    id: one.id,
+    name: one.name,
+    kind: one.kind,
+    within: one.of ?? "",
+    "within.name": PLACES.find((p) => p.id === one.of)?.name ?? "",
+    code: one.code ?? "",
+  };
+})();
+
 const firstOf = (collection: string): Readonly<Record<string, unknown>> | undefined =>
-  collection === "product" ? FIRST : collection === "count" ? COUNTING : undefined;
+  collection === "product" ? FIRST
+    : collection === "count" ? COUNTING
+      : collection === "location" ? SHELF_FIRST : undefined;
 
 /**
  * ⚠️ WHAT THE DOOR WOULD TITLE THIS SCREEN — see `Drawn.name` and D106. A screen
@@ -410,6 +432,22 @@ const SEEN: Has = {
        page reporting shelves the thing is not on, which is the one fault a
        narrowed view exists to prevent and the hardest to notice in a picture. */
     "lines-of-this": rows(SHELF.filter((one) => one.product === FIRST.id)),
+    /* ⚠️ THE SAME `stock` READ FROM THE OTHER END, NARROWED THE SAME WAY. A
+       board answering this with every line would draw a shelf holding things
+       that are somewhere else — `lines-of-this`' fault mirrored, and just as
+       invisible in a picture. */
+    "on-this-shelf": rows(LINES
+      .filter((one) => one.where === SHELF_FIRST.id)
+      .map((one) => ({
+        id: one.id,
+        product: one.product,
+        "product.name": one.name,
+        quantity: one.quantity,
+        seen: one.seen,
+      }))),
+    "codes-of-this": rows(CODES
+      .filter((one) => one.product === FIRST.id)
+      .map((one) => ({ id: one.id, value: one.value, kind: one.kind, pack: one.pack }))),
     "every-place": rows(PLACES.map((one) => ({
       id: one.id,
       name: one.name,

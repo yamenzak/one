@@ -1192,6 +1192,7 @@ its own header, cited by other files, and doing nothing.
 | D108 | A list says where its rows go, and that is where "back" is | 0 |
 | D109 | A way back belongs beside the act, and an operation reached by nothing has no way to be offered | 0 |
 | D110 | A verb of a subject the app has drawn is called from somewhere, and the remainder is a countdown | 0 |
+| D111 | A page about one thing can call a write that works on many, and a condition inside a card is a condition | 0 |
 <!-- /generated -->
 
 ---

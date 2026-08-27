@@ -491,11 +491,31 @@ export type Layout =
  * a second time, so the day a screen sends and the year it sends can never
  * disagree — which they can at 23:59:59 on the thirty-first of December.
  */
-export type Fill =
+export type FillFrom =
   | "record" | "today" | "year"
   | { readonly field: string } | { readonly says: Said }
   /** ⚠️ What somebody narrowed the screen to — see `PickSpec`. */
   | { readonly picked: string };
+
+/**
+ * ⚠️ AND `each` IS THE SAME VALUE IN A LIST OF ONE, which is the whole of what a
+ * detail page needs to reach a write that works on many. `product.label` takes
+ * `ids` because a workspace labels forty shelves in a sitting — and the place a
+ * person actually asks for a label is the page about the one shelf they are
+ * standing at. Without it the choice was an operation that takes a single id and
+ * a second one that takes a list, which is two implementations of one act and
+ * therefore two places for the scoping loop to be wrong.
+ *
+ * ⚠️ IT WRAPS AND DOES NOT COLLECT. `each` says the ARITY the input wants, not
+ * that a screen may gather several records; a body has no selection and this
+ * does not give it one. The bulk case is a screen that offers the whole
+ * collection, and it is a different surface with a different question.
+ *
+ * ⚠️ AND IT CANNOT NEST, BY TYPE. `{ each: { each: ... } }` does not compose,
+ * because a list of lists is a shape no operation in this vocabulary takes and
+ * one nobody could read at either end of the wire.
+ */
+export type Fill = FillFrom | { readonly each: FillFrom };
 
 /**
  * ⚠️ THE THIRD SOURCE, AND IT IS THE ONE `/move` FOUND. `record` is the id of
@@ -597,17 +617,34 @@ export const opensOn = (pick: PickSpec): string => (
   pick.any !== undefined ? "" : pick.opens ?? pick.options?.[0]?.value ?? ""
 );
 
-/** ⚠️ One reading of the five forms, so no caller writes the branch twice. */
+/**
+ * ⚠️ One reading of the six forms, so no caller writes the branch twice.
+ *
+ * ⚠️ `every` IS ARITY AND NOT A SIXTH SOURCE, which is why it rides beside `of`
+ * rather than replacing it. Every caller that asks WHERE a value comes from —
+ * the composition check that wants a subject, the one that wants a column that
+ * exists — asks exactly the same question of `{ each: "record" }` as of
+ * `"record"`, and would have had to unwrap it first to get the same answer.
+ * Only the two resolvers read `every`, because only they build a value.
+ */
 export const fillOf = (
   one: Fill,
-): { readonly of: "record" | "today" | "year" }
+): (
+  | { readonly of: "record" | "today" | "year" }
   | { readonly of: "field"; readonly field: string }
   | { readonly of: "says"; readonly says: Said }
-  | { readonly of: "picked"; readonly picked: string } => (
-    typeof one === "string" ? { of: one }
-      : "field" in one ? { of: "field", field: one.field }
-        : "picked" in one ? { of: "picked", picked: one.picked }
-          : { of: "says", says: one.says });
+  | { readonly of: "picked"; readonly picked: string }
+) & { readonly every: boolean } => {
+  const every = typeof one === "object" && "each" in one;
+  const source: FillFrom = every ? (one as { each: FillFrom }).each : (one as FillFrom);
+  return {
+    ...(typeof source === "string" ? { of: source } as const
+      : "field" in source ? { of: "field", field: source.field } as const
+        : "picked" in source ? { of: "picked", picked: source.picked } as const
+          : { of: "says", says: source.says } as const),
+    every,
+  };
+};
 
 /**
  * EVERY FILL AN ACT NEEDS, RESOLVED — the browser's half of `Fill`.
@@ -641,15 +678,22 @@ export const fillWith = (
   const out: Record<string, unknown> = {};
   for (const [name, one] of Object.entries(fills)) {
     const source = fillOf(one);
-    if (source.of === "record" && from.record) out[name] = from.record;
-    if (source.of === "today") out[name] = from.today;
-    if (source.of === "year") out[name] = Number(from.today.slice(0, 4));
-    
+    let value: unknown;
+    if (source.of === "record" && from.record) value = from.record;
+    if (source.of === "today") value = from.today;
+    if (source.of === "year") value = Number(from.today.slice(0, 4));
+
     if (source.of === "field") {
-      const value = from.held?.[source.field];
-      if (value !== undefined && value !== null && value !== "") out[name] = value;
+      const held = from.held?.[source.field];
+      if (held !== undefined && held !== null && held !== "") value = held;
     }
-    if (source.of === "says") out[name] = source.says;
+    if (source.of === "says") value = source.says;
+    /* ⚠️ WRAPPED ONLY WHERE THERE IS SOMETHING TO WRAP — see `Fill`. `[]` is not
+       "nothing supplied": a list-taking operation reads an empty list as "you
+       named no rows" and refuses saying so, which is a worse answer than the
+       required-field refusal a missing key gives, and a wrong one when the truth
+       is that the screen has not resolved its record yet. */
+    if (value !== undefined) out[name] = source.every ? [value] : value;
   }
   return out;
 };

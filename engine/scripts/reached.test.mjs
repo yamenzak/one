@@ -270,9 +270,10 @@ const WAITING = new Set([
   /* The AI lane's second half: `product.see` reads photographs and IS reached
      from the register flow; the preview of what it made is not drawn anywhere. */
   "inventory/product.preview",
-  /* Both need a screen of their own rather than a control on an existing one —
-     a bulk import, and the label printer. */
-  "inventory/product.import", "inventory/product.label",
+  /* A bulk import needs a screen of its own — a paste, a preview of what the
+     columns were read as, and only then a write. It is the one act in this
+     product where pressing the control is not the decision. */
+  "inventory/product.import",
   /* THE RELEASE RAIL, WHOLE. A batch is opened, filled, ended, then held until
      somebody releases it or fails it — and recalled or lifted afterwards. Seven
      verbs, one feature, gated on `processes`, and its screens were emptied with
@@ -295,10 +296,28 @@ const subjectsIn = (entries) => new Set(entries
   .map(([whole]) => /^\s*\{[^{}]*\bof:\s*"([^"]+)"/.exec(whole)?.[1])
   .filter(Boolean));
 
-/** Every `<collection>.<verb>` the manifest declares as a write, in order. */
-const writesIn = (src) => [...src.matchAll(
-  /id:\s*"([a-z]+)\.([a-z_]+)",\s*\n\s*kind:\s*"write"/g)]
-  .map((m) => [m[1], `${m[1]}.${m[2]}`]);
+/**
+ * Every `<collection>.<verb>` the manifest declares as a write, in order.
+ *
+ * ⚠️ AND THE SECOND PATTERN IS A VERB WHOSE ID IS AN ARGUMENT, WHICH THE FIRST
+ * COULD NOT SEE AT ALL. `location.label` is built by a factory shared with
+ * `product.label` — `operation({ id, kind: "write" })`, with the id passed in —
+ * so there is no `id: "location.label"` anywhere in the tree and this guard
+ * never asked about it. Not a false pass: a verb it does not know exists is one
+ * it cannot report, and the shelf-labelling half of a scanning product sat
+ * callable by nobody underneath a green run.
+ *
+ * ⚠️ THE CALL SITE IS ALSO ITS DECLARATION — see `namesIt`. Both halves are
+ * needed and either alone is worse than neither: seeing the verb without
+ * discounting its construction reports it as permanently wired, and discounting
+ * the construction without seeing the verb discounts nothing.
+ */
+const writesIn = (src) => [
+  ...[...src.matchAll(/id:\s*"([a-z]+)\.([a-z_]+)",\s*\n\s*kind:\s*"write"/g)]
+    .map((m) => [m[1], `${m[1]}.${m[2]}`]),
+  ...[...src.matchAll(/=\s*\w+\(\s*"([a-z]+)\.([a-z_]+)"/g)]
+    .map((m) => [m[1], `${m[1]}.${m[2]}`]),
+];
 
 /**
  * ⚠️ A MENTION THAT IS NOT ITS OWN DECLARATION. An operation is reached by being
@@ -313,10 +332,18 @@ const writesIn = (src) => [...src.matchAll(
  * raw source would have called it wired for the month it was not. `strip` blanks
  * every comment before any of this runs, and the same rule the screen half above
  * records: a sentence about where something is reached from is not reaching it.
+ *
+ * ⚠️ AND AN ID HANDED TO A FACTORY IS A DECLARATION TOO, which `id: "…"` alone
+ * could not see. `location.label` is built by a function taking its id as an
+ * argument, so its only appearance in the tree was its own construction site —
+ * one quote, no `id:` line, counted as a reach, and the verb was reported as
+ * wired through every run in which nothing could call it. That is precisely the
+ * "appears once, where it is defined" case above, wearing a different syntax.
  */
 const namesIt = (hay, op) => {
-  const quoted = new RegExp(`"${op.replace(".", "\\.")}"`, "g");
-  const declared = new RegExp(`id:\\s*"${op.replace(".", "\\.")}"`, "g");
+  const one = op.replace(".", "\\.");
+  const quoted = new RegExp(`"${one}"`, "g");
+  const declared = new RegExp(`(?:id:\\s*|\\w+\\(\\s*)"${one}"`, "g");
   return [...hay.matchAll(quoted)].length > [...hay.matchAll(declared)].length;
 };
 
