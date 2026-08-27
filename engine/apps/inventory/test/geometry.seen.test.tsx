@@ -41,7 +41,8 @@ import { chromium, type Browser } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   DESK, ENOUGH_TO_RANK, FINGER, PHONE, SCALE_CEILING,
-  contrastOf, geometryOf, isLarge, mixedHeads, mounted, sayHeads, sayTwins, strayTwins, scaleOf,
+  contrastOf, geometryOf, isLarge, mixedHeads, mounted, outOfGutter, outOfRhythm,
+  sayHeads, sayTwins, strayTwins, scaleOf,
   stylesheet, tooSmall, unreadable,
 } from "@engine/design/measuring";
 import { INVENTORY_ROUTES, INVENTORY_SURFACES } from "../src/screens/index.js";
@@ -298,6 +299,32 @@ describe("the headings on every screen", () => {
       const seen = await at(route, PHONE);
       const mixed = mixedHeads(seen.heads);
       expect(mixed, `${route}: ${sayHeads(mixed)}`).toEqual([]);
+    }, 30_000);
+  }
+});
+
+/**
+ * ONE COLUMN, ONE GUTTER, ONE RHYTHM — see `Geometry.column`.
+ *
+ * ⚠️ NO COMPONENT CAN ASK THIS, WHICH IS WHY IT IS HERE AND NOT A CLASS CHECK.
+ * A screen is a hero, a narrowing, its blocks and its way out, each drawn by
+ * something that knows only its own children — so the space BETWEEN them is
+ * nobody's, and every part can be right while the column reads as two rhythms.
+ * That is what it did: a stacked body opened a second `data-blocks` container
+ * inside the frame's, and a screen's gaps changed part way down for no reason a
+ * reader could see.
+ */
+describe("the column on every screen", () => {
+  for (const route of EVERY) {
+    it(`sits at one gutter: ${route}`, async () => {
+      const odd = outOfGutter((await at(route, PHONE)).column, PHONE.width);
+      expect(odd, `${route}: ${odd.map((o) => `[${o.left}..${o.right}] "${o.text}"`).join(" · ")}`)
+        .toEqual([]);
+    }, 30_000);
+
+    it(`keeps one rhythm down it: ${route}`, async () => {
+      const gaps = outOfRhythm((await at(route, PHONE)).column);
+      expect(gaps, `${route}: gaps of ${gaps.join("px, ")}px in one column`).toEqual([]);
     }, 30_000);
   }
 });

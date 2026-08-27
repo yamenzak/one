@@ -463,7 +463,87 @@ export interface Geometry {
     readonly rank: string; readonly count: number;
     readonly withLine: string; readonly noLine: string;
   }[];
+  /**
+   * THE PAINTED SECTIONS OF THE PAGE, IN ORDER, WITH THEIR EDGES.
+   *
+   * ⚠️ WHAT SOMEBODY SEES IS A COLUMN OF CARDS, AND NO COMPONENT CAN SEE IT. A
+   * screen's rhythm is not one container's `gap`: the hero, the narrowing, the
+   * blocks and the way out are four siblings, each drawn by something that knows
+   * only its own children, and the space BETWEEN them belongs to whatever they
+   * happen to land in. Every one of those components can be individually correct
+   * while the column reads as three different rhythms — which is the fault this
+   * exists to catch, and the reason it is a reading rather than a class check.
+   *
+   * ⚠️ `[data-blocks] > *`, WHICH IS THE SYSTEM'S OWN NAME FOR A TOP-LEVEL
+   * SECTION — see `Arriving`. The rhythm and the stagger are both positional on
+   * that container's DOM children, so those children are exactly what a screen's
+   * column IS; anything else here would be a second definition, and the first
+   * screen drawn in a way this one did not anticipate is where they part.
+   */
+  readonly column: readonly {
+    readonly left: number; readonly right: number;
+    readonly top: number; readonly bottom: number;
+    readonly text: string;
+  }[];
 }
+
+/** ⚠️ Sub-pixel layout is real; a section half a pixel out is not a finding. */
+const SAME = 1.5;
+
+/**
+ * THE DISTINCT PAIRS OF EDGES A PAGE'S SECTIONS SIT AT — one is a gutter, more
+ * than one is a column that does not line up.
+ */
+export const outOfGutter = (
+  column: Geometry["column"],
+  /** ⚠️ Needed to recognise the one section that is allowed to reach both edges. */
+  width: number,
+): Geometry["column"] => {
+  const seen: { left: number; right: number }[] = [];
+  const odd: Geometry["column"][number][] = [];
+  for (const [i, one] of column.entries()) {
+    /*
+      ⚠️ THE FIRST SECTION MAY REACH BOTH EDGES, AND ONLY THE FIRST. A `subject`
+      hero has no plate deliberately — it IS the top of the page, so it starts
+      where the crown starts rather than a gutter to the right of it, and a card
+      under it would put the two loudest things on the screen at two left edges.
+      That is a decision `HeroSpec` makes per kind and it reads as one.
+
+      ⚠️ ANYWHERE ELSE IT IS THE FAULT THIS EXISTS FOR. A card among cards, wider
+      than its neighbours by the width of the gutter, is not a system — it is one
+      component that forgot the padder, and it looks exactly like the deliberate
+      version until you notice the ones above and below it do not match.
+    */
+    if (i === 0 && one.left <= SAME && one.right >= width - SAME) continue;
+    const known = seen.find((s) =>
+      Math.abs(s.left - one.left) <= SAME && Math.abs(s.right - one.right) <= SAME);
+    if (known) continue;
+    seen.push({ left: one.left, right: one.right });
+    odd.push(one);
+  }
+  return odd.length > 1 ? odd : [];
+};
+
+/**
+ * THE GAPS BETWEEN CONSECUTIVE SECTIONS — one number is a rhythm, several is not.
+ *
+ * ⚠️ ONLY BETWEEN SECTIONS THAT SHARE A COLUMN. Two tiles side by side are peers
+ * on one row, and the vertical distance between a tile and the one under it is
+ * the grid's business rather than the page's; measured as a gap it would report
+ * every grid on every screen as out of rhythm.
+ */
+export const outOfRhythm = (column: Geometry["column"]): readonly number[] => {
+  const gaps: number[] = [];
+  for (let i = 1; i < column.length; i++) {
+    const over = column[i - 1]!;
+    const under = column[i]!;
+    if (under.top < over.bottom - SAME) continue;
+    if (Math.abs(over.left - under.left) > SAME) continue;
+    gaps.push(Math.round(under.top - over.bottom));
+  }
+  const distinct = [...new Set(gaps)].sort((a, b) => a - b);
+  return distinct.length > 1 ? distinct : [];
+};
 
 /**
  * ⚠️ THE ONE EXEMPTION, AND IT IS WRITTEN DOWN RATHER THAN QUIET. A tag's remove
@@ -980,7 +1060,34 @@ export async function geometryOf(
           ({ px: s.px, weight: s.weight, count: s.count, text: s.text }))
         .sort((a: { px: number }, b: { px: number }) => b.px - a.px);
       const ink = Array.from(inks.values());
-      return { spill, worst, targets, cut, type, ink, twins, heads };
+
+      /*
+        ⚠️ THE COLUMN A PERSON SEES — see `Geometry.column`. The ground is what
+        the page itself is painted, so a section is anything painted differently
+        from it; the outermost one wins, because a card inside a card is one
+        thing to look at and two to a walk that does not stop.
+      */
+      const sections: {
+        left: number; right: number; top: number; bottom: number; text: string;
+      }[] = [];
+      for (const held of Array.prototype.slice.call(
+        document.querySelectorAll("[data-blocks]"),
+      ) as Element[]) {
+        for (const el of Array.prototype.slice.call(held.children) as Element[]) {
+          const style = getComputedStyle(el);
+          if (style.display === "none" || style.visibility === "hidden") continue;
+          const box = el.getBoundingClientRect();
+          if (!box.width || !box.height) continue;
+          sections.push({
+            left: Math.round(box.left * 10) / 10, right: Math.round(box.right * 10) / 10,
+            top: Math.round(box.top * 10) / 10, bottom: Math.round(box.bottom * 10) / 10,
+            text: (el.textContent ?? "").trim().replace(/\s+/g, " ").slice(0, 40),
+          });
+        }
+      }
+      const column = sections.sort((a, b) => a.top - b.top || a.left - b.left);
+
+      return { spill, worst, targets, cut, type, ink, twins, heads, column };
     }, viewport.width);
   } finally {
     await page.close();

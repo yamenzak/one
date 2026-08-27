@@ -24,6 +24,7 @@ import {
   MEMBERSHIP, addShard, compPlan, createTenant, found, noteBelonging, noteShardApp,
   startSession, upsertAccount, type Db,
 } from "@engine/runtime";
+import { isDrawn } from "@engine/kernel";
 import { inventory } from "@engine/inventory";
 import worker, { APPS, LEGAL } from "../src/index.js";
 import { warm } from "./warm.js";
@@ -1063,5 +1064,76 @@ describe("a flow reaches the agent door", () => {
   it("leaves an operation nobody walks to alone", async () => {
     const found = (await tools()).find((tool) => tool.name === "product.recount");
     expect(found?.description).not.toContain("A person reaching this is asked");
+  });
+});
+
+/**
+ * ⚠️ THE SCREEN DOOR ANSWERS A FLOW, AND NOTHING DROVE IT UNTIL THIS FILE.
+ *
+ * A story screen has no body, so every derivation the door runs — the views, the
+ * acts, the choices — reads from a field that is not there. The browser draws the
+ * flow's controls out of the write's own `input`, so an `acts` map missing that
+ * one entry is not a degraded screen: it is an empty one, silently, with the
+ * shell still around it.
+ */
+describe("the door answers every screen it draws", () => {
+  const drawn = async (id: string): Promise<Said> => {
+    const res = await at(`/api/screen/${id}`, { headers: { cookie } });
+    return { status: res.status, body: await res.json() as Record<string, unknown> };
+  };
+
+  /*
+    ⚠️ EVERY ONE OF THEM, DERIVED — not the flow alone. `isDrawn` is what the
+    door asks, so this asks the same question of the same list: a screen the
+    kernel calls drawn and the door will not answer is a route in the nav whose
+    only outcome is a blank page. Written as one named screen it would have
+    covered the flow and nothing else, which is how the flow came to be the one
+    that broke.
+  */
+  it("answers all of them, and none is a 404", async () => {
+    const drawable = (inventory().screens ?? []).filter(isDrawn);
+    expect(drawable.length, "no screen is drawn — this asserts nothing").toBeGreaterThan(3);
+    for (const one of drawable) {
+      const said = await drawn(one.id);
+      expect(said.status, `${one.id}: ${JSON.stringify(said.body)}`).toBe(200);
+    }
+  });
+
+  /* ⚠️ AND A SCREEN THAT IS THE APP'S OWN CODE IS NOT THIS DOOR'S, which is the
+     other half of the same rule — a door answering everything would hand a
+     `session` screen an empty body it has no use for. */
+  it("leaves a screen that draws itself alone", async () => {
+    const own = (inventory().screens ?? []).filter((one) => !isDrawn(one));
+    for (const one of own) expect((await drawn(one.id)).status).toBe(404);
+  });
+
+  it("sends the write a flow walks toward, with the input its steps are drawn from", async () => {
+    const said = await drawn("add-a-product");
+    expect(said.status, JSON.stringify(said.body)).toBe(200);
+
+    const acts = said.body.acts as Record<string, { input?: Record<string, unknown> }>;
+    const write = acts["product.register"];
+    expect(write, `acts held ${JSON.stringify(Object.keys(acts))}`).toBeDefined();
+
+    /* ⚠️ THE INPUT, NOT MERELY THE KEY. Every step draws its controls out of the
+       write's declaration — `StepSpec.takes` names the fields and the input is
+       where their kind, label and options come from — so an entry that arrived
+       with an empty `input` is a flow of blank steps rather than no flow at all,
+       which is the harder version of this bug to see. */
+    const asked = (inventory().screens ?? [])
+      .find((one) => one.id === "add-a-product")!.story!.asks
+      .flatMap((step) => step.takes ?? []);
+    expect(asked.length, "no step takes a field — this asserts nothing").toBeGreaterThan(0);
+    for (const name of asked) {
+      expect(Object.keys(write!.input ?? {}), `nothing to draw ${name} from`).toContain(name);
+    }
+  });
+
+  /* ⚠️ AND THE READER THAT RUNS BEFORE ANYBODY IS ASKED — see `StorySpec.fills`.
+     It is an operation like any other and the browser sends the pictures to it,
+     so it has to arrive with its own input. */
+  it("sends the reader the flow fills from", async () => {
+    const acts = (await drawn("add-a-product")).body.acts as Record<string, unknown>;
+    expect(Object.keys(acts)).toContain("product.see");
   });
 });

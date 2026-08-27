@@ -28,7 +28,7 @@
  */
 
 import * as React from "react";
-import { Button, Drawer } from "@heroui/react";
+import { Button } from "@heroui/react";
 import type {
   Binding, BlockSpec, Fields, Format, GroupSpec, GuideBook, Layout, MilestoneBook, Placed, Presence,
   Raised, Read, SurfaceSpec, Viewed,
@@ -719,15 +719,25 @@ function Leaving({ has }: { readonly has: Has }) {
   return (
     <div className="flex justify-end">
       <PutAside
-        trigger={
-          <Drawer.Trigger>
-            {/* ⚠️ QUIET, AND THE WORD RATHER THAN A GLYPH. A bin icon alone at
-                the foot of a page is a control somebody has to press to find out
-                about, and this is the one control in the product where finding
-                out by pressing is not acceptable. */}
-            <Button variant="tertiary">{aside.bin ? "Delete" : "Put it away"}</Button>
-          </Drawer.Trigger>
-        }
+        /*
+          ⚠️ THE BUTTON ITSELF, NOT A BUTTON INSIDE `Drawer.Trigger`. The drawer's
+          root is a `DialogTrigger`, which wires its own button child — so
+          wrapping ours in `Drawer.Trigger` put one pressable inside another:
+          invalid HTML, two elements answering one press, and, since both carry a
+          generated id, the same name twice in the document, which is what hands
+          a screen reader the wrong element. It photographs perfectly, so only a
+          browser ever found it.
+
+          ⚠️ AND THE ANSWER IS NOT TO PUT THE BUTTON'S CLASSES ON THE TRIGGER.
+          That restyles a library component by hand (D7), and a class written
+          here is one a workspace's branding never reaches.
+
+          ⚠️ QUIET, AND THE WORD RATHER THAN A GLYPH. A bin icon alone at the
+          foot of a page is a control somebody has to press to find out about,
+          and this is the one control in the product where finding out by
+          pressing is not acceptable.
+        */
+        trigger={<Button variant="tertiary">{aside.bin ? "Delete" : "Put it away"}</Button>}
         name={aside.name}
         /* ⚠️ THE COLLECTION'S OWN WORD, MID-SENTENCE — "The product itself is
            kept". `label.one` is a heading and is capitalised for one. */

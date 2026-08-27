@@ -16,7 +16,8 @@ import { join } from "node:path";
 import { chromium, type Browser } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
-  DESK, PHONE, geometryOf, mixedHeads, mounted, sayHeads, sayTwins, strayTwins, stylesheet, tooSmall,
+  DESK, PHONE, geometryOf, mixedHeads, mounted, outOfGutter, outOfRhythm,
+  sayHeads, sayTwins, strayTwins, stylesheet, tooSmall,
 } from "@engine/design/measuring";
 import { GROUND_ROUTES } from "../src/screens/index.js";
 
@@ -119,6 +120,24 @@ describe("the headings on every ground screen", () => {
       const seen = await at(route, PHONE);
       const mixed = mixedHeads(seen.heads);
       expect(mixed, `${route}: ${sayHeads(mixed)}`).toEqual([]);
+    }, 30_000);
+  }
+});
+
+/*
+  ⚠️ AND THE SAME QUESTION OF THE GROUND, for the reason every sweep here is
+  asked of both: a column that changes rhythm part way down is caught before it
+  is copied into a product, rather than after.
+*/
+describe("the column on every ground screen", () => {
+  for (const route of GROUND_ROUTES) {
+    it(`sits at one gutter and keeps one rhythm: ${route}`, async () => {
+      const seen = await at(route, PHONE);
+      const odd = outOfGutter(seen.column, PHONE.width);
+      expect(odd, `${route}: ${odd.map((o) => `[${o.left}..${o.right}] "${o.text}"`).join(" · ")}`)
+        .toEqual([]);
+      const gaps = outOfRhythm(seen.column);
+      expect(gaps, `${route}: gaps of ${gaps.join("px, ")}px in one column`).toEqual([]);
     }, 30_000);
   }
 });

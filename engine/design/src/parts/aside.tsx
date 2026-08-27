@@ -34,7 +34,7 @@ import { glyphOf } from "../frame/shell.js";
 type Asking = "bin" | "freeze";
 
 export interface PutAsideProps {
-  /** The control that opens it — a `Drawer.Trigger` wrapping a button. */
+  /** ⚠️ The button itself. The root is a `DialogTrigger` and wires it — see `Leaving`. */
   readonly trigger: React.ReactNode;
   /**
    * ⚠️ WHAT IT IS CALLED, IN THE QUESTION. "Delete this?" over a list somebody

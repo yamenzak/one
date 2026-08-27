@@ -426,7 +426,7 @@ and a manifest that does not compose refuses to boot.
 | `gate` | the eight gates, in the order that decides which sentence somebody reads first | 3 | — |
 | `surface` | a screen declared — its shape, its blocks, and the closed vocabulary they bind through | 26 | — |
 | `blocks` | which blocks a screen may name at all | 3 | — |
-| `manifest` | the whole app, and the composition that refuses a broken one | 14 | — |
+| `manifest` | the whole app, and the composition that refuses a broken one | 15 | — |
 | `entitlement` | what a plan includes, and the allowance algebra over it | 17 | — |
 | `credit` | metered work: the reserve, the rate, the ceiling | 15 | — |
 | `dunning` | the ladder from past due to erased | 5 | — |
@@ -448,7 +448,7 @@ and a manifest that does not compose refuses to boot.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**323 of them**, 322 reached by something today.
+**324 of them**, 323 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 

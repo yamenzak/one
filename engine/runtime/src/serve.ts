@@ -26,7 +26,7 @@ import type {
 } from "@engine/kernel";
 import {
   IN_GOOD_STANDING, LEGAL_INDEX, LEGAL_PATH, PLATFORM_PROBLEMS, PROOF_WINDOW_MS, blockedBy, check,
-  checkAll, doorFor, newId, passagesOf, problem, resolveFlags,
+  checkAll, doorFor, isDrawn, newId, passagesOf, problem, resolveFlags,
 } from "@engine/kernel";
 import { compose, type Composed, type Resolved as ResolvedOp } from "./compose.js";
 import { switchesFor } from "./flags.js";
@@ -841,7 +841,9 @@ export function serve(wiring: Wiring): (request: Request) => Promise<Response> {
         const make = wiring.apps[appId];
         if (!make) continue;
         const app = make();
-        const screen = (app.screens ?? []).find((one) => one.id === want && one.body);
+        /* ⚠️ `isDrawn`, NOT A BODY. The kernel owns which screens this door
+           answers — see there for what asking twice cost. */
+        const screen = (app.screens ?? []).find((one) => one.id === want && isDrawn(one));
         if (!screen) continue;
         if (request.method !== "GET") {
           return refusing(problem(PLATFORM_PROBLEMS, "platform.not_found"));

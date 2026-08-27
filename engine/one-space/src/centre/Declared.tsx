@@ -18,7 +18,9 @@
  */
 
 import * as React from "react";
-import { ready, trouble, useTelling, waiting, type Loaded } from "@engine/design";
+import {
+  Await, Trouble, Waiting, ready, trouble, useTelling, waiting, type Loaded,
+} from "@engine/design";
 import { Doing, asks, type Ran } from "@engine/design/doing";
 /* ⚠️ NOT THROUGH THE BARREL, WHICH IS THE RENDERER'S OWN RULE. `@engine/design`
    re-exports thirty components; the entry chunk carries the contract and this
@@ -34,7 +36,7 @@ const Create = React.lazy(() => import("@engine/design/create")
    browser bundle — so what both ends need is declared once, in the layer both
    are allowed to reach. */
 import {
-  BLOCKS, SCREEN_PATH, askedOf, fillOf, isGroup, verbId, viewsIn,
+  BLOCKS, PLATFORM_PROBLEMS, SCREEN_PATH, askedOf, fillOf, isGroup, problem, verbId, viewsIn,
   type Fields, type Fill, type GuideBook, type MilestoneBook, type Problem, type Raised,
   type ScreenSpec,
   type SurfaceSpec, type Viewed,
@@ -425,17 +427,32 @@ export function Declared({ screen, screens, at, go, currency, app }: {
     ...(wantsBook ? { book } : {}),
   }), [got.of, ids, onGo, onDo, currency, picked, named, wantsBook, book, editing, onAside]);
 
+  /*
+    ⚠️ A FLOW WAITS AND FAILS OUT LOUD, LIKE EVERY OTHER SCREEN. It used to be
+    handed `acts` and render `null` when the write was not in them — which is
+    true while the request is in flight and true forever if the door refuses, so
+    a 404 on the screen door and a round trip in progress drew the same thing:
+    the shell, and nothing inside it. `Await` is what the rest of the surface
+    uses, and it orders the three the same way here.
+  */
   if (screen.story) {
     return (
-      <React.Suspense fallback={null}>
-        <Flow
-          screen={screen}
-          acts={acts}
-          run={run}
-          made={made}
-          onGo={onGo}
-          chose={app.chose ?? {}}
-          metered={app.metered ?? []}
+      <React.Suspense fallback={<Waiting />}>
+        <Await
+          of={got.of}
+          waiting={<Waiting />}
+          again={got.again}
+          then={(drawn) => (
+            <Flow
+              screen={screen}
+              acts={drawn.acts}
+              run={run}
+              made={made}
+              onGo={onGo}
+              chose={app.chose ?? {}}
+              metered={app.metered ?? []}
+            />
+          )}
         />
       </React.Suspense>
     );
@@ -620,7 +637,23 @@ function Flow({ screen, acts, run, made, onGo, chose, metered }: {
     })();
   }, [fills, given, write, tell]);
 
-  if (!write) return null;
+  /*
+    ⚠️ AND IF THE WRITE IS STILL NOT THERE, IT SAYS SO. The door answered, so
+    this is not a round trip in progress — it is a flow walking toward an
+    operation this app does not offer, which `refuseSurface` refuses at
+    composition and so should be unreachable. `return null` is what made the
+    same line cover a real 404 for as long as it did: the one shape that cannot
+    be told apart from a screen that is simply empty.
+  */
+  /* ⚠️ RAISED FROM THE CATALOGUE, LIKE EVERY OTHER REFUSAL — the `ref` names the
+     operation, so what somebody reports is the flow and the write it wanted. */
+  if (!write) {
+    return (
+      <Trouble
+        problem={problem(PLATFORM_PROBLEMS, "platform.unavailable", {}, { ref: told.writes })}
+      />
+    );
+  }
 
   return (
     <Create

@@ -367,9 +367,22 @@ export function Arranged({ layout, children, aside }: {
   if (layout.as === "split") {
     return <Columns aside={aside} side={layout.aside}>{children}</Columns>;
   }
-  /* ⚠️ `blocks`, because the rhythm between a screen's blocks is measured from
-     the DOM rather than from a walk over React children — see `rhythm`. */
-  return <Stack space="roomy" blocks>{children}</Stack>;
+  /*
+    ⚠️ A FRAGMENT, SO A STACKED BODY JOINS THE SCREEN'S OWN COLUMN RATHER THAN
+    STARTING A SECOND ONE. This was `<Stack space="roomy" blocks>`, and it put a
+    second `data-blocks` container INSIDE the frame's — see `Arriving`. Both
+    halves of that container's job are positional on its DOM children, so nesting
+    broke both: the screen's rhythm became two rhythms, one per container, which
+    is a column whose gaps change part way down for no reason a reader can see;
+    and the stagger restarted at the nested one, so the blocks under it all
+    arrived on the delay of a first block.
+
+    ⚠️ AND THE OTHER TWO LAYOUTS ARE NOT THE SAME CASE. A grid and a split are
+    ONE section of the column — several things arranged inside one box, spaced by
+    that box — so they are a child of the screen's stack rather than a rival to
+    it. A stack is not: it is the column itself, said twice.
+  */
+  return <>{children}</>;
 }
 
 /**

@@ -205,6 +205,23 @@ export interface ScreenSpec {
   readonly body?: SurfaceSpec;
 }
 
+/**
+ * WHETHER THE SCREEN DOOR IS THE ONE THAT ANSWERS THIS SCREEN.
+ *
+ * A body is read and a story is walked, and both are drawn from what
+ * `/api/screen/<id>` sends — the views, the record, the acts and their input. A
+ * screen with neither is the app's own code and asks the door for nothing.
+ *
+ * ⚠️ ONE ANSWER, BECAUSE THE DOOR HELD A SECOND ONE AND IT WAS WRONG. It matched
+ * on a body alone, so every declared flow 404'd: the browser's `acts` map stayed
+ * empty, the flow drew nothing, and what a person saw was the shell around a
+ * blank page — no problem, no skeleton, nothing to say what had happened. The
+ * read layer under it was already right and was never reached. Anything deciding
+ * what the door will answer asks here rather than re-deciding.
+ */
+export const isDrawn = (screen: ScreenSpec): boolean =>
+  Boolean(screen.body ?? screen.story);
+
 /** A flow of questions, declared. */
 export interface StorySpec {
   /**
