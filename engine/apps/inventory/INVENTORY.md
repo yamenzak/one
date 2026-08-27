@@ -496,6 +496,56 @@ written to catch that excused them for having no surface at all — which is the
 case where the surface is what is missing. The widened reach guard is what said
 so.
 
+### What a case, a work order or a build number used
+
+A **job** is a consuming context that references something outside the system —
+a patient case, a work order, a build number, a service call, a cook, a room
+turnaround. What makes it general is that the reference is a **label the
+workspace chose** rather than a record this app holds: the moment it became a
+patient it stopped being sellable to a factory.
+
+Open one at `/jobs`, take stock against it from `/job`, and close it when the
+work is done. Nothing else changes about a movement — it comes off the shelf
+through the same chokepoint, writes the same ledger row and counts against the
+same quota. What the job adds is which promise the movement answered.
+
+⚠️ **AND A JOB HAS NO LINE TABLE, DELIBERATELY.** What it consumed is already in
+the ledger against its id, so the trace is a QUERY. That is why a job correct on
+Tuesday acquires a concern on Thursday — a recall lands on a lot it used — and
+why the screen leads with what is **in doubt** rather than with how many lines
+it took. A status written when the job closed can never learn that.
+
+⚠️ **THREE VERBS AND A PRICED ENTITLEMENT, AND NOT ONE DOOR UNTIL NOW.** `jobs`
+is sold — a gate every tier that carries it names — so this was a capability a
+workspace could pay for and never see. That is sharper than an unreached verb,
+because somebody was charged for it.
+
+### The words a catalogue is filed under
+
+A **tag** is a word this workspace uses for a kind of thing, and it is a
+vocabulary rather than a string on each product. Asking a model to categorise
+something against nothing produces "Cleaning", "Cleaning products", "Cleaning
+supplies" and "Janitorial" across four mornings — every one defensible, and the
+catalogue is then unfilterable by the thing it was categorised for. A table can
+be READ before it is written to, so registering a product asks "which of these
+does it belong to" rather than "what would you call this".
+
+`/words` is the list, `/word` is one of them with everything filed under it, and
+a product's own page says what kind of thing it is. Renaming lands in one place
+and every product under it follows — which is the whole argument for the table,
+and which nothing could do until `tag.rename` existed.
+
+⚠️ **RENAMING ONTO A WORD THAT EXISTS IS REFUSED**, which is the match-before-mint
+rule read the other way round. Registration matches a word before it makes one,
+so "Cleaning" and "cleaning" are one row; a rename that ignored the match would
+put the second word back and undo it, quietly, on the one table whose value is
+that it holds each word once.
+
+⚠️ **AND THE REGISTER FLOW HAD BEEN ASKING SINCE OI-18a WITH NOTHING SHOWING IT
+BACK.** Every word somebody typed was matched, minted and filed, and no screen in
+the product ever displayed one — so the honest description of that step was that
+it asked for work and discarded it politely.
+
 ### Labels
 
 A shelf has no manufacturer, so its code is always ours. A product usually has
@@ -624,21 +674,26 @@ product in this repository to photograph any other way: the interesting states
 are a line that ran out, one nobody has touched since spring, and a shelf
 somebody labelled and never filled.
 
-### Eighteen collections
+### Twenty collections
 
 `product` · `supplier` · `code` · `location` · `batch` · `unit` · `kit` ·
 `process` · `process-item` · `job` · `count` · `tally` · `stock` · `ledger` ·
-`shot` · `tag` · `tagging` · `sourcing`
+`shot` · `tag` · `tagging` · `sourcing` · `buying` · `buying-line`
 
 Erasure is derived from what each one declares; nothing here carries a
 hand-written cascade.
 
-### Fifty operations
+### Sixty-one operations
 
 Grouped by what they are about: the shelf (`stock.*`), the code book (`code.*`),
 deliveries (`batch.*`), objects (`unit.*`), kits (`kit.*`), counting
-(`count.*`), the rail (`process.*`), jobs (`job.*`), the catalogue
-(`product.*`), and the report.
+(`count.*`), the rail (`process.*`), jobs (`job.*`), buying (`buying.*`), the
+words a catalogue is filed under (`tag.*`), the catalogue (`product.*`), the
+workspace's own defaults (`inventory.*`), and the report.
+
+⚠️ **RECOUNT IT RATHER THAN TRUSTING THIS SENTENCE.** It said fifty for two
+rounds after the purchasing rail landed, which is what every hand-kept figure in
+this repository eventually does.
 
 ### Six settings
 
@@ -732,6 +787,8 @@ follows and the shape every screen is drawn to.
 | `/place` | Place | — | `location:read` | `declared` | `declared` |
 | `/runs` | Runs | primary | `process:read` | `declared` | `declared` |
 | `/run` | Run | — | `process:read` | `declared` | `declared` |
+| `/jobs` | Jobs | — | `process:read` | `declared` | `declared` |
+| `/job` | Job | — | `process:read` | `declared` | `declared` |
 | `/orders` | Orders | — | `order:read` | `declared` | `declared` |
 | `/order` | Order | — | `order:read` | `declared` | `declared` |
 | `/suppliers` | Suppliers | — | `order:read` | `declared` | `declared` |
@@ -740,6 +797,8 @@ follows and the shape every screen is drawn to.
 | `/item` | Item | — | `stock:read` | `declared` | `declared` |
 | `/kits` | Kits | — | `stock:read` | `declared` | `declared` |
 | `/kit` | Kit | — | `stock:read` | `declared` | `declared` |
+| `/words` | Tags | — | `product:read` | `declared` | `declared` |
+| `/word` | Tag | — | `product:read` | `declared` | `declared` |
 | `/add` | Add a product | — | `product:write` | `declared` | `declared` |
 | `/import` | Bring in a spreadsheet | — | `stock:adjust` | `declared` | `declared` |
 

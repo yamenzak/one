@@ -29,8 +29,9 @@ import { inventory } from "../index.js";
 import { INVENTORY_SESSIONS, INVENTORY_SURFACES } from "./index.js";
 import {
   BUYING, CODES, COUNTED, COUNTS, DAILY, DISAGREES, DUE_FOR_SERVICE, ITEMS, KIT_MEMBERS,
-  KIT_ROWS, KIT_SHORT, LEFT, LINES, MOVING, ORDERS, ORDER_LINES, PLACES, RUNNING, RUNS,
-  RUN_ITEMS, SUPPLIERS, SUPPLIES, THINGS, TOLD, WRONG,
+  FILINGS, JOBS, JOB_USED, KIT_ROWS, KIT_SHORT, LEFT, LINES, MOVING, ORDERS, ORDER_LINES, PLACES,
+  RUNNING, RUNS,
+  RUN_ITEMS, SUPPLIERS, SUPPLIES, THINGS, TOLD, WORDS, WRONG,
 } from "./sample.js";
 
 /** ⚠️ Every permission a screen names, so none of them is undrawable here. */
@@ -355,6 +356,17 @@ const ORDER_FIRST = { ...(ORDERS.find((one) => one.state === "placed") ?? ORDERS
  */
 const ITEM_FIRST = { ...(ITEMS.find((one) => one.life === "issued") ?? ITEMS[0]!) };
 
+/** ⚠️ And the word the detail page opens on, picked for having more than one
+    product under it — a tag filed against nothing photographs the empty state. */
+const WORD_FIRST = { ...(WORDS.find((one) => one.id === "tag-1") ?? WORDS[0]!) };
+
+/**
+ * ⚠️ AND THE JOB THAT IS OPEN, because that is the standing where the detail page
+ * draws its acts — taking stock against it, and closing it. A closed one
+ * photographs the same page with the act group missing.
+ */
+const JOB_FIRST = { ...(JOBS.find((one) => one.state === "open") ?? JOBS[0]!) };
+
 /** ⚠️ And the kit that is SHORT, which is the state its screen exists for. */
 const KIT_FIRST = { ...(KIT_ROWS.find((one) => one.state === "open") ?? KIT_ROWS[0]!) };
 
@@ -371,7 +383,9 @@ const firstOf = (collection: string): Readonly<Record<string, unknown>> | undefi
           : collection === "buying" ? ORDER_FIRST
             : collection === "supplier" ? SUPPLIER_FIRST
               : collection === "unit" ? ITEM_FIRST
-                : collection === "kit" ? KIT_FIRST : undefined;
+                : collection === "kit" ? KIT_FIRST
+                  : collection === "job" ? JOB_FIRST
+                    : collection === "tag" ? WORD_FIRST : undefined;
 
 /**
  * ⚠️ WHAT THE DOOR WOULD TITLE THIS SCREEN — see `Drawn.name` and D106. A screen
@@ -549,6 +563,16 @@ const SEEN: Has = {
       .filter((one) => one.supplier === SUPPLIER_FIRST.id).map((one) => ({ ...one }))),
     "on-this-order": rows(ORDER_LINES
       .filter((one) => one.buying === ORDER_FIRST.id).map((one) => ({ ...one }))),
+    "jobs": rows(JOBS.map((one) => ({ ...one }))),
+    /* ⚠️ NOT NARROWED BY A COLUMN, because the trace is not one. `job.trace`
+       reads the LEDGER backwards for takes that named this job, so the fixture
+       stands in for the operation's answer rather than for a table. */
+    "used-on-this-job": rows(JOB_USED.map((one) => ({ ...one }))),
+    "words": rows(WORDS.map((one) => ({ ...one }))),
+    "words-on-this": rows(FILINGS
+      .filter((one) => one.product === FIRST.id).map((one) => ({ ...one }))),
+    "filed-under-this": rows(FILINGS
+      .filter((one) => one.tag === WORD_FIRST.id).map((one) => ({ ...one }))),
   },
 };
 

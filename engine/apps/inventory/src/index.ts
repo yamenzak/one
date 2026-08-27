@@ -46,6 +46,7 @@ import {
   ORDERS, afterArrival, outstanding, refuseArrival, refuseOrder, saysLine,
   type Line, type Order, type OrderAct,
 } from "./ordering.js";
+import { saysUsed, type Doubt } from "./tracing.js";
 import {
   KITS, LIVES, checkKit, refuseAct, refuseKitAct, shelfStep, wantsIn,
   type Act, type KitState, type Life, type Short,
@@ -526,6 +527,12 @@ const tag = collection({
   retention: null,
   onClose: { then: "purge" },
   offline: "cache",
+  /* ⚠️ MINTED BY REGISTRATION AND RENAMED BY ITS OWN VERB, NEVER MADE BY HAND.
+     A generic update beside `tag.rename` would be a second way to change a word
+     — one that checks for a clash and one that does not — and the table's whole
+     value is that it holds each word once. A tag typed into a form with no
+     product on it is a word filed under nothing. */
+  without: ["create", "update", "delete"],
   /* ⚠️ The whole point of the table: a tag is looked up by its word. */
   searchable: ["name"],
   fields: {
@@ -2592,6 +2599,65 @@ const learn = operation<
       .run();
 
     return { value: of.value };
+  },
+});
+
+/* ----------------------------------------------------------------- words --- */
+
+/**
+ * RENAMING A WORD THE WORKSPACE FILES THINGS UNDER.
+ *
+ * ⚠️ `tagging` SAYS "SO A TAG CAN BE RENAMED IN ONE PLACE" AND NOTHING COULD.
+ * The join was declared for exactly this and the verb was never written, so the
+ * argument for a table over a string on each product — the whole reason the
+ * catalogue stays filterable — was a promise in a comment.
+ *
+ * ⚠️ AND RENAMING ONTO A WORD THAT EXISTS IS REFUSED, which is `tag`'s own rule
+ * read the other way round. `product.register` MATCHES before it mints, so
+ * "Cleaning" typed today and "cleaning" typed in March are one row; a rename
+ * that ignored the match would put the second word back and undo it — quietly,
+ * on the one table whose value is that it holds each word once.
+ */
+const renameTag = operation<{ tag: string; name: string }, { name: string }>({
+  id: "tag.rename",
+  kind: "write",
+  summary: "Rename a tag",
+  input: {
+    tag: field.text({ label: "Tag", required: true, holds: "none" }),
+    name: field.text({ label: "Tag", required: true, holds: "none", max: 60 }),
+  },
+  output: { name: field.text({ label: "Tag", holds: "none" }) },
+  permission: "product:write",
+  idempotency: { mode: "key" },
+  emits: ["tag.renamed"],
+  outcome: {
+    message: "Renamed.", tone: "success", invalidates: ["tag.list", "tagging.list"],
+  },
+  fails: ["platform.not_found", "inventory.wordTaken"],
+  audit: (input) => ({ subject: input.tag, verb: "renamed the tag" }),
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const db = c.db as Db;
+    const name = input.name.trim();
+    if (!name) return c.fail("platform.invalid", {}, { fields: { name: "Say what to call it" } });
+
+    const held = await db.prepare(
+      `SELECT id FROM tag WHERE tenant_id = ? AND id = ?`)
+      .bind(c.tenantId, input.tag).first<{ id: string }>();
+    if (!held) c.fail("platform.not_found");
+
+    /* ⚠️ CASE-INSENSITIVE, AND AGAINST EVERY OTHER ROW — the same comparison
+       `product.register` matches on. Anything narrower lets the duplicate in
+       through the door the register flow closes. */
+    const clash = await db.prepare(
+      `SELECT name FROM tag WHERE tenant_id = ? AND lower(name) = ? AND id <> ? LIMIT 1`)
+      .bind(c.tenantId, name.toLowerCase(), input.tag).first<{ name: string }>();
+    if (clash) c.fail("inventory.wordTaken", { name: clash.name });
+
+    await db.prepare(
+      `UPDATE tag SET name = ?, edited_at = ?, edited_by = ? WHERE id = ? AND tenant_id = ?`)
+      .bind(name, c.now, c.accountId ?? null, input.tag, c.tenantId).run();
+    return { name };
   },
 });
 
@@ -5507,7 +5573,13 @@ const closeJob = operation<{ job: string; day: string }, { state: string }>({
  */
 interface Consumed {
   movement: string; product: string; name: string; quantity: number;
-  batch: string; lot: string; at: string; doubt: string;
+  batch: string; lot: string; at: string; doubt: Doubt;
+  /* ⚠️ THE ROW AS A SENTENCE — see `saysUsed`. A `Listing` folds to a name, a
+     line under it and one value at the end, so how many, which lot and whether
+     that lot is in question cannot be three columns without two of them arriving
+     as bare strings nobody can tell apart. The wording is pure and tested; the
+     screen draws it. */
+  says: string;
 }
 
 const traceJob = operation<
@@ -5549,25 +5621,30 @@ const traceJob = operation<
       .all<{ movement: string; product: string; delta: number; at: string;
         batch: string; lot: string; standing: string; name: string; verdict: string }>();
 
-    const items = rows.results.map((row): Consumed => ({
-      movement: row.movement,
-      product: row.product,
-      name: row.name,
-      quantity: Math.abs(row.delta),
-      batch: row.batch,
-      lot: row.lot,
-      at: row.at,
+    const items = rows.results.map((row): Consumed => {
       /*
         ⚠️ THE DOUBT IS COMPUTED HERE, FROM WHAT IS TRUE NOW. A lot frozen since
         the job closed is a concern; one a run failed and somebody unfroze is a
         different concern, and both are the reason this read exists.
       */
-      doubt: row.standing === "held"
+      const doubt: Doubt = row.standing === "held"
         ? "held"
         : row.verdict === "failed" || row.verdict === "lifted"
           ? "not released"
-          : "",
-    }));
+          : "";
+      const quantity = Math.abs(row.delta);
+      return {
+        movement: row.movement,
+        product: row.product,
+        name: row.name,
+        quantity,
+        batch: row.batch,
+        lot: row.lot,
+        at: row.at,
+        doubt,
+        says: saysUsed({ quantity, lot: row.lot, doubt }),
+      };
+    });
 
     return { items, doubted: items.filter((i) => i.doubt).length };
   },
@@ -6967,7 +7044,7 @@ const manifest = (): AppSpec => defineApp({
     openRun, loadRun, endRun, releaseRun, failRun, recallRun, liftHold, lateResult,
     openOrder, addLine, dropLine, placeOrder, receiveLine, closeOrder, cancelOrder,
     orderLines,
-    openJob, closeJob, traceJob,
+    openJob, closeJob, traceJob, renameTag,
     labelPlaces, labelThings, shelf, report, history, seeImport, doImport,
   ],
 
@@ -7050,6 +7127,40 @@ const manifest = (): AppSpec => defineApp({
        so a verdict stored on the run would make those two the same row. */
     { id: "in-this-run", of: "process-item",
       where: [{ field: "process", is: { here: "record" } }] },
+    /*
+      ⚠️ EVERY CASE, WORK ORDER OR BUILD NUMBER THIS WORKSPACE HAS OPENED — the
+      collection three verbs have been writing into since OI-10 with nothing
+      reading it back, on an entitlement that is priced and sold.
+
+      ⚠️ NEWEST FIRST, because an open job is a job somebody is standing in
+      front of. The oldest is a case closed years ago.
+    */
+    { id: "jobs", of: "job", limit: 100, sort: { by: "opened", dir: "down" } },
+    /*
+      ⚠️ THE WORDS THIS WORKSPACE FILES THINGS UNDER — the vocabulary
+      `product.register` has been minting since OI-18a with nothing reading it
+      back. A tag matched before it is minted is the mechanism that keeps a
+      catalogue filterable; a tag nobody can see is a mechanism nobody can trust,
+      because there is no way to find out it is working.
+    */
+    { id: "words", of: "tag", limit: 200, sort: { by: "name", dir: "up" } },
+    /* ⚠️ WHAT ONE PRODUCT IS FILED UNDER. The join is what makes a rename land
+       in one place, which is `tagging`'s whole reason to exist. */
+    { id: "words-on-this", of: "tagging",
+      where: [{ field: "product", is: { here: "record" } }] },
+    /* ⚠️ AND THE OTHER DIRECTION, which is the question the table was declared
+       for: everything filed under this word. */
+    { id: "filed-under-this", of: "tagging",
+      where: [{ field: "tag", is: { here: "record" } }] },
+    /*
+      ⚠️ ASKED, AND THE LEDGER IS THE LINE TABLE — see `job.trace`. A job records
+      nothing of its own; every take against it already named it in `against`, so
+      what it used is a QUERY and the doubt is computed from what is true NOW. A
+      stored list would be a copy that can disagree with the history, and the
+      history is what an audit reads.
+    */
+    { id: "used-on-this-job", of: "ledger",
+      asked: { operation: "job.trace", take: "items", fills: { job: "record" } } },
     /* ⚠️ EVERY SUPPLIER A WORKSPACE BUYS FROM — the collection `product.register`
        has been writing into since OI-14 with nothing reading it back. */
     { id: "suppliers", of: "supplier", limit: 200, sort: { by: "name", dir: "up" } },
@@ -7889,6 +8000,21 @@ const manifest = (): AppSpec => defineApp({
             },
           }],
         }, {
+          /* ⚠️ THE WORDS BELONG TO THE CATALOGUE, so this is where they are
+             reached from. A tag is a way INTO the list of products rather than a
+             thing in its own right, and a destination on the bar for it would be
+             a sixth item for a second-order noun. */
+          group: null,
+          of: [{
+            block: "NavRow",
+            goes: "words",
+            bind: {
+              label: { from: { of: "words", says: "Tags" } },
+              under: { from: { of: "words",
+                says: "The words this workspace files things under" } },
+            },
+          }],
+        }, {
           block: "Listing",
           shows: [
             { field: "name", label: "Name" },
@@ -8182,6 +8308,29 @@ const manifest = (): AppSpec => defineApp({
             a product with an empty book, where a control below an empty state is
             a control below the sentence telling them it is empty.
           */
+          /*
+            ⚠️ WHAT KIND OF THING IT IS, AND THE REGISTER FLOW HAS BEEN ASKING
+            SINCE OI-18a. Every word somebody typed there was matched, minted and
+            filed, and no screen in the product ever showed one back — so the
+            honest description of that step was that it asked for work and
+            discarded it politely.
+          */
+          {
+            group: "What kind of thing it is",
+            of: [{
+              block: "Listing",
+              shows: [{ field: "tag.name", label: "Tag" }],
+              goes: { to: "word", by: "tag" },
+              nothing: {
+                says: "Not filed under anything",
+                under: "Registering a product asks what kind of thing it is",
+              },
+              bind: {
+                label: { from: { of: "words", says: "What kind of thing it is" } },
+                of: { from: { of: "view", view: "words-on-this" } },
+              },
+            }],
+          },
           {
             group: "Its codes",
             of: [
@@ -8720,6 +8869,14 @@ const manifest = (): AppSpec => defineApp({
         shape: "list",
         layout: { as: "stack" },
         blocks: [{
+          /* ⚠️ THE WAY TO JOBS, AND IT IS `leads` RATHER THAN A ROW. A `goes` to
+             a screen this workspace has not bought would draw a control that
+             dead-ends; `leads` is resolved through the manifest and dropped
+             where the person may not open it, so the same declaration is right
+             on a plan that carries `jobs` and on one that does not. */
+          group: null,
+          of: [{ block: "QuickActions", leads: ["jobs"] }],
+        }, {
           group: null,
           of: [{
             /* ⚠️ `process:run` OPENS ONE AND `process:release` SIGNS FOR IT,
@@ -9047,6 +9204,295 @@ const manifest = (): AppSpec => defineApp({
       because ordering is a morning job, and the buy list on Reports, because
       that is where the decision to order is made.
     */
+    /*
+      THE WORDS THIS WORKSPACE FILES THINGS UNDER.
+
+      ⚠️ A VOCABULARY RATHER THAN A STRING ON EACH PRODUCT, AND THAT ARGUMENT ONLY
+      HOLDS IF SOMEBODY CAN SEE THE LIST. Asking a model to categorise a thing
+      against nothing produces "Cleaning", "Cleaning products", "Cleaning
+      supplies" and "Janitorial" across four mornings — so `product.register`
+      matches a word before it mints one, and it has been doing that since OI-18a
+      with nothing reading the table back. A mechanism nobody can look at is one
+      nobody can trust, because there is no way to find out it is working.
+
+      ⚠️ REACHED FROM PRODUCTS, WHICH IS WHAT IT IS ABOUT. A word here is a way
+      into the catalogue and not a thing in its own right, so it is one hop from
+      the catalogue rather than a destination on the bar.
+    */
+    { id: "words", route: "/words", label: "Tags", nav: "none", icon: "tag",
+      permission: "product:read",
+      body: {
+        shape: "list",
+        layout: { as: "stack" },
+        blocks: [{
+          block: "Listing",
+          /* ⚠️ WHERE THE WORD CAME FROM EARNS THE SECOND COLUMN, for the reason
+             `code.source` records the same thing: a word a model invented and a
+             word somebody typed deserve different amounts of trust on the day
+             the list needs tidying. */
+          shows: [
+            { field: "name", label: "Tag" },
+            { field: "source", label: "Added by" },
+          ],
+          goes: "word",
+          nothing: {
+            says: "No tags yet",
+            under: "Registering a product asks what kind of thing it is",
+          },
+          bind: {
+            label: { from: { of: "words", says: "Tags" } },
+            of: { from: { of: "view", view: "words" } },
+          },
+        }],
+      } },
+    /*
+      ONE WORD: WHAT IS FILED UNDER IT, AND THE ONE THING THAT MAY BE DONE TO IT.
+
+      ⚠️ RENAMING IS THE ACT, AND `tagging` WAS DECLARED FOR IT. "So a tag can be
+      renamed in one place" is the join's own header, and until now nothing
+      could — the promise was a comment. Renaming onto a word that exists is
+      refused, because the match-before-mint rule read the other way round is
+      what keeps each word in the list once.
+    */
+    { id: "word", route: "/word", label: "Tag", nav: "none", icon: "tag",
+      permission: "product:read", of: "tag",
+      body: {
+        shape: "detail",
+        layout: { as: "stack" },
+        blocks: [
+          {
+            group: "What is filed under it",
+            of: [{
+              block: "Listing",
+              shows: [{ field: "product.name", label: "Product" }],
+              goes: { to: "product", by: "product" },
+              nothing: {
+                says: "Nothing under it",
+                under: "A word with nothing filed under it is one to rename or leave",
+              },
+              bind: {
+                label: { from: { of: "words", says: "What is filed under it" } },
+                of: { from: { of: "view", view: "filed-under-this" } },
+              },
+            }],
+          },
+          {
+            group: "Tidying the list",
+            of: [{
+              block: "ActionRow",
+              does: [{ op: "tag.rename", fills: { tag: "record" } }],
+              bind: {
+                icon: { from: { of: "words", says: "edit" } },
+                label: { from: { of: "words", says: "Rename it" } },
+                /* ⚠️ WHAT RENAMING REACHES IS THE PART WORTH SAYING. It is one
+                   row, and every product filed under it follows — which is the
+                   whole argument for a table over a string on each product. */
+                under: { from: { of: "words",
+                  says: "Every product filed under it follows" } },
+              },
+            }],
+          },
+          /* ⚠️ THE WORD ITSELF IS NOT A ROW HERE, because it is the title. A
+             detail screen is named by its record (D106), so "Tag / Consumable"
+             under a heading reading "Consumable" is the same word twice — which
+             is the fault the product page was photographed making. What is left
+             is the one thing the title cannot say. */
+          {
+            group: "Where it came from",
+            of: [
+              { block: "FieldRow",
+                when: { has: { of: "field", field: "source" } },
+                bind: {
+                  label: { from: { of: "words", says: "Added by" } },
+                  value: { from: { of: "field", field: "source" } },
+                } },
+            ],
+          },
+        ],
+      } },
+    /*
+      WHAT THE WORKSPACE IS CONSUMING STOCK FOR — a patient case, a work order, a
+      build number, a service call, a cook, a room turnaround.
+
+      ⚠️ WHAT MAKES IT GENERAL IS THAT THE REFERENCE IS A LABEL THE WORKSPACE
+      CHOSE rather than a record this app holds. The moment it became a patient
+      it stopped being sellable to a factory.
+
+      ⚠️ THREE VERBS AND A PRICED ENTITLEMENT, AND NOT ONE DOOR. `jobs` is sold —
+      `withheld: "gate"`, named by every tier that carries it — so this was a
+      capability a workspace could pay for and never see. That is a sharper
+      failure than an unreached verb, because somebody was charged for it.
+
+      ⚠️ REACHED FROM RUNS RATHER THAN FROM THE BAR, and the mechanism is
+      `leads`. A sixth destination breaks a nav built to look deliberate at three
+      to five, and a `goes` to a screen the workspace has not bought would
+      dead-end — `leads` is resolved through the manifest and DROPPED where the
+      person may not open it, which is the one shape that is right on both plans.
+    */
+    { id: "jobs", route: "/jobs", label: "Jobs", nav: "none", icon: "note",
+      permission: "process:read", features: ["jobs"],
+      body: {
+        shape: "list",
+        layout: { as: "stack" },
+        blocks: [{
+          group: null,
+          of: [{
+            block: "ActionRow",
+            does: [{ op: "job.open", fills: { day: "today" } }],
+            bind: {
+              icon: { from: { of: "words", says: "add" } },
+              label: { from: { of: "words", says: "Open a job" } },
+              under: { from: { of: "words",
+                says: "Give it the number your workspace already uses for it" } },
+            },
+          }],
+        }, {
+          block: "Listing",
+          /* ⚠️ THEIR REFERENCE LEADS, because it is the only thing on the row
+             anybody will recognise. `label` is what somebody typed to remind
+             themselves; the reference is what is written on the paperwork, said
+             on the telephone, and searched for. */
+          shows: [
+            { field: "ref", label: "Reference" },
+            { field: "label", label: "What it is" },
+            { field: "state", label: "Standing" },
+          ],
+          goes: "job",
+          nothing: {
+            says: "No jobs yet",
+            under: "Open one and everything taken against it is traceable to it",
+          },
+          bind: {
+            label: { from: { of: "words", says: "Jobs" } },
+            of: { from: { of: "view", view: "jobs" } },
+          },
+        }],
+      } },
+    /*
+      ONE JOB: WHAT IT USED, AND WHAT OF THAT IS NOW IN QUESTION.
+
+      ⚠️ THE HERO IS THE DOUBT AND NOT THE COUNT. How many lines a case consumed
+      is a number nobody opens a job to read; whether any of them is a lot
+      somebody has since frozen or a run refused to release is the reason this
+      screen exists, and it is a number that can change while the job sits here
+      closed and untouched.
+
+      ⚠️ AND TAKING STOCK IS OFFERED HERE RATHER THAN ASKING FOR A JOB ON THE
+      SHELF. `against` is a free-text column, so a take screen offering it would
+      ask somebody to type an id; from the job it is the record, filled, and
+      cannot be the wrong one.
+    */
+    { id: "job", route: "/job", label: "Job", nav: "none", icon: "note",
+      permission: "process:read", of: "job", features: ["jobs"],
+      body: {
+        shape: "detail",
+        layout: { as: "stack" },
+        hero: {
+          as: "figure",
+          nothing: {
+            says: "Nothing taken against it",
+            under: "Take stock against it and it will be traced here",
+          },
+          bind: {
+            value: { from: { of: "count", view: "used-on-this-job" } },
+            of: { from: { of: "words", says: "Lines it used" } },
+            fresh: { from: { of: "field", field: "opened" }, as: "when" },
+            mark: { from: { of: "words", says: "note" } },
+          },
+        },
+        blocks: [
+          {
+            group: "What it used",
+            of: [{
+              block: "Listing",
+              /* ⚠️ ONE SENTENCE RATHER THAN THREE COLUMNS — see `saysUsed`. How
+                 many, which lot and whether that lot is in question cannot be
+                 three slots without two of them arriving as bare strings nobody
+                 can tell apart. */
+              shows: [
+                { field: "name", label: "Product" },
+                { field: "says", label: "How it stands" },
+              ],
+              goes: { to: "product", by: "product" },
+              nothing: {
+                says: "Nothing taken against it",
+                under: "Take stock against it and it will be here",
+              },
+              bind: {
+                label: { from: { of: "words", says: "What it used" } },
+                of: { from: { of: "view", view: "used-on-this-job" } },
+              },
+            }],
+          },
+          {
+            group: "While it is open",
+            when: { is: { of: "field", field: "state" }, one: ["open"] },
+            of: [
+              {
+                block: "ActionRow",
+                does: [{ op: "stock.take", fills: { against: "record", day: "today" } }],
+                bind: {
+                  icon: { from: { of: "words", says: "box" } },
+                  label: { from: { of: "words", says: "Take stock against it" } },
+                  under: { from: { of: "words",
+                    says: "It comes off the shelf as usual, and this is what it was for" } },
+                },
+              },
+              {
+                block: "ActionRow",
+                does: [{ op: "job.close", fills: { job: "record", day: "today" } }],
+                bind: {
+                  icon: { from: { of: "words", says: "check" } },
+                  label: { from: { of: "words", says: "Close it" } },
+                  /* ⚠️ WHAT CLOSING DOES NOT DO IS THE PART WORTH SAYING. The
+                     trace is read backwards, so a job closed today can still
+                     acquire a concern tomorrow. */
+                  under: { from: { of: "words",
+                    says: "The trace stays live — a recall can still reach it" } },
+                },
+              },
+            ],
+          },
+          {
+            group: "What it is",
+            of: [
+              { block: "FieldRow",
+                bind: {
+                  label: { from: { of: "words", says: "Standing" } },
+                  value: { from: { of: "field", field: "state" } },
+                } },
+              { block: "FieldRow",
+                bind: {
+                  label: { from: { of: "words", says: "Reference" } },
+                  value: { from: { of: "field", field: "ref" } },
+                } },
+              { block: "FieldRow",
+                when: { has: { of: "field", field: "label" } },
+                bind: {
+                  label: { from: { of: "words", says: "What it is" } },
+                  value: { from: { of: "field", field: "label" } },
+                } },
+              { block: "FieldRow",
+                bind: {
+                  label: { from: { of: "words", says: "Opened" } },
+                  value: { from: { of: "field", field: "opened" }, as: "when" },
+                } },
+              { block: "FieldRow",
+                when: { has: { of: "field", field: "closed" } },
+                bind: {
+                  label: { from: { of: "words", says: "Closed" } },
+                  value: { from: { of: "field", field: "closed" }, as: "when" },
+                } },
+              /* ⚠️ A NOTE IS PROSE AND HAS NO LABEL, which is what separates it
+                 from every row above. "Note / Note" down a card is the pair
+                 `ControlRow` was fixed for, one component over. */
+              { block: "NoteRow",
+                when: { has: { of: "field", field: "note" } },
+                bind: { children: { from: { of: "field", field: "note" } } } },
+            ],
+          },
+        ],
+      } },
     /*
       EVERYTHING THAT IS ONE OF A KIND — a drill, a probe, a surgical tray.
 
@@ -10191,6 +10637,18 @@ const manifest = (): AppSpec => defineApp({
       status: 409, retryable: false, tone: "warning",
       title: "There is nothing on this order yet",
       detail: "Put a product on it before placing it.",
+    },
+    /*
+      ⚠️ THE WORD IS NAMED BACK, BECAUSE THE MATCH IS CASE-INSENSITIVE AND THE
+      SPELLING IS NOT. Somebody renaming a tag to "Cleaning" against a row
+      already reading "cleaning" is told nothing useful by "that name is taken" —
+      what they need to see is the word that is in the way, in the case it is
+      actually stored in, so they can decide whether they meant to merge.
+    */
+    "inventory.wordTaken": {
+      status: 409, retryable: false, tone: "warning",
+      title: "That word is already a tag",
+      detail: "“{name}” is already in this workspace's list.",
     },
     /*
       ⚠️ A LATE RESULT THAT CONTRADICTS AN EARLIER ONE IS REFUSED, NEVER APPLIED,

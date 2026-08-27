@@ -595,8 +595,52 @@ describe("a job, and what it used", () => {
     ok(await write("job.close", { job, day: TODAY }));
 
     const said = ok(await read("job.trace", { job }));
-    const items = said.items as { product: string; quantity: number }[];
+    const items = said.items as { product: string; quantity: number; says: string }[];
     expect(items.some((one) => one.product === product && one.quantity === 4)).toBe(true);
+
+    /*
+      ⚠️ AND THE SENTENCE COMES BACK WITH IT, because the screen draws one column
+      rather than three. How many, which lot and whether the lot is in question
+      are one fact about a line; a screen assembling them from columns would be a
+      second place the wording happens, and the trace's own row is where it
+      belongs. `/job` binds `says`, so a handler that stopped sending it would
+      draw a list of blank second lines with nothing failing anywhere.
+    */
+    expect(items.find((one) => one.product === product)?.says).toBe("4 taken");
+    expect(said.doubted).toBe(0);
+  });
+});
+
+/* ------------------------------------------------------------------ words --- */
+
+/*
+  ⚠️ THE WHOLE ARGUMENT FOR A TABLE OVER A STRING ON EACH PRODUCT is that a word
+  is held once and renamed in one place. `tagging`'s own header said so while
+  nothing could rename anything, so this drives the half that was a promise.
+*/
+describe("the words a catalogue is filed under", () => {
+  it("renames a word once, and refuses a rename onto one that exists", async () => {
+    const first = idOf(await write("product.register", {
+      name: "Nitrile gloves", tracking: "counted", unit: "box",
+      tags: ["Consumable", "Protective equipment"], day: TODAY,
+    }));
+    expect(first.length).toBeGreaterThan(0);
+
+    const words = ok(await read("tag.list", {})) as { items?: unknown };
+    const rows = (words.items ?? []) as { id: string; name: string }[];
+    const consumable = rows.find((one) => one.name === "Consumable");
+    const other = rows.find((one) => one.name === "Protective equipment");
+    expect(consumable && other).toBeTruthy();
+
+    ok(await write("tag.rename", { tag: consumable!.id, name: "Consumables" }));
+
+    /*
+      ⚠️ CASE-INSENSITIVE, WHICH IS THE COMPARISON REGISTRATION MATCHES ON.
+      Anything narrower lets the duplicate in through the door the register flow
+      closes, on the one table whose value is that it holds each word once.
+    */
+    const clash = await write("tag.rename", { tag: other!.id, name: "consumables" });
+    expect(clash.status).toBe(409);
   });
 });
 

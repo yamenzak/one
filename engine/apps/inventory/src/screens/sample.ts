@@ -632,3 +632,70 @@ export const KIT_MEMBERS = [
 export const KIT_SHORT = [
   { kit: "k-1", product: "t-clamp", name: "Towel clamp", want: 2 },
 ] as const;
+
+/**
+ * WHAT THE WORKSPACE WAS CONSUMING STOCK FOR.
+ *
+ * ⚠️ THE REFERENCES ARE A CLINIC'S AND THE LABELS ARE ENGLISH, which is the
+ * whole shape of this collection: what makes `job` general is that the reference
+ * is a label the workspace chose, not a record this app holds. A fixture of
+ * invented ids would photograph the one thing that is never on the screen.
+ *
+ * ⚠️ AND ONE IS OPEN AND ONE IS CLOSED, because the acts on the detail page are
+ * gated on the standing. A fixture of open jobs alone photographs a screen that
+ * can never be seen without its controls.
+ */
+export const JOBS = [
+  { id: "job-1", ref: "CASE-4471", label: "Minor procedure, room 2",
+    state: "open", opened: "2026-08-26", closed: "" },
+  { id: "job-2", ref: "CASE-4468", label: "Dressing change",
+    state: "closed", opened: "2026-08-24", closed: "2026-08-24" },
+  { id: "job-3", ref: "WO-1189", label: "Bench calibration",
+    state: "closed", opened: "2026-08-19", closed: "2026-08-20" },
+] as const;
+
+/**
+ * ⚠️ ONE LINE IS IN DOUBT AND TWO ARE NOT, which is the state the trace exists
+ * to show. A fixture where every lot was clean would photograph the case nobody
+ * opens a job to check, and one where every lot was held would make the alarm
+ * read as the ordinary colour of the screen.
+ *
+ * ⚠️ AND `says` IS THE HANDLER'S SENTENCE — see `saysUsed`. Written out here
+ * rather than composed, because a fixture that reproduced the arithmetic would
+ * be a second implementation of it that can agree with the screen and disagree
+ * with the ledger.
+ */
+export const JOB_USED = [
+  { id: "l-9", product: "t-glove", name: "Nitrile gloves, blue",
+    says: "4 taken · lot NG-2211" },
+  { id: "l-10", product: "t-resin", name: "Casting resin, clear",
+    says: "1 taken · lot CR-0043 — the lot is held" },
+  { id: "l-11", product: "t-paper", name: "A4 paper", says: "2 taken" },
+] as const;
+
+/**
+ * THE WORDS THIS WORKSPACE FILES THINGS UNDER.
+ *
+ * ⚠️ ALL THREE SOURCES ARE HERE, because `source` is the column that decides
+ * what to do on the day the list needs tidying — a word a model invented and a
+ * word somebody typed deserve different amounts of trust, and a fixture of one
+ * kind photographs a list that cannot be seen making the distinction.
+ */
+export const WORDS = [
+  { id: "tag-1", name: "Consumable", source: "typed" },
+  { id: "tag-2", name: "Protective equipment", source: "typed" },
+  { id: "tag-3", name: "Single use", source: "ai-assisted" },
+  { id: "tag-4", name: "Stationery", source: "imported" },
+] as const;
+
+/** One product, one word — the join that makes a rename land in one place. */
+export const FILINGS = [
+  { id: "tgg-1", product: "t-glove", "product.name": "Nitrile gloves, blue",
+    tag: "tag-1", "tag.name": "Consumable" },
+  { id: "tgg-2", product: "t-glove", "product.name": "Nitrile gloves, blue",
+    tag: "tag-2", "tag.name": "Protective equipment" },
+  { id: "tgg-3", product: "t-glove", "product.name": "Nitrile gloves, blue",
+    tag: "tag-3", "tag.name": "Single use" },
+  { id: "tgg-4", product: "t-paper", "product.name": "A4 paper",
+    tag: "tag-4", "tag.name": "Stationery" },
+] as const;

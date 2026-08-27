@@ -4557,3 +4557,49 @@ named and a group around it would head it twice.
 **Therefore never:** a screen carrying two lists neither of which says what it
 is; a value drawn twice in one row with only one of the two saying what it
 counts; or an accessible name treated as though it were a heading.
+
+## D116 — A sold capability with no door, and a vocabulary nobody can see
+
+**Date:** 2026-08-27 · **Status:** shipped
+
+**THE ANSWER TO "BUILD IT OR DELETE IT" WAS BUILD, FOR BOTH, AND THE REASONS ARE
+DIFFERENT.** `job` had three verbs, a trace that reads the ledger backwards, and
+a PRICED entitlement — `jobs` is a gate every tier that carries it names — so a
+workspace could pay for it and never see a door. That is sharper than an
+unreached verb: somebody was charged. `tag` had no verbs at all, which is why
+the verb pass could never have found it; what it had was a register flow minting
+words into it since OI-18a and no screen anywhere showing one back.
+
+**A JOB HAS NO LINE TABLE AND THAT IS WHY THE SCREEN LEADS WITH DOUBT.** What it
+consumed is already in the ledger against its id, so the trace is a query — a job
+correct on Tuesday acquires a concern on Thursday when a recall lands on a lot it
+used, and a status written at close time can never learn that. How many lines it
+took is a number nobody opens a job to read.
+
+**AND TAKING STOCK IS OFFERED FROM THE JOB, NOT THE JOB FROM THE SHELF.**
+`against` is free text, so a take screen offering it would ask somebody to type
+an id. From the job it is the record, filled, and cannot be the wrong one. The
+movement itself is unchanged: same chokepoint, same ledger row, same quota. What
+the job adds is which promise the movement answered.
+
+**`tag.rename` EXISTS BECAUSE `tagging`'S OWN HEADER PROMISED IT.** "So a tag can
+be renamed in one place" was written when the join was declared and nothing could
+— the argument for a table over a string on each product was a comment. Renaming
+onto a word that already exists is REFUSED, which is the match-before-mint rule
+read backwards: registration matches before it mints, so a rename that ignored
+the match would put the duplicate back and undo it, on the one table whose value
+is that it holds each word once. `tag` lost its generic create/update/delete in
+the same change, because two ways to rename — one that checks and one that does
+not — is the second answer this repository keeps finding.
+
+**REACHED FROM RUNS AND FROM PRODUCTS RATHER THAN FROM THE BAR.** A nav built to
+look deliberate at three to five does not get a sixth and a seventh destination
+for second-order nouns. Jobs uses `leads`, which is resolved through the manifest
+and DROPPED where the person may not open it — the one shape that is right both
+on a plan carrying `jobs` and on one that does not; a `goes` there would
+dead-end. Tags uses a plain row, because every plan has them.
+
+**Therefore never:** an entitlement that is priced and gated with no surface
+behind it; a table a flow writes and nothing reads; a promise about a mechanism
+in a comment with no verb under it; or a second way to change a value where one
+of the two checks a rule and the other does not.

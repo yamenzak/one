@@ -278,9 +278,6 @@ const WAITING = new Set([
   /* Teaching the scanner a code it did not recognise — the other half of
      `code.resolve`, which the viewfinder already calls. */
   "inventory/code.learn",
-  /* Work orders. Built by OI-10 alongside the release rail, which shipped its
-     surface; this half did not. */
-  "inventory/job.open", "inventory/job.close",
 ]);
 
 /**
@@ -465,12 +462,6 @@ const UNSEEN = new Set([
      "Can you photograph it?", the handler writes the rows, no screen reads
      them. */
   "inventory/shot",
-  /* Free labelling of products. Declared with no verbs at all, which is why the
-     verb pass above could never have found it. */
-  "inventory/tag", "inventory/tagging",
-  /* Work orders — the last of the three, and the collection is unseen for the
-     same reason its verbs are waiting. */
-  "inventory/job",
 ]);
 
 {

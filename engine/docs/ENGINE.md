@@ -1198,6 +1198,7 @@ its own header, cited by other files, and doing nothing.
 | D113 | A standing decides which acts a screen offers, and a date is never drawn as the string it is stored as | 0 |
 | D114 | A subject with no screen is a failure, and a table two schemas create is a 503 | 1 |
 | D115 | A name that is announced and not drawn is not a name | 0 |
+| D116 | A sold capability with no door, and a vocabulary nobody can see | 0 |
 <!-- /generated -->
 
 ---
