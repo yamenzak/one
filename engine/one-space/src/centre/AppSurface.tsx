@@ -159,7 +159,25 @@ export function AppSurface({ app, route, onGo }: {
             own data land at about the same moment, so a different placeholder
             here would be a second shape flashing in front of the first. */}
         <React.Suspense fallback={<RowsWaiting />}>
+          {/*
+            ⚠️ ONE SCREEN, ONE `Declared` — and the key is what makes that true.
+            Without it the component persisted across a lateral move and carried
+            the PREVIOUS screen's answer into the next one, because `useLoad`
+            deliberately keeps a `ready` it already holds rather than blanking.
+            That is right within one screen and wrong across two: for a render,
+            the flow read another screen's `acts` and reported the write it walks
+            toward as missing, and a body read views by ids the old answer does
+            not have and drew them as confidently empty.
+
+            ⚠️ AND IT COSTS THE INSTANT REVISIT NOTHING, which is the thing worth
+            checking before adding a key. That property is the answer CACHE's —
+            `known` reads a module-level map in `useLoad`'s initialiser — so a
+            screen with a cached answer still mounts straight into `ready`.
+            Holding the old value across a key change was buying nothing except
+            one frame of another screen's data.
+          */}
           <Declared
+            key={declared.id}
             screen={declared}
             screens={app.screens}
             at={beneath(declared.route, route)}

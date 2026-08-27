@@ -255,6 +255,35 @@ if (!named) {
   ok(`routes: ${RENDERS_ANY_APP.length} file(s) that draw any app, none naming one's address`);
 }
 
+/*
+  ⚠️ ONE SCREEN, ONE `Declared` — and only a key makes that true. A lateral move
+  is not a rebuild, so without one the component persists across it and carries
+  the answer it already held into the next screen: `useLoad` deliberately keeps a
+  `ready` rather than blanking, which is right within a screen and wrong across
+  two. What that produced was a flow reading another screen's `acts` and
+  reporting its own write as missing, and a body reading views by ids the old
+  answer does not have and drawing them as confidently empty — for one render,
+  on every open, which is long enough to see and short enough to disbelieve.
+
+  ⚠️ AND IT IS CHECKED HERE RATHER THAN RENDERED, because what has to be true is
+  about the MOUNT rather than about any output: two screens drawn by one
+  component instance. A test would have to navigate and catch a single frame; the
+  key either is on the element or it is not.
+*/
+const MOUNT = "one-space/src/centre/AppSurface.tsx";
+const mounted = readFileSync(join(ENGINE, MOUNT), "utf8");
+const opens = mounted.indexOf("<Declared");
+if (opens < 0) {
+  fail(`${MOUNT}: draws no <Declared>, so this guard covers nothing.\n` +
+       `       It moved — point this at the file that mounts it.`);
+} else if (!/^\s*key=\{/m.test(mounted.slice(opens, opens + 400))) {
+  fail(`${MOUNT}: <Declared> is mounted with no \`key\`.\n` +
+       `       One instance would then draw two screens, and the second would open on\n` +
+       `       the first's answer for a render — see the note above this check.`);
+} else {
+  ok("mounting: a screen change replaces the component that draws it");
+}
+
 console.log(bad
   ? `\napps: ${bad} finding(s) — an app doing what the platform is for.`
   : `\napps: manifests declare, the platform does, and composition waits for a request.`);
