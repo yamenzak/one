@@ -19,8 +19,8 @@ import {
   startSession, upsertAccount, type Db,
 } from "@engine/runtime";
 import { inventory } from "@engine/inventory";
-import { upFrom } from "@engine/kernel";
-import worker, { APPS, LEGAL } from "../src/index.js";
+import { included, upFrom, type Allowance } from "@engine/kernel";
+import worker, { APPS, LEGAL, PLANS } from "../src/index.js";
 import { warm } from "./warm.js";
 
 const { ctx, settled } = warm();
@@ -647,14 +647,27 @@ describe("what the plan opens", () => {
     a product that no longer had them and failed with a message that reads like a
     regression. What it is FOR is that a paid tier is handed what a free one is
     withheld, and that survives every screen coming and going.
+
+    ⚠️ AND IT DERIVES FROM `features` AS WELL AS `flag`, which is what makes it
+    an assertion at all. It read only our own switch, OneInventory has never used
+    one, and so this walked an empty list and passed — a suite green on a claim
+    it was not making. The two tiers differ on `processes`, and the count below
+    is what stops the silence coming back.
   */
   it("hands a workspace that bought it every screen the free tier is withheld", async () => {
     const res = await at("/api/centre.view", { headers: { cookie } });
     expect(res.status).toBe(200);
     const body = await res.json() as { apps: { id: string; screens: { id: string }[] }[] };
     const ids = (body.apps.find((a) => a.id === "inventory")?.screens ?? []).map((s) => s.id);
-    const gated = (inventory().screens ?? []).flatMap((one) => (one.flag ? [one.id] : []));
-    for (const id of gated) expect(ids).toContain(id);
+    const paid = PLANS.find((one) => one.id === "studio")!.includes as Record<string, Allowance>;
+    const free = PLANS.find((one) => one.id === "solo")!.includes as Record<string, Allowance>;
+    const buys = (tier: Record<string, Allowance>, keys?: readonly string[]) =>
+      !keys || keys.some((key) => included(tier[key] ?? false));
+    const only = (inventory().screens ?? [])
+      .filter((one) => !one.flag && buys(paid, one.features) && !buys(free, one.features));
+    expect(only.length, "the two tiers open the same screens, so this proves nothing")
+      .toBeGreaterThan(0);
+    for (const one of only) expect(ids, one.id).toContain(one.id);
     /* ⚠️ AND IT SEES THE ORDINARY ONES TOO, so a tier that opened the gated set
        by breaking the filter altogether does not pass this. */
     expect(ids).toContain("products");

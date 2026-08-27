@@ -1194,6 +1194,7 @@ its own header, cited by other files, and doing nothing.
 | D110 | A verb of a subject the app has drawn is called from somewhere, and the remainder is a countdown | 0 |
 | D111 | A page about one thing can call a write that works on many, and a condition inside a card is a condition | 0 |
 | D112 | A flow shows what it is about to do, and holds what nobody should be asked | 0 |
+| D113 | A standing decides which acts a screen offers, and a date is never drawn as the string it is stored as | 0 |
 <!-- /generated -->
 
 ---

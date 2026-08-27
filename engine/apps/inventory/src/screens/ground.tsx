@@ -28,8 +28,8 @@ import {
 import { inventory } from "../index.js";
 import { INVENTORY_SESSIONS, INVENTORY_SURFACES } from "./index.js";
 import {
-  BUYING, CODES, COUNTED, COUNTS, DAILY, DISAGREES, LEFT, LINES, MOVING, PLACES, RUNNING, THINGS,
-  TOLD, WRONG,
+  BUYING, CODES, COUNTED, COUNTS, DAILY, DISAGREES, LEFT, LINES, MOVING, PLACES, RUNNING, RUNS,
+  RUN_ITEMS, THINGS, TOLD, WRONG,
 } from "./sample.js";
 
 /** ⚠️ Every permission a screen names, so none of them is undrawable here. */
@@ -329,10 +329,20 @@ const SHELF_FIRST = (() => {
   };
 })();
 
+/**
+ * ⚠️ AND THE RUN, PICKED FOR THE STANDING RATHER THAN FOR ITS CONTENTS — see
+ * `RUNS`. Every act card on that page is `when`-gated on `state`, so which row a
+ * board opens decides which half of the screen is photographed at all; `ended`
+ * is the one standing where somebody owes the run a decision, which is what the
+ * whole rail is for.
+ */
+const RUN_FIRST = { ...(RUNS.find((one) => one.state === "ended") ?? RUNS[0]!) };
+
 const firstOf = (collection: string): Readonly<Record<string, unknown>> | undefined =>
   collection === "product" ? FIRST
     : collection === "count" ? COUNTING
-      : collection === "location" ? SHELF_FIRST : undefined;
+      : collection === "location" ? SHELF_FIRST
+        : collection === "process" ? RUN_FIRST : undefined;
 
 /**
  * ⚠️ WHAT THE DOOR WOULD TITLE THIS SCREEN — see `Drawn.name` and D106. A screen
@@ -481,6 +491,14 @@ const SEEN: Has = {
     "what-left": rows(LEFT.map((one) => ({ ...one }))),
     "what-was-wrong": rows(WRONG.map((one) => ({ ...one }))),
     "day-by-day": rows(DAILY.map((one) => ({ ...one }))),
+    "runs": rows(RUNS.map((one) => ({ ...one }))),
+    /* ⚠️ NARROWED TO THE RUN THE PAGE IS ABOUT, for the reason `lines-of-this`
+       is: a board answering this with every item would draw a run holding
+       deliveries that are in a different one, and the figure above the list
+       counts exactly these rows — so the two would disagree in a picture
+       nobody could tell was wrong. */
+    "in-this-run": rows(RUN_ITEMS
+      .filter((one) => one.process === RUN_FIRST.id).map((one) => ({ ...one }))),
   },
 };
 

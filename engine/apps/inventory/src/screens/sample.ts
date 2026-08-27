@@ -434,3 +434,73 @@ export const MOVING: readonly Moving[] = [
   { id: "lg-5", product: "t-paper", name: "A4 paper",
     says: saysMove("received", 24, "Bench"), at: "2026-08-26T09:02:00.000Z" },
 ];
+
+/**
+ * RUNS, AND THE ONE THE DETAIL PAGE OPENS ON IS THE ONE AWAITING A DECISION.
+ *
+ * ⚠️ EVERY STANDING IS HERE, WHICH IS WHAT MAKES THE LIST WORTH PHOTOGRAPHING.
+ * `state` is the column somebody scans, and a sample where every row said the
+ * same word would be a picture of a list that has one job and cannot be seen
+ * doing it. Five words, five rows.
+ *
+ * ⚠️ AND THE RECORD IS `ended` RATHER THAN `open` OR `released`, deliberately.
+ * Each standing draws a DIFFERENT set of act cards — `refuseRun` is what decides
+ * which — and there is exactly one where somebody owes the screen a decision.
+ * A board opening on `open` photographs a page with two ordinary rows on it; one
+ * opening on `released` photographs a page with almost none. What the rail is
+ * FOR is the moment between them.
+ */
+export interface Run {
+  readonly id: string;
+  readonly kind: string;
+  readonly machine: string;
+  readonly state: "open" | "ended" | "released" | "failed" | "recalled";
+  readonly started: string;
+  readonly evidence: string;
+}
+
+export const RUNS: readonly Run[] = [
+  { id: "r-1", kind: "Autoclave cycle", machine: "Autoclave 2", state: "ended",
+    started: "2026-08-27", evidence: "Indicator strip 8841" },
+  { id: "r-2", kind: "Autoclave cycle", machine: "Autoclave 1", state: "open",
+    started: "2026-08-27", evidence: "" },
+  { id: "r-3", kind: "Resin cure", machine: "Oven B", state: "released",
+    started: "2026-08-26", evidence: "Cure log 220-4" },
+  { id: "r-4", kind: "Autoclave cycle", machine: "Autoclave 2", state: "failed",
+    started: "2026-08-25", evidence: "Indicator strip 8836 — did not turn" },
+  { id: "r-5", kind: "Scale calibration", machine: "Bench scale", state: "recalled",
+    started: "2026-08-21", evidence: "Certificate C-118" },
+];
+
+/**
+ * WHAT ONE RUN COVERS — the deliveries held under it, and where each one stands.
+ *
+ * ⚠️ THE VERDICT DIFFERS BETWEEN TWO ROWS OF THE SAME RUN, which is the state
+ * this list exists to be able to show. A recall reaches what is still on a shelf
+ * and not what has been used, and a lift is per delivery — so a sample where
+ * every verdict agreed would photograph the one case the column is never needed
+ * for.
+ *
+ * ⚠️ AND THE SHAPE IS THE JOINED ONE. `batch.lot` and `batch.printed` are what
+ * the declaration names and what `joinRows` answers with; a fixture holding
+ * `batch` alone would draw two blank cells under two correct headings.
+ */
+export interface RunItem {
+  readonly id: string;
+  readonly process: string;
+  readonly batch: string;
+  readonly "batch.lot": string;
+  readonly "batch.printed": string;
+  readonly verdict: "pending" | "released" | "failed" | "lifted";
+}
+
+export const RUN_ITEMS: readonly RunItem[] = [
+  { id: "ri-1", process: "r-1", batch: "b-tray-1", "batch.lot": "TR-0912",
+    "batch.printed": "2027-02-01", verdict: "pending" },
+  { id: "ri-2", process: "r-1", batch: "b-tray-2", "batch.lot": "TR-0913",
+    "batch.printed": "2027-02-01", verdict: "pending" },
+  { id: "ri-3", process: "r-1", batch: "b-glove-1", "batch.lot": "4471",
+    "batch.printed": "2026-08-25", verdict: "lifted" },
+  { id: "ri-4", process: "r-3", batch: "b-resin-1", "batch.lot": "RS-2204",
+    "batch.printed": "2029-04-30", verdict: "released" },
+];

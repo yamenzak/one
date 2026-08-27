@@ -285,6 +285,45 @@ string the screen never shows is an act that reports success and delivers
 nothing — and a code re-typed off a screen is a code that will be typed wrong
 onto a shelf and resolve to nothing forever.
 
+### The release rail
+
+⚠️ **SEVEN VERBS WERE BUILT, DRIVEN END TO END, AND CALLABLE BY NOBODY.** The
+release rail is the compliance half of this product — a batch is made,
+quarantined, and used only after somebody reads the evidence and puts their name
+to it — and it shipped with no address at all. `process.result` was the one thing
+wired, which is what put the subject in the reach guard's sights and started the
+countdown this closes.
+
+⚠️ **ENDING AND RELEASING ARE TWO ACTS BY TWO PARTIES, AND THE SCREEN SHOWS IT.**
+A machine finishing its cycle is a fact about a machine; "this may be used" is a
+judgement somebody puts their name to after reading the printout. Collapsing them
+makes the green light the qualification. So `process:run` opens a run, fills it
+and ends it, `process:release` decides — two grants, two cards, and the person at
+the machine is not the person who signs for it.
+
+⚠️ **EVERY ACT IS GATED ON THE STANDING, AND THAT MIRRORS `refuseRun` RATHER THAN
+RESTATING IT.** The handler refuses regardless — releasing from `open` is the
+single most tempting shortcut in the rail and it fails at the door — so what the
+condition buys is that nobody is offered a control whose only outcome is a
+refusal. Both halves read the same five words.
+
+⚠️ **AND THE LIST IS THE RECORD, NOT A QUEUE.** `/runs` shows every run rather
+than the open ones, because what this rail exists to produce is something an
+auditor reads two years later — which is also why the collection refuses
+`delete`. Newest first puts the one awaiting a decision at the top without the
+screen claiming to be a worklist.
+
+⚠️ **`/runs` IS A DESTINATION AND THE ENTITLEMENT IS WHY THAT IS SAFE.** A
+workspace that does runs does them all day, so it is somewhere somebody stands;
+a workspace whose plan does not include `processes` never sees it, and the bar
+is built to look deliberate at three, four or five for exactly this reason.
+
+⚠️ **LIFTING IS PER ITEM, AND IT LIFTS TO "NEEDS WORK" RATHER THAN TO "GOOD TO
+GO".** A recall reaches the boxes still on a shelf and not the ones already used,
+so the verdict lives on the item. Holding stock frozen for ever because a form
+cannot be completed is how a rule gets worked around — and the honest description
+of a tray whose steriliser failed is that it is unfrozen and still not released.
+
 ### Bringing in a catalogue
 
 ⚠️ **`product.import` HAS EXISTED SINCE THE APP WAS BUILT AND WAS REACHABLE FROM
@@ -607,6 +646,8 @@ follows and the shape every screen is drawn to.
 | `/count` | Count | — | `stock:read` | `declared` | `declared` |
 | `/product` | Product | — | `product:read` | `declared` | `declared` |
 | `/place` | Place | — | `location:read` | `declared` | `declared` |
+| `/runs` | Runs | primary | `process:read` | `declared` | `declared` |
+| `/run` | Run | — | `process:read` | `declared` | `declared` |
 | `/add` | Add a product | — | `product:write` | `declared` | `declared` |
 | `/import` | Bring in a spreadsheet | — | `stock:adjust` | `declared` | `declared` |
 

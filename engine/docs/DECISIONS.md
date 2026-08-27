@@ -4404,3 +4404,58 @@ image rather than at a test.
 a change; a preview computed by running the write; a flow that cannot supply a
 fact about the device; a product's word on a platform's button; or a fixture
 holding a second answer to a question the declaration already answers.
+
+## D113 — A standing decides which acts a screen offers, and a date is never drawn as the string it is stored as
+
+**Date:** 2026-08-27 · **Status:** shipped
+
+**The release rail is two grants and five words, and the screen is built out of
+the same five.** `refuseRun` is the whole model — `open → ended → released`, with
+`failed` and `recalled` off the end and `lifted` per delivery — and `/run` gates
+every act group on `state` with a `when` that mirrors it rather than restating
+it. The handler refuses regardless: releasing from `open` is the most tempting
+shortcut in the rail and it fails at the door. What the condition buys is that
+nobody is offered a control whose only outcome is a refusal.
+
+**AND THE STANDING IS SAID IN PROSE BECAUSE EVERY ACT GROUP IS CONDITIONAL.** A
+released run draws none of them, so a page that stated where it stood only
+through which controls it happened to offer would say nothing at all about the
+runs an auditor opens two years later. The `Standing` row is the one thing on
+that screen that is always drawn.
+
+**`process:run` OPENS A RUN AND `process:release` SIGNS FOR IT**, and that is
+the design rather than two similar grants: the person at the machine must not be
+the person who decides the machine was right. Both entitle on `processes`, which
+`solo` does not buy and `plus` does — a single-chair clinic that sterilises is
+exactly the customer a Studio-only gate would exclude.
+
+**THE TWO SUITES ASSERTING THAT WERE BOTH VACUOUS, AND ONE WAS GREEN ON A CLAIM
+IT WAS NOT MAKING.** They derived "what is withheld" from `flag`, which is OUR
+switch; a plan is `features`, which is THEIRS. OneInventory has never used a
+flag, so both walked an empty list — the free tier's suite passed by asserting
+nothing, and the paid tier's by asserting nothing twice. Both now resolve
+`features` against the tier's own `includes`, read out of `PLANS` rather than
+restated, and both fail if the count of gated screens is zero.
+
+**A DATE DRAWN PLAIN IS A REFUSAL NOW, AND IT SHIPPED ON THREE SCREENS ACROSS TWO
+APPS.** The formatter check only ever ran when a declaration SAID `as`, so the
+wrong pair was caught and the ABSENT one was waved through — `String(v)` on a
+`day` put `2026-08-27` under a big number in the one slot on a hero whose entire
+job is how old something is, and down a list column headed "Started". There is no
+case for the raw value: `when` says "Today", "Yesterday", and then the date, so
+past two days it draws what the stored string was going to say anyway, in the
+reader's own locale and zone.
+
+**AND THE HERO WAS NEVER ASKED AT ALL, WHICH IS THE PART WORTH REMEMBERING.**
+The format checks lived inline in the block loop; the hero had its own shorter
+loop for slots and kinds and nothing else. So the slot at the top of a detail
+screen, in the biggest type on the page, was the one slot no check reached. It is
+one walk called from both now — two implementations of "is this drawn right" is
+how the one that matters ends up being the one nobody wrote.
+
+**Therefore never:** a control offered against a standing that can only refuse
+it; a page whose standing is inferable only from which acts it happens to draw;
+one grant covering both doing the work and signing for it; a plan-gating suite
+that asks about our switches and calls that the customer's plan; a date drawn as
+its stored text; or a check written inline in one loop when a second loop asks
+the same question.

@@ -1134,7 +1134,7 @@ export type BlockIndex = Readonly<Record<string, BlockEntry>>;
 export type SurfaceRefusal =
   | "not_a_name" | "view_unknown" | "view_collection_unknown" | "view_field_unknown"
   | "block_unknown" | "hero_unknown" | "hero_opens_nothing" | "slot_unknown" | "slot_missing" | "slot_kind_wrong"
-  | "field_unknown" | "field_without_a_subject" | "format_wrong"
+  | "field_unknown" | "field_without_a_subject" | "format_wrong" | "format_missing"
   | "dispatch_not_closed" | "dispatch_unreachable" | "two_kinds_of_screen"
   | "goes_nowhere"
   | "wide_without_a_grid"
@@ -1712,6 +1712,59 @@ export function refuseSurface(
   if (screen.of && !subject) {
     at("view_collection_unknown", `is about "${screen.of}", which this app does not declare`);
   }
+
+  /**
+   * WHETHER A BOUND SLOT DRAWS ITS VALUE THE WAY THAT VALUE HAS TO BE DRAWN.
+   *
+   * ⚠️ ONE WALK, CALLED FROM BOTH THE HERO AND EVERY BLOCK, BECAUSE THE HERO IS
+   * WHERE IT ACTUALLY WENT WRONG. The block loop had these checks inline and the
+   * hero had none — so the slot at the very top of a detail screen, in the
+   * biggest type on the page, was the one slot nothing asked about. Two
+   * implementations of "is this drawn right" is how the one that matters ends up
+   * being the one that was never written.
+   */
+  function formatted(where: string, slot: string, binding: Binding): void {
+    /*
+      ⚠️ THE FORMATTER IS CHECKED AGAINST THE FIELD'S DECLARED KIND, WHICH IS THE
+      ONLY PLACE THE TWO EVER MEET. Neither half is wrong on its own: the field
+      is a real field and the formatter is a real formatter. What is wrong is the
+      pair, and nothing downstream of here can see both.
+    */
+    if (binding.from.of === "field") {
+      const f = subject?.[binding.from.field];
+      if (f && binding.as && binding.as !== "plain") {
+        const takes = FORMATS[binding.as];
+        if (takes !== "any" && !takes.includes(f.kind)) {
+          at("format_wrong",
+            `${where}: "${binding.from.field}" is a ${f.kind} and is drawn as ${binding.as}, `
+            + `which says ${takes.join(" or ")}`);
+        }
+      }
+      /*
+        ⚠️ AND THE MIRROR: A DATE LEFT UNFORMATTED, which is the half that got
+        through. The check above only ever ran when somebody SAID `as`, so the
+        wrong pair was caught and the absent one was not — and a `day` drawn
+        plain is `String(v)`, which put `2026-08-27` under a big number in the
+        one slot on a hero whose entire job is how OLD something is.
+
+        ⚠️ THERE IS NO CASE FOR THE RAW VALUE, WHICH IS WHY THIS IS A REFUSAL
+        RATHER THAN A REPORT. `when` says "Today", "Yesterday", and then the
+        date — so past two days it draws what the stored string was going to say
+        anyway, in the reader's own locale and zone. The bare ISO text is never
+        the better answer; it is only ever the forgotten one.
+      */
+      if (f && !binding.as && (f.kind === "day" || f.kind === "instant")) {
+        at("format_missing",
+          `${where}: "${binding.from.field}" is a ${f.kind} and is drawn plain, `
+          + "which shows the stored text — say `as: \"when\"`");
+      }
+    }
+    if (binding.as && binding.as !== "plain" && binding.from.of === "count"
+      && !(FORMATS[binding.as] === "any"
+        || (FORMATS[binding.as] as readonly FieldKind[]).includes("number"))) {
+      at("format_wrong", `${where}: "${slot}" is a count and is drawn as ${binding.as}`);
+    }
+  }
   for (const name of fieldsIn(body)) {
     if (!screen.of) {
       at("field_without_a_subject",
@@ -1875,6 +1928,7 @@ export function refuseSurface(
           at("slot_kind_wrong",
             `${lead}: "${slot}" takes ${spec.takes.join(" or ")}, and is given a ${binding.from.of}`);
         }
+        formatted(lead, slot, binding);
       }
     }
     /* ⚠️ THE SAME QUESTION A BLOCK'S SHORTCUTS ARE ASKED, and it has to be asked
@@ -2009,10 +2063,20 @@ export function refuseSurface(
              type errors: both are strings by the time they reach a browser, so
              they render as `$NaN` and `Invalid Date` down a whole column on a
              screen nobody opened during review. */
-          if (!col.as || col.as === "plain") continue;
           const of = reach.on === "self"
             ? held[reach.field]
             : collections.find((c) => c.id === reach.to)?.fields[reach.field];
+          /* ⚠️ AND A DATE COLUMN LEFT PLAIN IS THE SAME FAULT DOWN A LIST —
+             see the binding half. `2026-08-27` under a heading reading "Started"
+             is the stored string shown to somebody who wanted to know whether
+             that was today. */
+          if ((!col.as || col.as === "plain") && of
+            && (of.kind === "day" || of.kind === "instant")) {
+            at("format_missing",
+              `${where} shows "${col.field}", which is a ${of.kind}, plain — `
+              + "that draws the stored text; say `as: \"when\"`");
+          }
+          if (!col.as || col.as === "plain") continue;
           const takes = FORMATS[col.as];
           if (of && takes !== "any" && !takes.includes(of.kind)) {
             at("format_wrong",
@@ -2146,25 +2210,7 @@ export function refuseSurface(
         at("slot_kind_wrong",
           `${where}: "${slot}" takes ${spec.takes.join(" or ")}, and is given a ${binding.from.of}`);
       }
-      /*
-        ⚠️ THE FORMATTER IS CHECKED AGAINST THE FIELD'S DECLARED KIND, WHICH IS
-        THE ONLY PLACE THE TWO EVER MEET. Neither half is wrong on its own: the
-        field is a real field and the formatter is a real formatter. What is
-        wrong is the pair, and nothing downstream of here can see both.
-      */
-      if (binding.as && binding.as !== "plain" && binding.from.of === "field") {
-        const f = subject?.[binding.from.field];
-        const takes = FORMATS[binding.as];
-        if (f && takes !== "any" && !takes.includes(f.kind)) {
-          at("format_wrong",
-            `${where}: "${binding.from.field}" is a ${f.kind} and is drawn as ${binding.as}, `
-            + `which says ${takes.join(" or ")}`);
-        }
-      }
-      if (binding.as && binding.as !== "plain" && binding.from.of === "count"
-        && !(FORMATS[binding.as] === "any" || (FORMATS[binding.as] as readonly FieldKind[]).includes("number"))) {
-        at("format_wrong", `${where}: "${slot}" is a count and is drawn as ${binding.as}`);
-      }
+      formatted(where, slot, binding);
     }
   }
 

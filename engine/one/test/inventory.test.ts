@@ -24,9 +24,9 @@ import {
   MEMBERSHIP, addShard, compPlan, createTenant, found, noteBelonging, noteShardApp,
   startSession, upsertAccount, type Db,
 } from "@engine/runtime";
-import { isDrawn } from "@engine/kernel";
+import { included, isDrawn, type Allowance } from "@engine/kernel";
 import { inventory } from "@engine/inventory";
-import worker, { APPS, LEGAL } from "../src/index.js";
+import worker, { APPS, LEGAL, PLANS } from "../src/index.js";
 import { warm } from "./warm.js";
 
 const { ctx, settled } = warm();
@@ -523,22 +523,42 @@ describe("what the plan opens", () => {
     product that had changed underneath it, and the failure said "expected to
     include 'run'" about a screen nobody had removed by mistake.
 
-    ⚠️ AND IT IS CORRECT IN BOTH WORLDS, which is the point of deriving it. Today
-    OneInventory gates no screen on a flag, so the assertion is that this tier
-    sees every screen its grants allow; the day a gated screen returns, the same
-    walk asserts it is withheld here — with no edit, and no silence in between.
+    ⚠️ AND IT IS CORRECT IN BOTH WORLDS, which is the point of deriving it. The
+    day a gated screen arrives, the same walk asserts it is withheld here — with
+    no edit, and no silence in between. The release rail is that day: `/runs` and
+    `/run` name `processes`, `solo` does not buy it, and both halves moved on
+    their own.
+
+    ⚠️ AND THE TIER IS READ OUT OF THE CATALOGUE RATHER THAN RESTATED. What is
+    withheld here is a sentence somebody wrote in `PLANS` — an edit there moves
+    this suite with it, instead of turning it red about a decision that was
+    made deliberately one file over.
   */
-  const GATED = (inventory().screens ?? []).flatMap((one) => (one.flag ? [one.id] : []));
+  const TIER = PLANS.find((one) => one.id === "solo")!.includes as Record<string, Allowance>;
+
+  /*
+    ⚠️ TWO REASONS A SCREEN DOES NOT TRAVEL, AND THE WALK KNOWS BOTH. A `flag` is
+    our switch and a `feature` is their plan; the surface filters on both, so a
+    suite that asked about one of them would call the other's absence a bug.
+
+    ⚠️ ANY, NOT ALL — mirroring `ScreenSpec.features`. A screen about runs AND
+    jobs is worth opening to somebody who bought only jobs, and asserting `all`
+    here would demand the product withhold a page half of which was paid for.
+  */
+  const sold = (one: { readonly features?: readonly string[] }): boolean =>
+    !one.features || one.features.some((key) => included(TIER[key] ?? false));
 
   it("withholds exactly what this tier did not buy, and nothing else", async () => {
     const ids = (await screensOf()).map((s) => s.id);
-    for (const id of GATED) expect(ids).not.toContain(id);
+    const gated = (inventory().screens ?? []).filter((one) => one.flag || !sold(one));
+    expect(gated.length, "nothing is gated, so this suite proves nothing").toBeGreaterThan(0);
+    for (const one of gated) expect(ids, one.id).not.toContain(one.id);
     /* ⚠️ AND KEEPS EVERY UNGATED ONE. Half of this claim is that the filter is
        not over-reaching: a screen withheld because a NEIGHBOUR was gated is the
        failure `/work` was designed against — it is about runs AND jobs, so
        gating it on runs alone would take the work orders with it. */
     const open = (inventory().screens ?? [])
-      .filter((one) => !one.flag && one.nav !== "none")
+      .filter((one) => !one.flag && sold(one) && one.nav !== "none")
       .map((one) => one.id);
     for (const id of open) expect(ids).toContain(id);
   });

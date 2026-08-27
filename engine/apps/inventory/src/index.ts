@@ -6533,6 +6533,24 @@ const manifest = (): AppSpec => defineApp({
        the shelf, and they are one table with the term swapped. */
     { id: "on-this-shelf", of: "stock", where: [{ field: "location", is: { here: "record" } }] },
     /*
+      ⚠️ EVERY RUN, NEWEST FIRST, AND NOT JUST THE ONES STILL OPEN. `counting`
+      asks for the absence because a closed count is history and history is a
+      different question — a run is the opposite. What a release rail exists to
+      produce is a RECORD: the run somebody signed for last March is the thing an
+      auditor asks about, and a list that showed only what is in flight would
+      hide the entire reason the collection cannot be deleted from.
+
+      ⚠️ SORTED BY WHEN IT STARTED, DESCENDING, so what is waiting for a
+      signature is at the top without the list pretending to be a queue. A rail
+      whose oldest run is first opens on something settled years ago.
+    */
+    { id: "runs", of: "process", limit: 50, sort: { by: "started", dir: "down" } },
+    /* ⚠️ WHAT ONE RUN COVERED, AND THE VERDICT IS PER ITEM — see `process-item`.
+       A recall reaches the boxes still on a shelf and not the ones already used,
+       so a verdict stored on the run would make those two the same row. */
+    { id: "in-this-run", of: "process-item",
+      where: [{ field: "process", is: { here: "record" } }] },
+    /*
       ⚠️ ASKED, BECAUSE THIS SCREEN'S SUBJECT IS ARITHMETIC AND A `Match` IS
       EQUALITY — see `ViewSpec.asked`. When a delivery runs out is the earliest
       of four clocks resolved against a threshold the workspace sets, none of
@@ -7915,7 +7933,7 @@ const manifest = (): AppSpec => defineApp({
                HAVE AN AGE — and it decides something: a session opened three
                days ago is one somebody walked away from, and closing it empties
                everything it never reached. */
-            fresh: { from: { of: "field", field: "day" } },
+            fresh: { from: { of: "field", field: "day" }, as: "when" },
             mark: { from: { of: "words", says: "tally" } },
           },
         },
@@ -8044,7 +8062,7 @@ const manifest = (): AppSpec => defineApp({
           block: "Listing",
           shows: [
             { field: "location.name", label: "Where" },
-            { field: "day", label: "Started" },
+            { field: "day", label: "Started", as: "when" },
             /* ⚠️ WHETHER THE EXPECTED NUMBER WAS HIDDEN, WHICH IS THE ONE FACT
                ABOUT A SESSION THAT CANNOT BE CHANGED ONCE IT IS RUNNING. It
                belongs on the row for the same reason it is per session: somebody
@@ -8095,6 +8113,318 @@ const manifest = (): AppSpec => defineApp({
       A registration that demanded them is a registration nobody completes, and
       an inventory nobody finishes filling is the thing this product is for.
     */
+    /*
+      EVERY RUN THIS WORKSPACE HAS DONE, AND THE ONE WAITING FOR A SIGNATURE.
+
+      ⚠️ SEVEN VERBS WERE BUILT, DRIVEN END TO END AND CALLABLE BY NOBODY. The
+      release rail is the compliance half of this product — a batch is made,
+      quarantined, and used only after somebody reads the evidence and puts their
+      name to it — and it shipped with no address at all. `process.result` was
+      the one thing wired, which is what put the subject in the reach guard's
+      sights and started the countdown this closes.
+
+      ⚠️ AND THE LIST IS THE RECORD, NOT A QUEUE. `runs` is every run rather than
+      the open ones, because what this rail exists to produce is something an
+      auditor reads two years later — the collection refuses `delete` for the
+      same reason. Newest first is what puts the one awaiting a decision at the
+      top without the screen claiming to be a worklist.
+    */
+    /*
+      ⚠️ A DESTINATION, AND THE ENTITLEMENT IS WHY THAT IS SAFE. A workspace that
+      does runs does them all day — the autoclave twice a morning, the oven every
+      batch — so this is somewhere somebody STANDS rather than somewhere they are
+      sent, which is the whole test for the bar. And a workspace whose plan does
+      not include `processes` never sees it: the server withholds the screen, and
+      the bar is built to look deliberate at three, four or five for exactly this
+      reason.
+    */
+    { id: "runs", route: "/runs", label: "Runs", nav: "primary", icon: "check",
+      permission: "process:read", features: ["processes"],
+      body: {
+        shape: "list",
+        layout: { as: "stack" },
+        blocks: [{
+          group: null,
+          of: [{
+            /* ⚠️ `process:run` OPENS ONE AND `process:release` SIGNS FOR IT,
+               which is the whole design rather than two similar grants — the
+               person at the machine must not be the person who decides the
+               machine was right. The gate reads the act's own permission, so
+               this row is simply absent for somebody who may only release. */
+            block: "ActionRow",
+            does: [{ op: "process.open", fills: { day: "today" } }],
+            bind: {
+              icon: { from: { of: "words", says: "add" } },
+              label: { from: { of: "words", says: "Start a run" } },
+              under: { from: { of: "words",
+                says: "A cycle, a cure, a calibration — whatever your workspace calls it" } },
+            },
+          }],
+        }, {
+          block: "Listing",
+          /* ⚠️ THE STANDING IS THE SECOND COLUMN AND THEREFORE A PHONE ROW'S
+             SECOND LINE, which is right: what somebody scans this list for is
+             which run is still waiting, and the kind is how they recognise it. */
+          shows: [
+            { field: "kind", label: "What it was" },
+            { field: "state", label: "Standing" },
+            { field: "started", label: "Started", as: "when" },
+          ],
+          goes: "run",
+          nothing: {
+            says: "No runs yet",
+            under: "Start one and everything it covers is held until you release it",
+          },
+          bind: {
+            label: { from: { of: "words", says: "Runs" } },
+            of: { from: { of: "view", view: "runs" } },
+          },
+        }],
+      } },
+    /*
+      ONE RUN: WHAT IS IN IT, WHERE IT STANDS, AND THE DECISION SOMEBODY OWES IT.
+
+      ⚠️ ENDING AND RELEASING ARE TWO ACTS BY TWO PARTIES AND THE SCREEN HAS TO
+      SHOW THAT — see `release.ts`. A machine finishing its cycle is a fact about
+      a machine; "this may be used" is a judgement somebody puts their name to
+      after reading the printout. So the two are separate rows, behind separate
+      grants, and neither is drawn while the run is in a standing it cannot
+      leave that way.
+
+      ⚠️ EVERY ACT IS `when`-GATED ON THE STANDING, AND THAT MIRRORS `refuseRun`
+      RATHER THAN RESTATING IT. The handler refuses regardless — releasing from
+      `open` is the single most tempting shortcut in the rail and it fails at the
+      door — so what the condition buys is that nobody is offered a control whose
+      only outcome is a refusal. The two agree because both are read from the
+      same five words.
+
+      ⚠️ NO WORLD, for the reason the product page states: somebody was SENT here
+      from a row they pressed.
+    */
+    { id: "run", route: "/run", label: "Run", nav: "none", icon: "check",
+      permission: "process:read", of: "process", features: ["processes"],
+      body: {
+        shape: "detail",
+        layout: { as: "stack" },
+        hero: {
+          as: "figure",
+          nothing: { says: "Nothing in it yet", under: "Put a delivery in and it will be here" },
+          bind: {
+            value: { from: { of: "count", view: "in-this-run" } },
+            of: { from: { of: "words", says: "Deliveries in it" } },
+            /* ⚠️ WHEN IT STARTED, WHICH IS THE ONE FIGURE HERE WITH AN AGE — and
+               it decides something. A run opened three days ago and never ended
+               is one somebody walked away from, and everything it covers has
+               been frozen ever since. */
+            fresh: { from: { of: "field", field: "started" }, as: "when" },
+            mark: { from: { of: "words", says: "check" } },
+          },
+        },
+        blocks: [
+          {
+            block: "Listing",
+            /*
+              ⚠️ THE VERDICT IS THE END OF THE ROW, which on a phone is where the
+              eye lands — and it is the one column that differs between two rows
+              of the same run after a recall.
+
+              ⚠️ AND THE LOT NAMES THE DELIVERY, BECAUSE THE PRODUCT IS TWO HOPS
+              AWAY AND A SCREEN MAY ONLY MAKE ONE. `batch.product.name` reads
+              through the item to the batch to the product, and the composition
+              check refuses it — correctly: a screen that could reach arbitrarily
+              far is a join nobody declared. The lot is what is printed on the
+              box anyway, which is what somebody standing at a shelf matches
+              against.
+            */
+            shows: [
+              { field: "batch.lot", label: "Lot" },
+              { field: "verdict", label: "Verdict" },
+              { field: "batch.printed", label: "Expires", as: "when" },
+            ],
+            nothing: {
+              says: "Nothing in it yet",
+              under: "Put a delivery in and it is held until this run is released",
+            },
+            bind: {
+              label: { from: { of: "words", says: "What it covers" } },
+              of: { from: { of: "view", view: "in-this-run" } },
+            },
+          },
+          {
+            group: "While it is running",
+            when: { is: { of: "field", field: "state" }, one: ["open"] },
+            of: [
+              {
+                block: "ActionRow",
+                does: [{ op: "process.put", fills: { process: "record" } }],
+                bind: {
+                  icon: { from: { of: "words", says: "box" } },
+                  label: { from: { of: "words", says: "Put a delivery in" } },
+                  under: { from: { of: "words",
+                    says: "It is held from now until somebody releases this run" } },
+                },
+              },
+              {
+                block: "ActionRow",
+                does: [{ op: "process.end", fills: { process: "record" } }],
+                bind: {
+                  icon: { from: { of: "words", says: "check" } },
+                  label: { from: { of: "words", says: "It has finished" } },
+                  /* ⚠️ AND THE EVIDENCE IS ASKED FOR HERE RATHER THAN AT THE
+                     RELEASE, because it is what the person at the machine is
+                     holding — a printout, an indicator lot, a certificate
+                     number. Asked of the releaser it would be a number they read
+                     off somebody else's paperwork. */
+                  under: { from: { of: "words",
+                    says: "Say what the printout or the indicator says" } },
+                },
+              },
+            ],
+          },
+          {
+            /*
+              ⚠️ THE DECISION, AND IT IS ITS OWN CARD BECAUSE IT IS ITS OWN JOB.
+              Both rows are `process:release`, both are only reachable once the
+              run has actually finished, and putting them beside "put a delivery
+              in" would be a screen where signing is one of four similar things.
+            */
+            group: "Somebody has to decide",
+            when: { is: { of: "field", field: "state" }, one: ["ended"] },
+            of: [
+              {
+                block: "ActionRow",
+                does: [{ op: "process.release", fills: { process: "record", day: "today" } }],
+                bind: {
+                  icon: { from: { of: "words", says: "check" } },
+                  label: { from: { of: "words", says: "Release it" } },
+                  under: { from: { of: "words",
+                    says: "Everything it covers becomes usable, under your name" } },
+                },
+              },
+              {
+                block: "ActionRow",
+                does: [{ op: "process.fail", fills: { process: "record" } }],
+                bind: {
+                  icon: { from: { of: "words", says: "alert" } },
+                  label: { from: { of: "words", says: "Fail it" } },
+                  under: { from: { of: "words",
+                    says: "Everything it covers freezes where it is" } },
+                },
+              },
+            ],
+          },
+          {
+            /* ⚠️ REACHED FROM `released` AND NOWHERE ELSE — see `refuseRun`. A
+               run nobody released has nothing out in the world to call back, and
+               a recall that could be used as a tidy-up is a recall that stops
+               meaning what it says. */
+            group: "It went out and it should not have",
+            when: { is: { of: "field", field: "state" }, one: ["released"] },
+            of: [{
+              block: "ActionRow",
+              does: [{ op: "process.recall", fills: { process: "record" } }],
+              bind: {
+                icon: { from: { of: "words", says: "alert" } },
+                label: { from: { of: "words", says: "Call it back" } },
+                under: { from: { of: "words",
+                  says: "Freezes what is still on a shelf, and says what it could not reach" } },
+              },
+            }],
+          },
+          {
+            /*
+              ⚠️ A QUARANTINE CAN ALWAYS BE LIFTED, AND IT LIFTS TO "NEEDS WORK"
+              RATHER THAN TO "GOOD TO GO" — see `mayLift`. Holding stock frozen
+              for ever because a form cannot be completed is how a rule gets
+              worked around, and the honest description of a tray whose steriliser
+              failed is that it is unfrozen and still not released.
+
+              ⚠️ IT ASKS WHICH DELIVERY, BECAUSE THE VERDICT IS PER ITEM. A
+              recall reaches some of what a run covered and not the rest, so
+              lifting is one row's decision rather than the run's.
+            */
+            group: "Unfreeze one of them",
+            when: { is: { of: "field", field: "state" }, one: ["failed", "recalled"] },
+            of: [{
+              block: "ActionRow",
+              does: [{ op: "process.lift", fills: { process: "record" } }],
+              bind: {
+                icon: { from: { of: "words", says: "edit" } },
+                label: { from: { of: "words", says: "Lift the hold on one" } },
+                under: { from: { of: "words",
+                  says: "It stops being frozen and it is still not released" } },
+              },
+            }],
+          },
+          {
+            /*
+              ⚠️ A RESULT THAT ARRIVES AFTER THE FACT, AND IT IS OFFERED AT EVERY
+              STANDING BUT `open` — a biological indicator read at 24 hours, a
+              laboratory report, a certificate. `landResult` decides what it
+              means: a late failure on a released run is a RECALL, which is the
+              ordinary case this whole rail is built for, and a late result that
+              contradicts an earlier one is refused rather than applied.
+            */
+            group: "A result came in later",
+            when: { not: { is: { of: "field", field: "state" }, one: ["open"] } },
+            of: [{
+              block: "ActionRow",
+              does: [{ op: "process.result", fills: { process: "record" } }],
+              bind: {
+                icon: { from: { of: "words", says: "clock" } },
+                label: { from: { of: "words", says: "Record a late result" } },
+                under: { from: { of: "words",
+                  says: "An indicator read the next day, a report, a certificate" } },
+              },
+            }],
+          },
+          {
+            group: "What it was",
+            of: [
+              /* ⚠️ THE STANDING IS SAID HERE BECAUSE IT IS THE ONLY PLACE THAT
+                 IS ALWAYS DRAWN. Every action group above is `when`-gated, so a
+                 released run has none of them — and a page that stated its
+                 standing only through which controls it happened to offer would
+                 say nothing at all about the runs an auditor actually opens. */
+              { block: "FieldRow",
+                bind: {
+                  label: { from: { of: "words", says: "Standing" } },
+                  value: { from: { of: "field", field: "state" } },
+                } },
+              { block: "FieldRow",
+                when: { has: { of: "field", field: "machine" } },
+                bind: {
+                  label: { from: { of: "words", says: "Machine" } },
+                  value: { from: { of: "field", field: "machine" } },
+                } },
+              { block: "FieldRow",
+                when: { has: { of: "field", field: "evidence" } },
+                bind: {
+                  label: { from: { of: "words", says: "Evidence" } },
+                  value: { from: { of: "field", field: "evidence" } },
+                } },
+              { block: "FieldRow",
+                when: { has: { of: "field", field: "ended" } },
+                bind: {
+                  label: { from: { of: "words", says: "Finished" } },
+                  value: { from: { of: "field", field: "ended" }, as: "when" },
+                } },
+              { block: "FieldRow",
+                when: { has: { of: "field", field: "released" } },
+                bind: {
+                  label: { from: { of: "words", says: "Released" } },
+                  value: { from: { of: "field", field: "released" }, as: "when" },
+                } },
+            ],
+          },
+          {
+            group: "Note",
+            when: { has: { of: "field", field: "note" } },
+            of: [{ block: "Markdown",
+              bind: { of: { from: { of: "field", field: "note" } } } }],
+          },
+        ],
+      } },
     /*
       A CATALOGUE NOBODY IS GOING TO TYPE.
 

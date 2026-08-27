@@ -267,16 +267,6 @@ const WAITING = new Set([
   /* A deliberate correction of a product's whole on-hand — UN-2 built the rule
      and the product page has no control for it. */
   "inventory/product.recount",
-  /* THE RELEASE RAIL, WHOLE. A batch is opened, filled, ended, then held until
-     somebody releases it or fails it — and recalled or lifted afterwards. Seven
-     verbs, one feature, gated on `processes`, and its screens were emptied with
-     everything else. It is the one entry here that is a WHOLE surface rather
-     than a control missing from an existing one, so it goes as a block or not
-     at all. `process.result` is wired, which is what put the subject in this
-     guard's sights in the first place. */
-  "inventory/process.open", "inventory/process.put", "inventory/process.end",
-  "inventory/process.release", "inventory/process.fail", "inventory/process.recall",
-  "inventory/process.lift",
 ]);
 
 /**

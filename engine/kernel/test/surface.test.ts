@@ -1347,8 +1347,25 @@ describe("how a column says its value", () => {
     expect(shown({ field: "title", label: "Title", as: "when" })).toContain("format_wrong");
   });
 
-  it("says nothing about a column that names no formatter", () => {
-    expect(shown({ field: "at", label: "Written" })).toEqual([]);
+  /*
+    ⚠️ THIS ASSERTED SILENCE, AND THE SILENCE WAS THE BUG. A column that names no
+    formatter used to be waved through whatever it was over — so a date drew
+    `String(v)`, and `2026-08-27` went down a list under a heading reading
+    "Written". The pair check only ever ran when somebody SAID `as`, which means
+    it caught the wrong formatter and could not see the missing one.
+
+    ⚠️ AND THE CASE FOR THE RAW VALUE DOES NOT EXIST. `when` says "Today",
+    "Yesterday" and then the date, so past two days it draws what the stored
+    string was going to say anyway — in the reader's own locale and zone.
+  */
+  it("refuses a date drawn with no formatter at all", () => {
+    expect(shown({ field: "at", label: "Written" })).toContain("format_missing");
+  });
+
+  /* ⚠️ AND EVERY OTHER KIND IS STILL LEFT ALONE, which is the half that keeps
+     the rule about dates rather than about formatters. */
+  it("says nothing about anything else that names no formatter", () => {
+    expect(shown({ field: "title", label: "Title" })).toEqual([]);
   });
 });
 

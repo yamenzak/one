@@ -925,7 +925,7 @@ export const GROUND: AppSpec = defineApp({
                 when: { has: { of: "field", field: "happened" } },
                 bind: {
                   label: { from: { of: "words", says: "Happened on" } },
-                  value: { from: { of: "field", field: "happened" } },
+                  value: { from: { of: "field", field: "happened" }, as: "when" },
                 } },
               { block: "FieldRow", edits: "minutes",
                 when: { has: { of: "field", field: "minutes" } },
