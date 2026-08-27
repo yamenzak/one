@@ -22,6 +22,20 @@
 
 import * as React from "react";
 import { Button } from "@heroui/react";
+/*
+ * ⚠️ THE PLATFORM'S CEILING, NOT A CEILING OF ITS OWN — see the kernel's
+ * `MOST_BYTES`. This file held four megabytes and it refused photographs a phone
+ * had just taken: `refuse` weighs the file somebody PICKED, and `shrunk` runs
+ * after it, so what was being enforced was a payload budget applied to the one
+ * thing it was never about. A 48-megapixel JPEG is ten megabytes on the way in
+ * and about half of one by the time anything is asked about it.
+ *
+ * ⚠️ AND WHAT THE PAYLOAD COSTS IS STILL GUARDED, one layer down and against the
+ * bytes that actually travel: `product.see` refuses a batch over eight megabytes
+ * AFTER the shrinking, which is the measurement that means something. Two caps
+ * on one thing is how the useless one comes to be the one people hit.
+ */
+import { MOST_BYTES } from "@engine/kernel";
 import { PickFile, shrunk } from "./pick-file.js";
 import { Stack } from "./arrange.js";
 import { Nothing } from "./state.js";
@@ -38,8 +52,6 @@ import { SPACE } from "../tokens/metrics.js";
  */
 export const MOST_SHOTS = 6;
 
-/** ⚠️ Under four megabytes between them — a phone's own photo is well inside it. */
-const MOST_BYTES = 4 * 1024 * 1024;
 
 export interface ShotsProps {
   /** ⚠️ Data URLs, in the order they were taken. */
