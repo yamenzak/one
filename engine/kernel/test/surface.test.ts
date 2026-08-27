@@ -1832,6 +1832,46 @@ describe("what a flow starts already answered", () => {
   });
 });
 
+/*
+  ⚠️ AND WHAT A FLOW SUPPLIES ITSELF — see `StorySpec.holds`. It exists because a
+  write taking a required `day` could not be reached by a flow at ALL: `starts`
+  reads a setting, and the device's calendar is not one. Both refusals here are a
+  value resolved, sent and dropped, and a write refused for want of a field the
+  flow believed it was supplying.
+*/
+describe("what a flow holds by itself", () => {
+  const holding = (holds: Record<string, unknown>) =>
+    told(flow({ holds })).filter((why) => why.startsWith("holds_"));
+
+  it("says nothing about a source that means something off a record", () => {
+    expect(holding({ name: "today" })).toEqual([]);
+  });
+
+  it("refuses an input the write does not take", () => {
+    expect(holding({ colour: "today" })).toContain("holds_takes_unknown");
+  });
+
+  /* ⚠️ A FLOW IS NOT ABOUT A RECORD, so both sources that read one resolve to
+     nothing — and the write refuses naming a field nobody was asked for. */
+  it("refuses a value read off a record", () => {
+    expect(holding({ name: "record" })).toContain("holds_reaches_a_record");
+    expect(holding({ name: { field: "brand" } })).toContain("holds_reaches_a_record");
+  });
+
+  /* ⚠️ AND IT SATISFIES `story_cannot_finish`, which is the whole point of it —
+     a required input nothing asks for is reached when the flow holds it. */
+  it("counts as a way the write's required input is reached", () => {
+    const needs = [{
+      ...WRITE,
+      input: { ...WRITE.input, day: field.day({ label: "On", required: true, holds: "none" }) },
+    }, SEES];
+    expect(refuseStory(flow(), needs, ASKING).map((p) => p.why))
+      .toContain("story_cannot_finish");
+    expect(refuseStory(flow({ holds: { day: "today" } }), needs, ASKING).map((p) => p.why))
+      .not.toContain("story_cannot_finish");
+  });
+});
+
 /**
  * ⚠️ WHERE A FLOW ENDS IS DECLARED BECAUSE THE ALTERNATIVE WAS A PRODUCT'S ROUTE
  * IN THE PLATFORM — see `StorySpec.lands`. The browser went to `/products` after

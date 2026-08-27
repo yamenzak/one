@@ -19,6 +19,7 @@
 
 import * as React from "react";
 import {
+  Consequences,
   Await, Screen, Trouble, Waiting, ready, trouble, useTelling, waiting, type Loaded,
 } from "@engine/design";
 import { Doing, asks, type Ran } from "@engine/design/doing";
@@ -583,8 +584,20 @@ function Flow({ screen, acts, run, made, onGo, chose, metered }: {
       if (value === undefined || value === null || value === "") continue;
       out[name] = value;
     }
+    /*
+      ⚠️ AND WHAT THE FLOW SUPPLIES ITSELF — see `StorySpec.holds`. The same
+      `fillWith` a body uses for an act, for the same reason: two readings of one
+      contract at the two ends of a product is how "the device's day" comes to
+      mean two things, and the day a flow sends is the day a shelf life is
+      counted from.
+
+      ⚠️ IT GOES IN BESIDE `starts` BECAUSE BOTH ARE ANSWERS THE PERSON DID NOT
+      GIVE. The difference is where they came from and nothing else, and a second
+      slot for them would be a second thing to remember to clear.
+    */
+    Object.assign(out, fillWith(told.holds ?? {}, { today: today() }));
     return out as Answers;
-  }, [told.starts, chose]);
+  }, [told.starts, told.holds, chose]);
 
   /* ⚠️ THE FIRST STEP THAT IS STILL A QUESTION, AND `askedOf` DECIDES WHICH ONE
      — the same walk the flow itself uses. Reimplemented here it would be a
@@ -687,6 +700,55 @@ function Flow({ screen, acts, run, made, onGo, chose, metered }: {
   }, [fills, given, write, tell]);
 
   /*
+    ⚠️ WHAT THE FLOW IS ABOUT TO DO, WORKED OUT WHEN IT IS ABOUT TO DO IT — see
+    `ShowsSpec`. The mirror of the fill above and deliberately the same shape:
+    an operation named in the manifest, handed the answers it was declared to
+    take, remembered by WHAT was sent rather than by a flag.
+
+    ⚠️ ON THE REVIEW AND NOWHERE ELSE. The operation reads the whole input — for
+    an import that is four hundred kilobytes of spreadsheet — so running it as
+    somebody types would be a round trip per keystroke on the one flow whose
+    first step is a paste.
+
+    ⚠️ AND A REPORT THAT COULD NOT BE MADE LEAVES THE REVIEW AS IT WAS. The flow
+    still works: somebody can still press, and the write still refuses what it
+    refuses. What must not happen is a row of zeroes, which is a confident claim
+    that this spreadsheet would do nothing.
+  */
+  const shows = told.shows;
+  const asked = React.useMemo(() => {
+    if (!shows || at !== "review") return null;
+    const out: Record<string, unknown> = {};
+    for (const [wants, from] of Object.entries(shows.with)) {
+      const value = held[from];
+      if (value === undefined || value === null || value === "") return null;
+      out[wants] = value;
+    }
+    return out;
+  }, [shows, at, held]);
+
+  const [counts, setCounts] = React.useState<Readonly<Record<string, number>> | null>(null);
+  const looked = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    if (!shows || !asked) return;
+    const key = JSON.stringify(asked);
+    if (looked.current === key) return;
+    looked.current = key;
+    void (async () => {
+      const said = await api.post(shows.by, asked);
+      /* ⚠️ AND A REPORT THAT COULD NOT BE MADE SAYS SO — the review is left as
+         it was rather than filled with zeroes, which would be a confident claim
+         that this press would do nothing. The flow still works: somebody can
+         still press, and the write still refuses what it refuses. */
+      if (!said.ok) { tell.failed(said.problem, "Could not work out what this would do"); return; }
+      const of = (said.value as Record<string, unknown>)[shows.take];
+      if (!of || typeof of !== "object") return;
+      setCounts(Object.fromEntries(Object.entries(of as Record<string, unknown>)
+        .filter(([, n]) => typeof n === "number")) as Record<string, number>);
+    })();
+  }, [shows, asked, tell]);
+
+  /*
     ⚠️ AND IF THE WRITE IS STILL NOT THERE, IT SAYS SO. The door answered, so
     this is not a round trip in progress — it is a flow walking toward an
     operation this app does not offer, which `refuseSurface` refuses at
@@ -721,8 +783,25 @@ function Flow({ screen, acts, run, made, onGo, chose, metered }: {
          so there is no button to put the sentence on — see `CreateProps.spends`. */
       {...(told.fills && metered.includes(told.fills.by) ? { spends: true } : {})}
       {...(write.choices ? { choices: write.choices } : {})}
+      /* ⚠️ THE CONSEQUENCES ABOVE THE PRESS — see `ShowsSpec`. `lead` is the
+         review's own slot for "what the thing looks like", and for a flow whose
+         subject is a change rather than a record, what it looks like is the
+         change. */
+      {...(counts ? { lead: <Consequences
+        says="What this will do"
+        of={Object.entries(counts).map(([key, count]) => ({
+          says: shows?.says?.[key] ?? key,
+          count,
+          ...(key === "refused" ? { ink: "warn" as const } : {}),
+        }))}
+      /> } : {})}
       does={{
-        label: "Add it",
+        /* ⚠️ THE WORD ON THE LAST PRESS IS THE FLOW'S — see `StorySpec.does`.
+           "Add it" is a product's sentence about a product, written into the
+           platform, and it read "Add it" over a button that applies eight
+           hundred rows of somebody else's spreadsheet. Same class as the
+           `/products` route this file already carries a paragraph about. */
+        label: told.does ?? "Add it",
         op: told.writes,
         onDo: () => {
           void (async () => {

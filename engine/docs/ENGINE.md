@@ -1193,6 +1193,7 @@ its own header, cited by other files, and doing nothing.
 | D109 | A way back belongs beside the act, and an operation reached by nothing has no way to be offered | 0 |
 | D110 | A verb of a subject the app has drawn is called from somewhere, and the remainder is a countdown | 0 |
 | D111 | A page about one thing can call a write that works on many, and a condition inside a card is a condition | 0 |
+| D112 | A flow shows what it is about to do, and holds what nobody should be asked | 0 |
 <!-- /generated -->
 
 ---

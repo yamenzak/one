@@ -166,10 +166,51 @@ const stepsOf = (block) => {
 };
 
 const MANIFESTS = appDirs().flatMap((dir) => filesIn(dir, /^index\.tsx?$/));
+
+/**
+ * ⚠️ THE END OF A `story:` IS FOUND BY COUNTING BRACES, NOT BY MATCHING AN
+ * INDENT. This was `/story:\s*\{([\s\S]*?)\n(\s{4,6})\},/` — a pattern about
+ * where somebody put a newline — and a story closing `} },` on one line ran
+ * straight past its own end into the NEXT screen, reporting that screen's id as
+ * a step with no question. Loud, and only by luck: the same brittleness under a
+ * different formatting reads a story SHORT, which drops its last steps and
+ * reports the flow as clean.
+ *
+ * ⚠️ AND STRINGS ARE THE REASON IT IS NOT THREE LINES. A brace inside a quoted
+ * sentence — `says: { as: "{unit}" }` is every other step in this repository —
+ * closes the block early to a counter that cannot see quotes.
+ */
+const storyAt = (src, from) => {
+  let depth = 0;
+  let quote = "";
+  for (let i = from; i < src.length; i++) {
+    const c = src[i];
+    if (quote) {
+      if (c === "\\") i++;
+      else if (c === quote) quote = "";
+      continue;
+    }
+    if (c === '"' || c === "'" || c === "`") { quote = c; continue; }
+    if (c === "{") depth++;
+    else if (c === "}" && --depth === 0) return src.slice(from + 1, i);
+  }
+  return null;
+};
+
 const STORIES = MANIFESTS.flatMap((file) => {
   const src = code(readFileSync(file, "utf8"));
-  return [...src.matchAll(/\bstory:\s*\{([\s\S]*?)\n(\s{4,6})\},/g)]
-    .map(([, block]) => ({ file: rel(file), block }));
+  return [...src.matchAll(/\bstory:\s*\{/g)].map((m) => {
+    const block = storyAt(src, m.index + m[0].length - 1);
+    /* ⚠️ AND A `story:` THIS CANNOT CLOSE IS SAID OUT LOUD RATHER THAN SKIPPED.
+       A dropped one is a flow every rule below stops asking about, reported as
+       part of a clean sweep — which is the failure the whole extraction was
+       just rewritten to end. */
+    if (block === null) {
+      fail(`${rel(file)}: a \`story:\` that never closes — this check could not read it,\n`
+        + "       so every rule below stopped applying to that flow.");
+    }
+    return { file: rel(file), block: block ?? "" };
+  }).filter((one) => one.block);
 });
 
 {

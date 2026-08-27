@@ -40,6 +40,7 @@ export * from "./parts/bones.js";
 export * from "./parts/recall.js";
 export * from "./parts/settle.js";
 export * from "./frame/screen.js";
+export * from "./parts/consequences.js";
 export * from "./parts/tally.js";
 export * from "./tokens/appearance.js";
 export * from "./tokens/motion.js";

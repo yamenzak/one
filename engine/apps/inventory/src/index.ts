@@ -5210,7 +5210,12 @@ const seeImport = operation<
   kind: "write",
   summary: "What this spreadsheet would do",
   input: {
-    text: field.long({ label: "Rows", required: true, holds: "none", max: 400_000 }),
+    /* ⚠️ SINGULAR, BECAUSE THE REFUSAL IS A SENTENCE — the door says
+       "<label> is needed before this can be saved", and "Rows is needed" is the
+       label leaking through a grammar it does not fit. Every generated message
+       in this product reads the label as a noun phrase, so the label has to be
+       one. */
+    text: field.long({ label: "Sheet", required: true, holds: "none", max: 400_000 }),
     /* ⚠️ WHAT SOMEBODY CORRECTED THE GUESS TO, and absent is the guess itself —
        which is what makes the first ask a paste rather than a form. */
     columns: field.json({ label: "Which column is which", holds: "none" }),
@@ -5267,7 +5272,12 @@ const doImport = operation<
   kind: "write",
   summary: "Bring a spreadsheet in",
   input: {
-    text: field.long({ label: "Rows", required: true, holds: "none", max: 400_000 }),
+    /* ⚠️ SINGULAR, BECAUSE THE REFUSAL IS A SENTENCE — the door says
+       "<label> is needed before this can be saved", and "Rows is needed" is the
+       label leaking through a grammar it does not fit. Every generated message
+       in this product reads the label as a noun phrase, so the label has to be
+       one. */
+    text: field.long({ label: "Sheet", required: true, holds: "none", max: 400_000 }),
     day: field.day({ label: "On", required: true, holds: "none" }),
     /* ⚠️ THE SAME MAPPING THE PREVIEW WAS SHOWN WITH. Sent again rather than
        remembered: a server-side draft would be a second copy of what is about
@@ -7270,6 +7280,30 @@ const manifest = (): AppSpec => defineApp({
         shape: "list",
         layout: { as: "stack" },
         blocks: [{
+          /*
+            ⚠️ THE WAY IN FOR A WORKSPACE THAT ALREADY HAS A CATALOGUE, and it
+            belongs on the catalogue rather than on home. Home is where the daily
+            acts are; this is done once, in the first hour, by somebody who is
+            standing in front of the list wondering how to fill it. The empty
+            state under it says "Register the first product" — true, and the
+            wrong advice for eight hundred of them.
+          */
+          group: null,
+          of: [{
+            /* ⚠️ A `NavRow` RATHER THAN AN `ActionRow`, BECAUSE IT GOES
+               SOMEWHERE. An act opens a form where it stands; this is a flow
+               with its own frame and its own way back, so it wears the chevron
+               that says so — the same distinction home draws between receiving
+               and registering. */
+            block: "NavRow",
+            goes: "import",
+            bind: {
+              label: { from: { of: "words", says: "Bring in a spreadsheet" } },
+              under: { from: { of: "words",
+                says: "Paste it, see what it would do, then apply it" } },
+            },
+          }],
+        }, {
           block: "Listing",
           shows: [
             { field: "name", label: "Name" },
@@ -8061,6 +8095,74 @@ const manifest = (): AppSpec => defineApp({
       A registration that demanded them is a registration nobody completes, and
       an inventory nobody finishes filling is the thing this product is for.
     */
+    /*
+      A CATALOGUE NOBODY IS GOING TO TYPE.
+
+      ⚠️ THE FIRST HOUR OF A WORKSPACE THAT ALREADY HAS AN INVENTORY, and until
+      now it was eight hundred passes through the register flow. `product.import`
+      has existed since the app was built, and it was reachable from nowhere —
+      which made the honest answer to "how do I get my stock in" a shrug.
+
+      ⚠️ IT IS A STORY BECAUSE PASTING IS NOT THE DECISION — see `StorySpec.shows`.
+      The decision is made against what the sheet WOULD do, and a screen with a
+      paste box and an Import button gives somebody nothing to decide with: a
+      column read wrongly puts a supplier's name in eight hundred product names,
+      and the only place anybody could notice is before it happens. So the flow
+      asks for the rows, and the review says "412 added · 61 changed · 11
+      refused" over the press.
+
+      ⚠️ THE COLUMN MAPPING IS THE GUESS, AND CORRECTING IT IS NOT ASKED FOR.
+      `product.preview` takes an optional `columns` and, absent, works one out —
+      right most of the time, which is why the guess is worth making. What this
+      flow cannot yet do is let somebody fix it; what it does instead is SHOW the
+      guess's consequences, so being wrong is survivable rather than invisible.
+      A mapping editor is a surface of its own and it is honest to say it is not
+      here.
+
+      ⚠️ AND `stock:adjust` IS THE GRANT, WHICH IS NOT AN OVERSIGHT. An import
+      carrying quantities SETS numbers rather than moving them, and this
+      product's sharpest access rule is that taking and correcting are different
+      grants — so the person on the floor who moves stock all day cannot paste a
+      spreadsheet over it.
+    */
+    { id: "import", route: "/import", label: "Bring in a spreadsheet",
+      nav: "none", icon: "add", permission: "stock:adjust", tone: "neutral",
+      story: {
+        writes: "product.import",
+        does: "Import them",
+        /* ⚠️ THE DEVICE'S DAY, NEVER A QUESTION — see `StorySpec.holds`. Every
+           row this applies is dated, and "on what day?" is a wizard step whose
+           whole content is a date somebody has to agree with. It is also the
+           reason `holds` exists at all: a story had `starts`, which reads a
+           setting, and no way to supply a fact about where somebody is
+           standing. */
+        holds: { day: "today" },
+        /* ⚠️ THE CATALOGUE, NOT A RECORD — see `StorySpec.lands`. Every other
+           flow here lands on the one thing it made; this one made four hundred,
+           and the only screen that can show that is the list. */
+        lands: "products",
+        /* ⚠️ THE PREVIEW IS THE POINT OF THE FLOW — see `ShowsSpec`. It is a
+           different operation from the write and is refused if it is not:
+           running the import to find out what the import would do has already
+           done it. */
+        shows: {
+          by: "product.preview",
+          with: { text: "text" },
+          take: "tally",
+          says: {
+            made: "added", changed: "changed", received: "put on a shelf",
+            learned: "suppliers added", refused: "refused",
+          },
+        },
+        asks: [
+          {
+            id: "text", ask: "What does your sheet say?",
+            under: "Copy the whole thing — headings and all — and paste it here",
+            takes: ["text"],
+            says: { as: "{text}" },
+          },
+        ],
+      } },
     { id: "add-a-product", route: "/add", label: "Add a product",
       /* ⚠️ NOT IN THE NAV. It is reached from the catalogue and from home —
          `nav: "primary"` would put a one-way flow beside four destinations, and

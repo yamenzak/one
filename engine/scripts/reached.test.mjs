@@ -267,13 +267,6 @@ const WAITING = new Set([
   /* A deliberate correction of a product's whole on-hand — UN-2 built the rule
      and the product page has no control for it. */
   "inventory/product.recount",
-  /* The AI lane's second half: `product.see` reads photographs and IS reached
-     from the register flow; the preview of what it made is not drawn anywhere. */
-  "inventory/product.preview",
-  /* A bulk import needs a screen of its own — a paste, a preview of what the
-     columns were read as, and only then a write. It is the one act in this
-     product where pressing the control is not the decision. */
-  "inventory/product.import",
   /* THE RELEASE RAIL, WHOLE. A batch is opened, filled, ended, then held until
      somebody releases it or fails it — and recalled or lifted afterwards. Seven
      verbs, one feature, gated on `processes`, and its screens were emptied with

@@ -544,7 +544,12 @@ function Walked({ screen, step }: {
          ABOUT THIS BOARD — `meteredIds` derives it in the deployment. Hardcoded
          `true` here would photograph a sentence the product might not say. */
       {...(told.fills && METERED.includes(told.fills.by) ? { spends: true } : {})}
-      does={{ label: "Add it", op: told.writes, onDo: () => undefined }}
+      /* ⚠️ THE FLOW'S OWN WORD — see `StorySpec.does`. Hardcoded here the board
+         photographed "Add it" over a button that applies eight hundred rows of
+         somebody else's spreadsheet, which is the picture the change to the
+         platform was meant to end. A fixture that answers a question its own
+         way is a fixture the photograph cannot be trusted from. */
+      does={{ label: told.does ?? "Add it", op: told.writes, onDo: () => undefined }}
     />
   );
 }

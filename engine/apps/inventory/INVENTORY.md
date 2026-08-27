@@ -285,6 +285,34 @@ string the screen never shows is an act that reports success and delivers
 nothing — and a code re-typed off a screen is a code that will be typed wrong
 onto a shelf and resolve to nothing forever.
 
+### Bringing in a catalogue
+
+⚠️ **`product.import` HAS EXISTED SINCE THE APP WAS BUILT AND WAS REACHABLE FROM
+NOWHERE**, which made the honest answer to "how do I get my stock in" a shrug —
+or eight hundred passes through the register flow. `/import` is the way in, and
+it is reached from the catalogue rather than from home: home is where the daily
+acts are, and this is done once, in the first hour, by somebody standing in front
+of an empty list wondering how to fill it.
+
+⚠️ **IT IS A FLOW BECAUSE PASTING IS NOT THE DECISION.** A column read wrongly
+puts a supplier's name in eight hundred product names, and the only place anybody
+could notice is before it happens — so a paste box and an Import button would be
+a control that gives somebody nothing to decide with. The flow asks for the rows,
+and the review says what applying them would do: how many added, how many
+changed, how many put on a shelf, how many refused. `StorySpec.shows` is the
+engine feature under it and D112 is why it is shaped that way.
+
+⚠️ **THE COLUMN MAPPING IS A GUESS AND CORRECTING IT IS NOT ASKED FOR.**
+`product.preview` works one out and is right most of the time, which is why the
+guess is worth making. What this flow cannot yet do is let somebody fix it; what
+it does instead is show the guess's consequences, so being wrong is survivable
+rather than invisible. A mapping editor is a surface of its own.
+
+⚠️ **AND `stock:adjust` IS THE GRANT.** An import carrying quantities SETS
+numbers rather than moving them, and this product's sharpest access rule is that
+taking and correcting are different grants — so the person on the floor who moves
+stock all day cannot paste a spreadsheet over it.
+
 ### The way back is beside the act, not in the log
 
 ⚠️ **AND FOR A MONTH THERE WAS NO WAY BACK AT ALL.** `undo` was built,
@@ -580,6 +608,7 @@ follows and the shape every screen is drawn to.
 | `/product` | Product | — | `product:read` | `declared` | `declared` |
 | `/place` | Place | — | `location:read` | `declared` | `declared` |
 | `/add` | Add a product | — | `product:write` | `declared` | `declared` |
+| `/import` | Bring in a spreadsheet | — | `stock:adjust` | `declared` | `declared` |
 
 ⚠️ **`declared` IN BOTH FILE COLUMNS IS THE ANSWER, NOT A GAP.** A declared body
 has no component and no container — the renderer draws it from `src/index.ts`, and a

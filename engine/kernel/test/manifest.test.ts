@@ -389,6 +389,70 @@ describe("what would fail on the first request", () => {
       .not.toContain("fill_each_not_a_list");
   });
 
+  /*
+    ⚠️ WHAT A FLOW SHOWS BEFORE IT COMMITS — see `ShowsSpec`. Every one of these
+    fails on the review, which is the one screen whose job is to let somebody
+    decide, and every one of them fails QUIETLY: nothing throws, the flow still
+    walks, and what is missing is the report the press was supposed to be made
+    against. For an import that reads as "nothing will happen" over a spreadsheet
+    about to be applied.
+  */
+  describe("what a flow shows before it commits", () => {
+    const REPORT = operation({
+      id: "note.preview", kind: "write", summary: "What this would do.",
+      input: { id: field.text({ label: "Id", required: true, holds: "none" }) },
+      output: { tally: field.json({ label: "How many of each", holds: "none" }) },
+      permission: "note:write", idempotency: { mode: "none" },
+      outcome: { why: "the answer IS the report" },
+      async handler() { return { tally: {} }; },
+    }) as unknown as AnyOperation;
+    const showing = (shows: Record<string, unknown>) => whyOf(app({
+      operations: [stub, REPORT],
+      screens: [{
+        id: "one", route: "/one", label: "One", permission: "note:write",
+        story: {
+          writes: stub.id, shows,
+          asks: [{ id: "id", ask: "Which one?", takes: ["id"] }],
+        },
+      }] as never,
+    }));
+
+    it("says nothing about a report that exists and answers what it takes", () => {
+      expect(showing({ by: "note.preview", with: { id: "id" }, take: "tally" }))
+        .not.toContain("story_shows");
+    });
+
+    it("refuses an operation this app does not declare", () => {
+      expect(showing({ by: "note.nope", with: {}, take: "tally" }))
+        .toContain("story_shows_unknown");
+    });
+
+    it("refuses an output field it does not answer with", () => {
+      expect(showing({ by: "note.preview", with: { id: "id" }, take: "counts" }))
+        .toContain("story_shows_nothing");
+    });
+
+    /* ⚠️ RUNNING THE WRITE TO FIND OUT WHAT THE WRITE WOULD DO HAS ALREADY DONE
+       IT, and the first time is the one nobody asked for. */
+    it("refuses showing the very operation it writes", () => {
+      expect(showing({ by: stub.id, with: { id: "id" }, take: "id" }))
+        .toContain("story_shows_the_write");
+    });
+
+    it("refuses handing it an input it does not take", () => {
+      expect(showing({ by: "note.preview", with: { imagined: "id" }, take: "tally" }))
+        .toContain("story_shows_unknown_input");
+    });
+
+    /* ⚠️ AND A SOURCE THE WRITE DOES NOT TAKE IS A REPORT OVER NOTHING: no step
+       answers it, so the operation is handed an empty input and answers about an
+       empty world. */
+    it("refuses feeding it from something no step answers", () => {
+      expect(showing({ by: "note.preview", with: { id: "imagined" }, take: "tally" }))
+        .toContain("story_shows_from_nothing");
+    });
+  });
+
   /* ⚠️ AND A SCREEN THAT IS ABOUT NOTHING HAS NO RECORD TO FILL FROM. The value
      would be undefined, the field would arrive empty, and the act would refuse
      for want of a thing the screen was supposed to know. */

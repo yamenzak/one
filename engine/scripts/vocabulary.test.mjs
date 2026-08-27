@@ -336,6 +336,13 @@ const WHY = {
        face as a prop of its own; a screen that needs a bare one draws it in a
        session. See the comment where it was, in kernel/src/blocks.ts. */
     "Face",
+    /* ⚠️ WHAT A FLOW IS ABOUT TO DO, AND A `view` CANNOT SAY IT. `Consequences`
+       takes a count PER OUTCOME — `{made: 412, refused: 11}` — which is one
+       operation's answer rather than rows of a collection, and the review draws
+       it from `StorySpec.shows`. Registered as a block it would be handed rows
+       and draw nothing, which is the exact fault the eleven charts below are
+       here for. */
+    "Consequences",
     "AreaChart", "ColumnChart", "StackedChart", "DivergingChart", "DumbbellChart",
     "HeatmapChart", "ScatterChart", "DonutChart", "CompositionBar", "Sparkline",
     "ChartTable",

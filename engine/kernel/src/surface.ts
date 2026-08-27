@@ -2214,6 +2214,7 @@ export type StoryRefusal =
   | "fills_takes_unknown" | "fills_given_unknown" | "fills_given_unanswered"
   | "fills_permission_wrong"
   | "starts_takes_unknown" | "starts_not_a_setting"
+  | "holds_takes_unknown" | "holds_reaches_a_record"
   /* ⚠️ A flow that ends somewhere that is not a screen — see `StorySpec.lands`. */
   | "lands_nowhere"
   | "story_cannot_finish";
@@ -2240,6 +2241,8 @@ export function refuseStory(
     readonly story?: {
       readonly writes: string;
       readonly starts?: Readonly<Record<string, string>>;
+      /** ⚠️ What the flow supplies itself — see `StorySpec.holds`. */
+      readonly holds?: Readonly<Record<string, Fill>>;
       readonly lands?: string;
       readonly fills?: {
         readonly by: string;
@@ -2338,6 +2341,29 @@ export function refuseStory(
     }
   }
 
+  /* --- what the flow holds by itself ------------------------------------- */
+
+  for (const [name, from] of Object.entries(told.holds ?? {})) {
+    /* ⚠️ SAME FAULT AS `starts_takes_unknown`, ONE SOURCE OVER: the value is
+       resolved, sent and dropped, and the write refuses for want of something
+       the flow believed it was supplying. */
+    if (!(name in write.input)) {
+      at("holds_takes_unknown",
+        `holds "${name}", and ${write.id} does not take it — the value would be sent and `
+        + "dropped, and the write refused for want of a field the flow thought it had");
+    }
+    /* ⚠️ AND A FLOW IS NOT ABOUT A RECORD — see `StorySpec.holds`. `record` and a
+       column ON one are the two sources a DETAIL screen has; a story is making
+       something that does not exist yet, so both resolve to nothing and the
+       write refuses naming a field nobody was asked for. */
+    const source = fillOf(from);
+    if (source.of === "record" || source.of === "field") {
+      at("holds_reaches_a_record",
+        `holds "${name}" from the record, and a flow is not about one — it is making `
+        + "something that does not exist yet, so the value would arrive empty");
+    }
+  }
+
   /* --- the fill --------------------------------------------------------- */
 
   const fills = told.fills ? operations.find((o) => o.id === told.fills?.by) : undefined;
@@ -2405,9 +2431,13 @@ export function refuseStory(
 
   const seen = new Set<string>();
   /** ⚠️ Everything the flow can put into the write, however it got there. */
-  const reached = new Set<string>(
-    fills ? Object.keys(fills.output).filter((k) => k in write.input) : [],
-  );
+  const reached = new Set<string>([
+    ...(fills ? Object.keys(fills.output).filter((k) => k in write.input) : []),
+    /* ⚠️ AND WHAT THE FLOW HOLDS BY ITSELF — see `StorySpec.holds`. A value the
+       device supplies is reached exactly as one a model filled is: the write
+       gets it, so `story_cannot_finish` must not report it missing. */
+    ...Object.keys(told.holds ?? {}).filter((k) => k in write.input),
+  ]);
   /** ⚠️ What a person or a block actually PUTS THERE — see `fills_given_unanswered`. */
   const answered = new Set<string>();
 

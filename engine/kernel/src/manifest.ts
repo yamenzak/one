@@ -57,7 +57,7 @@ import type { AreaBook, SettingBook } from "./setting.js";
 import { refuseSettings } from "./setting.js";
 import { LADDER, refuseLadder } from "./dunning.js";
 import { SURFACES, refuseSurfaces } from "./brand.js";
-import type { Match, SurfaceSpec, ViewSpec } from "./surface.js";
+import type { Fill, Match, SurfaceSpec, ViewSpec } from "./surface.js";
 import {
   blocksIn, fillOf, fillsIn, goOf, refuseStory, refuseSurface, refuseView, unreadViews,
 } from "./surface.js";
@@ -257,6 +257,27 @@ export interface StorySpec {
    */
   readonly starts?: Readonly<Record<string, string>>;
   /**
+   * WHAT THE FLOW SUPPLIES ITSELF AND NEVER ASKS FOR — the write's input name to
+   * where the value comes from.
+   *
+   * ⚠️ IT IS AN ACT'S `fills`, ON A FLOW, AND THE ABSENCE WAS A REAL HOLE. A body
+   * has supplied the device's day to every act since `Fill` was written; a story
+   * had `starts`, which reads a SETTING, and nothing else — so a write taking a
+   * required `day` could not be reached by a flow at all. The import flow found
+   * it by being refused at composition, which is the guard working.
+   *
+   * ⚠️ AND "On what day?" IS NOT A QUESTION ANYBODY SHOULD BE ASKED. The answer
+   * is on the device, it is right every time, and a step for it is a screen in a
+   * wizard whose whole content is a date somebody has to agree with.
+   *
+   * ⚠️ IT IS THE SAME `Fill` A BODY USES, deliberately: `record` is meaningless
+   * on a flow that is making something, and the composition check refuses it
+   * there — but `today`, `year` and `says` mean exactly what they mean
+   * everywhere else, and a second vocabulary for "a value nobody types" is how
+   * the two come to disagree.
+   */
+  readonly holds?: Readonly<Record<string, Fill>>;
+  /**
    * AN OPERATION WHOSE OUTPUT ARRIVES AS ANSWERS, BEFORE ANYBODY IS ASKED.
    *
    * ⚠️ THIS IS WHAT TURNS A FLOW FROM ASKING INTO CONFIRMING, AND IT IS THE
@@ -278,6 +299,23 @@ export interface StorySpec {
    */
   readonly fills?: FillsSpec;
   /**
+   * WHAT THIS FLOW WOULD DO, WORKED OUT BEFORE IT DOES IT — see `ShowsSpec`.
+   *
+   * ⚠️ IT IS `fills` RUN AT THE OTHER END OF THE FLOW, AND THE MIRROR IS EXACT.
+   * A fill runs before anybody is asked and arrives as ANSWERS; this runs when
+   * every answer is in and arrives as a REPORT, on the review, above the press.
+   * Neither is a hook: both name an operation, so what a flow will do before it
+   * commits is a fact about the product rather than a line in one screen.
+   *
+   * ⚠️ AND THE FLOW IT EXISTS FOR IS THE ONE WHOSE PRESS CANNOT BE UNDONE BY
+   * LOOKING AT IT. A spreadsheet is eight hundred rows and one column read
+   * wrongly puts a supplier's name in every product name; the refusals are
+   * eleven rows nobody can find afterwards. A review that recaps the ANSWERS
+   * ("a spreadsheet, today") is true and says nothing, because the answer is not
+   * where the consequence is.
+   */
+  readonly shows?: ShowsSpec;
+  /**
    * THE QUESTIONS, IN ORDER, INCLUDING THE ONES THAT ARE OFTEN SKIPPED.
    *
    * ⚠️ DECLARED EVEN WHERE `when` REMOVES THEM AT RUNTIME. This is what the flow
@@ -286,6 +324,19 @@ export interface StorySpec {
    * describe a flow nobody ever walks.
    */
   readonly asks: readonly StepSpec[];
+  /**
+   * THE WORD ON THE LAST PRESS.
+   *
+   * ⚠️ IT WAS "Add it", IN THE PLATFORM, FOR EVERY FLOW IN EVERY APP — the same
+   * shape as `lands` before it: one product's sentence about one product,
+   * written where every product reads it. It said "Add it" over a button that
+   * applies eight hundred rows of a spreadsheet, and it would have said it over
+   * a flow that closes something.
+   *
+   * ⚠️ ABSENT KEEPS "Add it", because most flows do make a thing and the default
+   * is right for them. What a flow may not do is be unable to say otherwise.
+   */
+  readonly does?: string;
   /**
    * WHERE SOMEBODY IS STANDING WHEN THE FLOW IS OVER — a screen this app
    * declares, opened on the record the write answered with.
@@ -335,6 +386,49 @@ export interface FillsSpec {
    * question about no pictures, answered with plausible nothing.
    */
   readonly with: Readonly<Record<string, string>>;
+}
+
+/**
+ * WHAT A FLOW WOULD DO, ASKED OF AN OPERATION AND DRAWN ON THE REVIEW.
+ *
+ * ⚠️ A COUNT PER OUTCOME, WHICH IS THE ONE SHAPE "WHAT WILL THIS DO" HAS. Four
+ * hundred and twelve added, sixty-one changed, eleven refused — three numbers a
+ * person weighs in a second, against a row-by-row list of eight hundred that
+ * nobody reads and that would need a screen of its own. `take` names the output
+ * field holding them, and it is `Record<string, number>` because anything richer
+ * is a surface rather than a summary.
+ *
+ * ⚠️ AND IT RUNS ON THE REVIEW RATHER THAN ON EVERY ANSWER. The operation reads
+ * the whole sheet, so running it per keystroke would be a round trip over four
+ * hundred kilobytes on a flow whose first step is a paste. Once, when there is
+ * something to decide about.
+ *
+ * ⚠️ THE OPERATION MUST NOT WRITE ANYTHING, AND NOTHING HERE CAN CHECK THAT. It
+ * is `kind: "write"` in practice — a body of eight hundred rows cannot travel in
+ * a query string, so a report is a POST like everything else, and `product.preview`
+ * says exactly that on itself. What this contract can say is that a flow shows
+ * its consequences with one operation and commits with another, and a manifest
+ * naming the SAME one for both is refused: that is not a preview, it is the
+ * import running twice.
+ */
+export interface ShowsSpec {
+  /** The operation that works it out. */
+  readonly by: string;
+  /**
+   * WHAT IT IS HANDED — its own input name, and the write's input that supplies
+   * it. Same direction as `FillsSpec.with`, and checked the same way: a value
+   * naming nothing a step answers is a report computed over nothing.
+   */
+  readonly with: Readonly<Record<string, string>>;
+  /** Which of its outputs holds the counts. */
+  readonly take: string;
+  /**
+   * ⚠️ THE WORD AFTER EACH NUMBER, BECAUSE THE ENGINE HAS NO NOUNS. A key
+   * reading `made` is a column name; "added" is what a person is being asked to
+   * agree to. Absent keys are drawn under their own key, which is honest and
+   * ugly — the same bargain every other generated label makes.
+   */
+  readonly says?: Readonly<Record<string, string>>;
 }
 
 /**
@@ -1492,6 +1586,50 @@ export function refuseApp(spec: AppSpec): readonly Refusal[] {
             `story_permission_wrong: is offered on "${s.permission}" and writes ${told.writes}, `
             + `which demands "${wants}" — somebody would be taken through every question and `
             + "refused at the last press");
+        }
+        /*
+          ⚠️ AND WHAT IT SHOWS BEFORE THE PRESS HAS TO BE REAL — see `ShowsSpec`.
+          Every one of these fails at the review, on the one screen whose job is
+          to let somebody decide, and every one of them fails QUIETLY: an unknown
+          operation is a 404 the review has nothing to draw, an output field that
+          is not there is a report of nothing, and a `with` naming no answer is a
+          report computed over an empty input — which for an import reads as
+          "nothing will happen" over a spreadsheet that is about to be applied.
+        */
+        const shows = told.shows;
+        if (shows) {
+          const by = spec.operations.find((o) => o.id === shows.by);
+          if (!by) {
+            at(`screen ${s.id}`,
+              `story_shows_unknown: its story shows "${shows.by}", which this app does not `
+              + "declare — the review would ask a 404 what the flow is about to do");
+          } else if (!(shows.take in by.output)) {
+            at(`screen ${s.id}`,
+              `story_shows_nothing: shows ${shows.by} and takes "${shows.take}", which it does `
+              + "not answer with — the review would draw an empty report over a press that "
+              + "is about to happen");
+          }
+          /* ⚠️ THE SAME OPERATION FOR BOTH IS NOT A PREVIEW, IT IS THE WRITE
+             RUNNING TWICE — and the first time is the one nobody asked for. */
+          if (shows.by === told.writes) {
+            at(`screen ${s.id}`,
+              `story_shows_the_write: shows ${shows.by} and writes it too — a flow that runs `
+              + "its own write to find out what it would do has already done it");
+          }
+          const takes = spec.operations.find((o) => o.id === told.writes)?.input ?? {};
+          for (const [wants_, from] of Object.entries(shows.with)) {
+            if (by && !(wants_ in by.input)) {
+              at(`screen ${s.id}`,
+                `story_shows_unknown_input: hands ${shows.by} a "${wants_}", which it does not `
+                + "take — the value would be dropped at the door");
+            }
+            if (!(from in takes)) {
+              at(`screen ${s.id}`,
+                `story_shows_from_nothing: feeds ${shows.by}'s "${wants_}" from "${from}", which `
+                + `${told.writes} does not take — so no step answers it and the report would be `
+                + "worked out over nothing");
+            }
+          }
         }
       }
     }

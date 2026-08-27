@@ -168,12 +168,12 @@ part that is not. Refresh with `node engine/scripts/docs.test.mjs --write`.
 | `tokens/` | colour, type, spacing, motion, the chrome and hem rules | 94 |
 | `scene/` | the ambience engine — families, marks, the world behind a screen | 1 |
 | `frame/` | page, shape, crown, nav, dock, overlays — what wraps a screen | 75 |
-| `parts/` | rows, cards, lists, controls, the four outcomes | 229 |
+| `parts/` | rows, cards, lists, controls, the four outcomes | 232 |
 | `rendered/` | whole surfaces drawn from a kernel declaration | 47 |
 | `chart/` | the data vocabulary — a number as a shape | 45 |
 | `measure/` | what a screen actually lays out, in a real browser — the harness every app sweeps its own screens with | 1 |
 
-**492 exports.** Every one is reachable as `import { … } from "@engine/design"`;
+**495 exports.** Every one is reachable as `import { … } from "@engine/design"`;
 there is no deep import, and a guard says so.
 
 ### `tokens/`
@@ -215,6 +215,7 @@ there is no deep import, and a guard says so.
 - `parts/beside.tsx` — `Hint`, `Pip`
 - `parts/blocks.tsx` — `Agenda`, `Branch`, `Crumbs`, `Document`, `Faq`, `Fills`, `Gauge`, `Hotkey`, `Moment`, `PageTabs`, `Reveal`, `Step`, `Steps`, `TabSpec`, `Timeline`, `Tree`, `TreeProps`
 - `parts/bones.tsx` — `blanks`, `useBones`, `Waiting`
+- `parts/consequences.tsx` — `Consequence`, `Consequences`, `ConsequencesProps`
 - `parts/credits.tsx` — `Credits`, `CreditsProps`
 - `parts/face.tsx` — `appFace`, `Face`, `FaceKind`, `FaceOf`, `FaceProps`, `Faces`, `FaceSize`, `faceUri`, `ONE_FACE`, `Orb`, `placeFace`, `thingFace`, `whoFace`, `worldFor`
 - `parts/feedback.tsx` — `Beep`, `say`, `wakeSound`

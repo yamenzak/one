@@ -4345,3 +4345,62 @@ rows is the same empty promise as the row it was there to hold.
 one-element list sent where a scalar is taken; an empty list standing in for a
 value the screen does not have; a condition evaluated at one nesting depth and
 not another; or a card drawn around nothing.
+
+## D112 — A flow shows what it is about to do, and holds what nobody should be asked
+
+**Status:** shipped · **Date:** 2026-08-27
+
+**A REVIEW OF THE ANSWERS IS NOT A REVIEW OF THE CONSEQUENCES.** For a flow that
+makes a thing, the two are the same: registering a product recaps four facts
+about a box, and reading them back IS the check. For a flow that applies a
+change they are nowhere near each other — an import recaps "a spreadsheet,
+today", which is true and says nothing about the four hundred and twelve rows
+about to be created and the eleven about to be refused. `StorySpec.shows` names
+an operation run when every answer is in, whose report is drawn on the review,
+above the press.
+
+**IT IS `fills` AT THE OTHER END OF THE FLOW, AND THE MIRROR IS EXACT.** A fill
+runs before anybody is asked and arrives as ANSWERS; this runs when the asking is
+done and arrives as a REPORT. Neither is a hook: both name an operation, so what
+a flow will do before it commits is a fact about the product — the docs list it,
+an agent can be told, and its credits meter on the same rail.
+
+**COUNTS, NOT ROWS.** Eight hundred lines of what-would-happen is a screen of its
+own that nobody scrolls; three numbers are weighed in a second. `take` names the
+output field holding them and it is `Record<string, number>`, because anything
+richer is a surface rather than a summary. The detail is not lost — the write
+answers with its refusals — but the DECISION is made against the shape.
+
+**AND SHOWING THE OPERATION IT WRITES IS REFUSED.** A flow that runs its own
+write to find out what the write would do has already done it, and the first time
+is the one nobody asked for. Four more refusals go with it, and every one of them
+fails on the review, quietly: an unknown operation, an output field it does not
+answer with, an input it does not take, and a source no step answers — which for
+an import reads as "nothing will happen" over a sheet about to be applied.
+
+**`StorySpec.holds` IS THE SECOND HALF, AND IT WAS A HOLE.** A body has supplied
+the device's day to every act since `Fill` was written; a story had `starts`,
+which reads a SETTING, and nothing else — so a write taking a required `day`
+could not be reached by a flow at all. The import found it by being refused at
+composition, which is the guard working. It is the same `Fill` a body uses, on
+purpose: a second vocabulary for "a value nobody types" is how the two come to
+disagree about what the device's day is, and the day a flow sends is the day a
+shelf life is counted from.
+
+**`StorySpec.does` IS THE THIRD, AND IT IS THE SAME SHAPE AS `lands`.** The word
+on the last press was `"Add it"`, in the platform, for every flow in every app —
+one product's sentence about one product, written where every product reads it.
+It said "Add it" over a button that applies eight hundred rows of somebody else's
+spreadsheet. Absent it still says "Add it", because most flows do make a thing;
+what a flow may not do is be unable to say otherwise.
+
+**AND THE FIXTURE HELD ITS OWN COPY, WHICH IS WHY THE PHOTOGRAPH MATTERED.** The
+board hardcoded the same string, so the picture of the fixed product still showed
+the bug. A fixture that answers a question its own way is a fixture nothing can
+be checked from — the third time this exact class has been found by looking at an
+image rather than at a test.
+
+**Therefore never:** a review that recaps the answers to a press whose subject is
+a change; a preview computed by running the write; a flow that cannot supply a
+fact about the device; a product's word on a platform's button; or a fixture
+holding a second answer to a question the declaration already answers.
