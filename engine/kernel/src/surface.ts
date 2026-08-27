@@ -1139,6 +1139,11 @@ export type SurfaceRefusal =
   | "goes_nowhere"
   | "wide_without_a_grid"
   | "shows_without_a_list" | "shows_field_unknown" | "nothing_unsaid"
+  /* ⚠️ TWO LISTS ON ONE SCREEN AND NOTHING SAYING WHICH IS WHICH — see the check
+     itself. A `Listing`'s own `label` is the table's accessible name and is
+     drawn nowhere, so the fault is invisible to every check that reads the
+     declaration and obvious in the first photograph. */
+  | "lists_unheaded"
   /* ⚠️ THE THREE A CHART'S AXES CAN GET WRONG — see `PlotSpec`. Every one of
      them draws an empty box under a correct heading. */
   | "plots_on_a_block_that_draws_none" | "plots_missing" | "plots_unlabelled"
@@ -1957,6 +1962,38 @@ export function refuseSurface(
           `${lead} opens "${go.to}" and its name is a ${named.of} rather than a row — `
           + "there is no record for the press to carry");
       }
+    }
+  }
+
+  /*
+    ⚠️ ONE LIST IS NAMED BY THE PAGE IT IS ON; TWO ARE NOT, AND NOTHING ON THE
+    SCREEN SAYS SO. A block's `label` is the table's ACCESSIBLE name — it reaches
+    a screen reader and is drawn nowhere — so a page carrying a warning list
+    above a catalogue list arrives as two cards of rows in the same ink, and the
+    only way to tell them apart is to know already. A heading is a `group`.
+
+    ⚠️ AND IT IS COUNTED PER SCREEN RATHER THAN REFUSED PER BLOCK, because the
+    single-list page is the common one and its heading would restate its own
+    title. What is wrong is the pair, so the pair is what is asked about.
+
+    ⚠️ THE PHOTOGRAPH IS WHAT FOUND THIS, three screens at once, all shipped
+    green. Every static check here reads the declaration, and the declaration
+    said `label` — which is a real slot, correctly filled, and invisible.
+  */
+  /* ⚠️ A CHART IS EXEMPT AND THAT IS NOT A SOFTENING. It reads a view like a
+     table does, and it DRAWS its own `describes` above the plot — so it is
+     already named on the page and a `group` around it would head it twice. A
+     block with no `plots` has only `label`, which is announced and not drawn. */
+  const drawnLists = [...blocksIn(body)].filter(({ block }) =>
+    !index[block.block]?.plots
+    && Object.values(block.bind ?? {}).some((x) => x.from.of === "view"));
+  if (drawnLists.length > 1) {
+    for (const { block, under } of drawnLists) {
+      if (under) continue;
+      at("lists_unheaded",
+        `${screen.id} draws ${drawnLists.length} lists and ${block.block} is under no heading — `
+        + "a block's label is the table's accessible name and is drawn nowhere, so unheaded "
+        + "lists arrive as sets of rows with nothing saying which is which");
     }
   }
 

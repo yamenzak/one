@@ -1459,6 +1459,84 @@ describe("what a chart plots", () => {
   });
 });
 
+/* ------------------------------------------------------------ two of them --- */
+
+/**
+ * ⚠️ A BLOCK'S `label` IS ANNOUNCED AND NOT DRAWN, which is what makes this
+ * invisible to every other check in this file. The declaration names the list
+ * correctly, the slot is real and filled, and the page shows two sets of rows in
+ * the same ink with nothing between them. It was found in a photograph, on three
+ * screens at once, all of them green here.
+ */
+describe("two lists on one screen", () => {
+  const CHARTED: BlockIndex = {
+    ...INDEX,
+    Run: {
+      id: "Run", bones: "chart", plots: "series",
+      takes: { series: { label: "What is plotted", takes: ["view"], required: true } },
+    },
+  };
+
+  const list = () => ({
+    block: "Listing",
+    nothing: { says: "None" },
+    bind: { rows: { from: { of: "view", view: "recent-notes" } } },
+  });
+  const chart = () => ({
+    block: "Run",
+    plots: { of: "at" },
+    nothing: { says: "None" },
+    bind: { series: { from: { of: "view", view: "recent-notes" } } },
+  });
+
+  const of = (blocks: readonly unknown[]) => refuseSurface(
+    screen({ body: body({ blocks: blocks as never }) }),
+    CHARTED, [recent], COLLECTIONS, [],
+  ).map((p) => p.why);
+
+  it("refuses a pair with neither under a heading", () => {
+    expect(of([list(), list()])).toEqual(["lists_unheaded", "lists_unheaded"]);
+  });
+
+  /* ⚠️ THE HALF-FIXED CASE, AND IT IS THE ONE TO KEEP. A fix applied to one of
+     two slots with a comment claiming both is this repository's signature
+     failure — so the check reports the list that is still bare rather than
+     falling silent because somebody headed the other one. */
+  it("reports only the one still under no heading", () => {
+    expect(of([{ group: "What was written", of: [list()] }, list()]))
+      .toEqual(["lists_unheaded"]);
+  });
+
+  it("accepts a pair where each says what it is", () => {
+    expect(of([
+      { group: "What was written", of: [list()] },
+      { group: "What was thrown away", of: [list()] },
+    ])).toEqual([]);
+  });
+
+  /* ⚠️ ONE LIST IS NAMED BY THE PAGE IT IS ON, and heading it would restate the
+     screen's own title one line down. What is wrong is the pair. */
+  it("says nothing about a single bare list", () => {
+    expect(of([list()])).toEqual([]);
+  });
+
+  /*
+    ⚠️ A CHART IS EXEMPT AND THAT IS A FACT ABOUT THE COMPONENT, NOT A WAIVER. It
+    draws `describes` above its own plot, so it arrives on the page already
+    named; wrapping it in a group would head it twice. The `Stat` beside it is
+    exempt for a different reason and needs no rule — it reads a `count`, not a
+    view, so it was never a list.
+  */
+  it("leaves a chart out of the count, because it draws its own name", () => {
+    expect(of([chart(), list()])).toEqual([]);
+  });
+
+  it("still refuses two bare lists beside a chart", () => {
+    expect(of([chart(), list(), list()]))
+      .toEqual(["lists_unheaded", "lists_unheaded"]);
+  });
+});
+
 /* ------------------------------------------------------- changing a fact --- */
 
 /**

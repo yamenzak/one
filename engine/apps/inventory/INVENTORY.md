@@ -467,6 +467,35 @@ work and discarded it politely. The reach guard's collection pass is what found
 it, the day it was widened to ask whether a person can see a row of a table at
 all.
 
+### Things that are one of a kind
+
+A drill, a probe, a surgical tray. An **item** has a life — `held`, `issued`,
+`retired` — and it keeps its place while it is out with somebody, which is what
+makes taking it back one press rather than a question about which rack it came
+from. Who has it is a person's name, declared as `contact` so it reaches the
+processing record and the retention clock; it is text rather than a reference
+because most of the people things are issued to are not in the system.
+
+⚠️ **THE NEXT SERVICE IS THE WHOLE OF THE ASSET CASE** — a thing nobody counts
+and everybody has to maintain. `/items` leads with what is due, because it is the
+only fact here with a clock on it and the only one nothing else in the product
+will ever raise.
+
+A **kit** is a set made of items with a recipe: a surgery tray, a tool roll.
+Putting an item in takes it off its shelf; taking it out puts it back.
+
+⚠️ **AND "IT IS COMPLETE" IS A CLAIM SOMEBODY SIGNS, WHICH IS WHY IT IS
+REFUSED WHILE ANYTHING IS SHORT.** A tray drawn as the things in it looks
+complete whatever is absent, so what is MISSING is its own list on the screen —
+and the empty state there is the one place in this product where nothing is good
+news.
+
+⚠️ **ELEVEN VERBS WERE BUILT FOR THESE IN OI-8 AND NEITHER HAD A SCREEN.** They
+were gated, audited, tested at the door and callable by nobody, and the guard
+written to catch that excused them for having no surface at all — which is the
+case where the surface is what is missing. The widened reach guard is what said
+so.
+
 ### Labels
 
 A shelf has no manufacturer, so its code is always ours. A product usually has
@@ -707,6 +736,10 @@ follows and the shape every screen is drawn to.
 | `/order` | Order | — | `order:read` | `declared` | `declared` |
 | `/suppliers` | Suppliers | — | `order:read` | `declared` | `declared` |
 | `/supplier` | Supplier | — | `order:read` | `declared` | `declared` |
+| `/items` | Items | — | `stock:read` | `declared` | `declared` |
+| `/item` | Item | — | `stock:read` | `declared` | `declared` |
+| `/kits` | Kits | — | `stock:read` | `declared` | `declared` |
+| `/kit` | Kit | — | `stock:read` | `declared` | `declared` |
 | `/add` | Add a product | — | `product:write` | `declared` | `declared` |
 | `/import` | Bring in a spreadsheet | — | `stock:adjust` | `declared` | `declared` |
 

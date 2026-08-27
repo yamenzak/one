@@ -576,3 +576,59 @@ export const SUPPLIES = [
   { id: "src-2", supplier: "sup-1", product: "t-paper", "product.name": "A4 paper",
     ref: "PAP-A4-80", leadDays: 3 },
 ] as const;
+
+/**
+ * THINGS THAT ARE ONE OF A KIND, AND THE SETS MADE OF THEM.
+ *
+ * ⚠️ ALL THREE LIVES ARE HERE, because `life` is the column somebody scans and a
+ * fixture where every row said the same word would photograph a list that has
+ * one job and cannot be seen doing it.
+ *
+ * ⚠️ AND THE ONE THE DETAIL PAGE OPENS ON IS `issued`, for the reason the run
+ * board picks `ended`: every act card is `when`-gated, so which row it opens on
+ * decides which half of the screen is photographed. `issued` draws the taking-
+ * back act AND the servicing pair — the two groups the page is built around.
+ */
+export const ITEMS = [
+  { id: "u-1", code: "ONE-U-4471", "product.name": "Cordless drill", product: "t-drill",
+    life: "issued", holder: "Ana Ruiz", issued: "2026-08-24", due: "2026-09-04",
+    serial: "DW-88210" },
+  { id: "u-2", code: "ONE-U-4472", "product.name": "Torque wrench", product: "t-wrench",
+    life: "held", holder: "", issued: "", due: "2026-08-30", serial: "TW-1180" },
+  { id: "u-3", code: "ONE-U-4473", "product.name": "Bench multimeter", product: "t-meter",
+    life: "retired", holder: "", issued: "", due: "", serial: "FL-77" },
+] as const;
+
+/** ⚠️ `unit.due`'s answer, not the table's — the view is ASKED. */
+export const DUE_FOR_SERVICE = [
+  { id: "u-2", code: "ONE-U-4472", product: "t-wrench", name: "Torque wrench",
+    serial: "TW-1180", on: "2026-08-30", standing: "soon", days: 3,
+    says: saysDue(3, "used") },
+  { id: "u-1", code: "ONE-U-4471", product: "t-drill", name: "Cordless drill",
+    serial: "DW-88210", on: "2026-09-04", standing: "soon", days: 8,
+    says: saysDue(8, "used") },
+] as const;
+
+export const KIT_ROWS = [
+  { id: "k-1", code: "ONE-K-0091", state: "open", product: "t-tray",
+    "product.name": "Minor procedures tray", built: "" },
+  { id: "k-2", code: "ONE-K-0092", state: "built", product: "t-tray",
+    "product.name": "Minor procedures tray", built: "2026-08-25" },
+] as const;
+
+/**
+ * ⚠️ THE OPEN ONE IS SHORT, WHICH IS WHAT THE SCREEN IS FOR. A fixture whose
+ * every tray was complete would photograph the state that needs no screen — and
+ * "what is missing" drawn empty over a tray missing a clamp is the failure the
+ * whole check exists to prevent.
+ */
+export const KIT_MEMBERS = [
+  { id: "u-4", kit: "k-1", product: "t-forceps", name: "Artery forceps",
+    code: "ONE-U-5510", stray: false },
+  { id: "u-5", kit: "k-1", product: "t-scissors", name: "Mayo scissors",
+    code: "ONE-U-5511", stray: false },
+] as const;
+
+export const KIT_SHORT = [
+  { kit: "k-1", product: "t-clamp", name: "Towel clamp", want: 2 },
+] as const;

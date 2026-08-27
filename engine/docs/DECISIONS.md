@@ -4521,3 +4521,39 @@ erase the record of why that stock is there.
 rule that counts a write as a reach; an app table sharing a name with one the
 platform puts on the same database; a second path that changes a number on a
 shelf; or an end state that can only mean "everything arrived".
+
+## D115 — A name that is announced and not drawn is not a name
+
+**Date:** 2026-08-27 · **Status:** shipped
+
+**A `Listing`'S `label` REACHES A SCREEN READER AND NOBODY LOOKING.** It is the
+table's accessible name, which is correct and is the whole of what it does — so
+a page carrying two lists drew two sets of rows in the same ink with nothing
+between them saying which was which. Every static check in the kernel read the
+declaration, found a real slot correctly filled, and reported green. It was
+found in a photograph, on five screens at once.
+
+**AND THE WORST OF THE FIVE INVERTED A FACT.** A kit page draws what is IN the
+tray and what is MISSING from it, one under the other. Unheaded, "Towel clamp ·
+2" sat directly beneath two instruments that are in the tray, in the same type,
+so the tray read as holding the clamp it is waiting for. The order page had the
+same shape one register down: the outstanding count as a bare `5` in the row's
+end slot, beside a sentence already ending "5 to come".
+
+**ONE LIST IS NAMED BY THE PAGE IT IS ON; TWO ARE NOT.** That is why
+`lists_unheaded` counts per screen rather than refusing per block — heading a
+single list would restate the screen's own title one line down. Where one of a
+pair is headed and the other is not, the bare one is still reported: a fix
+applied to one of two slots with a comment claiming both is this repository's
+signature failure and the check is not allowed to fall silent for it.
+
+**A CHART IS EXEMPT BECAUSE IT WAS FIXED, NOT BECAUSE IT WAS SPARED.** Its
+`describes` had lived in `<title>` and `aria-label` alone for the life of the
+chart vocabulary — read aloud to anybody listening, invisible to everybody
+looking, while the file's own header called it "the thing meant to be read
+first". It is a `<figcaption>` now, so a chart arrives on the page already
+named and a group around it would head it twice.
+
+**Therefore never:** a screen carrying two lists neither of which says what it
+is; a value drawn twice in one row with only one of the two saying what it
+counts; or an accessible name treated as though it were a heading.

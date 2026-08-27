@@ -7067,6 +7067,23 @@ const manifest = (): AppSpec => defineApp({
       where: [{ field: "supplier", is: { here: "record" } }],
       sort: { by: "raised", dir: "down" } },
     /* ⚠️ ASKED, BECAUSE THE ROW IS A SENTENCE — see `buying.lines`. */
+    /* ⚠️ EVERY ITEMISED THING, and `life` is the column somebody scans: what is
+       out with a person is the question an asset list is opened with. */
+    { id: "items", of: "unit", limit: 100, sort: { by: "code", dir: "up" } },
+    /* ⚠️ ASKED, BECAUSE "DUE" IS ARITHMETIC AGAINST A WARNING WINDOW THE
+       WORKSPACE SETS — see `unit.due`. A stored flag would be a number that was
+       true on the night it was written. */
+    { id: "due-for-service", of: "unit",
+      asked: { operation: "unit.due", take: "items", fills: { today: "today" } } },
+    { id: "kits", of: "kit", limit: 100, sort: { by: "code", dir: "up" } },
+    /* ⚠️ WHAT IS IN THIS KIT AND WHAT IS MISSING FROM IT, from one read — see
+       `kit.check`. Two views would be two answers to one question, and a tray
+       reported complete by one and short by the other is the fault the whole
+       check exists against. */
+    { id: "in-this-kit", of: "unit",
+      asked: { operation: "kit.check", take: "members", fills: { kit: "record" } } },
+    { id: "missing-from-this-kit", of: "unit",
+      asked: { operation: "kit.check", take: "short", fills: { kit: "record" } } },
     { id: "on-this-order", of: "buying-line",
       asked: { operation: "buying.lines", take: "items", fills: { buying: "record" } } },
     /*
@@ -7288,7 +7305,7 @@ const manifest = (): AppSpec => defineApp({
           {
             group: null,
             wide: true,
-            of: [{ block: "QuickActions", leads: ["add-a-product", "orders"] }],
+            of: [{ block: "QuickActions", leads: ["add-a-product", "orders", "items"] }],
           },
           /*
             ⚠️ RECEIVING IS A ROW ON HOME AND NOT A SCREEN BEHIND A CHIP, and the
@@ -7549,8 +7566,11 @@ const manifest = (): AppSpec => defineApp({
       what earns one is a screen somebody ARRIVES at; this is one they were sent
       to, by a tile or by a notification at seven in the morning.
     */
+    /* ⚠️ A WORLD, BECAUSE THIS IS A RESULT RATHER THAN A LIST — see `Sky`. What
+       earns a ground is a screen somebody ARRIVES at to read an answer; the
+       rows underneath are the working, not the destination. */
     { id: "expiring", route: "/expiring", label: "Going out of date", nav: "none",
-      icon: "calendar", permission: "stock:read",
+      icon: "calendar", permission: "stock:read", sky: "glow",
       body: {
         shape: "list",
         layout: { as: "stack" },
@@ -7634,8 +7654,11 @@ const manifest = (): AppSpec => defineApp({
       workspace leaves a hole in a screen everybody opens, and the nav already
       drops a destination somebody may not reach.
     */
+    /* ⚠️ AND SO IS THIS ONE, for the same reason and in a different family. Two
+       results wearing one ground would read as one screen a person had failed to
+       leave; `etch` is ruled geometry under a page that is entirely arithmetic. */
     { id: "report", route: "/report", label: "Reports", nav: "primary", icon: "chart",
-      permission: "ledger:read",
+      permission: "ledger:read", sky: "etch",
       body: {
         shape: "figure",
         layout: { as: "stack" },
@@ -7694,18 +7717,6 @@ const manifest = (): AppSpec => defineApp({
             */
             group: "What to buy",
             of: [{
-              /* ⚠️ THE LIST BELOW IS THE DECISION AND THIS IS THE ACT. Working
-                 out what to order and having nowhere to record that you did is
-                 what made this screen a calculator; the row is here rather than
-                 on Home because this is where somebody has just decided. */
-              block: "NavRow",
-              goes: "orders",
-              bind: {
-                label: { from: { of: "words", says: "Orders" } },
-                under: { from: { of: "words",
-                  says: "Put what is short on an order, and book the van in" } },
-              },
-            }, {
               block: "Listing",
               shows: [
                 { field: "name", label: "Product" },
@@ -7723,6 +7734,31 @@ const manifest = (): AppSpec => defineApp({
               bind: {
                 label: { from: { of: "words", says: "What to buy" } },
                 of: { from: { of: "view", view: "what-to-buy" } },
+              },
+            }],
+          },
+          /*
+            ⚠️ THE LIST ABOVE IS THE DECISION AND THIS IS THE ACT, WHICH IS WHY
+            IT COMES AFTER IT. Working out what to order and having nowhere to
+            record that you did is what made this screen a calculator; the row is
+            here rather than on Home because this is where somebody has just
+            decided.
+
+            ⚠️ AND IT IS ITS OWN CARD RATHER THAN THE FIRST ROW OF THAT LIST.
+            Inside the group it shared a surface with four products and read as a
+            fifth — a destination in the same ink and the same shape as the
+            things to buy. A row that goes somewhere and a row that is a fact
+            about stock are two kinds of row, and a card is what separates them.
+          */
+          {
+            group: null,
+            of: [{
+              block: "NavRow",
+              goes: "orders",
+              bind: {
+                label: { from: { of: "words", says: "Orders" } },
+                under: { from: { of: "words",
+                  says: "Put what is short on an order, and book the van in" } },
               },
             }],
           },
@@ -7924,32 +7960,41 @@ const manifest = (): AppSpec => defineApp({
           },
         },
         blocks: [
+          /* ⚠️ HEADED BECAUSE THE PAGE CARRIES A SECOND LIST — the codes, far
+             enough down that the two are never seen together and near enough
+             that a reader arriving at one has no way to tell which they are on.
+             A block's `label` is the table's accessible name and is drawn
+             nowhere; a heading is a `group`. */
           {
-            block: "Listing",
-            /* ⚠️ THE PRODUCT'S OWN COLUMN IS GONE, because the screen is about
-               it. A list repeating its subject on every row is a column of one
-               value with the useful ones pushed off a phone. */
-            /*
-              ⚠️ THE NUMBER IS LAST, AND ON A PHONE THAT IS WHAT PUTS IT ON THE
-              RIGHT. `Listing` folds its first three columns into a row's name,
-              its second line and its end — so a quantity in the middle slot is
-              set as a caption under the shelf name, in the smallest type on the
-              screen, which is the one figure somebody opened this to read. Same
-              order reads correctly as columns on a desk: what, when, how many.
-            */
-            shows: [
-              { field: "location.name", label: "Where" },
-              { field: "seen", label: "Last seen", as: "when" },
-              { field: "quantity", label: "How many" },
-            ],
-            nothing: {
-              says: "Not on any shelf",
-              under: "Receive some and the shelves will be here",
-            },
-            bind: {
-              label: { from: { of: "words", says: "On the shelves" } },
-              of: { from: { of: "view", view: "lines-of-this" } },
-            },
+            group: "On the shelves",
+            of: [{
+              block: "Listing",
+              /* ⚠️ THE PRODUCT'S OWN COLUMN IS GONE, because the screen is about
+                 it. A list repeating its subject on every row is a column of one
+                 value with the useful ones pushed off a phone. */
+              /*
+                ⚠️ THE NUMBER IS LAST, AND ON A PHONE THAT IS WHAT PUTS IT ON THE
+                RIGHT. `Listing` folds its first three columns into a row's name,
+                its second line and its end — so a quantity in the middle slot is
+                set as a caption under the shelf name, in the smallest type on
+                the screen, which is the one figure somebody opened this to read.
+                Same order reads correctly as columns on a desk: what, when, how
+                many.
+              */
+              shows: [
+                { field: "location.name", label: "Where" },
+                { field: "seen", label: "Last seen", as: "when" },
+                { field: "quantity", label: "How many" },
+              ],
+              nothing: {
+                says: "Not on any shelf",
+                under: "Receive some and the shelves will be here",
+              },
+              bind: {
+                label: { from: { of: "words", says: "On the shelves" } },
+                of: { from: { of: "view", view: "lines-of-this" } },
+              },
+            }],
           },
           /*
             ⚠️ THE HERO ABOVE SAYS "RECEIVE SOME AND IT WILL BE HERE", AND THIS IS
@@ -9002,6 +9047,400 @@ const manifest = (): AppSpec => defineApp({
       because ordering is a morning job, and the buy list on Reports, because
       that is where the decision to order is made.
     */
+    /*
+      EVERYTHING THAT IS ONE OF A KIND — a drill, a probe, a surgical tray.
+
+      ⚠️ ELEVEN VERBS WERE BUILT FOR THIS AND KITS IN OI-8 AND NEITHER HAD A
+      SCREEN. They were gated, audited, tested at the door and callable by
+      nobody; the guard written to catch that excused them for having no surface
+      at all, which is the case where the surface is what is missing.
+
+      ⚠️ SERVICE LEADS, BECAUSE IT IS THE ONLY THING HERE WITH A CLOCK. What is
+      out with somebody is a fact a person can see by looking at the list; what
+      is overdue for calibration is one nothing else in the product will ever
+      raise.
+    */
+    { id: "items", route: "/items", label: "Items", nav: "none", icon: "tag",
+      permission: "stock:read",
+      body: {
+        shape: "list",
+        layout: { as: "stack" },
+        hero: {
+          as: "figure",
+          nothing: {
+            says: "Nothing needs servicing",
+            under: "An item with a next service date appears here before it is due",
+          },
+          bind: {
+            value: { from: { of: "count", view: "due-for-service" } },
+            of: { from: { of: "words", says: "Due for service" } },
+            mark: { from: { of: "words", says: "clock" } },
+          },
+        },
+        blocks: [{
+          group: null,
+          of: [{
+            block: "NavRow",
+            goes: "kits",
+            bind: {
+              label: { from: { of: "words", says: "Kits" } },
+              under: { from: { of: "words",
+                says: "Trays and sets made of these, and what each is missing" } },
+            },
+          }],
+        }, {
+          /* ⚠️ TWO LISTS ON ONE PAGE ARE TWO HEADINGS. A `Listing`'s `label` is
+             the table's accessible name and is drawn nowhere, so an unheaded
+             pair arrives as two cards of rows with nothing saying that the first
+             is a warning and the second is the catalogue. One list is named by
+             the page it is on; two are not. */
+          group: "Due for service",
+          of: [{
+            block: "Listing",
+            /* ⚠️ THE DAY LEADS THE SECOND SLOT AND THE STANDING THE FIRST, for
+               the reason the orders list does: the leading column is the row's
+               name when the list folds and has to be text. */
+            shows: [
+              { field: "name", label: "Product" },
+              { field: "says", label: "When" },
+              { field: "code", label: "Label" },
+            ],
+            goes: { to: "item", by: "id" },
+            nothing: {
+              says: "Nothing is due",
+              under: "An item is here once it has a next service date",
+            },
+            bind: {
+              label: { from: { of: "words", says: "Due for service" } },
+              of: { from: { of: "view", view: "due-for-service" } },
+            },
+          }],
+        }, {
+          group: "Every item",
+          of: [{
+            block: "Listing",
+            shows: [
+              { field: "code", label: "Label" },
+              { field: "life", label: "Standing" },
+              { field: "holder", label: "With" },
+            ],
+            goes: "item",
+            nothing: {
+              says: "Nothing itemised yet",
+              under: "A product tracked one by one puts its items here",
+            },
+            bind: {
+              label: { from: { of: "words", says: "Every item" } },
+              of: { from: { of: "view", view: "items" } },
+            },
+          }],
+        }],
+      } },
+    /*
+      ONE ITEM: where it is, who has it, and what is owed it.
+
+      ⚠️ EVERY ACT IS `when`-GATED ON `life` AND THAT MIRRORS `refuseAct` RATHER
+      THAN RESTATING IT. Issuing a retired drill is the tempting one and it fails
+      at the door; what the condition buys is that nobody is offered a control
+      whose only outcome is a refusal.
+    */
+    { id: "item", route: "/item", label: "Item", nav: "none", icon: "tag",
+      permission: "stock:read", of: "unit",
+      body: {
+        shape: "detail",
+        layout: { as: "stack" },
+        blocks: [
+          {
+            group: "While it is on the shelf",
+            when: { is: { of: "field", field: "life" }, one: ["held"] },
+            of: [{
+              block: "ActionRow",
+              does: [{ op: "unit.issue", fills: { unit: "record", day: "today" } }],
+              bind: {
+                icon: { from: { of: "words", says: "person" } },
+                label: { from: { of: "words", says: "Give it to somebody" } },
+                under: { from: { of: "words",
+                  says: "It keeps its place, so taking it back is one press" } },
+              },
+            }],
+          },
+          {
+            group: "While somebody has it",
+            when: { is: { of: "field", field: "life" }, one: ["issued"] },
+            of: [{
+              block: "ActionRow",
+              does: [{ op: "unit.return", fills: { unit: "record", day: "today" } }],
+              bind: {
+                icon: { from: { of: "words", says: "box" } },
+                label: { from: { of: "words", says: "Take it back" } },
+                under: { from: { of: "words", says: "It returns to where it came from" } },
+              },
+            }],
+          },
+          {
+            /* ⚠️ SERVICING IS OFFERED WHEREVER IT IS, because a thing out with
+               somebody can still come back for calibration — and a retired one
+               cannot be serviced, which is what retiring means. */
+            group: "Keeping it working",
+            when: { not: { is: { of: "field", field: "life" }, one: ["retired"] } },
+            of: [
+              {
+                block: "ActionRow",
+                does: [{ op: "unit.serve", fills: { unit: "record", day: "today" } }],
+                bind: {
+                  icon: { from: { of: "words", says: "check" } },
+                  label: { from: { of: "words", says: "Record a service" } },
+                  under: { from: { of: "words",
+                    says: "Say what was done and when the next one is due" } },
+                },
+              },
+              {
+                block: "ActionRow",
+                does: [{ op: "unit.retire", fills: { unit: "record", day: "today" } }],
+                bind: {
+                  icon: { from: { of: "words", says: "alert" } },
+                  label: { from: { of: "words", says: "Take it out of service" } },
+                  under: { from: { of: "words",
+                    says: "For good — the record stays and the item stops counting" } },
+                },
+              },
+            ],
+          },
+          {
+            group: "What it is",
+            of: [
+              /* ⚠️ THE STANDING IS SAID HERE BECAUSE IT IS THE ONLY THING ALWAYS
+                 DRAWN. Every act group above is `when`-gated, so a retired item
+                 has none of them. */
+              { block: "FieldRow",
+                bind: {
+                  label: { from: { of: "words", says: "Standing" } },
+                  value: { from: { of: "field", field: "life" } },
+                } },
+              { block: "FieldRow",
+                bind: {
+                  label: { from: { of: "words", says: "Product" } },
+                  value: { from: { of: "field", field: "product.name" } },
+                } },
+              { block: "FieldRow",
+                when: { has: { of: "field", field: "holder" } },
+                bind: {
+                  label: { from: { of: "words", says: "With" } },
+                  value: { from: { of: "field", field: "holder" } },
+                } },
+              { block: "FieldRow",
+                when: { has: { of: "field", field: "issued" } },
+                bind: {
+                  label: { from: { of: "words", says: "Out since" } },
+                  value: { from: { of: "field", field: "issued" }, as: "when" },
+                } },
+              { block: "FieldRow",
+                when: { has: { of: "field", field: "due" } },
+                bind: {
+                  label: { from: { of: "words", says: "Next service" } },
+                  value: { from: { of: "field", field: "due" }, as: "when" },
+                } },
+              { block: "FieldRow",
+                when: { has: { of: "field", field: "serial" } },
+                bind: {
+                  label: { from: { of: "words", says: "Serial" } },
+                  value: { from: { of: "field", field: "serial" } },
+                } },
+              { block: "FieldRow",
+                when: { has: { of: "field", field: "code" } },
+                bind: {
+                  label: { from: { of: "words", says: "Label" } },
+                  value: { from: { of: "field", field: "code" } },
+                } },
+            ],
+          },
+        ],
+      } },
+    /*
+      SETS MADE OF ITEMS — a surgery tray, a tool roll, a service kit.
+
+      ⚠️ REACHED FROM `/items` BECAUSE A KIT IS MADE OF THEM. The bar is five and
+      full; a kit is a thing somebody arrives at from the items it holds rather
+      than a place they stand.
+    */
+    { id: "kits", route: "/kits", label: "Kits", nav: "none", icon: "box",
+      permission: "stock:read",
+      body: {
+        shape: "list",
+        layout: { as: "stack" },
+        blocks: [{
+          group: null,
+          of: [{
+            block: "ActionRow",
+            does: [{ op: "kit.assemble", fills: { day: "today" } }],
+            bind: {
+              icon: { from: { of: "words", says: "add" } },
+              label: { from: { of: "words", says: "Start a kit" } },
+              under: { from: { of: "words",
+                says: "Pick what it is, then put items into it" } },
+            },
+          }],
+        }, {
+          block: "Listing",
+          shows: [
+            { field: "code", label: "Label" },
+            { field: "state", label: "Standing" },
+            { field: "product.name", label: "What it is" },
+          ],
+          goes: "kit",
+          nothing: {
+            says: "No kits yet",
+            under: "Start one and put items into it — it says what is missing",
+          },
+          bind: {
+            label: { from: { of: "words", says: "Kits" } },
+            of: { from: { of: "view", view: "kits" } },
+          },
+        }],
+      } },
+    /*
+      ONE KIT: what is in it, what is missing, and what may be done to it.
+
+      ⚠️ WHAT IS MISSING IS ITS OWN LIST, AND IT IS THE REASON THIS SCREEN
+      EXISTS. A tray drawn as the things in it is a tray that looks complete
+      whatever is absent — and "complete" is a claim somebody signs by pressing
+      Build, which the door refuses while anything is short.
+    */
+    { id: "kit", route: "/kit", label: "Kit", nav: "none", icon: "box",
+      permission: "stock:read", of: "kit",
+      body: {
+        shape: "detail",
+        layout: { as: "stack" },
+        hero: {
+          as: "figure",
+          nothing: { says: "Nothing in it yet", under: "Put an item in and it will be here" },
+          bind: {
+            value: { from: { of: "count", view: "in-this-kit" } },
+            of: { from: { of: "words", says: "Items in it" } },
+            mark: { from: { of: "words", says: "box" } },
+          },
+        },
+        blocks: [
+          /*
+            ⚠️ THE TWO LISTS SAY OPPOSITE THINGS AND MUST NOT BE READ AS ONE. In
+            it, and short by — an unheaded pair puts "Towel clamp · 2" directly
+            under two items that ARE in the tray, in the same ink, and the tray
+            reads as holding a clamp it is waiting for. `label` is the table's
+            accessible name and is drawn nowhere, so the heading is a `group`.
+          */
+          {
+            group: "What is in it",
+            of: [{
+              block: "Listing",
+              shows: [
+                { field: "name", label: "Product" },
+                { field: "code", label: "Label" },
+              ],
+              nothing: {
+                says: "Nothing in it yet",
+                under: "Put an item in and it is counted against the recipe",
+              },
+              bind: {
+                label: { from: { of: "words", says: "What is in it" } },
+                of: { from: { of: "view", view: "in-this-kit" } },
+              },
+            }],
+          },
+          {
+            group: "What is missing",
+            of: [{
+              block: "Listing",
+              shows: [
+                { field: "name", label: "Product" },
+                { field: "want", label: "Short by", as: "num" },
+              ],
+              /* ⚠️ AN EMPTY LIST HERE IS GOOD NEWS AND SAYS SO. Every other empty
+                 state in this product is a workspace that has not started; this
+                 one is a tray that is complete. */
+              nothing: {
+                says: "Nothing missing",
+                under: "Everything the recipe asks for is in it",
+              },
+              bind: {
+                label: { from: { of: "words", says: "What is missing" } },
+                of: { from: { of: "view", view: "missing-from-this-kit" } },
+              },
+            }],
+          },
+          {
+            group: "While it is being put together",
+            when: { is: { of: "field", field: "state" }, one: ["open"] },
+            of: [
+              {
+                block: "ActionRow",
+                does: [{ op: "kit.put", fills: { kit: "record" } }],
+                bind: {
+                  icon: { from: { of: "words", says: "add" } },
+                  label: { from: { of: "words", says: "Put an item in" } },
+                  under: { from: { of: "words",
+                    says: "It stops being on its shelf and belongs to this kit" } },
+                },
+              },
+              {
+                block: "ActionRow",
+                does: [{ op: "kit.take", fills: { kit: "record" } }],
+                bind: {
+                  icon: { from: { of: "words", says: "edit" } },
+                  label: { from: { of: "words", says: "Take one out" } },
+                  under: { from: { of: "words", says: "It goes back to where it was" } },
+                },
+              },
+              {
+                block: "ActionRow",
+                does: [{ op: "kit.build", fills: { kit: "record", day: "today" } }],
+                bind: {
+                  icon: { from: { of: "words", says: "check" } },
+                  label: { from: { of: "words", says: "It is complete" } },
+                  /* ⚠️ THE REFUSAL IS SAID BEFORE THE PRESS, because it is the
+                     one act here that is a claim rather than a movement. */
+                  under: { from: { of: "words",
+                    says: "Refused while anything the recipe asks for is missing" } },
+                },
+              },
+            ],
+          },
+          {
+            group: "Once it is built",
+            when: { is: { of: "field", field: "state" }, one: ["built"] },
+            of: [{
+              block: "ActionRow",
+              does: [{ op: "kit.break", fills: { kit: "record" } }],
+              bind: {
+                icon: { from: { of: "words", says: "alert" } },
+                label: { from: { of: "words", says: "Break it up" } },
+                under: { from: { of: "words",
+                  says: "Everything in it goes back to being an item on its own" } },
+              },
+            }],
+          },
+          {
+            group: "What it is",
+            of: [
+              { block: "FieldRow",
+                bind: {
+                  label: { from: { of: "words", says: "Standing" } },
+                  value: { from: { of: "field", field: "state" } },
+                } },
+              { block: "FieldRow",
+                bind: {
+                  label: { from: { of: "words", says: "What it is" } },
+                  value: { from: { of: "field", field: "product.name" } },
+                } },
+              { block: "FieldRow",
+                when: { has: { of: "field", field: "built" } },
+                bind: {
+                  label: { from: { of: "words", says: "Built" } },
+                  value: { from: { of: "field", field: "built" }, as: "when" },
+                } },
+            ],
+          },
+        ],
+      } },
     { id: "orders", route: "/orders", label: "Orders", nav: "none", icon: "box",
       permission: "order:read",
       body: {
@@ -9082,24 +9521,33 @@ const manifest = (): AppSpec => defineApp({
         },
         blocks: [
           {
-            block: "Listing",
-            /* ⚠️ ORDERED AND ARRIVED SIDE BY SIDE, because the gap between them
-               is the only thing anybody opens this screen to read. A list
-               showing one of the two is a list somebody has to do arithmetic
-               against while holding a telephone. */
-            shows: [
-              { field: "name", label: "Product" },
-              { field: "says", label: "How it stands" },
-              { field: "left", label: "To come", as: "num" },
-            ],
-            nothing: {
-              says: "Nothing on it yet",
-              under: "Put a product on it, then place the order",
-            },
-            bind: {
-              label: { from: { of: "words", says: "What was asked for" } },
-              of: { from: { of: "view", view: "on-this-order" } },
-            },
+            group: "What was asked for",
+            of: [{
+              block: "Listing",
+              /* ⚠️ ORDERED AND ARRIVED IN ONE SENTENCE, because the gap between
+                 them is the only thing anybody opens this screen to read, and a
+                 list showing one of the two is a list somebody has to do
+                 arithmetic against while holding a telephone.
+
+                 ⚠️ AND THE OUTSTANDING COUNT IS NOT A THIRD COLUMN. `saysLine`
+                 already ends "5 to come"; a bare `5` in the row's end slot
+                 beside it is the same digit twice with only one of them saying
+                 what it counts — the fold's end column is where a number goes
+                 when nothing else has said it. The photograph is what caught
+                 this; the static checks cannot see a duplicate. */
+              shows: [
+                { field: "name", label: "Product" },
+                { field: "says", label: "How it stands" },
+              ],
+              nothing: {
+                says: "Nothing on it yet",
+                under: "Put a product on it, then place the order",
+              },
+              bind: {
+                label: { from: { of: "words", says: "What was asked for" } },
+                of: { from: { of: "view", view: "on-this-order" } },
+              },
+            }],
           },
           {
             group: "While it is being written",
@@ -9316,51 +9764,65 @@ const manifest = (): AppSpec => defineApp({
                 } },
             ],
           },
+          /*
+            ⚠️ EACH LIST IS UNDER A HEADING, AND THAT IS NOT DECORATION HERE. A
+            `Listing`'s `label` is the table's accessible name and is drawn
+            nowhere, so two lists stacked on one page arrive as two unexplained
+            cards — the photograph showed a set of products and a set of orders
+            with nothing between them saying which was which. One list on a page
+            is named by the page; two are not.
+          */
           {
-            block: "Listing",
-            /* ⚠️ THEIR REFERENCE IS THE COLUMN THAT EARNS ITS PLACE. Ours is on
-               the product page; theirs is what goes on the order and is almost
-               never what this workspace calls it. */
-            /* ⚠️ TWO COLUMNS, NOT THREE. The supplier's own lead time is in the
-               header above; a per-product one at the end of a row folds to a
-               bare number that reads as a quantity. What earns the end slot is
-               the reference, which is the thing somebody reads out loud. */
-            shows: [
-              { field: "product.name", label: "Product" },
-              { field: "ref", label: "Their reference" },
-            ],
-            goes: { to: "product", by: "product" },
-            nothing: {
-              says: "Nothing recorded yet",
-              under: "Adding a product asks who supplies it",
-            },
-            bind: {
-              label: { from: { of: "words", says: "What they supply" } },
-              of: { from: { of: "view", view: "supplies-this" } },
-            },
+            group: "What they supply",
+            of: [{
+              block: "Listing",
+              /* ⚠️ THEIR REFERENCE IS THE COLUMN THAT EARNS ITS PLACE. Ours is
+                 on the product page; theirs is what goes on the order and is
+                 almost never what this workspace calls it. */
+              /* ⚠️ TWO COLUMNS, NOT THREE. The supplier's own lead time is in
+                 the header above; a per-product one at the end of a row folds to
+                 a bare number that reads as a quantity. What earns the end slot
+                 is the reference, which is the thing somebody reads out loud. */
+              shows: [
+                { field: "product.name", label: "Product" },
+                { field: "ref", label: "Their reference" },
+              ],
+              goes: { to: "product", by: "product" },
+              nothing: {
+                says: "Nothing recorded yet",
+                under: "Adding a product asks who supplies it",
+              },
+              bind: {
+                label: { from: { of: "words", says: "What they supply" } },
+                of: { from: { of: "view", view: "supplies-this" } },
+              },
+            }],
           },
           {
-            block: "Listing",
-            /* ⚠️ THE STANDING LEADS BECAUSE IT IS THE ONLY COLUMN EVERY ROW
-               HAS. A draft has no order number and the day cannot lead — the
-               leading column is the row's name when the list folds, and a name
-               has to be text, so a `when` there would draw the stored string.
-               What somebody scans a supplier's orders for is which are still
-               out, which is the standing anyway. */
-            shows: [
-              { field: "state", label: "Standing" },
-              { field: "raised", label: "Started", as: "when" },
-              { field: "ref", label: "Their order number" },
-            ],
-            goes: "order",
-            nothing: {
-              says: "Nothing ordered from them yet",
-              under: "Start an order and it will be here",
-            },
-            bind: {
-              label: { from: { of: "words", says: "Orders with them" } },
-              of: { from: { of: "view", view: "orders-with" } },
-            },
+            group: "Orders with them",
+            of: [{
+              block: "Listing",
+              /* ⚠️ THE STANDING LEADS BECAUSE IT IS THE ONLY COLUMN EVERY ROW
+                 HAS. A draft has no order number and the day cannot lead — the
+                 leading column is the row's name when the list folds, and a name
+                 has to be text, so a `when` there would draw the stored string.
+                 What somebody scans a supplier's orders for is which are still
+                 out, which is the standing anyway. */
+              shows: [
+                { field: "state", label: "Standing" },
+                { field: "raised", label: "Started", as: "when" },
+                { field: "ref", label: "Their order number" },
+              ],
+              goes: "order",
+              nothing: {
+                says: "Nothing ordered from them yet",
+                under: "Start an order and it will be here",
+              },
+              bind: {
+                label: { from: { of: "words", says: "Orders with them" } },
+                of: { from: { of: "view", view: "orders-with" } },
+              },
+            }],
           },
         ],
       } },

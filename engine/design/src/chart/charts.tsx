@@ -56,6 +56,25 @@ export interface Series {
   readonly subject?: boolean;
 }
 
+/**
+ * THE CHART'S NAME, DRAWN.
+ *
+ * ⚠️ IT IS A COMPONENT BECAUSE FOUR FIGURES IN THIS FILE NEED IT AND THREE OF
+ * THEM ARE NOT `Frame`. `BarChart`, `DumbbellChart` and `HeatmapChart` size
+ * their own viewBox to the row count, so they build their `<figure>` by hand —
+ * and a caption written into `Frame` alone reached six of nine forms, including
+ * none of the three most likely to be long enough to need one. A fix applied to
+ * some of N with a comment claiming all of them is the failure this file is
+ * closing, one layer up.
+ *
+ * ⚠️ AND IT IS SAID TWICE ON PURPOSE — here, and in the `<svg>`'s `<title>` and
+ * `aria-label`. Both are the same string, never two: the one that drifts would
+ * be the one nobody can see.
+ */
+const Says = ({ describes }: { readonly describes: string }) => (
+  <figcaption className={TYPE.label}>{describes}</figcaption>
+);
+
 interface FrameProps {
   readonly describes: string;
   readonly y?: Span;
@@ -79,6 +98,15 @@ function Frame({ describes, y, rules = true, children, under }: FrameProps) {
   const say = useFigures();
   return (
     <figure className={`flex w-full flex-col ${SPACE.tight}`}>
+      {/*
+        ⚠️ AND IT IS DRAWN, NOT ONLY ANNOUNCED. This sentence lived in `<title>`
+        and `aria-label` alone for the whole life of the chart vocabulary — read
+        aloud to anybody listening and invisible to everybody looking, so a
+        screen carrying two charts drew two unlabelled plots and the header two
+        paragraphs up called this "the thing meant to be read first". A name a
+        sighted reader cannot see is not a name; it is a comment in the DOM.
+      */}
+      <Says describes={describes} />
       {/*
         ⚠️ IT SCALES, AND IT STOPS SCALING — the second half was missing. A 320
         unit-wide viewBox stretched across a 1180px panel is a 3.7× zoom on
@@ -356,6 +384,7 @@ export function BarChart({ describes, data, subject }: {
 
   return (
     <figure className={`flex w-full flex-col ${SPACE.tight}`}>
+      <Says describes={describes} />
       <svg viewBox={`0 0 ${W} ${Math.max(H, rows)}`} className="w-full" role="img" aria-label={describes}>
         <title>{describes}</title>
         {data.map((d, i) => {
@@ -503,6 +532,7 @@ export function DumbbellChart({ describes, data }: {
 
   return (
     <figure className="flex w-full flex-col">
+      <Says describes={describes} />
       <svg viewBox={`0 0 ${W} ${Math.max(H, rows)}`} className="w-full" role="img" aria-label={describes}>
         <title>{describes}</title>
         {data.map((d, i) => {
@@ -564,6 +594,7 @@ export function HeatmapChart({ describes, rows, columns, values, signed = false 
 
   return (
     <figure className="flex w-full flex-col">
+      <Says describes={describes} />
       <svg
         viewBox={`0 0 ${W} ${rows.length * ch + 16}`}
         className="w-full" role="img" aria-label={describes}

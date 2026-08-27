@@ -28,8 +28,9 @@ import {
 import { inventory } from "../index.js";
 import { INVENTORY_SESSIONS, INVENTORY_SURFACES } from "./index.js";
 import {
-  BUYING, CODES, COUNTED, COUNTS, DAILY, DISAGREES, LEFT, LINES, MOVING, ORDERS, ORDER_LINES,
-  PLACES, RUNNING, RUNS, RUN_ITEMS, SUPPLIERS, SUPPLIES, THINGS, TOLD, WRONG,
+  BUYING, CODES, COUNTED, COUNTS, DAILY, DISAGREES, DUE_FOR_SERVICE, ITEMS, KIT_MEMBERS,
+  KIT_ROWS, KIT_SHORT, LEFT, LINES, MOVING, ORDERS, ORDER_LINES, PLACES, RUNNING, RUNS,
+  RUN_ITEMS, SUPPLIERS, SUPPLIES, THINGS, TOLD, WRONG,
 } from "./sample.js";
 
 /** ⚠️ Every permission a screen names, so none of them is undrawable here. */
@@ -347,6 +348,16 @@ const RUN_FIRST = { ...(RUNS.find((one) => one.state === "ended") ?? RUNS[0]!) }
  */
 const ORDER_FIRST = { ...(ORDERS.find((one) => one.state === "placed") ?? ORDERS[0]!) };
 
+/**
+ * ⚠️ AND THE ITEM, PICKED FOR THE LIFE THAT DRAWS THE MOST — see `ITEMS`.
+ * `issued` is the one standing where both act groups appear: taking it back, and
+ * the servicing pair that is offered wherever a thing is not retired.
+ */
+const ITEM_FIRST = { ...(ITEMS.find((one) => one.life === "issued") ?? ITEMS[0]!) };
+
+/** ⚠️ And the kit that is SHORT, which is the state its screen exists for. */
+const KIT_FIRST = { ...(KIT_ROWS.find((one) => one.state === "open") ?? KIT_ROWS[0]!) };
+
 /** ⚠️ The supplier the order is with, so the two pages agree about one world. */
 const SUPPLIER_FIRST = {
   ...(SUPPLIERS.find((one) => one.id === ORDER_FIRST.supplier) ?? SUPPLIERS[0]!),
@@ -358,7 +369,9 @@ const firstOf = (collection: string): Readonly<Record<string, unknown>> | undefi
       : collection === "location" ? SHELF_FIRST
         : collection === "process" ? RUN_FIRST
           : collection === "buying" ? ORDER_FIRST
-            : collection === "supplier" ? SUPPLIER_FIRST : undefined;
+            : collection === "supplier" ? SUPPLIER_FIRST
+              : collection === "unit" ? ITEM_FIRST
+                : collection === "kit" ? KIT_FIRST : undefined;
 
 /**
  * ⚠️ WHAT THE DOOR WOULD TITLE THIS SCREEN — see `Drawn.name` and D106. A screen
@@ -515,6 +528,16 @@ const SEEN: Has = {
        nobody could tell was wrong. */
     "in-this-run": rows(RUN_ITEMS
       .filter((one) => one.process === RUN_FIRST.id).map((one) => ({ ...one }))),
+    "items": rows(ITEMS.map((one) => ({ ...one }))),
+    "due-for-service": rows(DUE_FOR_SERVICE.map((one) => ({ ...one }))),
+    "kits": rows(KIT_ROWS.map((one) => ({ ...one }))),
+    /* ⚠️ NARROWED TO THE KIT THE PAGE IS ABOUT, for the reason every other
+       narrowed view here is: a board answering with everything would draw a tray
+       holding instruments that are in a different one. */
+    "in-this-kit": rows(KIT_MEMBERS
+      .filter((one) => one.kit === KIT_FIRST.id).map((one) => ({ ...one }))),
+    "missing-from-this-kit": rows(KIT_SHORT
+      .filter((one) => one.kit === KIT_FIRST.id).map((one) => ({ ...one }))),
     "suppliers": rows(SUPPLIERS.map((one) => ({ ...one }))),
     /* ⚠️ NARROWED TO THE SUPPLIER THE PAGE IS ABOUT, for the reason every other
        narrowed view here is: a board answering with everything would draw a
