@@ -1154,8 +1154,21 @@ function only(c: Ctx, column = "location"): { sql: string; bound: readonly strin
 }
 
 const moveInput = {
-  product: field.text({ label: "Product", required: true, holds: "none" }),
-  location: field.text({ label: "Location", required: true, holds: "none" }),
+  /*
+    ⚠️ REFERENCES RATHER THAN TEXT, AND THE DIFFERENCE IS WHAT A FORM DRAWS. A
+    `ref` is a question with a list of answers — the door sends the rows and the
+    screen draws a picker; a `text` is a box, and the box asked somebody standing
+    at a shelf to type the identifier of the shelf they were touching. That is
+    the "form asking for an id" the whole `ref` seam exists to remove, and these
+    two were the last inputs in this product still asking for one.
+
+    ⚠️ AND THE WIRE IS UNCHANGED: a `ref` carries the id it always carried, so
+    the scan path, the arrive path and every existing caller send exactly what
+    they sent. What is added is a refusal — a write naming a place that is not
+    there now fails at the door instead of writing a line pointing at nothing.
+  */
+  product: field.ref({ label: "Product", required: true, holds: "none", to: "product" }),
+  location: field.ref({ label: "Location", required: true, holds: "none", to: "location" }),
   quantity: field.number({ label: "How many", required: true, holds: "none" }),
   /* ⚠️ THE DEVICE'S LOCAL DATE, SENT BY THE DEVICE. A server has no way to know
      what day it is where somebody is standing, and a shelf life counted on the
@@ -6613,6 +6626,33 @@ const manifest = (): AppSpec => defineApp({
               of: { from: { of: "view", view: "lines-of-this" } },
             },
           },
+          /*
+            ⚠️ THE HERO ABOVE SAYS "RECEIVE SOME AND IT WILL BE HERE", AND THIS IS
+            THE RECEIVING. Every field the write needs that the screen is already
+            standing on is supplied rather than asked: the product is the record,
+            the day is the device's, and `typed` is what distinguishes a quantity
+            somebody keyed from one a camera read. What is left is the two
+            questions a person actually has — which shelf, and how many.
+
+            ⚠️ AND IT IS THE FIRST `does` IN THIS PRODUCT. Every write until now
+            was reached from a session screen written by hand; this is a declared
+            body offering one, which is what makes the rest of them portable.
+          */
+          {
+            group: null,
+            of: [{
+              block: "ActionRow",
+              does: [{
+                op: "stock.receive",
+                fills: { product: "record", day: "today", capture: { says: "typed" } },
+              }],
+              bind: {
+                icon: { from: { of: "words", says: "box" } },
+                label: { from: { of: "words", says: "Put some on a shelf" } },
+                under: { from: { of: "words", says: "Say where it went and how many" } },
+              },
+            }],
+          },
           {
             group: "What it is",
             of: [
@@ -6693,6 +6733,33 @@ const manifest = (): AppSpec => defineApp({
         shape: "list",
         layout: { as: "stack" },
         blocks: [{
+          /* ⚠️ IN A CARD OF ITS OWN, BECAUSE A ROW NEEDS A SURFACE. Bare between
+             the title and the list it read as a heading with a caption — a
+             `Group` with no label is the card every settings row sits on. */
+          group: null,
+          of: [{
+          /*
+            ⚠️ THE EMPTY STATE UNDER THIS SAYS "ADD A ROOM, AN AISLE OR A SHELF
+            AND IT WILL BE HERE", AND UNTIL NOW NOTHING ON THE SCREEN COULD. A
+            list whose emptiness names the act that would end it, with no way to
+            perform that act, is the sharpest version of a promise a product does
+            not keep — somebody reads the sentence, looks for the button, and
+            concludes the feature is missing.
+
+            ⚠️ THE FORM IS THE COLLECTION'S OWN — `location.create` takes exactly
+            the fields a place declares, drawn from the declaration. Nothing here
+            says what a place is; the collection already did.
+          */
+          block: "ActionRow",
+          does: ["location.create"],
+          bind: {
+            icon: { from: { of: "words", says: "add" } },
+            label: { from: { of: "words", says: "Add a place" } },
+            under: { from: { of: "words",
+              says: "A room, an aisle, a shelf or a fridge" } },
+          },
+          }],
+        }, {
           block: "Listing",
           /* ⚠️ THE PARENT'S NAME RATHER THAN THE TREE, AND THAT IS HONEST FOR
              NOW. A place points at the place it is inside, so one hop says

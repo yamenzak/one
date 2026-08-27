@@ -138,6 +138,13 @@ const ROWS: BlockIndex = {
   ActionRow: block("ActionRow", "rows", {
     label: slot("What it does", SAID, true),
     under: slot("What that means", SAID),
+    /* ⚠️ A ROW OF WORDS IN A CARD OF ROWS OF WORDS IS NOT A CONTROL. Every other
+       pressable row in this library leads with a mark, and without one an act
+       reads as a heading with a caption — photographed on Places, "Add a place"
+       looked like a section title above the list. The component has taken an
+       `icon` since it was written; the registry did not offer it, so no
+       declaration could reach it. */
+    icon: glyph("The mark beside it"),
   }),
 
   /** One step of something being explained. */
