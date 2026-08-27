@@ -467,7 +467,7 @@ generated ones) — plus every platform guard in `pnpm engine:gate`.
 
 ## Part III — the screen index
 
-**Nine, and every one of them is drawn by the engine from the declaration.** The
+**Ten, and every one of them is drawn by the engine from the declaration.** The
 surface was emptied whole on 2026-08-26 and is being rebuilt one screen at a
 time, each designed from what somebody standing in front of it is trying to do
 rather than ported from what stood there before.
@@ -483,6 +483,7 @@ follows and the shape every screen is drawn to.
 | `/places` | Places | primary | `location:read` | `declared` | `declared` |
 | `/report` | Reports | primary | `ledger:read` | `declared` | `declared` |
 | `/counts` | Being counted | — | `stock:read` | `declared` | `declared` |
+| `/count` | Count | — | `stock:read` | `declared` | `declared` |
 | `/product` | Product | — | `product:read` | `declared` | `declared` |
 | `/add` | Add a product | — | `product:write` | `declared` | `declared` |
 
@@ -531,6 +532,35 @@ list it backs was a page somebody scrolls past a hundred cartons of gloves to
 find the one carton of anything that matters. `standing` narrows it, absent means
 what runs out, and `fine` is still askable — a change to what it says by default
 rather than to what it can say.
+
+**The count session can be opened, worked and closed from the product, which for
+a long time it could not.** Four operations were built, gated, audited and
+reachable through the API and through an agent, and `/counts` listed the open
+sessions and gave nobody a way into one. `/count` is the shelf somebody is
+standing at with a phone, and its order is the order of the job: count one more
+(the thing done forty times), what you have counted (the running check), what
+closing would change (read once, near the end), and the close.
+
+⚠️ **THE TALLY IS NOT THE SHELF, AND THE TWO LISTS SAY SO.** Until the session
+closes, what has been scanned is a running total and the balance is still
+whatever `stock` holds; reading them as one would make a half-finished count
+visible to everybody as fact. The differences are the two read against each other
+and include **the lines the count did not find**, which go to zero — the rows a
+person most has to see before pressing close, because a session somebody
+abandoned half way through empties the rest of the rack.
+
+⚠️ **AND `stock:read` OPENS IT WHILE `stock:adjust` CLOSES IT.** Counting is open
+to everybody on the floor; SETTLING a count writes corrections, and somebody who
+takes things all day must never be able to make a number agree with what they
+took. The close row asks the gate and says why it cannot be pressed rather than
+disappearing.
+
+⚠️ **`count.tally` NEEDED THE DEVICE'S YEAR, AND NO DECLARED BODY COULD SUPPLY
+ONE.** A six-digit expiry has its century inferred from a window around now, so
+reading one needs the year where the box is — and four operations here take it as
+required input. `today` is a date string and a manifest cannot hold a year
+without being edited every January, so `Fill` gained `year`, derived from the
+same day both ends already send rather than read off a second clock.
 
 **The recorded share has a screen at last, which is the figure Part I opens
 with.** `/report` is five asked views over ONE operation: consumption, shrinkage,

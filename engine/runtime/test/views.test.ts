@@ -322,6 +322,25 @@ describe("a view answered by an operation", () => {
   /* ⚠️ AND A DIFFERENT QUESTION IS STILL ASKED. The key is the operation and its
      input, so two views over one operation with different fills are two runs —
      which is what makes this a memo rather than a bug. */
+  /*
+    ⚠️ THE DEVICE'S YEAR, AND IT IS THE SAME DAY'S — see `Fill`. A six-digit
+    expiry has its century inferred from a window around now, so reading one
+    needs the year where the BOX is; taken off a clock a second time it could
+    disagree with the day sent beside it, which is a real state one second before
+    midnight on the thirty-first of December.
+  */
+  it("fills the year from the day the device sent", async () => {
+    let saw: Record<string, unknown> = {};
+    await runView(
+      shard(), APP,
+      asked({ fills: { today: "today", year: "year" } }),
+      TENANT, { today: "2026-12-31" }, [],
+      async (_op, input) => { saw = input; return { items: [] }; },
+    );
+    expect(saw["today"]).toBe("2026-12-31");
+    expect(saw["year"]).toBe("2026");
+  });
+
   it("still asks again when the input differs", async () => {
     let ran = 0;
     await runViews(

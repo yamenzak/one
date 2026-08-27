@@ -836,17 +836,35 @@ describe("which screen an address belongs to", () => {
  * clicking both.
  */
 describe("what is above a screen", () => {
+  /*
+    ⚠️ THE LISTS DECLARE WHERE THEIR ROWS GO, WHICH IS WHAT MAKES THIS FIXTURE
+    LIKE A MANIFEST. It used to give the list screen `of: "product"` and nothing
+    else, and that is the shape no manifest has ever had: `of` means "the record
+    this screen is ABOUT", which is false of a catalogue. So the branch this
+    tested was reached by the fixture and by nothing in any product — every
+    sub-page in the tree went back to home whatever it was a sub-page of, with
+    this test green the whole time. A fixture shaped unlike the thing it stands
+    for is a test that proves the test.
+  */
+  const opens = (to: string) => ({
+    shape: "list" as const,
+    layout: { as: "stack" as const },
+    blocks: [{
+      block: "Listing", goes: to, nothing: { says: "None" },
+      bind: { rows: { from: { of: "view" as const, view: "all" } } },
+    }],
+  });
   const SCREENS = [
     { route: "/", id: "home", nav: "primary" as const },
     { route: "/stock", id: "stock", nav: "primary" as const, of: "stock" },
-    { route: "/things", id: "things", nav: "none" as const, of: "product",
-      body: { shape: "list" } },
+    { route: "/things", id: "things", nav: "none" as const, body: opens("product") },
     { route: "/thing", id: "product", nav: "none" as const, of: "product",
-      body: { shape: "detail" } },
-    { route: "/report", id: "report", nav: "none" as const, body: { shape: "figure" } },
+      body: { shape: "detail" as const, layout: { as: "stack" as const }, blocks: [] } },
+    { route: "/report", id: "report", nav: "none" as const,
+      body: { shape: "figure" as const, layout: { as: "stack" as const }, blocks: [] } },
   ];
 
-  it("leads a record's screen back to where that record was listed", () => {
+  it("leads a record's screen back to the list whose rows open it", () => {
     expect(upFrom(SCREENS, SCREENS[3]!)?.id).toBe("things");
   });
 
@@ -866,9 +884,23 @@ describe("what is above a screen", () => {
   });
 
   /* ⚠️ AND A LISTING IS NEVER ABOVE ITSELF, which `s !== screen` is the whole of
-     — a list screen for a collection matches its own condition, so without it
-     the catalogue's back arrow reloaded the catalogue. */
+     — a list that opened its own rows would match its own condition, and the
+     catalogue's back arrow would reload the catalogue. */
   it("never leads a listing back to itself", () => {
-    expect(upFrom(SCREENS, SCREENS[2]!)?.id).toBe("home");
+    const loop = [...SCREENS, { route: "/loop", id: "loop", nav: "none" as const,
+      of: "product", body: opens("loop") }];
+    /* ⚠️ HOME, and without `s !== screen` it would be `loop` — the screen
+       reloading itself, which is what a back arrow must never do. */
+    expect(upFrom(loop, loop[5]!)?.id).toBe("home");
+  });
+
+  /* ⚠️ AND A LIST THAT LEADS SOMEWHERE ELSE IS NOT ABOVE THIS ONE. Matching on
+     the collection rather than on the LINK would put the shelf list above a
+     product page and above a count, because both are `of` something a stock line
+     mentions. */
+  it("ignores a list whose rows open a different screen", () => {
+    const other = [...SCREENS, { route: "/places", id: "places", nav: "none" as const,
+      body: opens("place") }];
+    expect(upFrom(other, other[3]!)?.id).toBe("things");
   });
 });

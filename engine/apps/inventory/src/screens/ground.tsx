@@ -22,11 +22,14 @@ import { Screen, Shell, ready, whoFace } from "@engine/design";
 import { Body, type Has } from "@engine/design/body";
 import { Create, type Answers } from "@engine/design/create";
 import type { ScreenSpec } from "@engine/kernel";
-import { editsIn, meteredIds, namesIn, upFrom } from "@engine/kernel";
+import {
+  editsIn, meteredIds, namesIn, operationsFor, upFrom, verbId,
+} from "@engine/kernel";
 import { inventory } from "../index.js";
 import { INVENTORY_SESSIONS, INVENTORY_SURFACES } from "./index.js";
 import {
-  BUYING, COUNTS, DAILY, LEFT, LINES, PLACES, RUNNING, THINGS, TOLD, WRONG,
+  BUYING, COUNTED, COUNTS, DAILY, DISAGREES, LEFT, LINES, PLACES, RUNNING, THINGS, TOLD,
+  WRONG,
 } from "./sample.js";
 
 /** ⚠️ Every permission a screen names, so none of them is undrawable here. */
@@ -292,8 +295,20 @@ const CATALOGUE = THINGS.map((one) => ({
 const FIRST = CATALOGUE.find((one) => one.storage) ?? CATALOGUE[0]!;
 
 /** ⚠️ What the board opens for a screen that is ABOUT something — see `Screen.of`. */
+/* ⚠️ THE JOINED SHAPE, NOT THE TABLE'S — a detail screen's record arrives with
+   its one-hop reaches already resolved (`joinRows`), and the count session's own
+   heading is the SHELF rather than a session id. A fixture holding the raw
+   columns photographs the eyebrow blank. */
+const COUNTING = {
+  id: COUNTS[0]!.id,
+  location: COUNTS[0]!.where,
+  "location.name": COUNTS[0]!.whereName,
+  day: COUNTS[0]!.day,
+  blind: COUNTS[0]!.blind,
+};
+
 const firstOf = (collection: string): Readonly<Record<string, unknown>> | undefined =>
-  collection === "product" ? FIRST : undefined;
+  collection === "product" ? FIRST : collection === "count" ? COUNTING : undefined;
 
 /**
  * ⚠️ WHAT THE DOOR WOULD TITLE THIS SCREEN — see `Drawn.name` and D106. A screen
@@ -333,17 +348,28 @@ const ableOn = (screen: ScreenSpec): Partial<Has> => {
   const fields = Object.fromEntries(editsIn(screen.body)
     .flatMap((name) => (of.fields[name] ? [[name, of.fields[name]!] as const] : [])));
   const named = namesIn(of);
+  /* ⚠️ THE DOOR'S OWN TWO QUESTIONS, NOT A CONSTANT — see `Drawn.aside`. A board
+     that answered `bin: true` for everything photographed a count session
+     offering Delete, on a collection that declares `without: ["update",
+     "delete"]` and has neither. A fixture more permissive than the deployment
+     photographs affordances no customer is given. */
+  const may = operationsFor(of);
+  const leaves = may.includes(verbId(of.id, "update"));
   return {
     ...(Object.keys(fields).length
       ? { edits: { fields, onSave: async () => undefined } }
       : {}),
-    aside: {
-      of: of.label.one,
-      name: String((named && record[named]) || String(record["id"] ?? "")),
-      bin: true,
-      already: null,
-    },
-    onAside: () => undefined,
+    ...(leaves
+      ? {
+        aside: {
+          of: of.label.one,
+          name: String((named && record[named]) || String(record["id"] ?? "")),
+          bin: may.includes(verbId(of.id, "delete")),
+          already: null,
+        },
+        onAside: () => undefined,
+      }
+      : {}),
   };
 };
 
@@ -384,6 +410,12 @@ const SEEN: Has = {
        BELOW SAYS — see `TOLD`. A board that answered these with a week's numbers
        under a segmented control reading "30 days" would photograph the exact
        disagreement `PickSpec.opens` exists to stop. */
+    /* ⚠️ WHAT ONE SESSION HAS FOUND, AND THE SHELF IS STILL HOLDING WHAT IT WAS
+       — see `tally`. The differences below are the two read against each other,
+       so a fixture where they agreed would photograph the one state this screen
+       has nothing to say about. */
+    "counted-here": rows(COUNTED.map((one) => ({ ...one }))),
+    "what-disagrees": rows(DISAGREES.map((one) => ({ ...one }))),
     "recorded": rows(TOLD.map((one) => ({ ...one }))),
     "what-to-buy": rows(BUYING.map((one) => ({ ...one }))),
     "what-left": rows(LEFT.map((one) => ({ ...one }))),

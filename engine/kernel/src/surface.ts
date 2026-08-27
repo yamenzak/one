@@ -480,9 +480,19 @@ export type Layout =
  * IS. The server has no way to know what day it is where somebody is standing,
  * and its own calendar would call a box expired the evening before it is — or,
  * west of Greenwich, current for a few hours after it is not.
+ *
+ * ⚠️ AND `year` IS THAT SAME DAY'S YEAR, WHICH IS NOT THE SAME AS A SECOND
+ * DEVICE FACT. A six-digit expiry printed on a box has its century inferred from
+ * a window around NOW, so reading one needs the year where the box is — and four
+ * operations in the inventory product take it as required input. None of them
+ * could be offered by a declared body at all: `today` is a date STRING and the
+ * input is a number, and a manifest cannot hold a year without being edited every
+ * January. Derived from `today` in both resolvers rather than read from the clock
+ * a second time, so the day a screen sends and the year it sends can never
+ * disagree — which they can at 23:59:59 on the thirty-first of December.
  */
 export type Fill =
-  | "record" | "today"
+  | "record" | "today" | "year"
   | { readonly field: string } | { readonly says: Said }
   /** ⚠️ What somebody narrowed the screen to — see `PickSpec`. */
   | { readonly picked: string };
@@ -590,13 +600,59 @@ export const opensOn = (pick: PickSpec): string => (
 /** ⚠️ One reading of the five forms, so no caller writes the branch twice. */
 export const fillOf = (
   one: Fill,
-): { readonly of: "record" | "today" } | { readonly of: "field"; readonly field: string }
+): { readonly of: "record" | "today" | "year" }
+  | { readonly of: "field"; readonly field: string }
   | { readonly of: "says"; readonly says: Said }
   | { readonly of: "picked"; readonly picked: string } => (
     typeof one === "string" ? { of: one }
       : "field" in one ? { of: "field", field: one.field }
         : "picked" in one ? { of: "picked", picked: one.picked }
           : { of: "says", says: one.says });
+
+/**
+ * EVERY FILL AN ACT NEEDS, RESOLVED — the browser's half of `Fill`.
+ *
+ * ⚠️ IT IS HERE RATHER THAN IN THE PAGE THAT USES IT BECAUSE THE OTHER HALF IS
+ * ALREADY SHARED. The runtime resolves the same five sources for an asked view;
+ * two readings of one contract is how a source comes to mean different things at
+ * the two ends of the wire, and the two ends are a browser and a worker, so
+ * nothing would ever compare them.
+ *
+ * ⚠️ ONE DAY IN, TWO FACTS OUT. `today` and `year` are the same calendar day
+ * read twice, which is the whole reason the year is not taken off a clock of its
+ * own: at 23:59:59 on the thirty-first of December two clock reads are two
+ * different years, and a box's expiry would be inferred around one while the
+ * movement was dated in the other.
+ *
+ * ⚠️ AND A SOURCE WITH NOTHING BEHIND IT IS LEFT OUT RATHER THAN SENT EMPTY. A
+ * detail screen whose address has not resolved has no record, and an empty string
+ * in a required field is a refusal that says the field is missing when the truth
+ * is that the screen is not ready.
+ */
+export const fillWith = (
+  fills: Readonly<Record<string, Fill>>,
+  from: {
+    readonly record?: string | undefined;
+    readonly today: string;
+    /** ⚠️ The record itself, for a `field` — see `Fill`. */
+    readonly held?: Readonly<Record<string, unknown>> | null | undefined;
+  },
+): Record<string, unknown> => {
+  const out: Record<string, unknown> = {};
+  for (const [name, one] of Object.entries(fills)) {
+    const source = fillOf(one);
+    if (source.of === "record" && from.record) out[name] = from.record;
+    if (source.of === "today") out[name] = from.today;
+    if (source.of === "year") out[name] = Number(from.today.slice(0, 4));
+    
+    if (source.of === "field") {
+      const value = from.held?.[source.field];
+      if (value !== undefined && value !== null && value !== "") out[name] = value;
+    }
+    if (source.of === "says") out[name] = source.says;
+  }
+  return out;
+};
 
 /**
  * AN ACT A BLOCK OFFERS, AND WHAT THE SCREEN FILLS IN FOR IT.

@@ -58,7 +58,9 @@ import { refuseSettings } from "./setting.js";
 import { LADDER, refuseLadder } from "./dunning.js";
 import { SURFACES, refuseSurfaces } from "./brand.js";
 import type { Match, SurfaceSpec, ViewSpec } from "./surface.js";
-import { fillOf, fillsIn, refuseStory, refuseSurface, refuseView, unreadViews } from "./surface.js";
+import {
+  blocksIn, fillOf, fillsIn, goOf, refuseStory, refuseSurface, refuseView, unreadViews,
+} from "./surface.js";
 import { ASKS, BLOCKS, HEROES } from "./blocks.js";
 import type { PurposeBook, VaultBook } from "./vault.js";
 import { refuseVault, strayFacts } from "./vault.js";
@@ -709,17 +711,39 @@ export const beneath = (route: string, path: string): readonly string[] => {
  * and nothing can tell the two cases apart from inside the page.
  */
 export const upFrom = <T extends {
+  readonly id: string;
   readonly route: string;
   readonly of?: string;
   readonly nav?: "primary" | "none";
-  readonly body?: { readonly shape: string } | undefined;
+  readonly body?: SurfaceSpec | undefined;
 }>(screens: readonly T[], screen: T): T | undefined => {
   if (screen.nav === "primary" || screen.route === "/") return undefined;
-  const listing = screen.of
-    ? screens.find((s) =>
-      s !== screen && s.of === screen.of && s.body?.shape === "list")
-    : undefined;
-  return listing ?? screens.find((s) => s.route === "/");
+  const home = screens.find((s) => s.route === "/");
+  /*
+    ⚠️ THE LIST WHOSE ROWS OPEN THIS SCREEN, WHICH IS THE EDGE SOMEBODY CAME
+    ALONG. This asked whether a list screen names the same `of` — and `of` means
+    "the record this screen is ABOUT", which is false of a catalogue, so no list
+    screen in any manifest ever declared one and the arm was reached by nothing:
+    every sub-page in every product went back to home whatever it was a sub-page
+    OF. `goes` is the link itself, it is already written down, and it is the only
+    thing in the manifest that says one screen leads to another.
+
+    ⚠️ DERIVED RATHER THAN DECLARED, which is the argument the arrow itself was
+    given. A screen naming its own parent would be a second spelling of a
+    relationship the manifest holds, and the two drift the first time a list
+    moves — which is the same reason `goes` takes a screen id rather than a
+    route.
+
+    ⚠️ AND SEVERAL LISTS MAY LEAD HERE, WHICH IS ORDINARY RATHER THAN A FAULT. A
+    product is opened from the catalogue, from a shelf line, from what ran out
+    and from what is going out of date. The first DECLARED wins, which is the
+    order somebody wrote the product in — and the catalogue is the screen a
+    product is about, so it is the one that is written first.
+  */
+  const opens = (one: T): boolean => Boolean(one.body)
+    && one.body!.shape === "list"
+    && blocksIn(one.body!).some((b) => b.block.goes && goOf(b.block.goes).to === screen.id);
+  return screens.find((s) => s !== screen && opens(s)) ?? home;
 };
 
 /* --------------------------------------------------------------- derived --- */

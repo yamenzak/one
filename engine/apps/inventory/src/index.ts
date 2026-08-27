@@ -3062,7 +3062,24 @@ async function differences(c: Ctx, session: string, location: string) {
   return settleCount(as(found.results), as(held.results));
 }
 
-const differs = operation<{ count: string }, { items: readonly Change[] }>({
+/**
+ * ⚠️ THE DISAGREEMENT AS A SENTENCE, DECIDED HERE. "40 → 37" is arithmetic
+ * somebody has to do in their head to find out which way it went; a screen drawn
+ * from a declaration has no `if`, and the three cases read differently — stock
+ * that is not there, stock nobody knew about, and a line the count did not find
+ * at all, which is the one that goes to zero.
+ */
+const saysDiffer = (was: number, found: number): string => {
+  if (!found) return `${was} on the books, none found`;
+  return found > was
+    ? `${found} found, ${found - was} more than the books`
+    : `${found} found, ${was - found} short`;
+};
+
+const differs = operation<
+  { count: string },
+  { items: readonly (Change & { name: string; says: string })[] }
+>({
   id: "count.differences",
   kind: "read",
   summary: "What closing this count would change",
@@ -3078,7 +3095,21 @@ const differs = operation<{ count: string }, { items: readonly Change[] }>({
       `SELECT location FROM count WHERE id = ? AND tenant_id = ?${only(c).sql}`)
       .bind(input.count, c.tenantId, ...only(c).bound).first<{ location: string }>();
     if (!session) return c.fail("platform.not_found");
-    return { items: await differences(c, input.count, session.location) };
+    const items = await differences(c, input.count, session.location);
+    /* ⚠️ ONE LOOKUP FOR EVERY NAME ON THE SCREEN, like the report's. A list of
+       ids is a list somebody cannot check against the shelf they are standing
+       at, which is the only thing this screen is for. */
+    const named = new Map((await db.prepare(
+      `SELECT id, name FROM product WHERE tenant_id = ?`)
+      .bind(c.tenantId).all<{ id: string; name: string }>())
+      .results.map((row) => [String(row.id), String(row.name)]));
+    return {
+      items: items.map((one) => ({
+        ...one,
+        name: named.get(one.product) ?? "—",
+        says: saysDiffer(one.was, one.found),
+      })),
+    };
   },
 });
 
@@ -6396,6 +6427,28 @@ const manifest = (): AppSpec => defineApp({
         operation: "stock.report", take: "daily",
         fills: { today: "today", span: { picked: "span" } },
       } },
+    /*
+      ⚠️ WHAT ONE SESSION HAS FOUND SO FAR, AND IT IS NOT THE SHELF — see `tally`.
+      Until the count is closed this is what somebody has scanned; the shelf still
+      holds whatever `stock` says, and reading the two as one would make a half
+      finished count visible to everybody else as fact. Narrowed to the session
+      the screen is about, which is the same shape the product page's shelves are.
+    */
+    { id: "counted-here", of: "tally",
+      where: [{ field: "count", is: { here: "record" } }] },
+    /*
+      ⚠️ ASKED, BECAUSE A DISAGREEMENT IS A COMPARISON AND A `Match` IS EQUALITY.
+      What closing would change is every tally against every balance on that
+      shelf, INCLUDING the lines the count did not find — which are the ones that
+      go to zero and are therefore the rows nobody can afford to miss. There is no
+      column anywhere that holds it and there should not be: it is true only at
+      the moment it is asked.
+    */
+    { id: "what-disagrees", of: "stock",
+      asked: {
+        operation: "count.differences", take: "items",
+        fills: { count: "record" },
+      } },
   ],
 
   /*
@@ -7312,6 +7365,149 @@ const manifest = (): AppSpec => defineApp({
       tile on the home and a screen of its own; a list of every count ever taken
       is history, and history is a different question.
     */
+    /*
+      THE SHELF SOMEBODY IS STANDING AT, WITH A PHONE.
+
+      ⚠️ FOUR OPERATIONS WERE BUILT, GATED, AUDITED AND REACHED BY NOTHING. A
+      count could be opened, tallied, compared and closed through the API and
+      through an agent, and the product listed the open sessions and gave nobody
+      a way into one — which is the shape this repository's own guard exists to
+      name, on the flow the product document calls the highest-leverage behaviour
+      it has.
+
+      ⚠️ THE ORDER IS THE ORDER OF THE JOB. Counting one more is the thing done
+      forty times; what has been counted is the running check; what disagrees is
+      read once, near the end; and closing is last because it is irreversible —
+      every difference becomes a correction in the history, and everything the
+      count did not find goes to zero.
+
+      ⚠️ `stock:read` OPENS IT AND `stock:adjust` CLOSES IT, which is why the two
+      are not the same screen's grant. Counting is open to everybody on the floor;
+      SETTLING a count writes corrections, and somebody who takes things all day
+      must never be able to make a number agree with what they took. The close row
+      asks the gate and says why it cannot be pressed rather than disappearing.
+    */
+    { id: "count", route: "/count", label: "Count", nav: "none", icon: "tally",
+      permission: "stock:read", of: "count",
+      body: {
+        shape: "detail",
+        layout: { as: "stack" },
+        hero: {
+          as: "figure",
+          nothing: {
+            says: "Nothing counted yet",
+            under: "Scan the first thing on this shelf",
+          },
+          bind: {
+            /* ⚠️ THE ROWS THE LIST BELOW DRAWS, COUNTED — one declaration read
+               twice, so the number and the lines behind it cannot disagree. */
+            value: { from: { of: "count", view: "counted-here" } },
+            /* ⚠️ THE SHELF, WHICH IS WHAT A COUNT IS ABOUT. A session id over a
+               big number is a screen that cannot be checked against the rack the
+               person is looking at. */
+            of: { from: { of: "field", field: "location.name" } },
+            /* ⚠️ WHEN IT WAS STARTED, WHICH IS THE ONE FIGURE HERE THAT DOES
+               HAVE AN AGE — and it decides something: a session opened three
+               days ago is one somebody walked away from, and closing it empties
+               everything it never reached. */
+            fresh: { from: { of: "field", field: "day" } },
+            mark: { from: { of: "words", says: "tally" } },
+          },
+        },
+        blocks: [
+          {
+            /*
+              ⚠️ THE THING DONE FORTY TIMES A MINUTE, AT THE TOP. `count.tally`
+              takes the session, a code, the year and how many — and three of the
+              four are facts the screen is standing on, so what is asked is the
+              code and nothing else.
+
+              ⚠️ AND THE YEAR IS THE DEVICE'S — see `Fill`. A six-digit expiry
+              has its century inferred from a window around now, so reading one
+              needs the year where the BOX is; before it could be filled, this
+              operation and three others could not be offered by a declared body
+              at all.
+            */
+            group: null,
+            of: [{
+              block: "ActionRow",
+              does: [{ op: "count.tally", fills: { count: "record", year: "year" } }],
+              bind: {
+                label: { from: { of: "words", says: "Count one more" } },
+                under: { from: { of: "words", says: "Scan it, or type the code on it" } },
+                icon: { from: { of: "words", says: "scan" } },
+              },
+            }],
+          },
+          {
+            group: "What you have counted",
+            of: [{
+              block: "Listing",
+              shows: [
+                { field: "product.name", label: "Product" },
+                { field: "quantity", label: "Counted", as: "num" },
+              ],
+              goes: { to: "product", by: "product" },
+              nothing: {
+                says: "Nothing counted yet",
+                under: "Every scan lands here, and the shelf is untouched until you close",
+              },
+              bind: {
+                label: { from: { of: "words", says: "Counted" } },
+                of: { from: { of: "view", view: "counted-here" } },
+              },
+            }],
+          },
+          {
+            /*
+              ⚠️ READ BEFORE CLOSING, WHICH IS THE WHOLE REASON CLOSING IS
+              EXPLICIT. A session somebody abandoned half way through empties the
+              rest of the rack, and nothing but a person looking can tell that
+              apart from a shelf that really is empty.
+
+              ⚠️ AND AN EMPTY LIST HERE IS THE GOOD ANSWER, not a nothing state
+              covering a failure — every number agreed.
+            */
+            group: "What closing would change",
+            of: [{
+              block: "Listing",
+              shows: [
+                { field: "name", label: "Product" },
+                { field: "says", label: "By how much" },
+                { field: "delta", label: "Correction", as: "num" },
+              ],
+              goes: { to: "product", by: "product" },
+              nothing: {
+                says: "Everything agrees",
+                under: "What you counted matches what the shelf was holding",
+              },
+              bind: {
+                label: { from: { of: "words", says: "Differences" } },
+                of: { from: { of: "view", view: "what-disagrees" } },
+              },
+            }],
+          },
+          {
+            /* ⚠️ LAST, BECAUSE IT IS THE IRREVERSIBLE ONE. Every difference above
+               becomes a correction in the history naming this session — "we
+               thought 40, counted 37, corrected −3, count #14, by Ana" — which is
+               the difference between an inventory somebody can audit and one they
+               can only believe. */
+            group: null,
+            of: [{
+              block: "ActionRow",
+              does: [{ op: "count.close", fills: { count: "record", day: "today" } }],
+              bind: {
+                label: { from: { of: "words", says: "Close this count" } },
+                under: {
+                  from: { of: "words", says: "Corrects every difference above, and says who" },
+                },
+                icon: { from: { of: "words", says: "check" } },
+              },
+            }],
+          },
+        ],
+      } },
     { id: "counts", route: "/counts", label: "Being counted", nav: "none", icon: "check",
       permission: "stock:read",
       body: {
@@ -7328,6 +7524,13 @@ const manifest = (): AppSpec => defineApp({
                taking over a count has to know which kind they walked into. */
             { field: "blind", label: "Blind" },
           ],
+          /* ⚠️ AND EVERY ROW OPENS THE SESSION, which for a day it did not. A
+             list of open counts nobody can enter is a list that says work is
+             happening and offers no way to do any of it — the four operations
+             behind one were reachable through the API and through an agent, and
+             from the product by nobody. This is also what puts `/counts` above
+             the session in the crown: `upFrom` reads the LINK. */
+          goes: "count",
           nothing: {
             says: "Nothing is being counted",
             under: "Open a count on a shelf and it stays here until settled",

@@ -97,6 +97,9 @@ export async function runView(
       const source = fillOf(from);
       const value = source.of === "record" ? here.record
         : source.of === "today" ? here.today
+          /* ⚠️ THE SAME DAY'S YEAR, DERIVED — see `Fill`. Reading a clock here
+             would be a second device fact that can disagree with the first. */
+          : source.of === "year" ? here.today?.slice(0, 4)
           /* ⚠️ A PICK IS THE ONLY PLACE A NARROWING REACHES — see `PickSpec`.
              `refuseSurface` refuses a pick no view fills from and a fill naming
              no pick, so an id absent here is a screen nobody has narrowed yet. */

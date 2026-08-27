@@ -36,8 +36,8 @@ const Create = React.lazy(() => import("@engine/design/create")
    browser bundle — so what both ends need is declared once, in the layer both
    are allowed to reach. */
 import {
-  BLOCKS, PLATFORM_PROBLEMS, SCREEN_PATH, askedOf, fillOf, isGroup, opensOn, problem, upFrom,
-  verbId, viewsIn,
+  BLOCKS, PLATFORM_PROBLEMS, SCREEN_PATH, askedOf, fillWith, isGroup, opensOn, problem,
+  upFrom, verbId, viewsIn,
   type Fields, type Fill, type GuideBook, type MilestoneBook, type Problem, type Raised,
   type ScreenSpec,
   type SurfaceSpec, type Viewed,
@@ -266,30 +266,17 @@ export function Declared({ screen, screens, at, go, currency, app }: {
    * and run the act on the press.
    */
   const held = got.of.status === "ready" ? got.of.data.record : null;
-  const filled = React.useCallback((id: string): Record<string, unknown> => {
-    const out: Record<string, unknown> = {};
-    for (const [name, from] of Object.entries(acts[id]?.fills ?? {})) {
-      const source = fillOf(from);
-      /* ⚠️ A FILL WITH NOTHING BEHIND IT IS LEFT OUT RATHER THAN SENT EMPTY. A
-         detail screen whose address has not resolved has no record, and an empty
-         string in a required field is a refusal that says the field is missing
-         when the truth is that the screen is not ready. */
-      if (source.of === "record" && record) out[name] = record;
-      if (source.of === "today") out[name] = today();
-      /* ⚠️ A COLUMN ON THE RECORD, WHICH IS NOT THE RECORD'S ID — see `Fill`.
-         Carrying stock takes the product and the shelf, and a stock line holds
-         both; with only the id the form asked a person to type two identifiers
-         they were looking at. */
-      if (source.of === "field") {
-        const value = held?.[source.field];
-        if (value !== undefined && value !== null && value !== "") out[name] = value;
-      }
-      /* ⚠️ A CONSTANT THE SCREEN SUPPLIES, and it is a literal from the manifest
-         rather than a value from anywhere a caller could reach. */
-      if (source.of === "says") out[name] = source.says;
-    }
-    return out;
-  }, [acts, record, held]);
+  const filled = React.useCallback(
+    /* ⚠️ THE KERNEL'S OWN READING, which is also what the worker uses for an
+       asked view's input — see `fillWith`. Answering it twice is how a source
+       comes to mean two things at the two ends of one wire. */
+    (id: string): Record<string, unknown> => fillWith(acts[id]?.fills ?? {}, {
+      ...(record ? { record } : {}),
+      today: today(),
+      held,
+    }),
+    [acts, record, held],
+  );
 
   const onDo = React.useCallback((id: string) => {
     const spec = acts[id];

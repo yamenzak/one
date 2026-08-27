@@ -237,6 +237,38 @@ describe("a screen is handed its record and its views together", () => {
   });
 
   /*
+    ⚠️ AND A COLLECTION THAT CANNOT BE UPDATED IS NOT OFFERED A WAY OUT AT ALL.
+    `without` is how a collection opts out of a verb — a count session is opened
+    and closed by its own operations and can never be edited — and this asked
+    only whether the caller MAY update, which is a different question with the
+    same answer for everybody: yes. So the one screen a session is reached from
+    drew "put aside", and the press would have gone to an operation the app does
+    not declare. `bin` was already asked this way one line down; a missing delete
+    merely hid a button, and a missing update drew one.
+  */
+  it("offers no way out of a collection that declares no update", async () => {
+    const sealed = { ...made("sealed", "stock", {
+      note: field.text({ label: "Note", holds: "none" }),
+    }), without: ["create", "update", "delete"] } as unknown as CollectionSpec;
+    const app = {
+      ...APP, collections: [...(APP.collections ?? []), sealed],
+    } as unknown as AppSpec;
+    const on: ScreenSpec = {
+      ...place, id: "sealed", of: "sealed", body: { ...place.body!, blocks: [] },
+    } as unknown as ScreenSpec;
+    await applySchema(shard(), [schemaFor(app)]);
+    const one = await put(shard(), sealed, TENANT, { note: "kept" }, null, NOW);
+    if ("why" in one) throw new Error(one.why);
+
+    const got = await drawnFor(shard(), app, on, TENANT, all, one.id);
+    if ("needs" in got) throw new Error(got.needs);
+    /* ⚠️ AND THE RECORD IS STILL THERE, so this is a withheld affordance rather
+       than a screen that failed to load. */
+    expect(got.record?.["note"]).toBe("kept");
+    expect(got.aside).toBeNull();
+  });
+
+  /*
     ⚠️ THE ACTS TRAVEL WITH THE SCREEN, AND ONLY THE ONES IT OFFERS. Sending the
     catalogue would put every operation in the product on the wire for a screen
     with one button on it; sending none would mean the browser cannot draw a form

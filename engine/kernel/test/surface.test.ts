@@ -17,7 +17,7 @@ import { describe, expect, it } from "vitest";
 import { collection } from "../src/collection.js";
 import { field } from "../src/field.js";
 import {
-  actsIn, askedOf, blocksIn, editsIn, fieldsIn, fillOf, fillsIn, opensOn, refuseStory,
+  actsIn, askedOf, blocksIn, editsIn, fieldsIn, fillOf, fillWith, fillsIn, opensOn, refuseStory,
   refuseSurface, refuseView,
   saidWhen, stepApplies, unreadViews,
   viewsIn, type ActSpec, type BlockIndex, type SurfaceSpec, type ViewSpec,
@@ -1109,6 +1109,44 @@ describe("what the screen fills in", () => {
   it("reads a literal", () => {
     expect(fillOf({ says: "typed" })).toEqual({ of: "says", says: "typed" });
     expect(fillOf({ says: 1 })).toEqual({ of: "says", says: 1 });
+  });
+
+  /*
+    ⚠️ AND RESOLVING THEM IS SHARED WITH THE WORKER — see `fillWith`. Two
+    readings of one contract at the two ends of a wire is how a source comes to
+    mean different things, and nothing would ever compare them.
+  */
+  describe("what a screen actually supplies", () => {
+    const HELD = { name: "Casting resin", product: "prd_1", brand: "" };
+
+    it("gives the record, the day and the record's own columns", () => {
+      expect(fillWith(
+        { count: "record", day: "today", product: { field: "product" }, capture: { says: "typed" } },
+        { record: "cnt_9", today: "2026-12-31", held: HELD },
+      )).toEqual({ count: "cnt_9", day: "2026-12-31", product: "prd_1", capture: "typed" });
+    });
+
+    /*
+      ⚠️ THE YEAR IS THAT SAME DAY'S, AS A NUMBER — see `Fill`. It is what reads
+      a six-digit expiry's century, four operations take it as required input,
+      and none of them could be offered by a declared body before: `today` is a
+      date string and a manifest cannot hold a year without being edited every
+      January. Taken off a clock of its own it could disagree with the day beside
+      it, which is a real state one second before midnight on this very date.
+    */
+    it("gives that day's year, as a number", () => {
+      expect(fillWith({ year: "year" }, { today: "2026-12-31" })).toEqual({ year: 2026 });
+    });
+
+    /* ⚠️ AND NOTHING IS SENT EMPTY. A screen whose address has not resolved has
+       no record, and an empty string in a required field is a refusal that says
+       the field is missing when the screen is merely not ready. */
+    it("leaves out what it has nothing for", () => {
+      expect(fillWith(
+        { count: "record", brand: { field: "brand" }, gone: { field: "nope" } },
+        { today: "2026-08-27", held: HELD },
+      )).toEqual({});
+    });
   });
 });
 

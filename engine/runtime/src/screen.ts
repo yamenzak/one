@@ -456,8 +456,19 @@ export async function drawnFor(
     `Drawn.aside`. Both go through `<collection>:write`, which is the same grant
     the generated update asks for: putting a record out of the way is a change to
     it, not a fifth kind of thing to be granted.
+
+    ⚠️ AND THE UPDATE HAS TO EXIST, WHICH THE GRANT DOES NOT SAY. `without` is how
+    a collection opts OUT of a verb — a count session is opened and closed by its
+    own operations and can never be edited — and this asked only whether the
+    person MAY update, which is a different question with the same answer for
+    everybody: yes. So a count offered "put aside" on the one screen a person
+    reaches it from, and the press would have gone to an operation the app does
+    not declare. `bin` was already asked this way one line down; the difference
+    was that a missing delete merely hid a button, and a missing update drew one.
   */
-  const aside: Aside | null = of && held && holds(permissionFor(of, "update"))
+  const aside: Aside | null = of && held
+    && operationsFor(of).includes(verbId(of.id, "update"))
+    && holds(permissionFor(of, "update"))
     ? {
       of: of.label.one,
       name: name ?? String(held["id"] ?? ""),

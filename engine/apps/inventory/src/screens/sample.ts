@@ -328,3 +328,44 @@ export const DAILY: readonly Ran[] = [
   day: dayPlus("2026-07-29" as Day, i),
   quantity,
 }));
+
+/**
+ * A SHELF PART WAY THROUGH BEING COUNTED, AND WHAT IT DISAGREES WITH.
+ *
+ * ⚠️ THE TALLY IS NOT THE SHELF, and the two fixtures are separate for the same
+ * reason the tables are — see `tally`. Until the session closes this is what
+ * somebody has scanned; the balance is still whatever `stock` says, and a board
+ * that answered both from one list would photograph a half-finished count as
+ * fact.
+ *
+ * ⚠️ AND THEY DISAGREE ON PURPOSE, IN BOTH DIRECTIONS AND IN THE THIRD WAY. One
+ * line is short, one is over, and one was not found at all — which is the row
+ * that goes to zero, the one closing a count destroys, and therefore the one a
+ * photograph of this screen most has to show.
+ */
+export interface Counted {
+  readonly id: string;
+  readonly product: string;
+  readonly "product.name": string;
+  readonly quantity: number;
+}
+
+export const COUNTED: readonly Counted[] = [
+  { id: "tly-1", product: "t-glove", "product.name": "Nitrile gloves, blue", quantity: 380 },
+  { id: "tly-2", product: "t-screw", "product.name": "Screws, M4 × 20", quantity: 26 },
+  { id: "tly-3", product: "t-tie", "product.name": "Cable ties, 200 mm", quantity: 7 },
+];
+
+export interface Disagrees {
+  readonly product: string;
+  readonly name: string;
+  readonly says: string;
+  readonly delta: number;
+}
+
+export const DISAGREES: readonly Disagrees[] = [
+  { product: "t-glove", name: "Nitrile gloves, blue", says: "380 found, 20 short", delta: -20 },
+  { product: "t-screw", name: "Screws, M4 × 20", says: "26 found, 2 more than the books",
+    delta: 2 },
+  { product: "t-paper", name: "A4 paper", says: "2 on the books, none found", delta: -2 },
+];

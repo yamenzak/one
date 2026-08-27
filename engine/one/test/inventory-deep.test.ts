@@ -19,6 +19,7 @@ import {
   startSession, upsertAccount, type Db,
 } from "@engine/runtime";
 import { inventory } from "@engine/inventory";
+import { upFrom } from "@engine/kernel";
 import worker, { APPS, LEGAL } from "../src/index.js";
 import { warm } from "./warm.js";
 
@@ -659,5 +660,86 @@ describe("what the month added up to", () => {
     expect(roles["user"]).not.toContain("ledger:read");
     const report = (inventory().screens ?? []).find((one) => one.id === "report");
     expect(report?.permission).toBe("ledger:read");
+  });
+});
+
+/* --------------------------------------------------------- the count session --- */
+
+/**
+ * A SHELF COUNTED, THROUGH THE SCREEN SOMEBODY STANDS AT.
+ *
+ * ⚠️ THE FOUR OPERATIONS WERE ALREADY DRIVEN — see `inventory.test`. What had
+ * never run is the SCREEN: a session opened from a list, its tallies read back,
+ * its differences asked for, and the close offered as a row. Every one of them
+ * was reachable through the API and through an agent, and from the product by
+ * nobody.
+ */
+describe("a shelf counted, through the screen", () => {
+  const screen = async (id: string, record?: string) => {
+    const query = new URLSearchParams({ today: TODAY, ...(record ? { record } : {}) });
+    const res = await at(`/api/screen/${id}?${query.toString()}`, { headers: { cookie } });
+    return {
+      status: res.status,
+      body: await res.json() as {
+        record: Record<string, unknown> | null;
+        acts: Record<string, unknown>;
+        views: Record<string, { items: Record<string, unknown>[]; count: number }>;
+      },
+    };
+  };
+
+  it("opens from the list, reads back what was tallied, and says what disagrees", async () => {
+    const bolts = await kindOf("Bolts, M8", "counted");
+    const bin = await placeOf("Bin 7");
+    ok(await write("stock.receive", {
+      product: bolts, location: bin, quantity: 40, day: TODAY, capture: "typed",
+    }));
+    /* ⚠️ A COUNT IS DRIVEN BY WHAT THE CAMERA READ, NEVER BY A PRODUCT ID, so
+       the label has to exist before the shelf can be counted — which is the
+       whole reason `product.label` is a write. */
+    const labelled = ok(await write("product.label", { ids: [bolts] }));
+    const code = String((labelled.items as { id: string; code: string }[])
+      .find((one) => one.id === bolts)?.code);
+    const session = String(ok(await write("count.open", {
+      location: bin, day: TODAY,
+    })).id);
+
+    /* ⚠️ THE LIST LEADS TO IT, which is what "you cannot open one" was about. */
+    const list = await screen("counts");
+    expect(list.body.views["counting"]?.items.some((one) => one["id"] === session)).toBe(true);
+
+    /* ⚠️ THIRTY-SEVEN AGAINST FORTY, so the difference is three short — the
+       number the whole flow exists to find. */
+    ok(await write("count.tally", { count: session, raw: code, year: 2026, quantity: 37 }));
+
+    const at37 = await screen("count", session);
+    expect(at37.status).toBe(200);
+    /* ⚠️ THE TALLY IS NOT THE SHELF. Until the session closes the balance is
+       still forty, and reading the two as one would make a half-finished count
+       visible to everybody else as fact. */
+    expect(at37.body.views["counted-here"]?.items[0]?.["quantity"]).toBe(37);
+    const differ = at37.body.views["what-disagrees"]?.items ?? [];
+    expect(differ.length).toBe(1);
+    expect(differ[0]?.["delta"]).toBe(-3);
+    expect(String(differ[0]?.["name"])).toBe("Bolts, M8");
+    expect(String(differ[0]?.["says"])).toBe("37 found, 3 short");
+
+    /* ⚠️ AND BOTH VERBS ARE OFFERED ON THE SCREEN, with everything the screen is
+       standing on already filled — the session, the day and the device's year. */
+    expect(Object.keys(at37.body.acts)).toContain("count.tally");
+    expect(Object.keys(at37.body.acts)).toContain("count.close");
+
+    ok(await write("count.close", { count: session, day: TODAY }));
+    const lines = ok(await read("stock.list")).items as { product: string; quantity: number }[];
+    expect(lines.find((one) => one.product === bolts)?.quantity).toBe(37);
+  });
+
+  /* ⚠️ AND THE WAY BACK IS THE LIST THAT LED HERE — see `upFrom`. Derived from
+     the `goes` on that list rather than declared, so a screen cannot disagree
+     with the link somebody followed to reach it. */
+  it("goes back to the list its rows were opened from", () => {
+    const screens = inventory().screens ?? [];
+    const here = screens.find((one) => one.id === "count")!;
+    expect(upFrom(screens, here)?.id).toBe("counts");
   });
 });

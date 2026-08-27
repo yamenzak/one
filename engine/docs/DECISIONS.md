@@ -4126,3 +4126,58 @@ them; a control whose drawn value was not the one sent; a reading order and a
 default sharing one slot; a narrowing over rows with no way back to all of them;
 a self-sizing control dropped into a flex row with no basis; or a conditional
 sentence missing the branch where nothing is wrong.
+
+## D108 — A list says where its rows go, and that is where "back" is
+
+`upFrom` looked for the list screen declaring the same `of` as the detail screen
+above it. `of` means "the record this screen is ABOUT", which is false of a
+catalogue — so no list screen in any manifest has ever declared one, the arm was
+reached by nothing, and every sub-page in every product went back to home
+whatever it was a sub-page OF. Its test was green the whole time, because the
+FIXTURE gave a list screen an `of`: a fixture shaped unlike the thing it stands
+for is a test that proves the test.
+
+**`goes` is the link itself and it is already written down.** A list declares
+which screen its rows open, which is the edge somebody actually travelled, so
+"where back leads" is the inverse of a relationship the manifest holds rather
+than a second spelling of one. Several lists may lead to one screen — a product
+is opened from the catalogue, from a shelf line, from what ran out and from what
+is going out of date — and the first DECLARED wins, which is the order somebody
+wrote the product in.
+
+**The year is the same day's, and that is a fill rather than a clock.** Four of
+OneInventory's operations take the device's calendar year as required input,
+because a six-digit expiry has its century inferred from a window around now and
+a server in another year reads a label differently from the phone looking at it.
+None of them could be offered by a declared body: `today` is a date string, the
+input is a number, and a manifest cannot hold a year without being edited every
+January. `Fill: "year"` is derived from `today` at both ends rather than read off
+a second clock, because two clock reads one second before midnight on the
+thirty-first of December are two different years — a box's expiry inferred around
+one while the movement is dated in the other.
+
+**And resolving a fill is now one function.** The worker resolved five sources
+for an asked view and the browser resolved the same five for an act, in two
+files, at two ends of a wire — so nothing would ever have compared them. Adding
+the year to one and not the other is a defect nothing in the tree could see, and
+that is the general case: `fillWith` is the kernel's reading and both ends go
+through it, exactly as `opensOn` is for a narrowing's default.
+
+**And a record can only be put aside where there is something to put it aside
+WITH.** The door asked whether the caller MAY update, which for a collection that
+declares `without: ["update"]` is a different question with the same answer for
+everybody: yes. So a count session — opened and closed by its own operations,
+never edited — drew "put aside" on the one screen it is reached from, and the
+press would have gone to an operation the app does not declare. `bin` was already
+asked the right way one line down; the difference is that a missing delete merely
+hid a button and a missing update drew one.
+
+⚠️ **THE FIXTURE SAID `bin: true` FOR EVERYTHING, WHICH IS HOW THE PHOTOGRAPH
+STILL LOOKED FINE.** A board more permissive than the deployment photographs
+affordances no customer is given — the same fault as the fixture that kept
+`upFrom`'s dead arm alive, in the same round, in a different file.
+
+**Therefore never:** a branch whose only caller is a fixture; a fixture more
+permissive than the door; a way back written from anything but the link that was
+followed; two device facts where one derives from the other; or one contract read
+in two places.
