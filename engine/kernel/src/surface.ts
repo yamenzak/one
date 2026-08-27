@@ -2036,7 +2036,31 @@ export function refuseSurface(
       if (!view) {
         at("shows_without_a_list",
           `${where} names columns and binds no view, so there are no rows for them to be columns of`);
-      } else if (!view.asked) {
+      }
+      /*
+        ⚠️ THE LEADING COLUMN IS A NAME, AND A FORMATTER ON IT IS A PROMISE THE
+        RENDERER CANNOT KEEP. Folded to a phone row the first column becomes the
+        row's title, which doubles as its ACCESSIBLE name — so it has to be text,
+        and `Listing` takes it as a string while every other slot takes a node.
+        The renderer therefore draws it with `String(v)` whatever the declaration
+        said: a `when` on the first column showed `2026-08-26` on a phone and
+        "Yesterday" in the table, from one declaration, with the comment beside
+        it claiming both halves agreed. Refused here rather than patched there,
+        because the alternative is a second text-only formatter table that will
+        drift from this one.
+
+        ⚠️ AND IT IS ASKED OF AN ASKED VIEW TOO, unlike the checks below. Those
+        compare a column against a collection's fields, which a handler's answer
+        does not have; this is about the DECLARATION's own shape, and the fold is
+        the same either way.
+      */
+      const lead = b.shows[0];
+      if (lead?.as && lead.as !== "plain") {
+        at("format_wrong",
+          `${where} draws its leading column "${lead.field}" as ${lead.as} — that column `
+          + "is the row's name when the list folds, which has to be text");
+      }
+      if (view && !view.asked) {
         /* ⚠️ AN ASKED VIEW'S COLUMNS GO UNCHECKED, AND IT IS THE HONEST LIMIT OF
            THIS — see `AskedSpec`. The rows are a handler's answer; the only
            thing anybody could check them against is a shape nothing writes

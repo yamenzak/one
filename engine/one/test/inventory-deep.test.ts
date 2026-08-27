@@ -929,3 +929,174 @@ describe("who moved what, and when", () => {
     expect(here?.permission).toBe("ledger:read");
   });
 });
+
+/* ------------------------------------------------------------ the orders --- */
+
+/**
+ * BUYING IT IN, DRIVEN — the loop `/report` could describe and not close.
+ *
+ * ⚠️ THE ASSERTION THAT MATTERS IS THAT THE SHELF MOVED. An order rail that
+ * updates its own numbers and leaves the stock alone is a spreadsheet with a
+ * state machine on it — every figure agrees, the order closes clean, and nothing
+ * is on the shelf. So every receipt here is checked against the balance and the
+ * ledger, not against the line it was booked to.
+ */
+describe("buying it in", () => {
+  const world = async () => {
+    const supplier = idOf(await write("supplier.create", {
+      name: "Harbour Supplies", contact: "Dana", email: "dana@harbour.example",
+      leadDays: 5,
+    }));
+    const place = idOf(await write("location.create", { name: "Goods in", kind: "room" }));
+    const product = idOf(await write("product.create", {
+      name: "Blue roll", unit: "roll", tracking: "counted",
+    }));
+    return { supplier, place, product };
+  };
+
+  const onHandOf = async (product: string): Promise<number> => {
+    const said = await read("stock.lines", { product });
+    expect(said.status, JSON.stringify(said.body)).toBe(200);
+    return (said.body.items as { quantity: number }[] ?? [])
+      .reduce((sum, one) => sum + one.quantity, 0);
+  };
+
+  it("opens an order, fills it, places it, and the delivery lands on the shelf", async () => {
+    const { supplier, place, product } = await world();
+    const buying = idOf(await write("buying.open", { supplier, today: TODAY }));
+
+    const added = await write("buying.add", { buying, product, quantity: 10 });
+    expect(added.status, JSON.stringify(added.body)).toBe(200);
+    expect(added.body.lines).toBe(1);
+
+    const placed = await write("buying.place", { buying, ref: "HS-4471" });
+    expect(placed.status, JSON.stringify(placed.body)).toBe(200);
+    expect(placed.body.state).toBe("placed");
+
+    const part = await write("buying.receive", {
+      buying, product, location: place, quantity: 4, day: TODAY, capture: "typed",
+    });
+    expect(part.status, JSON.stringify(part.body)).toBe(200);
+    expect(part.body.state).toBe("part");
+    expect(part.body.left).toBe(6);
+    /* ⚠️ THE SHELF, WHICH IS THE WHOLE POINT — see the describe's header. */
+    expect(await onHandOf(product)).toBe(4);
+
+    /* ⚠️ AND IT CLOSES ITSELF WHEN THE LAST ONE LANDS. Nobody who has just
+       received the last box wants to be asked to press a second button saying
+       so, and an order left open because they did not is one that shows up for
+       ever on the list of what is still coming. */
+    const rest = await write("buying.receive", {
+      buying, product, location: place, quantity: 6, day: TODAY, capture: "typed",
+    });
+    expect(rest.body.state).toBe("closed");
+    expect(rest.body.left).toBe(0);
+    expect(await onHandOf(product)).toBe(10);
+  });
+
+  /*
+    ⚠️ ONE ARRIVAL PATH, AND THIS IS WHAT SAYS SO. The receipt must be in the
+    ledger under the same verb an ordinary one is, carrying the order in
+    `against` — otherwise a delivery booked against an order is invisible to the
+    history, the usage report and the undo.
+  */
+  it("writes the movement to the one ledger, against the order", async () => {
+    const { supplier, place, product } = await world();
+    const buying = idOf(await write("buying.open", { supplier, today: TODAY }));
+    await write("buying.add", { buying, product, quantity: 3 });
+    await write("buying.place", { buying });
+    await write("buying.receive", {
+      buying, product, location: place, quantity: 3, day: TODAY, capture: "typed",
+    });
+
+    const said = await read("stock.history", { product, today: TODAY });
+    expect(said.status, JSON.stringify(said.body)).toBe(200);
+    const rows = said.body.items as { says: string }[];
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.some((one) => /received/i.test(one.says))).toBe(true);
+  });
+
+  /*
+    ⚠️ RAISING A PLACED LINE IS THE TEMPTING ONE, and it is what the whole record
+    exists against: a line quietly moved from 10 to 12 after 12 turn up is a
+    receipt that reconciles perfectly against a promise nobody made.
+  */
+  it("refuses to change what a placed order asked for", async () => {
+    const { supplier, product } = await world();
+    const buying = idOf(await write("buying.open", { supplier, today: TODAY }));
+    await write("buying.add", { buying, product, quantity: 10 });
+    await write("buying.place", { buying });
+
+    const again = await write("buying.add", { buying, product, quantity: 2 });
+    expect(again.status).toBe(409);
+    expect(JSON.stringify(again.body)).toMatch(/cannot change/);
+  });
+
+  /* ⚠️ AND PLACING AN EMPTY ONE IS REFUSED — `settled([])` is true, so an order
+     placed with nothing on it would close itself on the first delivery against a
+     line that does not exist. */
+  it("refuses to place an order with nothing on it", async () => {
+    const { supplier } = await world();
+    const buying = idOf(await write("buying.open", { supplier, today: TODAY }));
+    const placed = await write("buying.place", { buying });
+    expect(placed.status).toBe(409);
+    expect(JSON.stringify(placed.body)).toMatch(/nothing on this order/);
+  });
+
+  /* ⚠️ OVER-DELIVERY IS ALLOWED AND THE SHELF IS TOLD THE TRUTH — see
+     `refuseArrival`. A case of 12 against an order for 10 is an ordinary
+     Tuesday, and refusing it would make the paperwork more important than the
+     stock. */
+  it("takes more than was ordered, and the shelf says twelve", async () => {
+    const { supplier, place, product } = await world();
+    const buying = idOf(await write("buying.open", { supplier, today: TODAY }));
+    await write("buying.add", { buying, product, quantity: 10 });
+    await write("buying.place", { buying });
+    const said = await write("buying.receive", {
+      buying, product, location: place, quantity: 12, day: TODAY, capture: "typed",
+    });
+    expect(said.status, JSON.stringify(said.body)).toBe(200);
+    expect(said.body.state).toBe("closed");
+    expect(said.body.left).toBe(0);
+    expect(await onHandOf(product)).toBe(12);
+  });
+
+  /*
+    ⚠️ CANCELLING A PART-RECEIVED ORDER WOULD ERASE WHY THE STOCK IS THERE, and
+    the refusal names the way out rather than only saying no.
+  */
+  it("refuses to cancel once some of it has arrived, and says to close it short", async () => {
+    const { supplier, place, product } = await world();
+    const buying = idOf(await write("buying.open", { supplier, today: TODAY }));
+    await write("buying.add", { buying, product, quantity: 10 });
+    await write("buying.place", { buying });
+    await write("buying.receive", {
+      buying, product, location: place, quantity: 4, day: TODAY, capture: "typed",
+    });
+
+    const cancelled = await write("buying.cancel", { buying });
+    expect(cancelled.status).toBe(409);
+    expect(JSON.stringify(cancelled.body)).toMatch(/close it short/);
+
+    /* ⚠️ AND THE WAY OUT WORKS, WITH THE SHORTFALL REPORTED. An order closed
+       short that could not say how short is one nobody can reconcile against
+       an invoice. */
+    const closed = await write("buying.close", { buying, reason: "Discontinued" });
+    expect(closed.status, JSON.stringify(closed.body)).toBe(200);
+    expect(closed.body.short).toBe(6);
+  });
+
+  /* ⚠️ AND NOTHING ARRIVES AGAINST A DRAFT. A delivery booked to an order
+     nobody sent is stock on the shelf under a promise that was never made. */
+  it("refuses a delivery against an order that was never placed", async () => {
+    const { supplier, place, product } = await world();
+    const buying = idOf(await write("buying.open", { supplier, today: TODAY }));
+    await write("buying.add", { buying, product, quantity: 5 });
+    const said = await write("buying.receive", {
+      buying, product, location: place, quantity: 5, day: TODAY, capture: "typed",
+    });
+    expect(said.status).toBe(409);
+    expect(JSON.stringify(said.body)).toMatch(/not been placed/);
+    expect(await onHandOf(product)).toBe(0);
+  });
+});

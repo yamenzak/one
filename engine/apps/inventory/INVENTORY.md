@@ -417,6 +417,56 @@ Receiving more of a held lot stays possible — a quarantine is about what may
 *leave*. Running a process and releasing what it produced are different grants,
 for the same reason taking and correcting are.
 
+### Buying it in
+
+Reports has worked out what to buy since the day it shipped — the product, the
+quantity, the reason and who to ring — and there was nothing to press. Somebody
+wrote the list out somewhere else and whatever happened next was invisible to
+the product that worked it out.
+
+An order goes to **one supplier**, is written as a **draft**, and is **placed**
+— and from then on what it asked for cannot change. A delivery lands against a
+line, the line's arrived figure rises, and the order **closes itself** when the
+last one lands.
+
+⚠️ **RECEIVING AGAINST AN ORDER IS THE SAME MOVEMENT AS ANY OTHER RECEIPT.** It
+goes through the one chokepoint, writes one ledger row, counts against one quota
+and carries the order in the movement's `against` — so there is one arrival path
+and one history. A purchasing feature with its own way of putting things on a
+shelf is two records that will disagree about the same carton.
+
+⚠️ **MORE THAN WAS ORDERED IS ALLOWED.** Suppliers over-ship; a case of 12
+against an order for 10 is an ordinary Tuesday. Refusing it would mean the shelf
+could not be told what is physically on it — a product making its own paperwork
+more important than the stock it exists to count. The shelf is the fact and the
+order is the promise; where they disagree, the promise was what was wrong.
+
+⚠️ **AND `closed` MEANS "NOTHING MORE IS COMING", NOT "EVERYTHING ARRIVED".** A
+supplier who sends eight of ten and never sends the rest leaves an order that is
+finished and short. Cancelling is reached only while nothing has arrived — the
+way out of a part-received order is to close it short, because cancelling one
+half of which is on the shelf would erase the record of why that stock is there.
+
+⚠️ **ORDERING IS ITS OWN GRANT, AND IT IS THE ONE THAT SPENDS MONEY.** Every
+other write moves a number between two places a workspace already owns; placing
+an order commits it to paying somebody. Receiving is `stock:move` — the person
+on the floor books the van in — and committing the workspace to the next one is
+`order:write`.
+
+### Who you buy from
+
+A supplier is a name, somebody to ask for, a way to reach them, **what they call
+us**, and how long they take. `sourcing` links them to a product with **their**
+reference for it, which is what goes on an order and is almost never what this
+workspace calls it.
+
+⚠️ **BOTH WERE WRITTEN FOR MONTHS AND READ BY NOTHING.** Adding a product asks
+who supplies it and the handler writes both rows; no screen ever showed either
+back, so the honest description of that step was that it asked somebody to do
+work and discarded it politely. The reach guard's collection pass is what found
+it, the day it was widened to ask whether a person can see a row of a table at
+all.
+
 ### Labels
 
 A shelf has no manufacturer, so its code is always ours. A product usually has
@@ -500,12 +550,17 @@ are (`stock`, `ledger`, `unit`, `kit`, `count`, plus `location` by its own id),
 and `reach.test.mjs` fails on any statement over one of them that neither carries
 the filter nor states why it is wide.
 
-**And a gate reaches the nav, not only the operation.** Four screens name the
-capabilities they are for — `/work` (runs *or* work orders), `/run`, `/case`,
-`/import` — and one the plan does not include never leaves the server, so it has
-no nav row, no route and no way in by typing. Runs open at Plus, work orders and
-the import at Solo, so a garage gets four primary destinations and a clinic gets
-five.
+**And a gate reaches the nav, not only the operation.** Two screens name the
+capability they are for — `/runs` and `/run`, both `processes` — and one the plan
+does not include never leaves the server, so it has no nav row, no route and no
+way in by typing. Runs open at Plus, so a garage on Solo gets four primary
+destinations and a clinic on Plus gets five.
+
+⚠️ **THIS PARAGRAPH NAMED `/work` AND `/case` FOR MONTHS AND NEITHER EXISTED.**
+They were emptied in the surface rewrite and never came back; the sentence went
+on describing a product that had changed underneath it, which is the same fault
+the two plan-gating suites had at the same time — a claim about gating that was
+true when written and asserted by nothing after.
 
 ---
 
@@ -648,6 +703,10 @@ follows and the shape every screen is drawn to.
 | `/place` | Place | — | `location:read` | `declared` | `declared` |
 | `/runs` | Runs | primary | `process:read` | `declared` | `declared` |
 | `/run` | Run | — | `process:read` | `declared` | `declared` |
+| `/orders` | Orders | — | `order:read` | `declared` | `declared` |
+| `/order` | Order | — | `order:read` | `declared` | `declared` |
+| `/suppliers` | Suppliers | — | `order:read` | `declared` | `declared` |
+| `/supplier` | Supplier | — | `order:read` | `declared` | `declared` |
 | `/add` | Add a product | — | `product:write` | `declared` | `declared` |
 | `/import` | Bring in a spreadsheet | — | `stock:adjust` | `declared` | `declared` |
 

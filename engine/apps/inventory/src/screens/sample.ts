@@ -17,6 +17,7 @@
    is the one failure a picture cannot reveal, because it looks correct. */
 import { dayPlus, type Day } from "@engine/kernel";
 import { saysDue, saysMove } from "../ledger.js";
+import { saysLine } from "../ordering.js";
 
 export type Tracking = "listed" | "counted" | "batched" | "itemised" | "assembled";
 
@@ -504,3 +505,74 @@ export const RUN_ITEMS: readonly RunItem[] = [
   { id: "ri-4", process: "r-3", batch: "b-resin-1", "batch.lot": "RS-2204",
     "batch.printed": "2029-04-30", verdict: "released" },
 ];
+
+/**
+ * WHO A WORKSPACE BUYS FROM, AND WHAT IS ON ORDER WITH THEM.
+ *
+ * ⚠️ THE PAGE THIS FURNISHES IS THE ONE THAT WAS EMPTY FOR MONTHS. `supplier`
+ * and `sourcing` have been written by the register flow since OI-14 with nothing
+ * reading them back; a board that answered both with nothing would photograph
+ * the state that was the bug.
+ *
+ * ⚠️ AND THE ORDER THE DETAIL PAGE OPENS ON IS `placed`, for the reason the run
+ * board picks `ended`: every act card is `when`-gated, so which row it opens on
+ * decides which half of the screen is photographed at all. `placed` is the one
+ * standing where a delivery can land AND the order can still be closed short —
+ * the two acts the rail exists for.
+ */
+export interface Ordered {
+  readonly id: string;
+  readonly supplier: string;
+  readonly "supplier.name": string;
+  readonly state: "draft" | "placed" | "part" | "closed" | "cancelled";
+  readonly raised: string;
+  readonly ref: string;
+  readonly due: string;
+}
+
+export const SUPPLIERS = [
+  { id: "sup-1", name: "Harbour Supplies", contact: "Dana Whitlock",
+    email: "dana@harbour.example", phone: "+44 20 7946 0102", account: "HW-4471",
+    leadDays: 5 },
+  { id: "sup-2", name: "Northgate Chemicals", contact: "Ravi Menon",
+    email: "orders@northgate.example", phone: "+44 161 496 0311", account: "NG-88",
+    leadDays: 12 },
+] as const;
+
+export const ORDERS: readonly Ordered[] = [
+  { id: "ord-1", supplier: "sup-1", "supplier.name": "Harbour Supplies",
+    state: "placed", raised: "2026-08-26", ref: "HS-99120", due: "2026-09-01" },
+  { id: "ord-2", supplier: "sup-2", "supplier.name": "Northgate Chemicals",
+    state: "part", raised: "2026-08-21", ref: "NG-4402", due: "2026-08-28" },
+  { id: "ord-3", supplier: "sup-1", "supplier.name": "Harbour Supplies",
+    state: "closed", raised: "2026-08-11", ref: "HS-98771", due: "2026-08-18" },
+  { id: "ord-4", supplier: "sup-2", "supplier.name": "Northgate Chemicals",
+    state: "draft", raised: "2026-08-27", ref: "", due: "" },
+];
+
+/**
+ * ⚠️ ORDERED AND ARRIVED DISAGREE ON EVERY ROW BUT ONE, which is the state this
+ * list exists to show. A fixture where the two columns matched would photograph
+ * the one case nobody opens an order to check.
+ */
+/* ⚠️ THE SHAPE `buying.lines` ANSWERS WITH, NOT THE TABLE'S — the view is ASKED,
+   so a fixture built out of columns would draw the right headings over blank
+   cells. `says` is the sentence the screen exists to show. */
+export const ORDER_LINES = [
+  { id: "oln-1", buying: "ord-1", product: "t-glove", name: "Nitrile gloves, blue",
+    says: saysLine({ product: "t-glove", asked: 20, had: 0 }), left: 20 },
+  { id: "oln-2", buying: "ord-1", product: "t-paper", name: "A4 paper",
+    says: saysLine({ product: "t-paper", asked: 8, had: 3 }), left: 5 },
+  { id: "oln-3", buying: "ord-2", product: "t-resin", name: "Casting resin, clear",
+    says: saysLine({ product: "t-resin", asked: 12, had: 12 }), left: 0 },
+  { id: "oln-4", buying: "ord-2", product: "t-screw", name: "Screws, M4 × 20",
+    says: saysLine({ product: "t-screw", asked: 500, had: 520 }), left: 0 },
+] as const;
+
+/** ⚠️ What a supplier supplies, with THEIR reference — see `sourcing`. */
+export const SUPPLIES = [
+  { id: "src-1", supplier: "sup-1", product: "t-glove", "product.name": "Nitrile gloves, blue",
+    ref: "NIT-BL-M", leadDays: 5 },
+  { id: "src-2", supplier: "sup-1", product: "t-paper", "product.name": "A4 paper",
+    ref: "PAP-A4-80", leadDays: 3 },
+] as const;

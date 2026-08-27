@@ -28,13 +28,14 @@ import {
 import { inventory } from "../index.js";
 import { INVENTORY_SESSIONS, INVENTORY_SURFACES } from "./index.js";
 import {
-  BUYING, CODES, COUNTED, COUNTS, DAILY, DISAGREES, LEFT, LINES, MOVING, PLACES, RUNNING, RUNS,
-  RUN_ITEMS, THINGS, TOLD, WRONG,
+  BUYING, CODES, COUNTED, COUNTS, DAILY, DISAGREES, LEFT, LINES, MOVING, ORDERS, ORDER_LINES,
+  PLACES, RUNNING, RUNS, RUN_ITEMS, SUPPLIERS, SUPPLIES, THINGS, TOLD, WRONG,
 } from "./sample.js";
 
 /** ⚠️ Every permission a screen names, so none of them is undrawable here. */
 const EVERYTHING = new Set([
   "product:read", "product:write", "location:read", "location:write",
+  "order:read", "order:write",
   "stock:read", "stock:move", "stock:adjust", "ledger:read",
   "process:read", "process:write",
 ]);
@@ -338,11 +339,26 @@ const SHELF_FIRST = (() => {
  */
 const RUN_FIRST = { ...(RUNS.find((one) => one.state === "ended") ?? RUNS[0]!) };
 
+/**
+ * ⚠️ AND THE ORDER, PICKED FOR THE STANDING THE RAIL EXISTS FOR — see `ORDERS`.
+ * `placed` is the one where a delivery can land AND the order can still be
+ * closed short, so it is the standing where the page draws the two acts it was
+ * built around.
+ */
+const ORDER_FIRST = { ...(ORDERS.find((one) => one.state === "placed") ?? ORDERS[0]!) };
+
+/** ⚠️ The supplier the order is with, so the two pages agree about one world. */
+const SUPPLIER_FIRST = {
+  ...(SUPPLIERS.find((one) => one.id === ORDER_FIRST.supplier) ?? SUPPLIERS[0]!),
+};
+
 const firstOf = (collection: string): Readonly<Record<string, unknown>> | undefined =>
   collection === "product" ? FIRST
     : collection === "count" ? COUNTING
       : collection === "location" ? SHELF_FIRST
-        : collection === "process" ? RUN_FIRST : undefined;
+        : collection === "process" ? RUN_FIRST
+          : collection === "buying" ? ORDER_FIRST
+            : collection === "supplier" ? SUPPLIER_FIRST : undefined;
 
 /**
  * ⚠️ WHAT THE DOOR WOULD TITLE THIS SCREEN — see `Drawn.name` and D106. A screen
@@ -499,6 +515,17 @@ const SEEN: Has = {
        nobody could tell was wrong. */
     "in-this-run": rows(RUN_ITEMS
       .filter((one) => one.process === RUN_FIRST.id).map((one) => ({ ...one }))),
+    "suppliers": rows(SUPPLIERS.map((one) => ({ ...one }))),
+    /* ⚠️ NARROWED TO THE SUPPLIER THE PAGE IS ABOUT, for the reason every other
+       narrowed view here is: a board answering with everything would draw a
+       supplier page listing products somebody else sells. */
+    "supplies-this": rows(SUPPLIES
+      .filter((one) => one.supplier === SUPPLIER_FIRST.id).map((one) => ({ ...one }))),
+    "orders": rows(ORDERS.map((one) => ({ ...one }))),
+    "orders-with": rows(ORDERS
+      .filter((one) => one.supplier === SUPPLIER_FIRST.id).map((one) => ({ ...one }))),
+    "on-this-order": rows(ORDER_LINES
+      .filter((one) => one.buying === ORDER_FIRST.id).map((one) => ({ ...one }))),
   },
 };
 

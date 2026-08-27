@@ -469,9 +469,6 @@ const UNSEEN = new Set([
      workspace's, and the half of the erasure mechanism that deletes somebody's
      own rows. Its surface is the test suite, deliberately. */
   "ground/check-in",
-  /* Who a workspace buys from. `product.register` asks and writes `sourcing`,
-     and nothing shows either back. */
-  "inventory/supplier", "inventory/sourcing",
   /* The gallery around `product.photo`. Same shape: the register flow asks
      "Can you photograph it?", the handler writes the rows, no screen reads
      them. */

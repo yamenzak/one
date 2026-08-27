@@ -1317,7 +1317,30 @@ describe("what a screen can be narrowed to", () => {
  * time it reaches a browser and therefore throws nowhere.
  */
 describe("how a column says its value", () => {
+  /* ⚠️ A PLAIN NAME LEADS, because the leading column is the row's title when
+     the list folds and is refused a formatter of its own — see the block below.
+     Testing a formatter in slot one would be testing that rule instead of this
+     one, and every case here would report the same refusal. */
   const shown = (col: unknown) => refuseSurface(
+    screen({
+      body: body({
+        blocks: [{
+          block: "Listing",
+          shows: [{ field: "title", label: "Title" } as never, col as never],
+          nothing: { says: "None" },
+          bind: { rows: { from: { of: "view", view: "recent-notes" } } },
+        }],
+      }),
+    }),
+    INDEX, [recent], COLLECTIONS, [],
+  ).map((p) => p.why);
+
+  /* ⚠️ AND THE LEADING COLUMN ITSELF, WHICH IS A DIFFERENT RULE. It becomes the
+     row's name on a phone AND that row's accessible name, so `Listing` takes it
+     as a string while every other slot takes a node — and the renderer draws it
+     with `String(v)` whatever was declared. A `when` there showed the stored
+     date on a phone and "Yesterday" in the table, from one declaration. */
+  const leading = (col: unknown) => refuseSurface(
     screen({
       body: body({
         blocks: [{
@@ -1330,6 +1353,14 @@ describe("how a column says its value", () => {
     }),
     INDEX, [recent], COLLECTIONS, [],
   ).map((p) => p.why);
+
+  it("refuses a formatter on the column that becomes the row's name", () => {
+    expect(leading({ field: "at", label: "Written", as: "when" })).toContain("format_wrong");
+  });
+
+  it("leaves a plain leading column alone", () => {
+    expect(leading({ field: "title", label: "Title" })).toEqual([]);
+  });
 
   it("accepts a formatter the field's kind can wear", () => {
     expect(shown({ field: "at", label: "Written", as: "when" })).toEqual([]);

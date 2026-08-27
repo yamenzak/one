@@ -4459,3 +4459,65 @@ one grant covering both doing the work and signing for it; a plan-gating suite
 that asks about our switches and calls that the customer's plan; a date drawn as
 its stored text; or a check written inline in one loop when a second loop asks
 the same question.
+
+## D114 — A subject with no screen is a failure, and a table two schemas create is a 503
+
+**Date:** 2026-08-27 · **Status:** shipped
+
+**THE GUARD WRITTEN TO CATCH AN UNREACHED CAPABILITY EXCUSED THE WORST CASE OF
+ONE.** `reached.test.mjs` asked about "verbs of a REACHED subject", so a
+collection with no screen and no wired verb was not a finding — it was not a
+question. `unit` (five verbs), `kit` (six) and `job` (three) were built, gated,
+audited, tested at the door and callable by nobody, and the guard reported
+`27 of 28 verb(s) of a reached subject called`. Every word of that was true.
+
+**THE NARROWING HAD A GOOD REASON AND IT EXPIRED.** It was written during RW-0,
+when every screen in the product had been emptied on purpose and they were
+coming back one at a time; the wide question then would have reported thirty-odd
+surfaces nobody had written yet, which is a guard everybody learns to ignore. The
+rebuild finished. Nothing expired with it, because nothing was watching the
+reason rather than the rule.
+
+**A COLLECTION IS REACHED THREE WAYS AND BEING WRITTEN IS NOT ONE OF THEM.** A
+screen draws it, a view reads it, or a control calls a verb of it. There is
+deliberately no fourth: "another table refs it" would excuse every join table in
+the repository, which is exactly where this hides. The sharp finding is that
+`product.register` asks "Can you photograph it?" and writes `shot`, asks who
+supplies it and writes `sourcing`, and nothing in the product ever showed either
+back — so the honest description of those steps was that they asked somebody to
+do work and discarded it politely. A rule counting a write as a reach would have
+called both wired.
+
+**AND THE TABLE NAME COLLISION IS A 503 ON EVERY DOOR.** The purchasing rail was
+written as `purchase` first, which is what the runtime calls the package rail's
+ledger — both land on a shard, `CREATE TABLE IF NOT EXISTS` is won by whichever
+module runs first, the loser's indexes then name columns that are not there,
+`ensureSchema` throws, and every route that touches D1 answers 500 including
+`/health`. The kernel refuses a reserved SQL WORD and knows nothing about the
+platform's own tables, because it is the pure contracts layer and has never seen
+one. `shadow.test.mjs` is the check, and it is PER DATABASE: OneInventory's
+`code` and the platform's `code` have never collided, because the platform's is
+a directory module and an app's collections only ever reach a shard. A guard
+matching every platform table would report that pair for ever, which is how a
+check earns an exemption list and then earns being ignored.
+
+**THE ORDER RAIL ITSELF NEVER MOVES STOCK.** Receiving against a line goes
+through the same chokepoint `stock.receive` does, writes the same ledger row,
+counts against the same quota and carries the order in `against`. A purchasing
+feature with its own way of putting things on a shelf is two histories that will
+disagree about the same carton. What it adds is which promise a movement
+answered.
+
+**AND MORE THAN WAS ORDERED IS ALLOWED.** Suppliers over-ship; refusing a case of
+12 against an order for 10 would mean the shelf could not be told what is
+physically on it — a product making its own paperwork more important than the
+stock it exists to count. The shelf is the fact and the order is the promise;
+where they disagree, the promise was what was wrong. `closed` means "nothing more
+is coming" rather than "everything arrived", and cancelling is reached only while
+nothing has, because cancelling an order half of which is on the shelf would
+erase the record of why that stock is there.
+
+**Therefore never:** a guard that excuses a whole noun for having no surface; a
+rule that counts a write as a reach; an app table sharing a name with one the
+platform puts on the same database; a second path that changes a number on a
+shelf; or an end state that can only mean "everything arrived".

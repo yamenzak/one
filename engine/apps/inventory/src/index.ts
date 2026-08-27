@@ -43,6 +43,10 @@ import {
   type Late, type Run, type RunAct, type Verdict,
 } from "./release.js";
 import {
+  ORDERS, afterArrival, outstanding, refuseArrival, refuseOrder, saysLine,
+  type Line, type Order, type OrderAct,
+} from "./ordering.js";
+import {
   KITS, LIVES, checkKit, refuseAct, refuseKitAct, shelfStep, wantsIn,
   type Act, type KitState, type Life, type Short,
 } from "./items.js";
@@ -583,6 +587,88 @@ const sourcing = collection({
     /* ⚠️ HOW LONG THEY TAKE, per supplier rather than per product — which is the
        whole reason somebody keeps a second one. */
     leadDays: field.number({ label: "Days to arrive", holds: "none", min: 0, max: 365 }),
+  },
+});
+
+/**
+ * WHAT WAS ASKED OF A SUPPLIER, AND WHETHER IT CAME.
+ *
+ * ⚠️ THE REPORT HAS KNOWN WHAT TO BUY SINCE OI-C AND THERE WAS NOTHING TO PRESS.
+ * `/report` computes the product, the quantity, the reason and who to ring; a
+ * person then wrote it out somewhere else, and whatever happened next was
+ * invisible to the product that worked it out. That is the gap this closes — not
+ * a new calculation, a way to act on one already made.
+ *
+ * ⚠️ IT NEVER MOVES STOCK. Receiving against a line goes through the same
+ * chokepoint `stock.receive` does, so there is one arrival path, one ledger row
+ * and one quota. A purchasing feature with its own way of putting things on a
+ * shelf is two histories that will disagree about the same carton.
+ *
+ * ⚠️ AND IT IS NOT DELETABLE. What a workspace ordered is the reason stock on a
+ * shelf is there and the reason money left; an order that can be removed is a
+ * delivery with nothing behind it. Cancelling is a STANDING, which is a record of
+ * a decision rather than the absence of one.
+ */
+const buying = collection({
+  id: "buying",
+  label: { one: "Order", many: "Orders" },
+  scope: { of: "tenant" },
+  permission: "order",
+  retention: null,
+  onClose: { then: "purge" },
+  offline: "queue",
+  without: ["create", "update", "delete"],
+  searchable: ["ref", "note"],
+  fields: {
+    supplier: field.ref({ label: "Supplier", required: true, holds: "none", to: "supplier" }),
+    state: field.enum({
+      label: "Standing", required: true, holds: "none", values: [...ORDERS],
+    }),
+    /* ⚠️ THE SUPPLIER'S NUMBER FOR IT, NOT OURS. Ours is the record's own id and
+       nobody on the other end of a telephone knows it; theirs is what gets
+       quoted back when somebody rings to ask where the van is. */
+    ref: field.text({ label: "Their order number", holds: "none", max: 80 }),
+    /* ⚠️ WHEN IT WAS STARTED, AND EVERY ORDER HAS ONE. `placed` is the fact that
+       it was sent and a draft has none, so a list sorted by that alone puts the
+       thing somebody is working on right now at the bottom. */
+    raised: field.day({ label: "Started", required: true, holds: "none" }),
+    placed: field.instant({ label: "Placed", holds: "none" }),
+    /* ⚠️ WHEN IT WAS SAID IT WOULD COME, which is what makes an order LATE — a
+       fact nothing else in this product can work out, because a lead time is an
+       average and a promise is a promise. */
+    due: field.day({ label: "Expected", holds: "none" }),
+    closed: field.instant({ label: "Closed", holds: "none" }),
+    note: field.long({ label: "Note", holds: "none", max: 2_000 }),
+  },
+});
+
+/**
+ * ONE PRODUCT ON ONE ORDER: what was asked for, and what has come so far.
+ *
+ * ⚠️ `had` IS CUMULATIVE, because one line is very often two vans. A column
+ * holding the last delivery would make an order that arrived in halves read as
+ * half-received for ever, and the outstanding figure — which is what somebody
+ * chases a supplier with — would be wrong in the supplier's favour.
+ *
+ * ⚠️ AND THE UNIT IS THE PRODUCT'S BASE UNIT, resolved through the packing
+ * ladder at the door exactly as receiving already does. An order in cases and a
+ * shelf in tablets is the ordinary case, and two places converting is two places
+ * to get it wrong.
+ */
+const buyingLine = collection({
+  id: "buying-line",
+  label: { one: "Line", many: "Lines" },
+  scope: { of: "tenant" },
+  permission: "order",
+  retention: null,
+  onClose: { then: "purge" },
+  offline: "queue",
+  without: ["create", "update", "delete"],
+  fields: {
+    buying: field.ref({ label: "Order", required: true, holds: "none", to: "buying" }),
+    product: field.ref({ label: "Product", required: true, holds: "none", to: "product" }),
+    asked: field.number({ label: "Ordered", required: true, holds: "none", min: 1 }),
+    had: field.number({ label: "Arrived", required: true, holds: "none", min: 0 }),
   },
 });
 
@@ -4948,6 +5034,402 @@ const lateResult = operation<
   },
 });
 
+/* ------------------------------------------------------------ the orders --- */
+
+interface Ordering { id: string; state: Order; supplier: string }
+
+const orderIn = async (c: Ctx, id: string): Promise<Ordering> => {
+  const of = await (c.db as Db).prepare(
+    `SELECT id, state, supplier FROM buying WHERE id = ? AND tenant_id = ?`)
+    .bind(id, c.tenantId).first<Ordering>();
+  if (!of) return c.fail("platform.not_found");
+  return of;
+};
+
+/* ⚠️ ONE REFUSAL SHAPE FOR EVERY ACT ON AN ORDER, and the sentence comes from
+   the pure rule — the same reason `refuseOn` exists for a run. Two spellings of
+   "it has already been placed" is how a screen and a door come to disagree about
+   what is possible. */
+const refuseOrderOn = (c: Ctx, state: Order, act: OrderAct): void => {
+  const why = refuseOrder(state, act);
+  if (why) c.fail("inventory.wrongOrder", { why });
+};
+
+/** ⚠️ Every line on an order, in the shape the pure arithmetic reads. */
+const linesOf = async (c: Ctx, order: string): Promise<readonly Line[]> => {
+  const rows = await (c.db as Db).prepare(
+    `SELECT product, asked, had FROM buying_line
+      WHERE buying = ? AND tenant_id = ? ORDER BY at ASC`)
+    .bind(order, c.tenantId).all<{ product: string; asked: number; had: number }>();
+  return rows.results ?? [];
+};
+
+const openOrder = operation<
+  { supplier: string; today: string; day?: string }, { id: string }
+>({
+  id: "buying.open",
+  kind: "write",
+  summary: "Start an order",
+  input: {
+    supplier: field.ref({ label: "Supplier", required: true, holds: "none", to: "supplier" }),
+    today: field.day({ label: "Today", required: true, holds: "none" }),
+    day: field.day({ label: "Expected", holds: "none" }),
+  },
+  output: { id: field.text({ label: "Order", holds: "none" }) },
+  permission: "order:write",
+  idempotency: { mode: "key" },
+  emits: ["buying.opened"],
+  outcome: { message: "Started.", tone: "success", invalidates: ["buying.list"] },
+  audit: (input) => ({ subject: input.supplier, verb: "started an order with" }),
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const id = newId("ord", new Date(c.now));
+    await (c.db as Db).prepare(
+      `INSERT INTO buying (id, tenant_id, supplier, state, raised, due, at, by)
+        VALUES (?, ?, ?, 'draft', ?, ?, ?, ?)`)
+      .bind(id, c.tenantId, input.supplier, input.today, input.day ?? null, c.now,
+        c.accountId ?? null).run();
+    return { id };
+  },
+});
+
+/**
+ * ⚠️ ADDING THE SAME PRODUCT TWICE RAISES THE LINE RATHER THAN MAKING A SECOND.
+ * Two lines for one product on one order is an order that cannot be received
+ * against without somebody choosing which half a delivery belongs to — a
+ * question with no answer, asked of the person holding the box.
+ */
+const addLine = operation<
+  { buying: string; product: string; quantity: number }, { lines: number }
+>({
+  id: "buying.add",
+  kind: "write",
+  summary: "Add a product to an order",
+  input: {
+    buying: field.text({ label: "Order", required: true, holds: "none" }),
+    product: field.ref({ label: "Product", required: true, holds: "none", to: "product" }),
+    quantity: field.number({ label: "How many", required: true, holds: "none", min: 1 }),
+  },
+  output: { lines: field.number({ label: "Lines", holds: "none" }) },
+  permission: "order:write",
+  idempotency: { mode: "key" },
+  emits: ["buying.lined"],
+  outcome: { message: "Added.", tone: "success", invalidates: ["buying.list"] },
+  fails: ["platform.not_found", "platform.invalid", "inventory.wrongOrder"],
+  audit: (input) => ({ subject: input.product, verb: "put on an order" }),
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const db = c.db as Db;
+    const of = await orderIn(c, input.buying);
+    refuseOrderOn(c, of.state, "add");
+    /* ⚠️ UNDER THE NUMBER IT IS ABOUT, NOT OVER THE FORM — the same rule
+       `inventory.short` records. `platform.invalid`'s own detail is a fixed
+       sentence, so a `why` handed to it is dropped and the person reads "check
+       the highlighted fields" with nothing highlighted. */
+    if (!Number.isFinite(input.quantity) || input.quantity < 1
+      || Math.floor(input.quantity) !== input.quantity) {
+      return c.fail("platform.invalid", {}, {
+        fields: { quantity: "How many has to be a whole number, at least one" },
+      });
+    }
+    /* ⚠️ THE ID IS DERIVED FROM THE PAIR, which is what makes the raise above
+       one statement instead of a read and a branch — and what makes a repeated
+       press idempotent in the same breath. */
+    await db.prepare(
+      `INSERT INTO buying_line (id, tenant_id, buying, product, asked, had, at, by)
+        VALUES (?, ?, ?, ?, ?, 0, ?, ?)
+        ON CONFLICT (id) DO UPDATE SET asked = asked + excluded.asked,
+          edited_at = excluded.at, edited_by = excluded.by`)
+      .bind(`pln_${of.id}_${input.product}`, c.tenantId, of.id, input.product,
+        input.quantity, c.now, c.accountId ?? null).run();
+    return { lines: (await linesOf(c, of.id)).length };
+  },
+});
+
+const dropLine = operation<{ buying: string; product: string }, { lines: number }>({
+  id: "buying.drop",
+  kind: "write",
+  summary: "Take a product off an order",
+  input: {
+    buying: field.text({ label: "Order", required: true, holds: "none" }),
+    product: field.ref({ label: "Product", required: true, holds: "none", to: "product" }),
+  },
+  output: { lines: field.number({ label: "Lines", holds: "none" }) },
+  permission: "order:write",
+  idempotency: { mode: "key" },
+  emits: ["buying.lined"],
+  outcome: { message: "Taken off.", tone: "success", invalidates: ["buying.list"] },
+  fails: ["platform.not_found", "inventory.wrongOrder"],
+  audit: (input) => ({ subject: input.product, verb: "took off an order" }),
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const of = await orderIn(c, input.buying);
+    refuseOrderOn(c, of.state, "drop");
+    await (c.db as Db).prepare(
+      `DELETE FROM buying_line WHERE buying = ? AND product = ? AND tenant_id = ?`)
+      .bind(of.id, input.product, c.tenantId).run();
+    return { lines: (await linesOf(c, of.id)).length };
+  },
+});
+
+/**
+ * ⚠️ PLACING AN EMPTY ORDER IS REFUSED, AND IT IS NOT A PEDANTRY. `settled([])`
+ * is true, so an order placed with no lines is one that would close itself on
+ * the first delivery against a line that does not exist — or, more likely, sit
+ * on the list of what is coming for ever, promising a supplier nothing.
+ */
+const placeOrder = operation<
+  { buying: string; ref?: string; day?: string }, { state: string; lines: number }
+>({
+  id: "buying.place",
+  kind: "write",
+  summary: "Place the order",
+  input: {
+    buying: field.text({ label: "Order", required: true, holds: "none" }),
+    ref: field.text({ label: "Their order number", holds: "none", max: 80 }),
+    day: field.day({ label: "Expected", holds: "none" }),
+  },
+  output: {
+    state: field.text({ label: "Standing", holds: "none" }),
+    lines: field.number({ label: "Lines", holds: "none" }),
+  },
+  permission: "order:write",
+  idempotency: { mode: "key" },
+  emits: ["buying.placed"],
+  outcome: { message: "Placed.", tone: "success", invalidates: ["buying.list"] },
+  fails: ["platform.not_found", "inventory.emptyOrder", "inventory.wrongOrder"],
+  audit: (input) => ({ subject: input.buying, verb: "placed" }),
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const of = await orderIn(c, input.buying);
+    refuseOrderOn(c, of.state, "place");
+    const lines = await linesOf(c, of.id);
+    if (!lines.length) return c.fail("inventory.emptyOrder");
+    await (c.db as Db).prepare(
+      `UPDATE buying SET state = 'placed', placed = ?,
+         ref = COALESCE(?, ref), due = COALESCE(?, due),
+         edited_at = ?, edited_by = ?
+        WHERE id = ? AND tenant_id = ?`)
+      .bind(c.now, input.ref?.trim() || null, input.day ?? null, c.now,
+        c.accountId ?? null, of.id, c.tenantId).run();
+    return { state: "placed", lines: lines.length };
+  },
+});
+
+/**
+ * A DELIVERY LANDING AGAINST A LINE.
+ *
+ * ⚠️ IT GOES THROUGH `stockMove` AND NOWHERE ELSE — see `ordering.ts`'s header.
+ * One arrival path, one ledger row, one quota, one set of refusals about short
+ * shelves and stale moves. Writing the shelf here would be a second way for a
+ * number to change and the first thing anybody would notice is two histories
+ * disagreeing about the same carton.
+ *
+ * ⚠️ AND THE LEDGER ROW CARRIES THE ORDER IN `against`, which is the field that
+ * already exists for exactly this: what a movement was FOR. Without it the
+ * arrival is indistinguishable from somebody receiving the same box off the back
+ * of a van nobody ordered.
+ */
+const receiveLine = operation<
+  {
+    buying: string; product: string; location: string; quantity: number;
+    day: string; capture: string; batch?: string;
+  },
+  { state: string; had: number; left: number }
+>({
+  id: "buying.receive",
+  kind: "write",
+  summary: "Receive part of an order",
+  input: {
+    buying: field.text({ label: "Order", required: true, holds: "none" }),
+    product: field.ref({ label: "Product", required: true, holds: "none", to: "product" }),
+    location: field.ref({ label: "Location", required: true, holds: "none", to: "location" }),
+    quantity: field.number({ label: "How many arrived", required: true, holds: "none" }),
+    day: field.day({ label: "On", required: true, holds: "none" }),
+    capture: field.text({ label: "Recorded by", required: true, holds: "none" }),
+    batch: field.text({ label: "Batch", holds: "none" }),
+  },
+  output: {
+    state: field.text({ label: "Standing", holds: "none" }),
+    had: field.number({ label: "Arrived so far", holds: "none" }),
+    left: field.number({ label: "Still to come", holds: "none" }),
+  },
+  permission: "stock:move",
+  idempotency: { mode: "key" },
+  emits: ["buying.received"],
+  outcome: {
+    message: "Received.", tone: "success",
+    invalidates: ["buying.list", "stock.list", "ledger.list"],
+  },
+  fails: [
+    "platform.not_found", "platform.invalid", "inventory.wrongOrder",
+    "inventory.short", "inventory.moved",
+  ],
+  audit: (input) => ({ subject: input.product, verb: "received against an order" }),
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const db = c.db as Db;
+    const of = await orderIn(c, input.buying);
+    refuseOrderOn(c, of.state, "receive");
+
+    const why = refuseArrival(input.quantity);
+    if (why) return c.fail("platform.invalid", {}, { fields: { quantity: why } });
+
+    const line = await db.prepare(
+      `SELECT product, asked, had FROM buying_line
+        WHERE buying = ? AND product = ? AND tenant_id = ?`)
+      .bind(of.id, input.product, c.tenantId)
+      .first<{ product: string; asked: number; had: number }>();
+    if (!line) return c.fail("platform.not_found");
+
+    /* ⚠️ THE SHELF MOVES FIRST, so a refusal from the one chokepoint — a place
+       that is not there, a stale move — leaves the order untouched. Bumping the
+       line first would leave an order claiming a delivery the shelf never saw. */
+    await stockMove(c, "received", {
+      product: input.product,
+      location: input.location,
+      quantity: input.quantity,
+      day: input.day,
+      capture: input.capture,
+      against: of.id,
+      ...(input.batch ? { batch: input.batch } : {}),
+    });
+
+    await db.prepare(
+      `UPDATE buying_line SET had = had + ?, edited_at = ?, edited_by = ?
+        WHERE buying = ? AND product = ? AND tenant_id = ?`)
+      .bind(input.quantity, c.now, c.accountId ?? null, of.id, input.product,
+        c.tenantId).run();
+
+    const after = afterArrival(await linesOf(c, of.id));
+    await db.prepare(
+      `UPDATE buying SET state = ?, closed = ?, edited_at = ?, edited_by = ?
+        WHERE id = ? AND tenant_id = ?`)
+      .bind(after, after === "closed" ? c.now : null, c.now, c.accountId ?? null,
+        of.id, c.tenantId).run();
+
+    const had = line.had + input.quantity;
+    return { state: after, had, left: outstanding({ ...line, had }) };
+  },
+});
+
+/**
+ * ⚠️ CLOSING IS HOW AN ORDER ENDS SHORT, and it is the way out of a
+ * part-received one — see `refuseOrder`. A supplier who sends eight of ten and
+ * will never send the other two leaves an order that is finished and short; a
+ * product whose only end is "everything arrived" makes somebody either invent
+ * the two or leave it open for ever.
+ */
+const closeOrder = operation<
+  { buying: string; reason?: string }, { state: string; short: number }
+>({
+  id: "buying.close",
+  kind: "write",
+  summary: "Close the order",
+  input: {
+    buying: field.text({ label: "Order", required: true, holds: "none" }),
+    reason: field.text({ label: "Why", holds: "none", max: 200 }),
+  },
+  output: {
+    state: field.text({ label: "Standing", holds: "none" }),
+    short: field.number({ label: "Never arrived", holds: "none" }),
+  },
+  permission: "order:write",
+  idempotency: { mode: "key" },
+  emits: ["buying.closed"],
+  outcome: { message: "Closed.", tone: "success", invalidates: ["buying.list"] },
+  fails: ["platform.not_found", "inventory.wrongOrder"],
+  audit: (input) => ({ subject: input.buying, verb: "closed" }),
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const of = await orderIn(c, input.buying);
+    refuseOrderOn(c, of.state, "close");
+    const lines = await linesOf(c, of.id);
+    const short = lines.reduce((sum, one) => sum + outstanding(one), 0);
+    await (c.db as Db).prepare(
+      `UPDATE buying SET state = 'closed', closed = ?,
+         note = COALESCE(?, note), edited_at = ?, edited_by = ?
+        WHERE id = ? AND tenant_id = ?`)
+      .bind(c.now, input.reason?.trim() || null, c.now, c.accountId ?? null,
+        of.id, c.tenantId).run();
+    return { state: "closed", short };
+  },
+});
+
+const cancelOrder = operation<{ buying: string; reason?: string }, { state: string }>({
+  id: "buying.cancel",
+  kind: "write",
+  summary: "Cancel the order",
+  input: {
+    buying: field.text({ label: "Order", required: true, holds: "none" }),
+    reason: field.text({ label: "Why", holds: "none", max: 200 }),
+  },
+  output: { state: field.text({ label: "Standing", holds: "none" }) },
+  permission: "order:write",
+  idempotency: { mode: "key" },
+  emits: ["buying.cancelled"],
+  outcome: { message: "Cancelled.", tone: "warning", invalidates: ["buying.list"] },
+  fails: ["platform.not_found", "inventory.wrongOrder"],
+  audit: (input) => ({ subject: input.buying, verb: "cancelled" }),
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const of = await orderIn(c, input.buying);
+    refuseOrderOn(c, of.state, "cancel");
+    await (c.db as Db).prepare(
+      `UPDATE buying SET state = 'cancelled', closed = ?,
+         note = COALESCE(?, note), edited_at = ?, edited_by = ?
+        WHERE id = ? AND tenant_id = ?`)
+      .bind(c.now, input.reason?.trim() || null, c.now, c.accountId ?? null,
+        of.id, c.tenantId).run();
+    return { state: "cancelled" };
+  },
+});
+
+/**
+ * WHAT IS ON AN ORDER, AS SENTENCES.
+ *
+ * ⚠️ AN ASKED VIEW RATHER THAN THE TABLE, FOR THE REASON `every-movement` IS ONE.
+ * A `Listing` folds to a name, a line under it and one value at the end, so
+ * "Ordered" and "Arrived" as two columns arrive as two bare numbers with nothing
+ * saying which is which — and the fact somebody opens an order to read is the GAP
+ * between them, which is not a column at all. The photograph is what said so.
+ */
+const orderLines = operation<
+  { buying: string },
+  { items: { id: string; product: string; name: string; says: string; left: number }[] }
+>({
+  id: "buying.lines",
+  kind: "read",
+  summary: "What is on an order",
+  input: { buying: field.text({ label: "Order", required: true, holds: "none" }) },
+  output: {
+    items: field.json({ label: "Lines", holds: "none" }),
+  },
+  permission: "order:read",
+  idempotency: { mode: "none" },
+  fails: ["platform.not_found"],
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const of = await orderIn(c, input.buying);
+    const rows = await (c.db as Db).prepare(
+      `SELECT l.id AS id, l.product AS product, p.name AS name,
+              l.asked AS asked, l.had AS had
+         FROM buying_line l JOIN product p ON p.id = l.product
+        WHERE l.buying = ? AND l.tenant_id = ? ORDER BY l.at ASC`)
+      .bind(of.id, c.tenantId)
+      .all<{ id: string; product: string; name: string; asked: number; had: number }>();
+    return {
+      items: (rows.results ?? []).map((one) => ({
+        id: one.id,
+        product: one.product,
+        name: one.name,
+        says: saysLine(one),
+        left: outstanding(one),
+      })),
+    };
+  },
+});
+
 /* --------------------------------------------------------------- the job --- */
 
 const openJob = operation<
@@ -6312,6 +6794,15 @@ const manifest = (): AppSpec => defineApp({
         decision away and calls it simplicity.
       */
       "process:read", "process:run", "process:release",
+      /*
+        ⚠️ ORDERING IS ITS OWN GRANT, AND IT IS THE ONE THAT SPENDS MONEY. Every
+        other write in this product moves a number between two places a
+        workspace already owns; placing an order commits it to paying somebody.
+        A stockroom where whoever can receive a delivery can also order forty
+        cases of it has no separation at all between the two halves of a supply
+        chain, and that is the oldest control there is.
+      */
+      "order:read", "order:write",
     ],
     roles: {
       /* ⚠️ The one who looks after the stock: receives, corrects, edits the
@@ -6320,6 +6811,7 @@ const manifest = (): AppSpec => defineApp({
         "product:read", "product:write", "location:read", "location:write",
         "stock:read", "stock:move", "stock:adjust", "ledger:read",
         "process:read", "process:run", "process:release",
+        "order:read", "order:write",
       ],
       /* ⚠️ THE COMMON ROLE, and the reason the split above exists. Most people
          in most workspaces only ever take things. */
@@ -6328,9 +6820,15 @@ const manifest = (): AppSpec => defineApp({
       user: [
         "product:read", "location:read", "stock:read", "stock:move",
         "process:read", "process:run",
+        /* ⚠️ READS ORDERS, DOES NOT PLACE THEM — the separation the permission's
+           own header argues for, in the role most people hold. Somebody on the
+           floor needs to know what is coming; committing the workspace to pay
+           for it is a different job. */
+        "order:read",
       ],
       viewer: [
         "product:read", "location:read", "stock:read", "ledger:read", "process:read",
+        "order:read",
       ],
     },
     /*
@@ -6457,7 +6955,7 @@ const manifest = (): AppSpec => defineApp({
 
   collections: [
     product, supplier, code, location, batch, unit, kit, process, processItem, job,
-    count, tally, stock, ledger, shot, tag, tagging, sourcing,
+    count, tally, stock, ledger, shot, tag, tagging, sourcing, buying, buyingLine,
   ],
   operations: [
     resembling, register,
@@ -6467,6 +6965,8 @@ const manifest = (): AppSpec => defineApp({
     assemble, putIn, takeOut, checking, build, breakUp,
     identify, readLabel, seeProduct, readNote, askInWords,
     openRun, loadRun, endRun, releaseRun, failRun, recallRun, liftHold, lateResult,
+    openOrder, addLine, dropLine, placeOrder, receiveLine, closeOrder, cancelOrder,
+    orderLines,
     openJob, closeJob, traceJob,
     labelPlaces, labelThings, shelf, report, history, seeImport, doImport,
   ],
@@ -6550,6 +7050,25 @@ const manifest = (): AppSpec => defineApp({
        so a verdict stored on the run would make those two the same row. */
     { id: "in-this-run", of: "process-item",
       where: [{ field: "process", is: { here: "record" } }] },
+    /* ⚠️ EVERY SUPPLIER A WORKSPACE BUYS FROM — the collection `product.register`
+       has been writing into since OI-14 with nothing reading it back. */
+    { id: "suppliers", of: "supplier", limit: 200, sort: { by: "name", dir: "up" } },
+    /* ⚠️ WHAT THIS ONE SUPPLIES, WHICH IS WHAT `sourcing` IS FOR. The register
+       flow asks who supplies a product and writes the row; until this view
+       nothing ever showed one. */
+    { id: "supplies-this", of: "sourcing",
+      where: [{ field: "supplier", is: { here: "record" } }] },
+    /* ⚠️ NEWEST FIRST, WHICH PUTS WHAT IS STILL COMING AT THE TOP — an order
+       nobody has received against is the one somebody is chasing. */
+    { id: "orders", of: "buying", limit: 50, sort: { by: "raised", dir: "down" } },
+    /* ⚠️ THIS SUPPLIER'S OWN, on their page, because "have we ordered from them
+       before" is the question somebody opens a supplier to answer. */
+    { id: "orders-with", of: "buying",
+      where: [{ field: "supplier", is: { here: "record" } }],
+      sort: { by: "raised", dir: "down" } },
+    /* ⚠️ ASKED, BECAUSE THE ROW IS A SENTENCE — see `buying.lines`. */
+    { id: "on-this-order", of: "buying-line",
+      asked: { operation: "buying.lines", take: "items", fills: { buying: "record" } } },
     /*
       ⚠️ ASKED, BECAUSE THIS SCREEN'S SUBJECT IS ARITHMETIC AND A `Match` IS
       EQUALITY — see `ViewSpec.asked`. When a delivery runs out is the earliest
@@ -6769,7 +7288,7 @@ const manifest = (): AppSpec => defineApp({
           {
             group: null,
             wide: true,
-            of: [{ block: "QuickActions", leads: ["add-a-product"] }],
+            of: [{ block: "QuickActions", leads: ["add-a-product", "orders"] }],
           },
           /*
             ⚠️ RECEIVING IS A ROW ON HOME AND NOT A SCREEN BEHIND A CHIP, and the
@@ -7175,6 +7694,18 @@ const manifest = (): AppSpec => defineApp({
             */
             group: "What to buy",
             of: [{
+              /* ⚠️ THE LIST BELOW IS THE DECISION AND THIS IS THE ACT. Working
+                 out what to order and having nowhere to record that you did is
+                 what made this screen a calculator; the row is here rather than
+                 on Home because this is where somebody has just decided. */
+              block: "NavRow",
+              goes: "orders",
+              bind: {
+                label: { from: { of: "words", says: "Orders" } },
+                under: { from: { of: "words",
+                  says: "Put what is short on an order, and book the van in" } },
+              },
+            }, {
               block: "Listing",
               shows: [
                 { field: "name", label: "Product" },
@@ -8455,6 +8986,384 @@ const manifest = (): AppSpec => defineApp({
       grants — so the person on the floor who moves stock all day cannot paste a
       spreadsheet over it.
     */
+    /*
+      WHAT HAS BEEN ORDERED, AND WHAT IS STILL COMING.
+
+      ⚠️ THIS IS THE OTHER HALF OF `/report`. That screen has computed what to
+      buy — the product, the quantity, the reason and who to ring — since OI-C,
+      and there was nothing to press: somebody wrote the list out somewhere else
+      and whatever happened next was invisible to the product that worked it out.
+      A stockroom that can tell you what to order and cannot record that you did
+      is a calculator, not a system.
+
+      ⚠️ NOT A DESTINATION, AND THAT IS THE BAR'S RULE RATHER THAN A JUDGEMENT
+      ABOUT IMPORTANCE. Five is the ceiling and it is full; this is reached from
+      the two places somebody arrives at it from — the shortcut row on Home,
+      because ordering is a morning job, and the buy list on Reports, because
+      that is where the decision to order is made.
+    */
+    { id: "orders", route: "/orders", label: "Orders", nav: "none", icon: "box",
+      permission: "order:read",
+      body: {
+        shape: "list",
+        layout: { as: "stack" },
+        blocks: [{
+          group: null,
+          of: [{
+            /* ⚠️ `order:write` RATHER THAN `order:read`, so the row is simply
+               absent for somebody who may see what is coming and not commit the
+               workspace to paying for it — see the permission's own header. */
+            block: "ActionRow",
+            does: [{ op: "buying.open", fills: { today: "today" } }],
+            bind: {
+              icon: { from: { of: "words", says: "add" } },
+              label: { from: { of: "words", says: "Start an order" } },
+              under: { from: { of: "words",
+                says: "Pick who it is going to, then put products on it" } },
+            },
+          }],
+        }, {
+          group: null,
+          of: [{
+            block: "NavRow",
+            goes: "suppliers",
+            bind: {
+              label: { from: { of: "words", says: "Suppliers" } },
+              under: { from: { of: "words",
+                says: "Who you buy from, and what each of them supplies" } },
+            },
+          }],
+        }, {
+          block: "Listing",
+          shows: [
+            { field: "supplier.name", label: "Supplier" },
+            { field: "state", label: "Standing" },
+            { field: "raised", label: "Started", as: "when" },
+          ],
+          goes: "order",
+          nothing: {
+            says: "Nothing on order",
+            under: "Reports works out what to buy — start an order from there or here",
+          },
+          bind: {
+            label: { from: { of: "words", says: "Orders" } },
+            of: { from: { of: "view", view: "orders" } },
+          },
+        }],
+      } },
+    /*
+      ONE ORDER: WHAT WAS ASKED FOR, WHAT HAS COME, AND WHAT IS LEFT TO DO.
+
+      ⚠️ EVERY ACT IS `when`-GATED ON THE STANDING AND THAT MIRRORS `refuseOrder`
+      RATHER THAN RESTATING IT. The handler refuses regardless — raising a placed
+      line is the tempting one, and it fails at the door — so what the condition
+      buys is that nobody is offered a control whose only outcome is a refusal.
+      Both are read from the same five words.
+
+      ⚠️ AND RECEIVING IS `stock:move` WHILE EVERYTHING ELSE IS `order:write`.
+      That is the separation the permission argues for, drawn: the person on the
+      floor books the van in, and committing the workspace to the next one is a
+      different job with a different grant.
+    */
+    { id: "order", route: "/order", label: "Order", nav: "none", icon: "box",
+      permission: "order:read", of: "buying",
+      body: {
+        shape: "detail",
+        layout: { as: "stack" },
+        hero: {
+          as: "figure",
+          nothing: { says: "Nothing on it yet", under: "Put a product on it and it will be here" },
+          bind: {
+            value: { from: { of: "count", view: "on-this-order" } },
+            of: { from: { of: "words", says: "Products on it" } },
+            fresh: { from: { of: "field", field: "raised" }, as: "when" },
+            mark: { from: { of: "words", says: "box" } },
+          },
+        },
+        blocks: [
+          {
+            block: "Listing",
+            /* ⚠️ ORDERED AND ARRIVED SIDE BY SIDE, because the gap between them
+               is the only thing anybody opens this screen to read. A list
+               showing one of the two is a list somebody has to do arithmetic
+               against while holding a telephone. */
+            shows: [
+              { field: "name", label: "Product" },
+              { field: "says", label: "How it stands" },
+              { field: "left", label: "To come", as: "num" },
+            ],
+            nothing: {
+              says: "Nothing on it yet",
+              under: "Put a product on it, then place the order",
+            },
+            bind: {
+              label: { from: { of: "words", says: "What was asked for" } },
+              of: { from: { of: "view", view: "on-this-order" } },
+            },
+          },
+          {
+            group: "While it is being written",
+            when: { is: { of: "field", field: "state" }, one: ["draft"] },
+            of: [
+              {
+                block: "ActionRow",
+                does: [{ op: "buying.add", fills: { buying: "record" } }],
+                bind: {
+                  icon: { from: { of: "words", says: "add" } },
+                  label: { from: { of: "words", says: "Put a product on it" } },
+                  under: { from: { of: "words",
+                    says: "The same product twice raises the line rather than making a second" } },
+                },
+              },
+              {
+                block: "ActionRow",
+                does: [{ op: "buying.drop", fills: { buying: "record" } }],
+                bind: {
+                  icon: { from: { of: "words", says: "edit" } },
+                  label: { from: { of: "words", says: "Take one off" } },
+                  under: { from: { of: "words", says: "While the order is still a draft" } },
+                },
+              },
+              {
+                block: "ActionRow",
+                does: [{ op: "buying.place", fills: { buying: "record" } }],
+                bind: {
+                  icon: { from: { of: "words", says: "check" } },
+                  label: { from: { of: "words", says: "Place it" } },
+                  /* ⚠️ THE CONSEQUENCE IS SAID BEFORE THE PRESS, because it is
+                     the one act here that cannot be undone by editing. */
+                  under: { from: { of: "words",
+                    says: "What it asks for is fixed from then on" } },
+                },
+              },
+            ],
+          },
+          {
+            group: "While it is coming",
+            when: { is: { of: "field", field: "state" }, one: ["placed", "part"] },
+            of: [
+              {
+                block: "ActionRow",
+                does: [{
+                  op: "buying.receive",
+                  fills: { buying: "record", day: "today", capture: { says: "typed" } },
+                }],
+                bind: {
+                  icon: { from: { of: "words", says: "box" } },
+                  label: { from: { of: "words", says: "Some of it arrived" } },
+                  under: { from: { of: "words",
+                    says: "Say what came and where it went — it goes on the shelf" } },
+                },
+              },
+              {
+                block: "ActionRow",
+                does: [{ op: "buying.close", fills: { buying: "record" } }],
+                bind: {
+                  icon: { from: { of: "words", says: "check" } },
+                  label: { from: { of: "words", says: "Close it" } },
+                  /* ⚠️ SHORT IS THE ORDINARY CASE AND THE COPY SAYS SO — see
+                     `refuseOrder`. A supplier who sends eight of ten and will
+                     never send the rest leaves an order that is finished. */
+                  under: { from: { of: "words",
+                    says: "Nothing more is coming, whether or not it all arrived" } },
+                },
+              },
+            ],
+          },
+          {
+            /* ⚠️ CANCELLING IS REACHED FROM `draft` AND `placed` AND NOWHERE
+               ELSE — see `refuseOrder`. Cancelling an order half of which is on
+               the shelf would erase the record of why that stock is there, and
+               the refusal names the way out rather than only saying no. */
+            group: "It is not going to happen",
+            when: { is: { of: "field", field: "state" }, one: ["draft", "placed"] },
+            of: [{
+              block: "ActionRow",
+              does: [{ op: "buying.cancel", fills: { buying: "record" } }],
+              bind: {
+                icon: { from: { of: "words", says: "alert" } },
+                label: { from: { of: "words", says: "Cancel it" } },
+                under: { from: { of: "words",
+                  says: "The record stays — a cancelled order is a decision, not a gap" } },
+              },
+            }],
+          },
+          {
+            group: "What it is",
+            of: [
+              /* ⚠️ THE STANDING IS SAID HERE BECAUSE IT IS THE ONLY THING ALWAYS
+                 DRAWN. Every act group above is `when`-gated, so a closed order
+                 has none of them — and a page stating where it stood only
+                 through which controls it happened to offer would say nothing
+                 about the orders somebody opens a year later. */
+              { block: "FieldRow",
+                bind: {
+                  label: { from: { of: "words", says: "Standing" } },
+                  value: { from: { of: "field", field: "state" } },
+                } },
+              { block: "FieldRow",
+                bind: {
+                  label: { from: { of: "words", says: "Supplier" } },
+                  value: { from: { of: "field", field: "supplier.name" } },
+                } },
+              { block: "FieldRow",
+                when: { has: { of: "field", field: "ref" } },
+                bind: {
+                  label: { from: { of: "words", says: "Their order number" } },
+                  value: { from: { of: "field", field: "ref" } },
+                } },
+              { block: "FieldRow",
+                when: { has: { of: "field", field: "due" } },
+                bind: {
+                  label: { from: { of: "words", says: "Expected" } },
+                  value: { from: { of: "field", field: "due" }, as: "when" },
+                } },
+              { block: "FieldRow",
+                when: { has: { of: "field", field: "note" } },
+                bind: {
+                  label: { from: { of: "words", says: "Note" } },
+                  value: { from: { of: "field", field: "note" } },
+                } },
+            ],
+          },
+        ],
+      } },
+    /*
+      WHO A WORKSPACE BUYS FROM.
+
+      ⚠️ `supplier` HAS BEEN WRITTEN SINCE OI-14 AND READ BY NOTHING. The register
+      flow asks who supplies a product, the handler writes the row and the
+      `sourcing` link, and no screen ever showed either back — so the honest
+      description of that step was that it asked somebody to do work and
+      discarded it politely. This is what the reach guard's collection pass found
+      the day it was widened.
+    */
+    { id: "suppliers", route: "/suppliers", label: "Suppliers", nav: "none", icon: "workspace",
+      permission: "order:read",
+      body: {
+        shape: "list",
+        layout: { as: "stack" },
+        blocks: [{
+          block: "Listing",
+          shows: [
+            { field: "name", label: "Name" },
+            { field: "contact", label: "Who to ask for" },
+            { field: "leadDays", label: "Takes", as: "num" },
+          ],
+          goes: "supplier",
+          nothing: {
+            says: "Nobody yet",
+            under: "Adding a product asks who supplies it, and they land here",
+          },
+          bind: {
+            label: { from: { of: "words", says: "Suppliers" } },
+            of: { from: { of: "view", view: "suppliers" } },
+          },
+        }],
+      } },
+    /*
+      ONE SUPPLIER: how to reach them, what they supply, and what has been asked
+      of them.
+
+      ⚠️ THE THREE ARE ONE PAGE BECAUSE THEY ARE ONE QUESTION. Somebody opens a
+      supplier while holding a telephone: who do I ask for, what do we buy from
+      them, and what is outstanding. Split across three screens it is the same
+      information and three taps.
+    */
+    { id: "supplier", route: "/supplier", label: "Supplier", nav: "none", icon: "workspace",
+      permission: "order:read", of: "supplier",
+      body: {
+        shape: "detail",
+        layout: { as: "stack" },
+        blocks: [
+          {
+            group: "How to reach them",
+            of: [
+              { block: "FieldRow",
+                when: { has: { of: "field", field: "contact" } },
+                bind: {
+                  label: { from: { of: "words", says: "Who to ask for" } },
+                  value: { from: { of: "field", field: "contact" } },
+                } },
+              { block: "FieldRow",
+                when: { has: { of: "field", field: "email" } },
+                bind: {
+                  label: { from: { of: "words", says: "Email" } },
+                  value: { from: { of: "field", field: "email" } },
+                } },
+              { block: "FieldRow",
+                when: { has: { of: "field", field: "phone" } },
+                bind: {
+                  label: { from: { of: "words", says: "Phone" } },
+                  value: { from: { of: "field", field: "phone" } },
+                } },
+              /* ⚠️ WHAT THEY CALL US, which is the one thing on this page nobody
+                 can look up and everybody is asked for on the telephone. */
+              { block: "FieldRow",
+                when: { has: { of: "field", field: "account" } },
+                bind: {
+                  label: { from: { of: "words", says: "Our account" } },
+                  value: { from: { of: "field", field: "account" } },
+                } },
+              /* ⚠️ THE LABEL CARRIES THE UNIT, because the value cannot. "A
+                 delivery takes / 5" is a number with no idea what it counts;
+                 the row has one slot for a word and this is it. */
+              { block: "FieldRow",
+                when: { has: { of: "field", field: "leadDays" } },
+                bind: {
+                  label: { from: { of: "words", says: "Days a delivery takes" } },
+                  value: { from: { of: "field", field: "leadDays" }, as: "num" },
+                } },
+            ],
+          },
+          {
+            block: "Listing",
+            /* ⚠️ THEIR REFERENCE IS THE COLUMN THAT EARNS ITS PLACE. Ours is on
+               the product page; theirs is what goes on the order and is almost
+               never what this workspace calls it. */
+            /* ⚠️ TWO COLUMNS, NOT THREE. The supplier's own lead time is in the
+               header above; a per-product one at the end of a row folds to a
+               bare number that reads as a quantity. What earns the end slot is
+               the reference, which is the thing somebody reads out loud. */
+            shows: [
+              { field: "product.name", label: "Product" },
+              { field: "ref", label: "Their reference" },
+            ],
+            goes: { to: "product", by: "product" },
+            nothing: {
+              says: "Nothing recorded yet",
+              under: "Adding a product asks who supplies it",
+            },
+            bind: {
+              label: { from: { of: "words", says: "What they supply" } },
+              of: { from: { of: "view", view: "supplies-this" } },
+            },
+          },
+          {
+            block: "Listing",
+            /* ⚠️ THE STANDING LEADS BECAUSE IT IS THE ONLY COLUMN EVERY ROW
+               HAS. A draft has no order number and the day cannot lead — the
+               leading column is the row's name when the list folds, and a name
+               has to be text, so a `when` there would draw the stored string.
+               What somebody scans a supplier's orders for is which are still
+               out, which is the standing anyway. */
+            shows: [
+              { field: "state", label: "Standing" },
+              { field: "raised", label: "Started", as: "when" },
+              { field: "ref", label: "Their order number" },
+            ],
+            goes: "order",
+            nothing: {
+              says: "Nothing ordered from them yet",
+              under: "Start an order and it will be here",
+            },
+            bind: {
+              label: { from: { of: "words", says: "Orders with them" } },
+              of: { from: { of: "view", view: "orders-with" } },
+            },
+          },
+        ],
+      } },
     { id: "import", route: "/import", label: "Bring in a spreadsheet",
       nav: "none", icon: "add", permission: "stock:adjust", tone: "neutral",
       story: {
@@ -8797,6 +9706,29 @@ const manifest = (): AppSpec => defineApp({
       status: 409, retryable: false, tone: "warning",
       title: "Not at this point in the run",
       detail: "{why}.",
+    },
+    /*
+      ⚠️ THE SAME SHAPE ONE RAIL OVER, AND IT IS A SEPARATE ENTRY BECAUSE THE
+      HEADING IS THE HALF SOMEBODY READS. "Not at this point in the run" over a
+      refused delivery is a sentence about a machine, on a screen about a van.
+    */
+    "inventory.wrongOrder": {
+      status: 409, retryable: false, tone: "warning",
+      title: "Not at this point in the order",
+      detail: "{why}.",
+    },
+    /*
+      ⚠️ ITS OWN ENTRY BECAUSE THE SENTENCE IS THE POINT. `settled([])` is true,
+      so an order placed with nothing on it closes itself on the first delivery
+      against a line that does not exist — or sits on the list of what is coming
+      for ever, promising a supplier nothing. Refused through
+      `platform.invalid` it read "check the highlighted fields" with nothing
+      highlighted, which is a refusal nobody can act on.
+    */
+    "inventory.emptyOrder": {
+      status: 409, retryable: false, tone: "warning",
+      title: "There is nothing on this order yet",
+      detail: "Put a product on it before placing it.",
     },
     /*
       ⚠️ A LATE RESULT THAT CONTRADICTS AN EARLIER ONE IS REFUSED, NEVER APPLIED,
