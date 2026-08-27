@@ -61,4 +61,5 @@ export async function harness(entry: string = ENTRY): Promise<string> {
 export const MOUNT = {
   opening: ENTRY,
   confirm: join(HERE, "confirm.mount.tsx"),
+  aside: join(HERE, "aside.mount.tsx"),
 } as const;

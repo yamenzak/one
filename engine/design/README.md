@@ -168,12 +168,12 @@ part that is not. Refresh with `node engine/scripts/docs.test.mjs --write`.
 | `tokens/` | colour, type, spacing, motion, the chrome and hem rules | 94 |
 | `scene/` | the ambience engine — families, marks, the world behind a screen | 1 |
 | `frame/` | page, shape, crown, nav, dock, overlays — what wraps a screen | 72 |
-| `parts/` | rows, cards, lists, controls, the four outcomes | 225 |
+| `parts/` | rows, cards, lists, controls, the four outcomes | 228 |
 | `rendered/` | whole surfaces drawn from a kernel declaration | 47 |
 | `chart/` | the data vocabulary — a number as a shape | 45 |
 | `measure/` | what a screen actually lays out, in a real browser — the harness every app sweeps its own screens with | 1 |
 
-**485 exports.** Every one is reachable as `import { … } from "@engine/design"`;
+**488 exports.** Every one is reachable as `import { … } from "@engine/design"`;
 there is no deep import, and a guard says so.
 
 ### `tokens/`
@@ -208,6 +208,7 @@ there is no deep import, and a guard says so.
 ### `parts/`
 
 - `parts/arrange.tsx` — `Arranged`, `Center`, `Cluster`, `Columns`, `Grid`, `Rail`, `Row`, `Spacer`, `spanning`, `Stack`, `Wide`
+- `parts/aside.tsx` — `PutAside`, `PutAsideProps`, `SAYS`
 - `parts/attach.tsx` — `Attach`, `Attached`, `AttachedRow`, `AttachProps`, `Progress`, `roomFor`, `Sending`
 - `parts/banner.tsx` — `Banner`, `BannerProps`
 - `parts/bars.tsx` — `Bars`, `Bars`, `barsFor`, `BarsProps`, `checksIn`, `CodeKind`, `kindOf`, `SAYS_KIND`

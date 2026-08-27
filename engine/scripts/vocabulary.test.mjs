@@ -221,6 +221,12 @@ const WHY = {
   chrome: [
     "Shell", "Crown", "PageCrown", "Glyph", "Island", "LeaveChip", "Menu", "NoticeHost",
     "Mark", "AsideRoute", "LegalLine", "Renewal", "Story", "Lockup", "Opening", "Beep",
+    /* ⚠️ THE SHEET THAT ASKS BEFORE A RECORD LEAVES — see `PutAside`. It is an
+       INTERRUPTION rather than a block: it is spawned over whatever is on screen
+       and owns the whole viewport while it is open, which is the same reason
+       `Confirm` and `Menu` are here. A declaration that could place one would be
+       a body that draws a modal in a grid cell. */
+    "PutAside",
   ],
   /*
     A CONTROL — it holds an answer somebody has not saved yet. That is a story's

@@ -19,6 +19,7 @@ export * from "./parts/beside.js";
 export * from "./parts/gated.js";
 export * from "./frame/runtime.js";
 export * from "./parts/surfaces.js";
+export * from "./parts/aside.js";
 export * from "./parts/bars.js";
 export * from "./parts/feedback.js";
 export * from "./parts/pick-file.js";
