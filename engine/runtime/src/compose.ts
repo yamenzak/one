@@ -28,7 +28,7 @@ import {
 import { tableFor } from "@engine/kernel";
 import type { Db } from "./sql.js";
 import {
-  MOST_ROWS, drop, list, patch, put, readOne, type VaultSeam, type WriteRefusal,
+  MOST_ROWS, list, patch, put, readOne, setAside, type VaultSeam, type WriteRefusal,
 } from "./records.js";
 import { reachingBy } from "./reach.js";
 import { memberOps } from "./member-ops.js";
@@ -42,6 +42,7 @@ import { searchOps } from "./search-ops.js";
 import { totalsOps } from "./totals-ops.js";
 import { noteGone, noteWritten } from "./search.js";
 import { centreOps } from "./centre-ops.js";
+import { binOps } from "./bin-ops.js";
 import { progressOps } from "./progress.js";
 
 /* ------------------------------------------------------------------ shape --- */
@@ -372,11 +373,27 @@ function refuse(
         return done;
       }
       case "delete": {
-        /* ⚠️ ONE STATEMENT, SCOPED AND REACHED IN ITS OWN `WHERE` — see `drop`.
-           A read to check ownership followed by a delete leaves a window between
-           them, and it was the one verb whose statement carried the scope and
-           not the reach. */
-        if (!await drop(ctx.db, spec, scope, String(input.id ?? ""), reaching)) {
+        /*
+          ⚠️ IT GOES IN THE BIN, IT IS NOT DESTROYED — see `Aside`. Somebody
+          presses this on the wrong row of a list at eleven at night; a hard
+          `DELETE` makes that unrecoverable from anywhere except a backup nobody
+          has ever restored. The record leaves every list in the product and
+          there are thirty days in which it can be brought back.
+
+          ⚠️ AND THE VERB KEEPS ITS NAME. Renaming it `bin` would make every
+          screen, every agent and every offline queue that calls `x.delete`
+          wrong at once — to rename a thing whose PURPOSE is unchanged. A person
+          pressing delete means "get this out of my way", and where the row
+          physically sits between now and the sweep is not their business.
+
+          ⚠️ ONE STATEMENT, SCOPED AND REACHED IN ITS OWN `WHERE` — see
+          `setAside`. A read to check ownership followed by a write leaves a
+          window between them, and this was the one verb whose statement carried
+          the scope and not the reach.
+        */
+        if (!await setAside(
+          ctx.db, spec, scope, String(input.id ?? ""), "binned", new Date(ctx.now), reaching,
+        )) {
           ctx.fail("platform.not_found");
         }
         /* ⚠️ MARKED GONE, NOT FORGOTTEN. The ledger row is the only handle on the
@@ -484,6 +501,12 @@ export function compose(app: AppSpec): Composed {
      query, which reads as a broken search rather than an absent one. */
   for (const [id, resolved] of Object.entries(searchOps(app))) byId.set(id, resolved);
   for (const [id, resolved] of Object.entries(centreOps(app))) byId.set(id, resolved);
+  /* ⚠️ ONLY WHERE THERE IS A COLLECTION TO BIN ANYTHING FROM — see `binOps`. An
+     app whose whole surface is hand-written operations has no generated delete,
+     so a trash over it would be a screen that is empty for ever. */
+  if (app.collections.length) {
+    for (const [id, resolved] of Object.entries(binOps(app))) byId.set(id, resolved);
+  }
   /* ⚠️ ONLY WHERE THERE IS A CHECKLIST OR SOMETHING TO CONGRATULATE. An app
      declaring neither would answer two routes about a guide it does not have —
      an empty checklist reads as one that is broken rather than absent. */

@@ -257,6 +257,7 @@ if (what === "guards") {
     ["move", "a workspace's records change shard — the only way its jurisdiction can"],
     ["renewal", "what this deployment is serving, so a tab running an old build finds out"],
     ["media-ops", "upload, list, fetch and delete — generated for any app with a media field"],
+    ["bin-ops", "the trash: what is in it, putting a record back, and freezing one — one set of routes across every collection"],
     ["resources", "wanted → created → bound → live → draining → gone, and the reaper"],
   ];
 

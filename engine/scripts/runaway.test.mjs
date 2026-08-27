@@ -404,6 +404,15 @@ const ALL = [
       [1, "the products a workspace has switched on — the deployment's own catalogue"]],
     ["runtime/src/operator.ts",
       [2, "the workspaces one account belongs to, and the deployment's product list"]],
+    /* ⚠️ ONE PER COLLECTION THE APP DECLARES, WHICH IS A NUMBER IN THE MANIFEST
+       — see `binnedIn`. The trash is one place across every collection, and
+       finding what is in it is one query per table; that count is fixed at
+       build time, so it cannot grow with a workspace's data. The alternative is
+       a second table written on every delete, which is a copy that has to be
+       kept in step with the row it points at through restore, freeze, edit and
+       erasure. */
+    ["runtime/src/bin-ops.ts",
+      [1, "the collections one app declares — the trash is one place across all of them"]],
     ["runtime/src/packages.ts", [1, "the packages one app declares"]],
     ["runtime/src/personal.ts", [2, "the workspaces one person belongs to"]],
     ["runtime/src/push.ts", [1, "the devices one person has registered"]],

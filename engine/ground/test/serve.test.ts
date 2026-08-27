@@ -159,6 +159,12 @@ describe("what the manifest produced", () => {
       /* ⚠️ The icon is its own operation, not a field on `brand.write` — it is
          bytes rather than JSON, and folding it in would mean every colour change
          re-uploading the picture. */
+      /* ⚠️ THE TRASH IS THE PLATFORM'S, AND THREE ROUTES FOR THE WHOLE APP — see
+         `binOps`. Per collection this would be sixty on a product with twenty,
+         and the screen would still have to fan out to find what is in there. */
+      "POST /api/bin.freeze",
+      "GET /api/bin.list",
+      "POST /api/bin.restore",
       "POST /api/brand.icon",
       "GET /api/brand.read",
       "POST /api/brand.write",

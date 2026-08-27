@@ -416,7 +416,7 @@ and a manifest that does not compose refuses to boot.
 | `present` | how a date, a number, a price and a measurement are written for one reader | 18 | — |
 | `infra` | what a product needs underneath it, and what each kind can promise | 11 | — |
 | `field` | what a value is: its kind, its bounds, what it holds, whether it is the app's to keep | 9 | — |
-| `collection` | what a thing an app keeps is — and the six operations it gets for free | 18 | — |
+| `collection` | what a thing an app keeps is — and the six operations it gets for free | 19 | — |
 | `operation` | one declaration carrying every cross-cutting concern (D12) | 12 | — |
 | `access` | permissions, roles, and what an app may never claim | 15 | — |
 | `reach` | how far one person works inside a workspace — where, as against what (D45) | 4 | — |
@@ -445,7 +445,7 @@ and a manifest that does not compose refuses to boot.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**319 of them**, 318 reached by something today.
+**320 of them**, 319 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -516,7 +516,7 @@ env or a binding.
 | `installable` | the manifest and the icon a workspace is installed as | 6 | — |
 | `platform-schema` | the platform's own tables, in dependency order, listed once | 2 | — |
 | `dispatch` | an event an operation raises becomes a note in somebody's inbox | 1 | — |
-| `sweep` | the daily clock: erase what is past the ladder's last rung | 11 | — |
+| `sweep` | the daily clock: erase what is past the ladder's last rung | 12 | — |
 | `vault-ops` | consent, grants, who looked, the processing record, export and erasure | 1 | — |
 | `dossier` | everything we hold about one person, and everything of theirs we delete | 8 | — |
 | `legal` | who agreed to what version, and the wall until they have | 6 | — |
@@ -525,9 +525,10 @@ env or a binding.
 | `move` | a workspace's records change shard — the only way its jurisdiction can | 9 | — |
 | `renewal` | what this deployment is serving, so a tab running an old build finds out | 3 | — |
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 1 | — |
+| `bin-ops` | the trash: what is in it, putting a record back, and freezing one — one set of routes across every collection | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 9 | — |
 
-**471 of them**, 470 reached by something today.
+**474 of them**, 473 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 

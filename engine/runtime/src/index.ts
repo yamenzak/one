@@ -29,6 +29,7 @@ export * from "./reconcile.js";
 export * from "./search.js";
 export * from "./vault.js";
 export * from "./records.js";
+export * from "./bin-ops.js";
 export * from "./handles.js";
 export * from "./compose.js";
 export * from "./deployment.js";

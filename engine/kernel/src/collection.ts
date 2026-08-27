@@ -108,6 +108,43 @@ export type CrudVerb = "list" | "read" | "create" | "update" | "delete";
 
 export const CRUD: readonly CrudVerb[] = ["list", "read", "create", "update", "delete"];
 
+/* ------------------------------------------------------------------ aside --- */
+
+/**
+ * A RECORD PUT ASIDE, AND THE TWO WAYS THAT HAPPENS.
+ *
+ * ⚠️ `delete` DOES NOT DESTROY, AND THAT IS THE WHOLE FEATURE. Somebody presses
+ * it on the wrong row of a list at eleven at night; a hard `DELETE` makes that
+ * unrecoverable from anywhere except a backup nobody has ever restored. A
+ * record goes ASIDE, and there are thirty days in which pressing the other
+ * button undoes it.
+ *
+ * ⚠️ `frozen` AND `binned` ARE NOT DEGREES OF THE SAME THING. A binned record is
+ * ON ITS WAY OUT: nothing should reach it, and it is destroyed on a schedule. A
+ * frozen one is STAYING and is out of the way — a product a workshop stopped
+ * buying, whose deliveries, counts and label history all still point at it and
+ * must go on resolving. Collapsed into one flag, either the trash never empties
+ * or a discontinued product takes its own history with it in a month.
+ *
+ * ⚠️ AND IT IS A COLUMN RATHER THAN A SECOND TABLE, WHICH IS THE DECISION WITH A
+ * COST. A separate table would make every existing read correct by construction;
+ * a column means a list that forgets the filter shows deleted records. The
+ * column wins on the other three: restoring is one `UPDATE` rather than a
+ * re-insert that can collide, a reference into the record still resolves for the
+ * thirty days that make restoring worth anything, and erasure is unchanged
+ * because the row never left the table erasure already walks. The filter lives
+ * in `records.ts` and nowhere else.
+ */
+export type Aside = "frozen" | "binned";
+
+/**
+ * ⚠️ HOW LONG THE TRASH HOLDS, AND IT IS NOT A SETTING. A workspace choosing
+ * seven days would be a workspace that can shorten the window it will need on
+ * the one occasion it matters, months before it happens. Thirty is long enough
+ * to survive a holiday and short enough that a bin is not a second database.
+ */
+export const BIN_DAYS = 30;
+
 /**
  * WHAT A PHONE DOES WITH NO SIGNAL.
  *

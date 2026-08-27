@@ -30,7 +30,7 @@
 import type {
   AppSpec, Channel, Instant, JobBook, JobDef, Letter, PackDef, PlanSpec, TenantId,
 } from "@engine/kernel";
-import { UNLIMITED, isSearchable } from "@engine/kernel";
+import { BIN_DAYS, UNLIMITED, isSearchable } from "@engine/kernel";
 
 /* ⚠️ THE SAME DISPATCH A REQUEST USES, aliased because `tell` is already the
    name of the failure route on `SweepDeps` and two things called `tell` in one
@@ -322,6 +322,47 @@ export async function sweepRetention(deps: SweepDeps): Promise<{ touched: number
 }
 
 /**
+ * EMPTY THE TRASH — the other half of `Aside`, and the half that makes it a
+ * promise rather than a place records accumulate.
+ *
+ * ⚠️ `binned` ONLY, NEVER `frozen`. A frozen record has no clock on it, which is
+ * the whole difference between the two; a sweep reading `aside IS NOT NULL`
+ * would destroy a discontinued product on the thirtieth day along with every
+ * reference into it, and the workspace would find out months later.
+ *
+ * ⚠️ IT WALKS THE DECLARATIONS RATHER THAN A LIST, so a collection added today
+ * is swept today. The same shape `sweepRetention` uses one function above, and
+ * for the same reason: a hand-written list of tables is the one that misses one,
+ * silently, while the run reports success.
+ */
+export async function sweepBin(deps: SweepDeps): Promise<{ touched: number; detail: string }> {
+  const now = (deps.now ?? (() => new Date()))();
+  const before = new Date(now.getTime() - BIN_DAYS * 24 * 60 * 60 * 1000).toISOString();
+
+  let deleted = 0;
+  const said: string[] = [];
+
+  for (const db of deps.shards) {
+    for (const make of Object.values(deps.apps)) {
+      for (const spec of make().collections) {
+        /* ⚠️ A missing table is not a failure — a shard legitimately holds only
+           the apps placed on it, and a sweep that threw would stop before the
+           tables that ARE there. */
+        try {
+          const done = await db.prepare(
+            `DELETE FROM ${table(spec.id)} WHERE aside = 'binned' AND aside_at < ?`)
+            .bind(before).run() as { meta?: { changes?: number } };
+          const rows = done?.meta?.changes ?? 0;
+          if (rows) { deleted += rows; said.push(`${spec.id} ${rows}`); }
+        } catch { /* not on this shard */ }
+      }
+    }
+  }
+
+  return { touched: deleted, detail: said.length ? said.join(", ") : "the bin held nothing that old" };
+}
+
+/**
  * ⚠️ EVERY RUN IS RECORDED, SUCCESSES AND FAILURES ALIKE. A job that stops
  * running does not fail — nothing is waiting for its answer, so a throw at 03:00
  * has no user, no request, no 500 and no red test. The console reads the LAST
@@ -377,6 +418,18 @@ export function platformJobs(deps: SweepDeps): JobBook {
     "Enforces every collection's and every purpose's declared retention.",
     () => sweepRetention(deps),
     { destroys: { floorDays: 1 }, budgetSeconds: 120 });
+
+  /*
+    ⚠️ THE TRASH HAS ITS OWN ROW, because "the retention sweep ran" does not
+    answer the question somebody asks after a record they meant to restore was
+    not there. And its floor is the window itself: a deployment that could
+    configure this to a day would be one where the promise on the screen is
+    thirty days and the truth is whatever somebody typed.
+  */
+  at("bin", "Empty the trash",
+    `Destroys what was deleted more than ${BIN_DAYS} days ago.`,
+    () => sweepBin(deps),
+    { destroys: { floorDays: BIN_DAYS }, budgetSeconds: 120 });
 
   /*
     ⚠️ A MOVE IN FLIGHT IS ADVANCED, because nothing else will. The operator

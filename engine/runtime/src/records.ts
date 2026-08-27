@@ -14,7 +14,7 @@
  * a handler will one day forget, and the failure is somebody else's records.
  */
 
-import type { CollectionSpec, Match, Sort, Value } from "@engine/kernel";
+import type { Aside, CollectionSpec, Match, Sort, Value } from "@engine/kernel";
 import { checkAll, checkSome, eraseBy, newId, vaultKeyFor } from "@engine/kernel";
 import { noteScopeGone } from "./search.js";
 import { column, table, type Db } from "./sql.js";
@@ -296,6 +296,21 @@ const within = (
   };
 };
 
+/**
+ * ⚠️ A RECORD PUT ASIDE IS NOT IN ANY LIST — see `Aside`. This clause is the
+ * whole cost of holding the trash as a column rather than a second table, and it
+ * is paid in exactly one file: every generated read goes through `list`,
+ * `countIn` and `countAll` below, so there is one place to remember it and one
+ * place to check.
+ *
+ * ⚠️ AND `readOne` DOES NOT CARRY IT, DELIBERATELY. A record in the bin has to
+ * be openable or it cannot be restored, and a frozen one has to be openable or
+ * every reference into it from live history is a dead link. What the screen does
+ * with a record that says it is aside is the screen's business; refusing to
+ * answer would make the restore path impossible to build.
+ */
+const LIVE = " AND aside IS NULL";
+
 /** ⚠️ Booleans are integers in SQLite and JSON is text. Everything else is itself. */
 const normalise = (value: unknown): unknown => {
   if (typeof value === "boolean") return value ? 1 : 0;
@@ -478,7 +493,7 @@ export async function list(
   const near = within(reaching);
 
   const scoped = erase ? `${column(erase.column)} = ?` : "1 = 1";
-  const where = `${scoped}${filter.sql}${near.sql}`;
+  const where = `${scoped}${filter.sql}${near.sql}${LIVE}`;
   const bound = [...(erase ? [scope] : []), ...filter.bound, ...near.bound];
 
   /* ⚠️ A PIPE, BECAUSE NEITHER HALF CAN CONTAIN ONE. An instant is ISO text and
@@ -560,7 +575,7 @@ export async function countAll(
   const counted = await Promise.all(specs.map((spec) => {
     const erase = eraseBy(spec);
     const near = within(reaching(spec));
-    const where = `${erase ? `${column(erase.column)} = ?` : "1 = 1"}${near.sql}`;
+    const where = `${erase ? `${column(erase.column)} = ?` : "1 = 1"}${near.sql}${LIVE}`;
     return db.prepare(`SELECT COUNT(*) AS n FROM ${table(spec.id)} WHERE ${where}`)
       .bind(...(erase ? [scope(spec)] : []), ...near.bound).first<{ n: number }>();
   }));
@@ -569,26 +584,30 @@ export async function countAll(
 }
 
 /**
- * REMOVE A RECORD, IN THE CALLER'S OWN SCOPE AND INSIDE THEIR REACH.
+ * PUT A RECORD ASIDE, OR BRING IT BACK — see `Aside`.
  *
- * ⚠️ IT LIVES HERE BECAUSE THE OTHER FOUR STATEMENTS DO. Written at the call
- * site it was the one of the five that carried the scope and not the reach — a
- * narrowed member could not read a row at another site and could delete it, on a
- * guessed id, which is the worst of the five to get wrong.
+ * ⚠️ ONE STATEMENT, SCOPED AND REACHED, for the reason `drop` is: a read to
+ * check ownership followed by a write leaves a window between them, and this is
+ * the write that makes a record disappear from every list in the product.
  *
- * ⚠️ AND IT REPORTS WHETHER IT MATCHED. A delete that matched nothing answering
- * 200 says a record was removed when it was somebody else's and is still there.
+ * ⚠️ IT REPORTS WHETHER IT MATCHED. Answering 200 for a row that was somebody
+ * else's says a record was binned when it is still there and still theirs.
+ *
+ * ⚠️ AND `aside_at` IS CLEARED ON THE WAY BACK. Left standing it is a date
+ * saying a live record was deleted a fortnight ago, which is the sentence a
+ * screen would print beside a product somebody is looking at right now.
  */
-export async function drop(
+export async function setAside(
   db: Db, spec: CollectionSpec, scope: string, id: string,
-  reaching: Reaching | null = null,
+  aside: Aside | null, now: Date, reaching: Reaching | null = null,
 ): Promise<boolean> {
   const erase = eraseBy(spec);
   const near = within(reaching);
   const done = await db.prepare(
-    `DELETE FROM ${table(spec.id)} WHERE id = ?${
+    `UPDATE ${table(spec.id)} SET aside = ?, aside_at = ? WHERE id = ?${
       erase ? ` AND ${column(erase.column)} = ?` : ""}${near.sql}`)
-    .bind(id, ...(erase ? [scope] : []), ...near.bound).run();
+    .bind(aside, aside ? now.toISOString() : null, id,
+      ...(erase ? [scope] : []), ...near.bound).run();
   return !!done.meta?.changes;
 }
 

@@ -83,6 +83,19 @@ export function statementsFor(spec: CollectionSpec): readonly string[] {
     `by TEXT`,
     `edited_at TEXT`,
     `edited_by TEXT`,
+    /*
+      ⚠️ AND WHETHER IT IS PUT ASIDE — see `Aside`. `NULL` is live, which is what
+      every row that predates this column already says, so nothing is migrated
+      and nothing has to be: the reconciler adds it by asking the table, and a
+      database from last month boots with every record correctly live.
+
+      ⚠️ TWO COLUMNS, BECAUSE "WHICH" AND "WHEN" ARE BOTH ANSWERS SOMEBODY NEEDS.
+      The bin sweep reads the date; the screen reads the reason; a single column
+      holding `"binned:2026-08-27T…"` would be a string two readers have to
+      agree how to split.
+    */
+    `aside TEXT`,
+    `aside_at TEXT`,
   ];
 
   const out = [`CREATE TABLE IF NOT EXISTS ${name} (${cols.join(", ")});`];
@@ -100,6 +113,7 @@ export const columnsFor = (spec: CollectionSpec): Readonly<Record<string, string
      that predates them, on its next boot, with nothing migrated by hand. */
   const out: Record<string, string> = {
     id: "TEXT", at: "TEXT", by: "TEXT", edited_at: "TEXT", edited_by: "TEXT",
+    aside: "TEXT", aside_at: "TEXT",
   };
   if (scope) out[column(scope.column)] = "TEXT";
   for (const [field, f] of Object.entries(spec.fields)) out[column(field)] = storeFor(f.kind);
