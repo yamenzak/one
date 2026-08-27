@@ -33,7 +33,7 @@ import type {
   Binding, BlockSpec, Fields, Format, GroupSpec, GuideBook, Layout, MilestoneBook, Placed, Presence,
   Raised, Read, SurfaceSpec, Viewed,
 } from "@engine/kernel";
-import { BLOCKS, goOf, isGroup, opOf, reached, remaining } from "@engine/kernel";
+import { BLOCKS, goOf, isGroup, opOf, opensOn, reached, remaining } from "@engine/kernel";
 import { Arranged, spanning } from "../parts/arrange.js";
 import { Group, QuickActions } from "../parts/surfaces.js";
 import { Region, ready, type Loaded } from "../parts/state.js";
@@ -940,6 +940,23 @@ function leadsOn(leads: readonly string[] | undefined, has: Has) {
  */
 const WORN_MOST = 4;
 
+/**
+ * ⚠️ A CONTROL THAT SIZES ITSELF NEEDS A BASIS, AND WITHOUT ONE THIS ROW GAVE IT
+ * ZERO. Every control here fills its box below its own breakpoint and goes
+ * content-sized above it — which is `w-full` on the inside, and `w-full`
+ * contributes NOTHING to a max-content measurement. So as a bare flex item the
+ * wrapper's base size resolved to 0: the segments then overflowed a zero-width
+ * box, wrapped one per line, and the library's `justify-center` centred each of
+ * them on the box's left edge — a period control drawn as a vertical stack
+ * hanging outside the page gutter, with every static check green and both halves
+ * internally correct. Photographed on the first screen ever to declare a `pick`.
+ *
+ * ⚠️ AND IT IS A BASIS RATHER THAN A COLUMN COUNT, so one narrowing fills the
+ * row and three share it, with no breakpoint anywhere — the same rule the tile
+ * grids follow.
+ */
+const NARROWING = "grow basis-64";
+
 function Narrowing({ body, has }: BodyProps) {
   const picks = body.picks ?? [];
   if (!picks.length || !has.onPick) return null;
@@ -958,21 +975,19 @@ function Narrowing({ body, has }: BodyProps) {
            back, and its absence means there was never anywhere to go back to. */
         const all = pick.any ? [{ id: "", label: pick.any }, ...options] : options;
         if (!all.length) return null;
-        const value = has.picked?.[pick.id] ?? all[0]!.id;
+        /* ⚠️ THE DEFAULT IS A DECLARATION, NOT THE HEAD OF THE LIST — see
+           `opensOn`, which is the kernel's one reading of it and is also what the
+           container seeds its held narrowing from. Two answers to "what does this
+           open on" is a control that says one period over another's figures. */
+        const value = has.picked?.[pick.id] ?? opensOn(pick);
         const onChange = (next: string) => has.onPick?.(pick.id, next);
-        return all.length > WORN_MOST
-          ? (
-            <Lookup
-              key={pick.id} label={pick.label} value={value}
-              onChange={onChange} options={all}
-            />
-          )
-          : (
-            <Segmented
-              key={pick.id} label={pick.label} value={value}
-              onChange={onChange} options={all}
-            />
-          );
+        return (
+          <div key={pick.id} className={NARROWING}>
+            {all.length > WORN_MOST
+              ? <Lookup label={pick.label} value={value} onChange={onChange} options={all} />
+              : <Segmented label={pick.label} value={value} onChange={onChange} options={all} />}
+          </div>
+        );
       })}
     </div>
   );

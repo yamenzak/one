@@ -17,8 +17,8 @@ import { describe, expect, it } from "vitest";
 import { collection } from "../src/collection.js";
 import { field } from "../src/field.js";
 import {
-  actsIn, askedOf, blocksIn, editsIn, fieldsIn, fillOf, fillsIn, refuseStory, refuseSurface,
-  refuseView,
+  actsIn, askedOf, blocksIn, editsIn, fieldsIn, fillOf, fillsIn, opensOn, refuseStory,
+  refuseSurface, refuseView,
   saidWhen, stepApplies, unreadViews,
   viewsIn, type ActSpec, type BlockIndex, type SurfaceSpec, type ViewSpec,
 } from "../src/surface.js";
@@ -1175,6 +1175,73 @@ describe("what a screen can be narrowed to", () => {
 
   it("reads a narrowing as a source of its own", () => {
     expect(fillOf({ picked: "span" })).toEqual({ of: "picked", picked: "span" });
+  });
+
+  /*
+    ⚠️ THE DEFAULT AND THE READING ORDER ARE TWO FACTS — see `PickSpec.opens`.
+    Four options or fewer are a segmented control, so the order is what somebody
+    reads left to right; making the first one the default forces a period list
+    that runs 30 · 7 · 90, or a report that opens on the wrong month.
+  */
+  it("accepts a written set that opens on something other than its first", () => {
+    expect(narrowed([{
+      ...SPAN,
+      options: [{ value: "week", label: "7 days" }, { value: "month", label: "30 days" }],
+      opens: "month",
+    }])).toEqual([]);
+  });
+
+  it("refuses opening on an option the set has not got", () => {
+    expect(narrowed([{ ...SPAN, opens: "fortnight" }]))
+      .toContain("pick_opens_unknown");
+  });
+
+  /* ⚠️ AND NOT OVER ROWS, because they are not known here — an unchecked default
+     is a control that opens on a row that may not exist. */
+  it("refuses a default over a collection's rows", () => {
+    expect(narrowed([{ id: "span", label: "Over", of: "note", any: "All", opens: "n1" }]))
+      .toContain("pick_two_ways");
+  });
+
+  /*
+    ⚠️ AND A PICK OVER ROWS MUST OFFER A WAY BACK — see `PickSpec.any`. The rows
+    arrive from the door AFTER the first read has gone out, so without one the
+    control draws its first row as chosen over a screen that was asked for every
+    one of them: a narrowing that never happened, stated as a fact.
+  */
+  it("refuses a pick over rows with no way back to all of them", () => {
+    expect(narrowed([{ id: "span", label: "Over", of: "note" }]))
+      .toContain("pick_rows_without_a_way_back");
+  });
+
+  it("accepts one that offers it", () => {
+    expect(narrowed([{ id: "span", label: "Over", of: "note", any: "Everywhere" }]))
+      .toEqual([]);
+  });
+
+  /*
+    ⚠️ ONE READING, TWO CALLERS — see `opensOn`. The container seeds the first
+    read from it and the renderer draws the chosen segment from it, and the two
+    disagreeing is a control saying "30 days" over a week of figures.
+  */
+  describe("what a narrowing opens on", () => {
+    it("is the first option where nothing says otherwise", () => {
+      expect(opensOn(SPAN)).toBe("week");
+    });
+
+    it("is what the declaration says where it says", () => {
+      expect(opensOn({
+        ...SPAN,
+        options: [{ value: "week", label: "7 days" }, { value: "month", label: "30 days" }],
+        opens: "month",
+      })).toBe("month");
+    });
+
+    /* ⚠️ AND "NOT NARROWED" WINS OVER BOTH, because a list that opens on
+       everything opens on everything — see `PickSpec.any`. */
+    it("is nothing at all where there is a way back to all of them", () => {
+      expect(opensOn({ id: "where", label: "Where", of: "note", any: "Everywhere" })).toBe("");
+    });
   });
 });
 

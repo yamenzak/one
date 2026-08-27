@@ -334,7 +334,7 @@ describe("the figures", () => {
     expect(told.inferred).toBe(10);
     expect(told.share).toBeCloseTo(0.75);
     expect(told.sharePct).toBe(75);
-    expect(told.says).toContain("without anybody scanning it");
+    expect(told.says).toContain("went unscanned");
   });
 });
 

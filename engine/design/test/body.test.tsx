@@ -527,3 +527,71 @@ describe("a row that does something asks the gate first", () => {
     expect(html).toContain("Your plan does not include this");
   });
 });
+
+/* ----------------------------------------------------------- the narrowing --- */
+
+/**
+ * WHAT THE CONTROL ABOVE A SCREEN SAYS IT IS SHOWING.
+ *
+ * ⚠️ AND THAT IS THE WHOLE FAULT THIS EXISTS FOR — a segmented control drawing
+ * one period over figures computed for another. Nothing throws, nothing is
+ * missing, both halves are internally correct, and the screen states a narrowing
+ * that never happened.
+ */
+describe("what a screen says it has been narrowed to", () => {
+  const SPAN = {
+    id: "span",
+    label: "Over",
+    options: [
+      { value: "week", label: "7 days" },
+      { value: "month", label: "30 days" },
+      { value: "quarter", label: "90 days" },
+    ],
+  };
+  const narrowed = (pick: unknown, over: Partial<Has> = {}) => drawn(
+    {
+      shape: "figure",
+      layout: { as: "stack" },
+      picks: [pick as never],
+      blocks: [],
+    },
+    { onPick: () => undefined, ...over },
+  );
+
+  /* ⚠️ WHICH SEGMENT IS CHOSEN, NOT WHICH WORDS ARE ON THE SCREEN. All three
+     labels are drawn whatever happens, so an assertion that the markup CONTAINS
+     "30 days" passes under every mutation this exists to catch. */
+  const chosen = (html: string) =>
+    [...html.matchAll(/data-selected="true"[^>]*>(?:<[^>]*>|<\/[^>]*>)*([^<]+)/g)]
+      .map((m) => m[1]);
+
+  /* ⚠️ THE DECLARED DEFAULT, NOT THE HEAD OF THE LIST — see `PickSpec.opens`.
+     The options are in reading order and the default is a separate decision; a
+     renderer taking the first is why they could not be. */
+  it("opens on what the manifest says, not on the first option", () => {
+    expect(chosen(narrowed({ ...SPAN, opens: "month" }))).toEqual(["30 days"]);
+  });
+
+  /* ⚠️ AND THE FIRST WHERE NOTHING SAYS OTHERWISE, which is the older rule and
+     is still right for a set with one obvious start. */
+  it("opens on the first where the manifest says nothing", () => {
+    expect(chosen(narrowed(SPAN))).toEqual(["7 days"]);
+  });
+
+  /* ⚠️ AND WHAT SOMEBODY CHOSE BEATS BOTH. */
+  it("draws what was picked over what it opens on", () => {
+    expect(chosen(narrowed({ ...SPAN, opens: "month" }, { picked: { span: "quarter" } })))
+      .toEqual(["90 days"]);
+  });
+
+  /* ⚠️ A CONTROL WITH NO HANDLER IS NOT DRAWN AT ALL, because a narrowing that
+     cannot be changed is a label claiming the screen is filtered. */
+  it("draws nothing where nothing can act on it", () => {
+    expect(renderToStaticMarkup(
+      <Body
+        body={{ shape: "figure", layout: { as: "stack" }, picks: [SPAN as never], blocks: [] }}
+        has={has()}
+      />,
+    )).not.toContain("7 days");
+  });
+});

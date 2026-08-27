@@ -25,7 +25,9 @@ import type { ScreenSpec } from "@engine/kernel";
 import { editsIn, meteredIds, namesIn, upFrom } from "@engine/kernel";
 import { inventory } from "../index.js";
 import { INVENTORY_SESSIONS, INVENTORY_SURFACES } from "./index.js";
-import { COUNTS, LINES, PLACES, RUNNING, THINGS } from "./sample.js";
+import {
+  BUYING, COUNTS, DAILY, LEFT, LINES, PLACES, RUNNING, THINGS, TOLD, WRONG,
+} from "./sample.js";
 
 /** ⚠️ Every permission a screen names, so none of them is undrawable here. */
 const EVERYTHING = new Set([
@@ -378,7 +380,25 @@ const SEEN: Has = {
        integer would photograph exactly that. */
     "running-out": rows(RUNNING.map((one) => ({ ...one }))),
     "out-of-date": rows(RUNNING.filter((one) => one.standing === "gone").map((one) => ({ ...one }))),
+    /* ⚠️ FIVE READINGS OF ONE PERIOD, AND THE PERIOD IS THE ONE THE CONTROL
+       BELOW SAYS — see `TOLD`. A board that answered these with a week's numbers
+       under a segmented control reading "30 days" would photograph the exact
+       disagreement `PickSpec.opens` exists to stop. */
+    "recorded": rows(TOLD.map((one) => ({ ...one }))),
+    "what-to-buy": rows(BUYING.map((one) => ({ ...one }))),
+    "what-left": rows(LEFT.map((one) => ({ ...one }))),
+    "what-was-wrong": rows(WRONG.map((one) => ({ ...one }))),
+    "day-by-day": rows(DAILY.map((one) => ({ ...one }))),
   },
+  /*
+    ⚠️ THE NARROWING, HELD RATHER THAN LIVE — see `PickSpec`. A board has no door
+    to re-ask, so what this fixes is which segment is DRAWN, and it has to be the
+    one the numbers above are of. Without it the control falls back to the
+    declaration's own default, which is right today and is a second place for the
+    answer to come from.
+  */
+  picked: { span: "month" },
+  onPick: () => undefined,
 };
 
 /**

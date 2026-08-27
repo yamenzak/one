@@ -15,6 +15,7 @@
 /* ⚠️ THE SAME FUNCTION THE OPERATION USES, NOT A PHRASE TYPED HERE. A fixture
    with its own wording photographs a sentence the product does not say — which
    is the one failure a picture cannot reveal, because it looks correct. */
+import { dayPlus, type Day } from "@engine/kernel";
 import { saysDue } from "../ledger.js";
 
 export type Tracking = "listed" | "counted" | "batched" | "itemised" | "assembled";
@@ -215,3 +216,115 @@ export const RUNNING: readonly Running[] = [
     on: "2026-09-20", by: "made", standing: "soon", days: 24,
     says: saysDue(24, "made") },
 ];
+
+/**
+ * A MONTH OF MOVEMENTS, ADDED UP FOUR WAYS.
+ *
+ * ⚠️ ONE OPERATION'S FIVE ANSWERS, WHICH IS FIVE VIEWS OVER ONE ROW SHAPE EACH —
+ * see `stock.report`. Nothing here is a table: consumption, shrinkage, the
+ * recorded share and what to buy are readings of the same ledger over the same
+ * period, so a fixture built out of `ledger` columns would draw five sets of
+ * correct headings over blank cells.
+ *
+ * ⚠️ AND THE SHARE IS DELIBERATELY NOT FLATTERING. A photograph of 100 %
+ * recorded is a picture of the one workspace this figure has nothing to say
+ * about — the screen exists because the number is usually in the eighties, and
+ * the sentence under it only appears when it is.
+ */
+export interface Told {
+  readonly recorded: number;
+  readonly inferred: number;
+  readonly share: number;
+  readonly sharePct: number;
+  readonly says: string;
+}
+
+export const TOLD: readonly Told[] = [{
+  recorded: 412,
+  inferred: 96,
+  share: 412 / 508,
+  sharePct: 81,
+  /* ⚠️ THE MIDDLE BRANCH OF THE THREE, which is the one a real workspace lands
+     on and the only one that says anything — see `stock.report`. */
+  says: "The rest went unscanned, and a count found it gone",
+}];
+
+/**
+ * ⚠️ SOONEST TO RUN OUT FIRST, AND THE `why` COLUMN IS WHY THAT ORDER IS NOT
+ * "HOW LITTLE IS LEFT" — see `reorder`. The gloves have more on the shelf than
+ * the resin and are still first, because they go through faster and the supplier
+ * takes longer: exactly the row a list sorted by quantity puts at the bottom.
+ */
+export interface Buying {
+  readonly product: string;
+  readonly name: string;
+  readonly onHand: number;
+  readonly order: number;
+  readonly unit: string;
+  readonly says: string;
+}
+
+export const BUYING: readonly Buying[] = [
+  { product: "t-glove", name: "Nitrile gloves, blue", onHand: 260, order: 900,
+    unit: "glove", says: "4 days left · runs out first · Ansell" },
+  { product: "t-paper", name: "A4 paper", onHand: 2, order: 9,
+    unit: "ream", says: "6 days left · runs out first · Viking" },
+  { product: "t-resin", name: "Casting resin, clear", onHand: 4, order: 6,
+    unit: "tin", says: "19 days left · below the line · Smooth-On" },
+  { product: "t-tie", name: "Cable ties, 200 mm", onHand: 1, order: 4,
+    unit: "bag", says: "Not moving · below the line" },
+];
+
+/** ⚠️ Biggest first, which is the only order this list has — see `usageIn`. */
+export interface Left {
+  readonly product: string;
+  readonly name: string;
+  readonly quantity: number;
+}
+
+export const LEFT: readonly Left[] = [
+  { product: "t-glove", name: "Nitrile gloves, blue", quantity: 1_840 },
+  { product: "t-screw", name: "Screws, M4 × 20", quantity: 46 },
+  { product: "t-paper", name: "A4 paper", quantity: 23 },
+  { product: "t-resin", name: "Casting resin, clear", quantity: 11 },
+];
+
+/**
+ * ⚠️ ONE ROW SHORT AND ONE BOTH WAYS, because those are two different findings
+ * and netting them off loses the second entirely — see `lossesIn`. A shelf that
+ * is forty short and thirty-eight over is somebody counting badly; a shelf that
+ * is only ever short is something else.
+ */
+export interface Wrong {
+  readonly product: string;
+  readonly name: string;
+  readonly says: string;
+}
+
+export const WRONG: readonly Wrong[] = [
+  { product: "t-glove", name: "Nitrile gloves, blue", says: "40 short · 38 over" },
+  { product: "t-screw", name: "Screws, M4 × 20", says: "12 short" },
+];
+
+/**
+ * ⚠️ ONE BUCKET PER DAY INCLUDING THE EMPTY ONES — see `dailyIn`. The two flat
+ * stretches are weekends, and they are the reason the gaps have to be in the
+ * data rather than skipped: a line drawn only through the days something
+ * happened makes a quiet fortnight look like a busy one.
+ */
+export interface Ran {
+  readonly day: Day;
+  readonly quantity: number;
+}
+
+export const DAILY: readonly Ran[] = [
+  74, 91, 68, 0, 0, 102, 88, 96, 71, 0, 0, 84, 119, 77, 63, 0, 0,
+  90, 105, 82, 69, 0, 0, 97, 76, 88, 111, 0, 0, 79,
+].map((quantity, i) => ({
+  /* ⚠️ THE DAYS ARE REAL AND CONSECUTIVE, because the chart's x is the POSITION
+     and a fixture with a gap in the dates would still draw an even line — which
+     is a picture that agrees with a bug. `dayPlus` rather than a slice off an
+     instant: a calendar day is not a substring of a timestamp (D7). */
+  day: dayPlus("2026-07-29" as Day, i),
+  quantity,
+}));

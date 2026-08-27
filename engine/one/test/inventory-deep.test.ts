@@ -560,3 +560,104 @@ describe("what the plan opens", () => {
     expect(ids).toContain("products");
   });
 });
+
+/* -------------------------------------------------------------- the report --- */
+
+/**
+ * WHAT A MONTH ADDED UP TO, THROUGH THE SCREEN THAT SHOWS IT.
+ *
+ * ⚠️ THE SCREEN AND NOT THE OPERATION, because everything between them is what
+ * had never run: five asked views over one read, a period fed in from a control,
+ * and the door holding one answer for all five. The operation was already tested
+ * and already right; a report nobody could open is the shape this file exists
+ * to find.
+ */
+describe("what the month added up to", () => {
+  const screen = async (id: string, over: Record<string, string> = {}) => {
+    const query = new URLSearchParams({ today: TODAY, ...over }).toString();
+    const res = await at(`/api/screen/${id}?${query}`, { headers: { cookie } });
+    return {
+      status: res.status,
+      body: await res.json() as {
+        views: Record<string, { items: Record<string, unknown>[]; count: number }>;
+      },
+    };
+  };
+
+  it("answers every reading of the same period from one screen", async () => {
+    const paper = await kindOf("Copier paper", "counted", { par: 4 });
+    const shelf = await placeOf("Stationery");
+    ok(await write("stock.receive", {
+      product: paper, location: shelf, quantity: 10, day: TODAY, capture: "typed",
+    }));
+    ok(await write("stock.take", {
+      product: paper, location: shelf, quantity: 6, day: TODAY, capture: "typed",
+    }));
+    /* ⚠️ A CORRECTION, WHICH IS THE OTHER HALF OF THE RECORDED SHARE. What left
+       with somebody scanning it and what a count found gone are two numbers, and
+       the figure this screen leads with is the ratio between them. Signed, and
+       DOWN: an adjustment is a delta, so `2` here would be two found rather than
+       two missing — see `applyMove`. */
+    ok(await write("stock.adjust", {
+      product: paper, location: shelf, quantity: -2, reason: "counted",
+      day: TODAY, capture: "typed",
+    }));
+
+    const got = await screen("report");
+    expect(got.status).toBe(200);
+    const told = got.body.views["recorded"]?.items[0];
+    expect(told).toBeTruthy();
+    /* ⚠️ SIX TAKEN AND NOTHING FOUND GONE BY A COUNT, so everything that left
+       was scanned out — see `toldIn`, which counts as inferred consumption only
+       what a COUNT found. The correction below is a discrepancy and reads on the
+       list; it is not somebody quietly walking off with two reams. */
+    expect(told?.["recorded"]).toBe(6);
+    expect(told?.["inferred"]).toBe(0);
+    expect(told?.["sharePct"]).toBe(100);
+    expect(String(told?.["says"])).toBe("Everything that left was scanned out");
+
+    /* ⚠️ AND THE OTHER FOUR ARE ANSWERED TOO, which is the half that had no
+       code path at all — `readsIn` walks the hero, the door runs every view a
+       body names, and the report is run once for all five. */
+    expect(got.body.views["what-left"]?.items.length).toBe(1);
+    expect(got.body.views["what-was-wrong"]?.items.length).toBe(1);
+    expect(got.body.views["day-by-day"]?.items.length).toBeGreaterThan(1);
+    /* ⚠️ 2 ON THE SHELF AGAINST A PAR OF 4 AND SIX A MONTH GOING OUT — the one
+       list on this screen somebody acts on. */
+    expect(got.body.views["what-to-buy"]?.items.length).toBe(1);
+  });
+
+  /* ⚠️ THE CONTROL ACTUALLY NARROWS, which is the whole of `PickSpec`: it
+     reaches an asked view's input on the worker, and held in the browser it
+     would move a segment and leave every figure under it exactly where it was. */
+  it("counts a different period when the screen is narrowed to one", async () => {
+    const ink = await kindOf("Ink, black", "counted");
+    const shelf = await placeOf("Print room");
+    ok(await write("stock.receive", {
+      product: ink, location: shelf, quantity: 40, day: TODAY, capture: "typed",
+    }));
+    ok(await write("stock.take", {
+      product: ink, location: shelf, quantity: 9, day: TODAY, capture: "typed",
+    }));
+
+    const week = await screen("report", { "pick.span": "week" });
+    const quarter = await screen("report", { "pick.span": "quarter" });
+    expect(week.body.views["day-by-day"]?.items.length).toBe(7);
+    expect(quarter.body.views["day-by-day"]?.items.length).toBe(90);
+    /* ⚠️ AND THE MOVEMENTS ARE IN BOTH, because today is inside both windows —
+       so what differs is the period and not which rows the narrowing dropped. */
+    expect(week.body.views["what-left"]?.items.length)
+      .toBe(quarter.body.views["what-left"]?.items.length);
+  });
+
+  /* ⚠️ AND `ledger:read` IS WHAT OPENS IT — the common role moves stock and may
+     not read the record of who moved it, which is why this is a screen of its
+     own rather than a group on the home. */
+  it("is not offered to somebody who may not read the history", () => {
+    const roles = inventory().access.roles;
+    expect(roles["keeper"]).toContain("ledger:read");
+    expect(roles["user"]).not.toContain("ledger:read");
+    const report = (inventory().screens ?? []).find((one) => one.id === "report");
+    expect(report?.permission).toBe("ledger:read");
+  });
+});

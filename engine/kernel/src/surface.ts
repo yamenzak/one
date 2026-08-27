@@ -530,15 +530,37 @@ export interface PickSpec {
   readonly id: string;
   /** ⚠️ The word over the control — "Over", "Where". Never the id. */
   readonly label: string;
-  /** ⚠️ A closed set the product wrote down. The first is what it opens on. */
+  /** ⚠️ A closed set the product wrote down, in the order it is read. */
   readonly options?: readonly PickOption[];
   /** ⚠️ Or every row of a collection — see `CollectionSpec.names`. */
   readonly of?: string;
+  /**
+   * WHICH OPTION IT OPENS ON, WHEN THAT IS NOT THE FIRST ONE.
+   *
+   * ⚠️ THE READING ORDER AND THE DEFAULT ARE TWO FACTS, AND THIS CONTRACT HELD
+   * ONE SLOT FOR BOTH. Four options or fewer are drawn as a segmented control —
+   * a row of words read left to right — so a period reads "7 days · 30 days ·
+   * 90 days" and nothing else. Making the first one the default then forces the
+   * choice between a list in the wrong order and a report that opens on the
+   * wrong period, and both are wrong on the screen rather than in the manifest.
+   *
+   * ⚠️ IT IS FOR A WRITTEN SET ONLY. A collection-backed pick's rows are not
+   * known where this is composed, so a value named here could not be checked
+   * against anything — and an unchecked default is a control that opens on a row
+   * that may not exist. `refuseSurface` refuses the pair.
+   */
+  readonly opens?: string;
   /**
    * ⚠️ THE WORDS FOR "NOT NARROWED", WHERE THAT IS AN ANSWER. A stock list opens
    * on everything and a place is how somebody narrows it; without a way back the
    * control is a trap. Absent means the first option is the only starting point,
    * which is right for a period — "no period" is not a report.
+   *
+   * ⚠️ AND A COLLECTION-BACKED PICK MUST HAVE ONE. Its rows arrive from the door
+   * after the first read has already gone out, so the control draws its first
+   * row as chosen while the screen under it was asked for everything — a
+   * narrowing that was never applied, stated as a fact. With `any` the first
+   * entry is "not narrowed", which is what actually happened.
    */
   readonly any?: string;
 }
@@ -547,6 +569,23 @@ export interface PickOption {
   readonly value: string;
   readonly label: string;
 }
+
+/**
+ * WHAT A NARROWING OPENS ON, READ IN ONE PLACE.
+ *
+ * ⚠️ TWO CALLERS AND ONE RULE, BECAUSE THEY HAVE TO AGREE OR THE SCREEN LIES.
+ * The container seeds its held narrowing from this so the FIRST read carries it;
+ * the renderer draws the chosen segment from it. Answered separately they drift
+ * by exactly one edit, and the result is a control saying "30 days" over a week
+ * of figures — every half internally correct, nothing anywhere disagreeing.
+ *
+ * ⚠️ `""` IS "NOT NARROWED" AND IS A REAL ANSWER, not an absence. A pick that
+ * offers a way back to everything opens there; `refuseSurface` insists on one
+ * for a collection-backed pick, whose rows this cannot see.
+ */
+export const opensOn = (pick: PickSpec): string => (
+  pick.any !== undefined ? "" : pick.opens ?? pick.options?.[0]?.value ?? ""
+);
 
 /** ⚠️ One reading of the five forms, so no caller writes the branch twice. */
 export const fillOf = (
@@ -1015,6 +1054,7 @@ export type SurfaceRefusal =
   /* ⚠️ THE FOUR A NARROWING CAN GET WRONG — see `PickSpec`. A control drawn over
      rows nothing narrows is the sharpest: it moves, and the screen does not. */
   | "pick_name_taken" | "pick_says_nothing" | "pick_two_ways" | "pick_narrows_nothing"
+  | "pick_opens_unknown" | "pick_rows_without_a_way_back"
   /* ⚠️ THE SIX A DOTTED PATH CAN GET WRONG — see `reachFor`. They are separate
      from `field_unknown` because the fix is different for each: a typo, a hop
      through something that is not a reference, a second hop that is not coming. */
@@ -1517,6 +1557,26 @@ export function refuseSurface(
       at("pick_says_nothing",
         `narrows by "${pick.id}" under no words — an unlabelled control on a screen full of `
         + "figures is one nobody knows the effect of");
+    }
+    /* ⚠️ A DEFAULT THAT NAMES NOTHING IS A CONTROL WITH NOTHING SELECTED, and
+       the screen under it was asked with a value no option can get back to. */
+    if (pick.opens !== undefined) {
+      if (pick.of) {
+        at("pick_two_ways",
+          `narrows by "${pick.id}" over ${pick.of}'s rows and names an option to open on — `
+          + "the rows are not known here, so nothing can check it names one of them");
+      } else if (!(pick.options ?? []).some((o) => o.value === pick.opens)) {
+        at("pick_opens_unknown",
+          `narrows by "${pick.id}" opening on "${pick.opens}", which is not one of the `
+          + "options — the control would draw with nothing chosen");
+      }
+    }
+    /* ⚠️ SEE `PickSpec.any`. Without it the control claims a narrowing that the
+       first read never carried. */
+    if (pick.of && pick.any === undefined) {
+      at("pick_rows_without_a_way_back",
+        `narrows by "${pick.id}" over ${pick.of}'s rows and offers no way back to all of `
+        + "them — the first row draws as chosen while the screen was asked for every one");
     }
   }
   /*

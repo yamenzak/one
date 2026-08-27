@@ -36,8 +36,8 @@ const Create = React.lazy(() => import("@engine/design/create")
    browser bundle — so what both ends need is declared once, in the layer both
    are allowed to reach. */
 import {
-  BLOCKS, PLATFORM_PROBLEMS, SCREEN_PATH, askedOf, fillOf, isGroup, problem, upFrom, verbId,
-  viewsIn,
+  BLOCKS, PLATFORM_PROBLEMS, SCREEN_PATH, askedOf, fillOf, isGroup, opensOn, problem, upFrom,
+  verbId, viewsIn,
   type Fields, type Fill, type GuideBook, type MilestoneBook, type Problem, type Raised,
   type ScreenSpec,
   type SurfaceSpec, type Viewed,
@@ -179,7 +179,20 @@ export function Declared({ screen, screens, at, go, currency, app }: {
     reaches an asked view's input on the worker; held in the browser it would
     move a control and leave the figures under it exactly where they were.
   */
-  const [picked, setPicked] = React.useState<Readonly<Record<string, string>>>({});
+  /*
+    ⚠️ SEEDED FROM THE BODY, BECAUSE AN UNSENT DEFAULT IS A CONTROL THAT LIES.
+    This started empty, so the very first read carried no `pick.*` at all while
+    the control under it drew its first option as chosen — a report showing
+    "7 days" over a month of movements, with nothing anywhere disagreeing. What
+    the manifest says the screen opens on is what goes out with the first read.
+  */
+  const [picked, setPicked] = React.useState<Readonly<Record<string, string>>>(
+    /* ⚠️ THE KERNEL'S OWN READING, which is also what the renderer draws the
+       chosen segment from — see `opensOn`. Answering it here as well is how the
+       control and the numbers under it come to disagree. */
+    () => Object.fromEntries(
+      (screen.body?.picks ?? []).map((one) => [one.id, opensOn(one)])),
+  );
   const record = at[0];
   /* ⚠️ SENT WITH EVERY SCREEN, NOT ONLY THE ONES THAT ASK. Which views a body
      reads is the manifest's business and the browser does not open it to find

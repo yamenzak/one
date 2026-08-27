@@ -161,6 +161,45 @@ export async function runView(
 }
 
 /**
+ * ONE ANSWER PER QUESTION, FOR THE LENGTH OF ONE SCREEN READ.
+ *
+ * ⚠️ A REPORT IS SEVERAL READINGS OF THE SAME MOVEMENTS, AND EACH ONE IS A VIEW.
+ * An operation answers a RECORD and a view is a list, so a handler working out
+ * five things at once reaches the screen as five views naming five of its output
+ * fields — and every one of them was a separate call, so a screen showing the
+ * recorded share beside what to buy ran the whole report five times over the same
+ * period. That is the exact fault `stock.report`'s own header argues against, one
+ * layer down: not four operations reading the ledger four times, but one
+ * operation read four times.
+ *
+ * ⚠️ THE PROMISE IS CACHED, NOT THE ANSWER, because the views run together. A
+ * result cache would be filled by the first call to RETURN, by which time the
+ * other four have already gone out.
+ *
+ * ⚠️ AND IT LIVES EXACTLY AS LONG AS THE READ. There is no staleness to reason
+ * about and nothing to invalidate: two views asking one question inside one
+ * request are asking about one moment, and an answer that differed between them
+ * would be a screen disagreeing with itself.
+ *
+ * ⚠️ SAFE BECAUSE AN ASKED VIEW MUST NAME A `read` — `refuseApp` refuses anything
+ * else, so there is no write here whose second call was the point.
+ */
+const askedOnce = (ask: Ask): Ask => {
+  const held = new Map<string, Promise<Record<string, unknown> | null>>();
+  return (operation, input) => {
+    /* ⚠️ THE FIELDS IN A FIXED ORDER, because two fills assembled in different
+       orders are the same question asked twice. */
+    const key = `${operation} ${JSON.stringify(Object.fromEntries(
+      Object.entries(input).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))))}`;
+    const already = held.get(key);
+    if (already) return already;
+    const run = ask(operation, input);
+    held.set(key, run);
+    return run;
+  };
+};
+
+/**
  * Every view a screen's body reads, run together.
  *
  * ⚠️ IN ONE ROUND TRIP, WHICH IS WHY IT IS A FUNCTION RATHER THAN N CALLS. A
@@ -174,7 +213,8 @@ export async function runViews(
   ask?: Ask,
 ): Promise<Readonly<Record<string, Viewed>>> {
   const wanted = (app.views ?? []).filter((v) => ids.includes(v.id));
+  const once = ask ? askedOnce(ask) : undefined;
   const done = await Promise.all(
-    wanted.map((v) => runView(db, app, v, scope, here, reaches[v.id] ?? [], ask)));
+    wanted.map((v) => runView(db, app, v, scope, here, reaches[v.id] ?? [], once)));
   return Object.fromEntries(wanted.map((v, i) => [v.id, done[i]!]));
 }

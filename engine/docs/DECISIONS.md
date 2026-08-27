@@ -4061,3 +4061,68 @@ a record travelling inside the payload for deleting it; a way back written as a
 route rather than derived from the manifest; a `collapses` set without checking
 whether the content draws the heading; or a browser harness that exercises a
 composition the product does not ship.
+
+## D107 — Five readings of one period is one question, and what the control says has to be what was asked
+
+A report is not four features. Consumption, shrinkage, how much of it anybody
+actually wrote down and what to buy are four readings of the SAME movements over
+the SAME period, which is why `stock.report` answers all four in one round trip —
+four operations could be given four different periods, and a screen showing a
+month's usage beside a fortnight's losses would say nothing anywhere about
+disagreeing.
+
+**A view is a list, so one such answer reaches a screen as several views naming
+several of its output fields — and each of them was its own call.** The screen
+that leads with the recorded share and carries what to buy under it ran the whole
+report five times over the same ledger, on every load. That is the argument the
+operation's own header makes, one layer down: not four operations reading the
+ledger four times, but one operation read four times. `runViews` holds one answer
+per question for the length of one read — the PROMISE, not the result, because
+the views run together and a result cache is filled by the first call to return,
+by which time the other four have gone out. It is safe because an asked view must
+name a `read`, which composition already refuses otherwise.
+
+**The period is a control, and this is the first `PickSpec` any manifest uses.**
+Everything built and reached by nothing has this shape, and mounting it found two
+faults in the mechanism. The container's held narrowing started EMPTY, so the
+first read carried no `pick.*` at all while the control under it drew its first
+option as chosen: a report showing "7 days" over a month of movements, both
+halves internally correct. And four options or fewer are drawn as a segmented
+control — a row of words read left to right — so the ORDER is what somebody reads
+and the DEFAULT is a separate decision, and one slot for both forces either a
+period list running 30 · 7 · 90 or a report that opens on the wrong period.
+`PickSpec.opens` separates them, `opensOn` is the one reading of it, and the
+container and the renderer both go through it because two answers to "what does
+this open on" is exactly the disagreement above.
+
+**And the control itself drew as a vertical stack outside the page gutter, which
+only a browser could say.** The markup was right, the classes were right, every
+unit test drew the correct segment as chosen, and the manifest composed. Every
+control the renderer places above a body fills its box below its own breakpoint —
+`w-full` on the inside — and `w-full` contributes NOTHING to a max-content
+measurement, so as a bare flex item the wrapper's base size resolved to ZERO: the
+segments overflowed a zero-width box, wrapped one per line, and the library's own
+`justify-center` centred each of them on its left edge. A basis on the row fixes
+it, and `narrowing.seen.test.tsx` reads where the segments LANDED rather than
+what class they were given — reading back `flex-basis` would be reading back what
+the component was told.
+
+**The same walk found the collection-backed case, which cannot be fixed the same
+way.** Its rows arrive from the door AFTER the first read has gone out, so there
+is nothing at composition to open on — a value named there could not be checked
+against anything, and the control would draw its first row as chosen over a
+screen that was asked for every one of them. `PickSpec.any` was already the way
+back to "not narrowed"; it is now REQUIRED of a pick over rows, which makes the
+honest start the drawn one.
+
+**And the sentence under a figure needs a branch for the good answer.** "The rest
+went unscanned" was said whenever anything had moved at all, so a workspace that
+scanned every single movement was told, at 100 %, that a count had found the rest
+missing. There is no rest. A figure that exists to be pushed up has to be able to
+say when somebody got there.
+
+**Therefore never:** several views over one operation without one answer behind
+them; a control whose drawn value was not the one sent; a reading order and a
+default sharing one slot; a narrowing over rows with no way back to all of them;
+a self-sizing control dropped into a flex row with no basis; or a conditional
+sentence missing the branch where nothing is wrong.

@@ -189,8 +189,11 @@ describe("a screen's views are run together", () => {
  * would have been a second thing every one of them had to learn.
  */
 describe("a view answered by an operation", () => {
-  const asked = (over: Record<string, unknown> = {}) => ({
-    id: "running-out", of: "shelf",
+  /* ⚠️ `id` IS THE VIEW'S AND EVERYTHING ELSE IS THE ASK'S, because two views
+     over one operation is the case the memo below is about — and a helper that
+     could only make one of them could not express it. */
+  const asked = ({ id = "running-out", ...over }: Record<string, unknown> = {}) => ({
+    id, of: "shelf",
     asked: { operation: "shelf.due", take: "items", fills: { today: "today" }, ...over },
   } as never);
 
@@ -293,5 +296,46 @@ describe("a view answered by an operation", () => {
     );
     expect(got["all"]?.count).toBe(3);
     expect(got["running-out"]?.count).toBe(1);
+  });
+
+  /*
+    ⚠️ ONE QUESTION, ONE ANSWER, FOR THE LENGTH OF ONE READ — see `askedOnce`. A
+    report works out four things from one pass over the ledger, so it reaches a
+    screen as four views naming four of its output fields — and each one was its
+    own call, which ran the whole report four times over the same period.
+  */
+  it("asks one question once, however many views name it", async () => {
+    let ran = 0;
+    const got = await runViews(
+      shard(),
+      withViews([asked({ id: "rows" }), asked({ id: "totals", take: "totals" })] as never),
+      ["rows", "totals"], TENANT, { today: "2026-08-25" }, {},
+      async () => {
+        ran++;
+        return { items: [{ id: "z" }], totals: [{ id: "t" }] };
+      },
+    );
+    expect(ran).toBe(1);
+    expect(got["rows"]?.count).toBe(1);
+  });
+
+  /* ⚠️ AND A DIFFERENT QUESTION IS STILL ASKED. The key is the operation and its
+     input, so two views over one operation with different fills are two runs —
+     which is what makes this a memo rather than a bug. */
+  it("still asks again when the input differs", async () => {
+    let ran = 0;
+    await runViews(
+      shard(),
+      withViews([
+        asked({ id: "a" }),
+        asked({ id: "b", fills: { today: "today", where: { says: "b1" } } }),
+      ] as never),
+      ["a", "b"], TENANT, { today: "2026-08-25" }, {},
+      async () => {
+        ran++;
+        return { items: [] };
+      },
+    );
+    expect(ran).toBe(2);
   });
 });

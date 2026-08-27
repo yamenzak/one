@@ -5522,7 +5522,28 @@ interface Reported {
     order: number; why: string; unit: string; supplier: string; says: string;
   }[];
   daily: readonly { day: string; quantity: number }[];
+  /*
+    ⚠️ HOW MANY THERE REALLY ARE, BECAUSE THE THREE LISTS ABOVE ARE CUT — see
+    `AskedSpec.total`. Every one of them is one row per PRODUCT over a whole
+    workspace's catalogue, so a warehouse's quarter is thousands of rows sent to
+    a phone to draw fifty of. They are each in the order somebody works in —
+    biggest usage, biggest discrepancy, soonest to run out — so the cut is off
+    the end that matters least, and a screen that did not carry the count would
+    quietly report the ceiling as the answer.
+  */
+  usedOf: number;
+  lossesOf: number;
+  buyOf: number;
 }
+
+/**
+ * ⚠️ FIFTY, AND IT IS A SCREEN'S NUMBER RATHER THAN A DATABASE'S. Past about
+ * this a list stops being read and starts being searched, and the report's own
+ * job is to put the handful that matter at the top — so the rows past it are ones
+ * nobody was going to reach by scrolling. The count beside each list is what
+ * keeps that honest.
+ */
+const MOST = 50;
 
 /*
   ⚠️ "NEVER" RATHER THAN "∞". A cover of Infinity is the honest arithmetic for a
@@ -5567,6 +5588,10 @@ const report = operation<{ today: string; span?: string }, Reported>({
     losses: field.json({ label: "What was wrong", holds: "none" }),
     buy: field.json({ label: "What to buy", holds: "none" }),
     daily: field.json({ label: "A day at a time", holds: "none" }),
+    /* ⚠️ THE THREE CUT LISTS SAY HOW LONG THEY REALLY ARE — see `Reported`. */
+    usedOf: field.number({ label: "How many products moved", holds: "none" }),
+    lossesOf: field.number({ label: "How many were wrong", holds: "none" }),
+    buyOf: field.number({ label: "How many to buy", holds: "none" }),
   },
   /*
     ⚠️ `ledger:read`, WHICH IS THE HISTORY'S OWN GRANT AND NOT `stock:read`. Every
@@ -5641,53 +5666,66 @@ const report = operation<{ today: string; span?: string }, Reported>({
     const days = Math.max(1, dayCount(since, until));
 
     const told = toldIn(entries);
+    const wrong = lossesIn(entries);
+    /*
+      ⚠️ EVERY PRODUCT IS WEIGHED, NOT ONLY THE ONES THAT MOVED. A par level is a
+      standing statement that something must be on the shelf whether or not it
+      moves — a fire extinguisher, a spare fuse — and a reorder list built from
+      the movements alone can never mention one.
+    */
+    const order = reorder(
+      kinds.results.map((row) => {
+        const of = row.supplier ? supplied.get(String(row.supplier)) : undefined;
+        return {
+          product: String(row.id),
+          onHand: onHand.get(String(row.id)) ?? 0,
+          par: Number(row.par ?? 0),
+          used: perProduct.get(String(row.id)) ?? 0,
+          supplier: String(of?.name ?? ""),
+          /* ⚠️ THEIRS WHERE THEY SAID, THE WORKSPACE'S OTHERWISE — and `null`
+             rather than `0`, because a supplier who has not been asked how long
+             they take is not a supplier who delivers today. */
+          leadDays: of?.leadDays ?? null,
+        };
+      }),
+      days, lead,
+    );
     return {
       /*
         ⚠️ THE SENTENCE IS DECIDED HERE BECAUSE IT IS A CONDITIONAL, and a screen
-        drawn from a declaration has no `if`. "Nothing left the shelves" and "the
-        rest went without anybody scanning it" are two different true things
-        about the same two numbers, and a percentage on its own is a score nobody
-        knows what to do with.
+        drawn from a declaration has no `if`. A percentage on its own is a score
+        nobody knows what to do with; what it MEANS is three different true
+        things about the same two numbers.
+
+        ⚠️ AND THE THIRD BRANCH IS THE GOOD ANSWER, WHICH IS THE ONE THAT WAS
+        MISSING. "The rest went unscanned" was said whenever anything had moved
+        at all — so a workspace that scanned every single movement was told, at
+        100 %, that a count had found the rest missing. There is no rest. The
+        figure this screen leads with exists to be pushed UP; congratulating
+        somebody who reached it costs a line and is the whole reason to show it.
       */
       told: [{
         ...told,
         sharePct: Math.round(told.share * 100),
         says: told.recorded + told.inferred === 0
           ? "Nothing left the shelves in this period"
-          : "The rest went without anybody scanning it, and a count found it missing",
+          : told.inferred === 0
+            ? "Everything that left was scanned out"
+            : "The rest went unscanned, and a count found it gone",
       }],
-      used: used.map((one) => ({ ...one, name: nameOf(one.product) })),
+      usedOf: used.length,
+      used: used.slice(0, MOST).map((one) => ({ ...one, name: nameOf(one.product) })),
       /* ⚠️ SHORT AND OVER STAY APART, and netting them off is what this refuses.
          A shelf that is forty short and thirty-eight over is a shelf somebody is
          counting badly, or two products being confused with each other; netted,
          it is a shelf that is two out and looks fine. */
-      losses: lossesIn(entries).map((one) => ({
+      lossesOf: wrong.length,
+      losses: wrong.slice(0, MOST).map((one) => ({
         ...one, name: nameOf(one.product),
         says: one.found ? `${one.lost} short · ${one.found} over` : "short",
       })),
-      /*
-        ⚠️ EVERY PRODUCT IS WEIGHED, NOT ONLY THE ONES THAT MOVED. A par level is
-        a standing statement that something must be on the shelf whether or not
-        it moves — a fire extinguisher, a spare fuse — and a reorder list built
-        from the movements alone can never mention one.
-      */
-      buy: reorder(
-        kinds.results.map((row) => {
-          const of = row.supplier ? supplied.get(String(row.supplier)) : undefined;
-          return {
-            product: String(row.id),
-            onHand: onHand.get(String(row.id)) ?? 0,
-            par: Number(row.par ?? 0),
-            used: perProduct.get(String(row.id)) ?? 0,
-            supplier: String(of?.name ?? ""),
-            /* ⚠️ THEIRS WHERE THEY SAID, THE WORKSPACE'S OTHERWISE — and `null`
-               rather than `0`, because a supplier who has not been asked how
-               long they take is not a supplier who delivers today. */
-            leadDays: of?.leadDays ?? null,
-          };
-        }),
-        days, lead,
-      ).map((one) => ({
+      buyOf: order.length,
+      buy: order.slice(0, MOST).map((one) => ({
         ...one, name: nameOf(one.product),
         unit: String(named.get(one.product)?.unit ?? "item"),
         /* ⚠️ WHO TO RING IS ON THE ROW, because this list is only a report until
@@ -6307,6 +6345,57 @@ const manifest = (): AppSpec => defineApp({
         operation: "batch.due", take: "items",
         fills: { today: "today", standing: { says: "gone" } },
       } },
+    /*
+      ⚠️ FIVE VIEWS OVER ONE OPERATION, AND IT RUNS ONCE — see `runViews`. The
+      report works out consumption, shrinkage, the recorded share and what to buy
+      from the SAME movements over the SAME period, which is why it is one
+      operation; a view is a list, so the one answer reaches the screen as five
+      of them naming five of its output fields. The runtime holds one answer per
+      question for the length of a read, so the five are one run of the report
+      rather than five — which is the argument on the operation itself, one layer
+      down.
+
+      ⚠️ AND THE PERIOD IS ON THE SCREEN RATHER THAN IN FIVE PLACES — see
+      `PickSpec`. Every one of them fills `span` from the same control, so the
+      figures cannot disagree about what they are figures OF, which is the exact
+      failure four separate operations would have made possible.
+
+      ⚠️ `of: "ledger"` ON ALL FIVE, INCLUDING THE ONES WHOSE ROWS ARE PRODUCTS.
+      `of` names what the permission is of, and every number here is a reading of
+      the movements — a person who may see what is on a shelf has not been given
+      the record of who took it.
+    */
+    { id: "recorded", of: "ledger",
+      asked: {
+        operation: "stock.report", take: "told",
+        fills: { today: "today", span: { picked: "span" } },
+      } },
+    /* ⚠️ AND THE THREE CUT LISTS CARRY THEIR OWN COUNT — see `AskedSpec.total`.
+       Without it a warehouse whose quarter touched four hundred products reads
+       "50", which is this product's ceiling reported as its answer. */
+    { id: "what-to-buy", of: "ledger",
+      asked: {
+        operation: "stock.report", take: "buy", total: "buyOf",
+        fills: { today: "today", span: { picked: "span" } },
+      } },
+    { id: "what-left", of: "ledger",
+      asked: {
+        operation: "stock.report", take: "used", total: "usedOf",
+        fills: { today: "today", span: { picked: "span" } },
+      } },
+    { id: "what-was-wrong", of: "ledger",
+      asked: {
+        operation: "stock.report", take: "losses", total: "lossesOf",
+        fills: { today: "today", span: { picked: "span" } },
+      } },
+    /* ⚠️ ONE ROW PER DAY INCLUDING THE EMPTY ONES — see `dailyIn`. The gaps are
+       the shape, and a line drawn only through the days something happened makes
+       a quiet fortnight look like a busy one. */
+    { id: "day-by-day", of: "ledger",
+      asked: {
+        operation: "stock.report", take: "daily",
+        fills: { today: "today", span: { picked: "span" } },
+      } },
   ],
 
   /*
@@ -6687,6 +6776,197 @@ const manifest = (): AppSpec => defineApp({
             of: { from: { of: "view", view: "running-out" } },
           },
         }],
+      } },
+    /*
+      ⚠️ THE SCREEN THIS PRODUCT'S OWN DOCUMENT LEADS WITH, AND IT DID NOT EXIST.
+      Part I says the reports screen opens on the RECORDED SHARE — of everything
+      that left the shelves, how much was scanned out and how much a count found
+      gone afterwards — because it is the one figure that says whether the others
+      mean anything. Every number behind it was computed, gated and tested, and
+      there was nowhere to read one.
+
+      ⚠️ AND THE PERIOD IS A CONTROL RATHER THAN FIVE SCREENS — see `PickSpec`.
+      This is the shape that control exists for and the first declaration in the
+      tree to use it: the whole screen is one question asked over one span, so the
+      span belongs above everything it changes and nowhere else.
+
+      ⚠️ `ledger:read`, WHICH THE COMMON ROLE DOES NOT HOLD. `user` may move stock
+      and may not read the history of who moved it, so this is a screen of its own
+      rather than a group on the home — a block that vanishes for most of a
+      workspace leaves a hole in a screen everybody opens, and the nav already
+      drops a destination somebody may not reach.
+    */
+    { id: "report", route: "/report", label: "Reports", nav: "primary", icon: "chart",
+      permission: "ledger:read",
+      body: {
+        shape: "figure",
+        layout: { as: "stack" },
+        picks: [{
+          id: "span",
+          label: "Over",
+          /* ⚠️ SHORTEST FIRST, WHICH IS READING ORDER AND NOT THE DEFAULT — see
+             `PickSpec.opens`. Four or fewer options are a segmented control, and
+             a row of periods that runs 30 · 7 · 90 is a control nobody trusts. */
+          options: [
+            { value: "week", label: "7 days" },
+            { value: "month", label: "30 days" },
+            { value: "quarter", label: "90 days" },
+          ],
+          /* ⚠️ THIRTY, BECAUSE IT IS WHAT THE OPERATION ITSELF DEFAULTS TO and
+             because a week of a lumpy store room is a consumption rate that
+             orders twice what is needed on a busy Monday and nothing on a quiet
+             one. The same question asked through the door and through the screen
+             has to give the same answer. */
+          opens: "month",
+        }],
+        hero: {
+          as: "figure",
+          nothing: {
+            says: "Nothing has moved yet",
+            under: "Take something off a shelf and this starts counting",
+          },
+          bind: {
+            value: { from: { of: "first", view: "recorded", field: "sharePct" } },
+            of: { from: { of: "words", says: "Written down when it happened" } },
+            /* ⚠️ A CONSTANT THAT IS NOT A NOUN, WHICH IS WHY IT IS SAFE HERE. The
+               product page's own note is about plurals: "1 deliveries" is what a
+               declared unit does to English. Per cent has no plural. */
+            unit: { from: { of: "words", says: "%" } },
+            mark: { from: { of: "words", says: "scan" } },
+          },
+        },
+        blocks: [
+          {
+            /*
+              ⚠️ THE ONE LIST ON THIS SCREEN SOMEBODY ACTS ON, AND IT COMES
+              STRAIGHT AFTER THE FIGURE. Every other section here is something to
+              KNOW; this is something to do this morning. It sat under the two
+              stats that explain the hero, and photographed on a phone that put
+              the only actionable thing on the screen below the fold behind a
+              number the hero had already said.
+
+              ⚠️ ORDERED SOONEST-TO-RUN-OUT RATHER THAN BY HOW LITTLE IS LEFT — a
+              product with two weeks of stock and a three-week supplier is out
+              before the order lands.
+            */
+            group: "What to buy",
+            of: [{
+              block: "Listing",
+              shows: [
+                { field: "name", label: "Product" },
+                /* ⚠️ HOW LONG, WHY, AND WHO TO RING, IN ONE COLUMN — the handler
+                   joins them, because a `Listing` has three slots and this is one
+                   fact about the row. */
+                { field: "says", label: "Why" },
+                { field: "order", label: "Order", as: "num" },
+              ],
+              goes: { to: "product", by: "product" },
+              nothing: {
+                says: "Nothing to order",
+                under: "Everything has enough on the shelf to last its supplier's lead time",
+              },
+              bind: {
+                label: { from: { of: "words", says: "What to buy" } },
+                of: { from: { of: "view", view: "what-to-buy" } },
+              },
+            }],
+          },
+          {
+            group: "How it was recorded",
+            of: [
+              {
+                block: "Stat",
+                bind: {
+                  value: { from: { of: "first", view: "recorded", field: "recorded" } },
+                  label: { from: { of: "words", says: "Scanned out" } },
+                  mark: { from: { of: "words", says: "scan" } },
+                },
+              },
+              {
+                /* ⚠️ A VERDICT, WHICH IS THE ONLY THING THAT EARNS AN INK — see
+                   `Stat.tone`. Stock that left with nobody recording it is not a
+                   count, it is the number this whole screen exists to shrink. */
+                block: "Stat",
+                bind: {
+                  value: { from: { of: "first", view: "recorded", field: "inferred" } },
+                  label: { from: { of: "words", says: "Found missing later" } },
+                  mark: { from: { of: "words", says: "alert" } },
+                  tone: { from: { of: "words", says: "warn" } },
+                },
+              },
+              {
+                /* ⚠️ THE SENTENCE THE OPERATION DECIDED — see `NoteRow`. "Nothing
+                   left the shelves" and "the rest went without anybody scanning
+                   it" are two true things about the same two numbers, and a
+                   declaration has no `if`. */
+                block: "NoteRow",
+                bind: {
+                  children: { from: { of: "first", view: "recorded", field: "says" } },
+                },
+              },
+            ],
+          },
+          {
+            group: "What left",
+            of: [
+              {
+                /* ⚠️ A LINE, BECAUSE THE SUBJECT IS THE RUN AND NOT THE DAYS. The
+                   x is the position — `dailyIn` answers one bucket per day
+                   including the empty ones, so the shape is the period and the
+                   gaps are part of it. */
+                block: "LineChart",
+                plots: { of: "quantity" },
+                nothing: {
+                  says: "Nothing left the shelves",
+                  under: "Take something off one and the line starts",
+                },
+                bind: {
+                  describes: { from: { of: "words", says: "A day at a time" } },
+                  series: { from: { of: "view", view: "day-by-day" } },
+                },
+              },
+              {
+                block: "Listing",
+                shows: [
+                  { field: "name", label: "Product" },
+                  { field: "quantity", label: "Left the shelves", as: "num" },
+                ],
+                goes: { to: "product", by: "product" },
+                nothing: {
+                  says: "Nothing left the shelves",
+                  under: "Nothing was taken or counted down in this period",
+                },
+                bind: {
+                  label: { from: { of: "words", says: "Most of it" } },
+                  of: { from: { of: "view", view: "what-left" } },
+                },
+              },
+            ],
+          },
+          {
+            /* ⚠️ LAST, BECAUSE IT IS THE SECTION THAT IS USUALLY EMPTY AND ALWAYS
+               THE MOST UNCOMFORTABLE. Short and over stay apart on the row — a
+               shelf that is forty short and thirty-eight over is a shelf somebody
+               is counting badly, and netted it is a shelf that looks fine. */
+            group: "What was wrong",
+            of: [{
+              block: "Listing",
+              shows: [
+                { field: "name", label: "Product" },
+                { field: "says", label: "By how much" },
+              ],
+              goes: { to: "product", by: "product" },
+              nothing: {
+                says: "Every count agreed",
+                under: "Nothing had to be corrected in this period",
+              },
+              bind: {
+                label: { from: { of: "words", says: "Corrections" } },
+                of: { from: { of: "view", view: "what-was-wrong" } },
+              },
+            }],
+          },
+        ],
       } },
     { id: "products", route: "/products", label: "Products", nav: "primary", icon: "tag",
       permission: "product:read",

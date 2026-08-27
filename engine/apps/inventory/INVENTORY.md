@@ -467,7 +467,7 @@ generated ones) — plus every platform guard in `pnpm engine:gate`.
 
 ## Part III — the screen index
 
-**Eight, and every one of them is drawn by the engine from the declaration.** The
+**Nine, and every one of them is drawn by the engine from the declaration.** The
 surface was emptied whole on 2026-08-26 and is being rebuilt one screen at a
 time, each designed from what somebody standing in front of it is trying to do
 rather than ported from what stood there before.
@@ -481,6 +481,7 @@ follows and the shape every screen is drawn to.
 | `/expiring` | Going out of date | — | `stock:read` | `declared` | `declared` |
 | `/products` | Products | primary | `product:read` | `declared` | `declared` |
 | `/places` | Places | primary | `location:read` | `declared` | `declared` |
+| `/report` | Reports | primary | `ledger:read` | `declared` | `declared` |
 | `/counts` | Being counted | — | `stock:read` | `declared` | `declared` |
 | `/product` | Product | — | `product:read` | `declared` | `declared` |
 | `/add` | Add a product | — | `product:write` | `declared` | `declared` |
@@ -530,6 +531,43 @@ list it backs was a page somebody scrolls past a hundred cartons of gloves to
 find the one carton of anything that matters. `standing` narrows it, absent means
 what runs out, and `fine` is still askable — a change to what it says by default
 rather than to what it can say.
+
+**The recorded share has a screen at last, which is the figure Part I opens
+with.** `/report` is five asked views over ONE operation: consumption, shrinkage,
+how much of it was written down and what to buy are four readings of the same
+movements over the same period, so they are one `stock.report` and the runtime
+holds one answer for all five (`runViews`). Four separate reads could be given
+four different periods, and a screen showing a month's usage beside a fortnight's
+losses would say nothing anywhere about disagreeing.
+
+⚠️ **THE PERIOD IS A CONTROL, AND IT IS THE FIRST `PickSpec` IN THE TREE.** 7 · 30
+· 90 days above everything it changes, opening on 30 — which is what the operation
+itself defaults to, so the same question asked through the door and through the
+screen gives the same answer. Making that possible needed `PickSpec.opens`: four
+options or fewer are drawn as a segmented control, so the ORDER is what somebody
+reads left to right and the DEFAULT is a separate decision, and one slot for both
+forces a period list running 30 · 7 · 90 or a report that opens on the wrong
+month.
+
+**Straight under the figure is what to buy — the one list on the screen somebody
+acts on**, ordered soonest-to-run-out rather than by how little is left, because a
+product with two weeks of stock and a three-week supplier is out before the order
+lands. Each row carries how long, why, and who to ring, so a line can be acted on
+without leaving it. It sat below the two stats that explain the hero and
+photographed with the only actionable thing on the screen under the fold, behind a
+number the hero had already said.
+
+⚠️ **AND `ledger:read` IS WHAT OPENS IT.** The common role moves stock and may not
+read the record of who moved it, which is why this is a screen of its own rather
+than a group on the home: a block that vanishes for most of a workspace leaves a
+hole in a screen everybody opens, and the nav already drops a destination somebody
+cannot reach.
+
+⚠️ **AND THE SENTENCE UNDER THE FIGURE HAS A THIRD BRANCH NOW.** "The rest went
+unscanned" was said whenever anything had moved at all — so a workspace that
+scanned every movement was told, at 100 %, that a count had found the rest
+missing. There is no rest. The figure exists to be pushed up; congratulating
+somebody who reached it costs a line.
 
 **And it is where a product is CORRECTED and where it is FINISHED, not only where
 it is read.** Two of its facts carry a pencil — the brand and the reorder line,
