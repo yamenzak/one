@@ -490,6 +490,13 @@ row naming a file here would send a reader to code the product does not run.
 That is the fault this whole index nearly became: for a while it named a
 hand-written file per route while the product drew the declaration.
 
+**Places can be made from Places.** Its empty state has always read "Add a room,
+an aisle or a shelf and it will be here" over a screen with no way to add one —
+a list whose emptiness names the act that would end it, with no control to
+perform it, which reads as a missing feature rather than a missing button. The
+form is `location.create`'s own input, so nothing on the screen says what a place
+is; the collection already did.
+
 **What the home leads with, and why it is not a total.** `/` opens on how many
 lines have run out — the one number that decides whether somebody walks to the
 store room, asked every morning and answered differently every morning. The
@@ -503,6 +510,22 @@ is one on a shelf, so it leads `by: "product"` rather than by its own id. The
 product page leads with WHERE the thing is — the shelves it is on, and the
 quantities under that — because somebody opening it is standing in front of a box
 asking a question about the world rather than about the record.
+
+**And it is where a product is CORRECTED and where it is FINISHED, not only where
+it is read.** Two of its facts carry a pencil — the brand and the reorder line,
+which are the two people actually change; the row opens the field's own sheet,
+drawn from the field's own declaration, and the save goes through the generated
+update. `unit` and `tracking` carry none: both are `settled`, `product.recount` is
+the way through, and the manifest is refused for offering either. Under the
+figure is the receiving — the hero says "Receive some and it will be here", and
+until 2026-08-27 nothing on the screen could. At the foot is the way out, which
+no screen declares: every detail screen in every product gets Delete and the
+thirty-day sheet behind it from the frame.
+
+**A flow ends here, on the product it just made.** Registration used to land on
+the catalogue, which asks somebody to find in eight hundred rows the thing they
+were holding a second ago — and which cannot say the one thing that is true of a
+product a minute old: it is not on a shelf yet.
 
 **Adding a product is a FLOW, and it is the third kind of screen.** A `body` is
 read and drawn; a `story` is walked — one question a screen, a dock that carries

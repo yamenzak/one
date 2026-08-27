@@ -588,6 +588,35 @@ A wizard whose wording does not move when somebody changes their mind is a form
 with a progress bar on it — and it reads as broken at exactly the moment somebody
 corrects themselves.
 
+**And a flow ends where it declares, on the thing it made** — `StorySpec.lands`
+names a screen this app declares, opened on the record the write answered with.
+It is not optional detail: `Declared.tsx` used to end every flow in every app on
+one product's route, so the second app's flow would have finished on a route it
+does not have. Absent means the flow ends where it started, which is right for
+one that RECORDS something (a count, a delivery) rather than one that MAKES it.
+
+## 7b. Three things a detail screen gets without asking
+
+⚠️ **A RECORD'S OWN SCREEN IS WHERE IT IS READ, CORRECTED AND REMOVED, AND ONLY
+THE FIRST OF THOSE WAS EVER DECLARED.** Sending somebody to a second screen to
+fix a typo is a second surface saying the same things in a different order; the
+two drift the first time a field is added.
+
+- **`BlockSpec.edits` names a field, and the row shows it and changes it.** The
+  write is DERIVED — `<collection>.update` — so a row's pencil can only ever
+  change the field the row is about. `refuseSurface` refuses four shapes and each
+  one is otherwise a pencil over a Save that cannot land: a block with nowhere to
+  put the control, a screen about no record, a field the collection has not got,
+  and a `settled` field the update deliberately does not advertise.
+- **The door decides who sees it.** It sends the field's whole declaration (the
+  sheet is drawn from it) and sends NOTHING to somebody whose role cannot write —
+  so no pencil at all, never a disabled one.
+- **The two ways out are drawn by the frame and declared by nobody.** Every
+  detail screen has the same two, so a manifest saying so per screen would be the
+  same three lines on forty of them, thirty-nine right and one forgotten. The
+  door answers what the collection is called, what the record is called, and
+  whether there is a delete verb at all (D104).
+
 ## 8. Before a screen is finished
 
 ⚠️ **THIS SECTION EXISTS BECAUSE A ROUND OF FEEDBACK ARRIVED WITH ELEVEN ITEMS ON

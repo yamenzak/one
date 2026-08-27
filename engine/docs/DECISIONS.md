@@ -3919,3 +3919,96 @@ saying it will spend credits is a warning about the past.
 pressed; a per-workspace switch standing in for a per-use decision the flow
 already offers; a cost warning on every screen of a flow; or a price quoted
 before the thing that determines it has happened.
+
+## D104 — Delete does not destroy, and the sentence is the feature
+
+**Delete stopped being true.** A record leaves the lists, is recoverable for
+thirty days and is then destroyed; a second column and a filter in one file
+(`records.ts`) is the whole mechanism, and it is thirty lines. What makes the
+trash worth having is not the mechanism. It is somebody reading "you can put it
+back" and pressing the button, instead of leaving a catalogue full of things
+nobody dares remove.
+
+**So a dialog still saying "this cannot be undone" is a defect, and it is the
+expensive direction of wrong.** Somebody who believes a delete is permanent
+hesitates over every one of them, asks a colleague, and works around the product
+— which is exactly the state the trash was built to end. The copy is asserted
+against `BIN_DAYS` and never against "30", so the promise cannot go on being made
+after the sweep changes.
+
+**`frozen` and `binned` are not degrees of the same thing.** A binned record is
+on its way out and is destroyed on a schedule. A frozen one is staying and is out
+of the way — a product a workshop stopped buying, whose deliveries, counts and
+label history all still point at it and must go on resolving. Collapsed into one
+flag, either the trash never empties or a discontinued product takes its own
+history with it in a month.
+
+**A column, not a second table, and the cost is stated.** A separate table would
+make every existing read correct by construction; a column means a list that
+forgets the filter shows deleted records. The column wins on the other three:
+restoring is one `UPDATE` rather than a re-insert that can collide, a reference
+into the record still resolves for the thirty days that make restoring worth
+anything, and erasure is unchanged because the row never left the table erasure
+already walks.
+
+**The alternative is offered from inside the confirmation, not beside it.** Two
+buttons on a record's page — Delete and Freeze — ask somebody to know the
+difference before they have a reason to care about it. The moment they care is
+the moment they have pressed Delete: half the time what they meant was "stop
+showing me this". Pressing it replaces the title, both sentences and the button
+in place, and the way back to the destructive option is then gone — a
+confirmation must never talk somebody INTO it.
+
+**And the whole thing is derived rather than declared.** Every detail screen in
+every product has the same two ways out, so a manifest saying so per screen would
+be the same three lines on forty of them, thirty-nine right and one forgotten.
+The door answers what the collection is called, what the record is called, and
+whether there is a delete verb at all.
+
+**Therefore never:** a confirmation describing a permanence the product no longer
+has; one flag for "on its way out" and "staying"; a sweep reading
+`aside IS NOT NULL`; a per-screen declaration of a way out every screen has; or a
+"30 days" typed into copy.
+
+## D105 — A fact is changed where it is read, and a flow ends where it says
+
+**Two halves of one rule: a screen must not send somebody somewhere else to do
+the obvious next thing.**
+
+**A row that shows a fact carries the way to change it.** The alternative is a
+second screen drawing the whole record as a form — the same things in a different
+order, drifting from the first the day a field is added. `BlockSpec.edits` names
+a field; the write is DERIVED (`<collection>.update`), so a row's pencil can only
+ever change the field the row is about, and the browser holds no second spelling
+of a name the kernel owns.
+
+**Four refusals at composition, and each is otherwise a pencil over a Save that
+cannot land:** a block with nowhere to put the control, a screen about no record,
+a field the collection has not got, and a `settled` field the generated update
+deliberately does not advertise. None of them fails anywhere else — React drops a
+prop a component does not take, and the door refuses long after the screen
+offered the change. The expensive shape is the last one: somebody presses, reads,
+types the correction, presses Save, and is told nothing happened.
+
+**The door sends the field's whole declaration, not a flag.** The sheet is drawn
+from it — the control, the help, the option names, the bounds. And it sends
+nothing at all to somebody whose role cannot write, so no pencil is drawn: not a
+disabled one, which invites somebody to go looking for how to enable it.
+
+**A flow ends where it declares, on the thing it just made.** `Declared.tsx`
+finished every flow in every app with `go("/products")` — one product's route,
+written into the one file that draws every product's screens. The second app's
+flow would have ended by moving somebody to a route it does not have: no error,
+no failing test, a blank page after the one press that mattered. `StorySpec.lands`
+names a screen; the guard is that the two files which draw any app may name no
+path at all.
+
+**And it is the thing, not the list it joins.** Landing on a list of eight
+hundred rows asks somebody to find what they were holding a second ago — and only
+the record's own page can say what is still missing, which for a new product is
+that it is not on a shelf yet. That is the next step, and a list cannot offer it.
+
+**Therefore never:** a second screen whose only job is to edit what the first one
+shows; a route belonging to one product written into the platform; a flow that
+ends on a list of what it just added to; or an affordance offered by a screen and
+refused by the door.

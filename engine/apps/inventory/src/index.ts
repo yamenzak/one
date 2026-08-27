@@ -7346,10 +7346,16 @@ const manifest = (): AppSpec => defineApp({
       why: "A shelf, a cold room, a van — anywhere you can point at.",
       done: "location.created", link: "/places", needs: "location:write", order: 2,
     },
+    /* ⚠️ THE CATALOGUE, BECAUSE THAT IS WHERE THE CONTROL IS. Receiving is
+       offered on a PRODUCT'S page — it has to be, since the product is what a
+       quantity is of — so a step pointing at the stock list sent somebody to a
+       screen with nothing on it to press. A guide step whose link does not
+       reach the thing it names is a checklist telling somebody to do something
+       and then showing them the wrong room. */
     "put-it-somewhere": {
       id: "put-it-somewhere", label: "Put something on a shelf",
       why: "Until then the catalogue is a list of things you own none of.",
-      done: "stock.received", link: "/", needs: "stock:move", order: 3,
+      done: "stock.received", link: "/products", needs: "stock:move", order: 3,
     },
     /* ⚠️ THEIRS, AND IT IS THE ONE EVERYBODY DOES. The three above happen once;
        this is the work — and it is the step that proves to somebody new that

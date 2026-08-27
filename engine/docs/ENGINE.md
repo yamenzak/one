@@ -1182,6 +1182,8 @@ its own header, cited by other files, and doing nothing.
 | D101 | A string with two jobs is two strings, and a recap is read rather than scanned | 0 |
 | D102 | A file has five states and a picker knows one of them | 0 |
 | D103 | The camera is the switch, and the switch has to say what it costs | 0 |
+| D104 | Delete does not destroy, and the sentence is the feature | 0 |
+| D105 | A fact is changed where it is read, and a flow ends where it says | 0 |
 <!-- /generated -->
 
 ---
