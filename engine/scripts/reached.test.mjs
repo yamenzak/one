@@ -231,22 +231,22 @@ for (const [app, manifest] of appManifests()) {
  * `unreachable` asks whether a permission is holdable; between them nobody was
  * asking whether an APP's operation has an address. Every lane was green.
  *
- * ⚠️ AND THE QUESTION IS ASKED ONLY OF A SUBJECT THE APP HAS ALREADY REACHED
- * FOR, which is what makes it answerable during a rebuild. Every screen in this
- * product was emptied on purpose (RW-0) and they are coming back one at a time;
- * asking it of everything would report thirty-odd verbs whose surfaces are not
- * written yet, which is a guard nobody can act on and everybody learns to
- * ignore. A collection the app has DRAWN, or one whose verbs it has wired ANY
- * of, is one it has decided about — so the failure this catches is the sharp
- * one: a screen ships, wires two of its subject's three verbs, and leaves the
- * third addressable by nobody.
+ * ⚠️ IT IS ASKED OF EVERY VERB, AND IT USED TO BE ASKED ONLY OF A SUBJECT THE
+ * APP HAD ALREADY REACHED FOR. That narrowing was written during RW-0, when
+ * every screen in this product had been emptied on purpose and they were coming
+ * back one at a time: asking it of everything would have reported thirty-odd
+ * verbs whose surfaces were not written yet, which is a guard nobody can act on
+ * and everybody learns to ignore. The rebuild finished. The narrowing did not
+ * expire with it.
  *
- * ⚠️ THE SECOND HALF OF THAT WAS ADDED BECAUSE THE FIRST MISSED THE CASE IT WAS
- * WRITTEN FOR. `stock` has no screen of its own — receiving and taking live on
- * the PRODUCT page, which is `of: "product"` — so asking only about drawn
- * subjects left every stock verb unexamined, and `stock.arrive` sat callable by
- * nobody through the round that introduced this check. A subject with one verb
- * wired and six not is exactly the shape here; the narrow rule could not see it.
+ * ⚠️ AND WHAT IT COST IS THE EXACT FAULT THIS FILE IS ABOUT, ONE LEVEL UP. A
+ * subject with NO screen and NO wired verb was not a finding — it was not a
+ * question. `unit` (five verbs), `kit` (six) and `job` (three) were built,
+ * gated, audited, tested at the door and reachable by nobody, and the one guard
+ * written to catch that reported `27 of 28 verb(s) of a reached subject called`.
+ * Every word of that sentence was true. A guard that excuses a whole noun for
+ * having no surface excuses precisely the case where the surface is what is
+ * missing.
  *
  * ⚠️ IT FOUND ONE THE DAY IT WAS WRITTEN. `/count` wired `count.tally` and
  * `count.close`, `/counts` listed the sessions — and `count.open` was called
@@ -267,6 +267,28 @@ const WAITING = new Set([
   /* A deliberate correction of a product's whole on-hand — UN-2 built the rule
      and the product page has no control for it. */
   "inventory/product.recount",
+  /*
+    ⚠️ THE THIRTEEN THE WIDENED QUESTION FOUND, AND EVERY ONE OF THEM WAS ALREADY
+    LIKE THIS. Nothing here regressed: they are what the narrow rule could not
+    see, written down the first time anything asked.
+  */
+  /* Marking a batch opened starts the third of the four expiry clocks, and
+     `/expiring` reports what that clock decides with no way to set it. */
+  "inventory/batch.open",
+  /* Teaching the scanner a code it did not recognise — the other half of
+     `code.resolve`, which the viewfinder already calls. */
+  "inventory/code.learn",
+  /* Serialised things: issue one to somebody, take it back, service it, retire
+     it. Built by OI-8; no screen. */
+  "inventory/unit.issue", "inventory/unit.return", "inventory/unit.serve",
+  "inventory/unit.retire",
+  /* Assemblies: build a set, put something in, take something out, break it
+     down. Built by OI-8; no screen. */
+  "inventory/kit.assemble", "inventory/kit.put", "inventory/kit.take",
+  "inventory/kit.build", "inventory/kit.break",
+  /* Work orders. Built by OI-10 alongside the release rail, which shipped its
+     surface; this half did not. */
+  "inventory/job.open", "inventory/job.close",
 ]);
 
 /**
@@ -336,15 +358,14 @@ const namesIt = (hay, op) => {
     const src = strip(readFileSync(manifest, "utf8"));
     const hay = `${src}\n${from}`;
     const writes = writesIn(src);
-    /* ⚠️ DRAWN, OR REACHED FOR — see the header. Either is the app saying it has
-       decided about this collection, and `stock` is only ever the second. */
-    const subjects = new Set([...subjectsIn(entries),
-      ...writes.filter(([, op]) => namesIt(hay, op)).map(([of_]) => of_)]);
+    /* ⚠️ REPORTED, NOT NARROWED BY — see the header. What a screen is about is
+       worth saying in the failure so the reader can see which nouns the product
+       does reach; it is no longer what decides whether the question is asked. */
+    const subjects = subjectsIn(entries);
     let asked = 0;
     let waiting = 0;
     const orphans = [];
-    for (const [of_, op] of writes) {
-      if (!subjects.has(of_)) continue;
+    for (const [, op] of writes) {
       asked++;
       const key = `${app}/${op}`;
       /* ⚠️ EVERY VERB ASKED ABOUT, REACHED OR NOT, because the stale check below
@@ -375,7 +396,7 @@ const namesIt = (hay, op) => {
       /* ⚠️ THE COUNTDOWN IS SAID OUT LOUD, because "every one of them called" over
          a corpus with seven waiting is a summary that reads better than the tree
          does — which is the failure every guard in this directory is about. */
-      ok(`${app}: ${asked - waiting} of ${asked} verb(s) of a reached subject called`
+      ok(`${app}: ${asked - waiting} of ${asked} declared verb(s) called`
         + (waiting ? `, ${waiting} waiting on a surface` : ""));
     }
   }
@@ -392,6 +413,128 @@ const namesIt = (hay, op) => {
   for (const key of WAITING) {
     if (!held.has(key)) fail(`reached: ${key} is listed as waiting and is not there — `
       + `it was renamed, deleted, or its subject lost its screen.`);
+  }
+}
+
+/* --------------------------------------- and a whole noun nobody can see --- */
+
+/**
+ * THE SAME FAULT ONE LEVEL UP: A COLLECTION NO PERSON CAN SEE A ROW OF.
+ *
+ * ⚠️ A TABLE IS NOT A SMALL DECLARATION. It is applied to every workspace's
+ * database, indexed, scoped, carried in the erasure cascade, listed in the
+ * holdings register a customer reads, and answered by the agent door. All of
+ * that is real work the product does on its behalf — and if no screen draws it,
+ * no view reads it and no control calls a verb of it, the return on all of it is
+ * that a person cannot see one row.
+ *
+ * ⚠️ AND BEING WRITTEN IS NOT BEING REACHED, WHICH IS THE SHARP PART. Two of the
+ * five this found are FILLED by a flow somebody completes: `product.register`
+ * asks "Can you photograph it?" and writes `shot`, and asks who supplies it and
+ * writes `sourcing`. Both handlers are correct. Both tables fill up. Nothing in
+ * the product ever shows either back, so the honest description of that step is
+ * that it asks somebody to do work and discards it politely. A rule that counted
+ * a write as a reach would call that wired.
+ *
+ * ⚠️ THE THREE WAYS TO BE REACHED ARE THE THREE WAYS A PERSON MEETS A RECORD: a
+ * screen ABOUT it, a view that READS it, or a verb of it a control CALLS. There
+ * is deliberately no fourth. "Another table refs it" would excuse every join
+ * table in the repository, which is exactly where this fault hides.
+ */
+const COLLECTIONS = /(?:^|\n)const \w+ = collection\(\{\s*\n\s*id:\s*"([^"]+)"/g;
+
+/**
+ * ⚠️ THE VIEWS BLOCK, BY ITS OWN SHAPE. `of:` is also how a binding names its
+ * source and how a screen names its subject, so a file-wide match would report
+ * every collection as read by something — a check that always passes, which is
+ * the failure mode every guard in this directory is a record of.
+ */
+const READS = (src) => {
+  const block = /\n  views: \[([\s\S]*?)\n  \],/.exec(src);
+  return new Set(block
+    ? [...block[1].matchAll(/\bof:\s*"([^"]+)"/g)].map((m) => m[1])
+    : []);
+};
+
+/**
+ * ⚠️ `UNSEEN` IS A COUNTDOWN ON THE SAME TERMS `WAITING` IS. A name that becomes
+ * reached fails until it is deleted; a name for a collection that is not there
+ * fails too. Each entry is a surface somebody owes, written where a reviewer
+ * sees it being added.
+ */
+const UNSEEN = new Set([
+  /* ⚠️ THE PROVING GROUND'S SECOND SCOPE, AND IT IS THE ONE ENTRY HERE THAT IS
+     NOT A COUNTDOWN. `check-in` exists so a reference app exercises
+     `scope.of: "subject"` — a record that is the PERSON's rather than the
+     workspace's, and the half of the erasure mechanism that deletes somebody's
+     own rows. Its surface is the test suite, deliberately. */
+  "ground/check-in",
+  /* Who a workspace buys from. `product.register` asks and writes `sourcing`,
+     and nothing shows either back. */
+  "inventory/supplier", "inventory/sourcing",
+  /* The gallery around `product.photo`. Same shape: the register flow asks
+     "Can you photograph it?", the handler writes the rows, no screen reads
+     them. */
+  "inventory/shot",
+  /* Free labelling of products. Declared with no verbs at all, which is why the
+     verb pass above could never have found it. */
+  "inventory/tag", "inventory/tagging",
+  /* The three whose verbs are in `WAITING` above; the collection is unseen for
+     the same reason and stops being so in the same commit. */
+  "inventory/unit", "inventory/kit", "inventory/job",
+]);
+
+{
+  const held = new Set();
+  for (const [app, manifest, entries, from] of SEEN) {
+    const src = strip(readFileSync(manifest, "utf8"));
+    const hay = `${src}\n${from}`;
+    const drawn = subjectsIn(entries);
+    const read = READS(src);
+    const called = new Set(writesIn(src)
+      .filter(([, op]) => namesIt(hay, op))
+      .map(([of_]) => of_));
+    const all = [...src.matchAll(COLLECTIONS)].map((m) => m[1]);
+    if (!all.length) {
+      fail(`reached: ${app} declares no collections this guard can see — it names their `
+        + `shape, so a manifest that changed it would pass by finding nothing to check.`);
+      continue;
+    }
+    let waiting = 0;
+    const unseen = [];
+    for (const id of all) {
+      const key = `${app}/${id}`;
+      held.add(key);
+      if (drawn.has(id) || read.has(id) || called.has(id)) {
+        if (UNSEEN.has(key)) {
+          fail(`reached: ${key} can be seen now and is still listed as unseen — `
+            + `delete the entry, or the list stops being a countdown.`);
+        }
+        continue;
+      }
+      if (UNSEEN.has(key)) waiting++;
+      else unseen.push(id);
+    }
+    if (unseen.length) {
+      fail(`reached: ${app} declares ${unseen.join(", ")} and no screen draws `
+        + `${unseen.length === 1 ? "it" : "them"}, no view reads `
+        + `${unseen.length === 1 ? "it" : "them"} and no control calls a verb of `
+        + `${unseen.length === 1 ? "it" : "them"}.\n`
+        + `       The table is created in every workspace, scoped, indexed, erased on `
+        + `purge and listed in the holdings register — and a person cannot see one row. `
+        + `Give it a surface, or add it to UNSEEN with the surface it is waiting for.`);
+    } else {
+      ok(`${app}: ${all.length - waiting} of ${all.length} collection(s) a person can reach`
+        + (waiting ? `, ${waiting} waiting on a surface` : ""));
+    }
+  }
+  if (!held.size) {
+    fail("reached: no app declares a collection — this check asked nothing, and a check "
+      + "that cannot fail is one nobody can rely on.");
+  }
+  for (const key of UNSEEN) {
+    if (!held.has(key)) fail(`reached: ${key} is listed as unseen and is not there — `
+      + `it was renamed or deleted.`);
   }
 }
 
