@@ -40,8 +40,17 @@ import { useBones } from "./bones.js";
  * reads. A screen with three of them has none.
  */
 export function Title(
-  { children, under }: {
+  { children, under, ref }: {
     readonly children: React.ReactNode;
+    /**
+     * ⚠️ THE `h1` ITSELF, FOR THE ONE CALLER THAT HAS TO MEASURE IT — see
+     * `useHandedOver`. A screen's name hands over to the crown at the moment it
+     * disappears, and what a person reads as the name is this line rather than
+     * the block around it: measured on the block, the crown waits for the note
+     * under it and the block's own padding as well, which is about 150px of
+     * scroll with the name nowhere at all.
+     */
+    readonly ref?: React.Ref<HTMLHeadingElement>;
     /**
      * ⚠️ A NODE, NOT A STRING, AND THE DIFFERENCE WAS A FACT THAT VANISHED.
      * `ScreenProps.under` has always been a `ReactNode` and the crown draws one;
@@ -55,7 +64,7 @@ export function Title(
 ) {
   return (
     <div className={`flex flex-col ${SPACE.hair}`} {...headed("title", under)}>
-      <h1 className={TYPE.title}>{children}</h1>
+      <h1 ref={ref} className={TYPE.title}>{children}</h1>
       {under ? <p className={TYPE.note}>{under}</p> : null}
     </div>
   );

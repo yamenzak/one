@@ -32,7 +32,9 @@
 import * as React from "react";
 import { Button } from "@heroui/react";
 import { Band, Page } from "./page.js";
-import { PageCrown, useChromeFoot, useCrownSocket, type Slot } from "./crown.js";
+import {
+  PageCrown, useChromeFoot, useCrownRow, useCrownSocket, useHandedOver, type Slot,
+} from "./crown.js";
 import { Docked } from "./chrome.js";
 import { sayGate, useGate } from "../parts/gated.js";
 import { TYPE } from "../tokens/type.js";
@@ -50,7 +52,7 @@ import { ShapeWaiting, useRecalledShape } from "../parts/recall.js";
 import {
   NUDGE, PAD, SAFE_BOTTOM, SCREEN_TITLE_PAD, SPACE, WHOLE,
 } from "../tokens/metrics.js";
-import { ARRIVE, arriveAt } from "../tokens/motion.js";
+import { ARRIVE, MOTION, arriveAt } from "../tokens/motion.js";
 
 /* ------------------------------------------------------------------ shape --- */
 
@@ -503,6 +505,21 @@ export function Screen<T = unknown>({
   */
   const trail = [also[0], also[1]].filter(Boolean) as readonly Slot[];
   /*
+    ⚠️ THE CROSSING, MEASURED HERE BECAUSE THE TWO ENDS ARE IN TWO FILES. A
+    socketed screen draws its display heading below and the crown is the shell's,
+    so `PageCrown`'s arrangement — name and row in one component, one
+    `useHandedOver` — is unavailable. The row travels down through the socket
+    (`useCrownRow`) and the answer travels back up in the claim, so the crossing
+    is still one threshold rather than one per side.
+
+    ⚠️ AND IT RUNS EVEN WHERE NO HEADING IS DRAWN, because a hook cannot be
+    conditional. The ref is then null, `useScrolling` resolves the document and
+    the callback returns on the first line — a listener and no state changes, on
+    a screen whose claim says `collapses` is not its business anyway.
+  */
+  const named = React.useRef<HTMLHeadingElement>(null);
+  const past = useHandedOver(named, useCrownRow());
+  /*
     ⚠️ ASKED ONCE, HERE, FOR BOTH HALVES OF THE ACT. The crown draws it above
     `md` and the dock below, and a verdict resolved twice is two chances to
     resolve it differently. Absent `op` reads as allowed — every screen that has
@@ -535,6 +552,7 @@ export function Screen<T = unknown>({
   const socketed = useCrownSocket({
     back: out, leave: how, title: name,
     under: typeof sub === "string" ? sub : undefined,
+    carried: past,
     also: trail, does: act,
   });
   const ownCrown = !socketed;
@@ -543,16 +561,27 @@ export function Screen<T = unknown>({
      a specialized screen has no nav under it, so the act takes the foot here.
      Outside a shell the answer is `act`, because a lone screen has no nav. */
   const foot = useChromeFoot();
-  /* ⚠️ A DESTINATION'S NAME IS A HEADING, NOT CHROME. With the shell's crown
-     standing there is nothing to collapse into, so the name belongs in the
-     content where a heading belongs — which is where it was going to end up the
-     first time somebody looked at a screen with no crown of its own. */
+  /* ⚠️ A SCREEN'S NAME IS A HEADING, NOT CHROME. With the shell's crown standing
+     the name belongs in the content where a heading belongs — which is where it
+     was going to end up the first time somebody looked at a screen with no crown
+     of its own. */
   /* ⚠️ AND A SCREEN WITH NO NAME DRAWS NO HEADING BLOCK, which it did: an empty
      `<h1>` and its padding, at the top of the one screen that deliberately has
      no title. The root of a product is named by the crown and by the bar item a
      thumb is already on; a heading there is the width of the screen spent
      telling somebody where they are after they arrived. */
-  const heading = socketed && !out && !!name;
+  /*
+    ⚠️ A SUB-PAGE DRAWS ONE TOO, AND IT USED TO BE THE ONE THAT DID NOT (`!out`).
+    The reasoning was that a sub-page's crown IS the place its name appears — and
+    it left a screen somebody had opened about one particular thing wearing that
+    thing's name at 14px in a chrome row, with the biggest type on the page
+    belonging to the first card under it. A pushed view is the composition a
+    display heading is FOR: the name arrives large, is read, scrolls away, and
+    the crown picks it up. That is what `PageCrown` has always done outside a
+    shell; there is no reason for the same screen to be a different page inside
+    one.
+  */
+  const heading = socketed && !!name;
 
   return (
     <>
@@ -572,7 +601,24 @@ export function Screen<T = unknown>({
 
       {heading ? (
         <Band bleed="hold" width={preset.width}>
-          <div className={SCREEN_TITLE_PAD}><Title under={sub}>{name}</Title></div>
+          {/* ⚠️ IT FADES ONLY WHERE SOMETHING IS WAITING TO CATCH IT — see
+              `crownFor`. A destination's claim has no way out, so the shell's
+              crown keeps the workspace and the product in its middle and never
+              takes a page name; a heading that dissolved anyway would leave the
+              screen with its name nowhere at all. `out` is the same fact
+              `crownFor` branches on, read here so the two cannot disagree. */}
+          <div
+            className={SCREEN_TITLE_PAD}
+            style={out
+              ? { opacity: past ? 0 : 1, transition: past ? MOTION.exit : MOTION.enter }
+              : undefined}
+          >
+            {/* ⚠️ THE `h1` IS WHAT THE CROSSING MEASURES, NOT THE BLOCK — see
+                `useHandedOver`. Measured on the block, the crown waits for the
+                line under the name and the block's own padding to clear as well,
+                which is about 150px of scroll after the name itself has gone. */}
+            <Title ref={named} under={sub}>{name}</Title>
+          </div>
         </Band>
       ) : null}
 

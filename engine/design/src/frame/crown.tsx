@@ -151,7 +151,15 @@ const OVERLAP = 12;
     crossing cannot oscillate. */
 const SLACK = 24;
 
-function useHandedOver(
+/**
+ * ⚠️ EXPORTED, BECAUSE THE TWO ENDS OF THE CROSSING ARE NOT ALWAYS IN ONE FILE.
+ * `PageCrown` draws the name and the row together and can measure both; a screen
+ * SOCKETED under a shell draws the name here and the row is the shell's, so the
+ * same question has to be asked from `screen.tsx` with a row it was handed. One
+ * implementation, because a second one is a second threshold and the two would
+ * hand over at different moments on two halves of the same product.
+ */
+export function useHandedOver(
   name: React.RefObject<HTMLElement | null>,
   crown: React.RefObject<HTMLElement | null>,
 ): boolean {
@@ -748,6 +756,18 @@ export interface CrownClaim {
    * unless it travels with the name.
    */
   readonly under?: string;
+  /**
+   * ⚠️ WHETHER THE NAME BELOW HAS SCROLLED AWAY — see `CrownProps.carried`. A
+   * sub-page draws its own display heading in content and the crown is the
+   * shell's, so the two ends of the crossing are in different files: the screen
+   * measures, and the answer travels with the claim.
+   *
+   * ⚠️ ABSENT MEANS "NOT COLLAPSING", which is what a claim published before any
+   * measurement says, and what a screen with no heading to hand over says
+   * permanently. `crownFor` reads it that way; the crown then shows the name at
+   * rest rather than never, which is the safe direction of the two.
+   */
+  readonly carried?: boolean;
   readonly also: readonly Slot[];
   readonly does?: CrownProps["does"];
 }
@@ -755,6 +775,22 @@ export interface CrownClaim {
 const CrownSocket = React.createContext<
   ((claim: CrownClaim | null) => void) | null
 >(null);
+
+/**
+ * ⚠️ THE ROW THE NAME HAS TO REACH, HANDED DOWN — because a socketed screen
+ * measures a crossing against a crown it does not draw. `useHandedOver` takes
+ * the larger of the row's height and the hem's, and the row is the larger of the
+ * two on any phone with a notch: the safe area is added to the crown and not to
+ * the veil. Guessed at the constant instead, the name hands over a few pixels of
+ * scroll late on exactly the devices this product is used on.
+ */
+const CrownRow = React.createContext<React.RefObject<HTMLElement | null> | null>(null);
+
+/** ⚠️ An empty ref outside a socket — `useHandedOver` falls back to the hem. */
+const NO_ROW: React.RefObject<HTMLElement | null> = { current: null };
+
+export const useCrownRow = (): React.RefObject<HTMLElement | null> =>
+  React.useContext(CrownRow) ?? NO_ROW;
 
 /**
  * WHICH CROWN WINS, AND WHAT IS IN IT — the whole rule, as a function.
@@ -791,22 +827,25 @@ export function crownFor(
   if (claim?.back) {
     return {
       /*
-        ⚠️ `collapses: false`, AND IT WAS `true` — WHICH LEFT A SUB-PAGE WITH NO
-        NAME AT ALL. `collapses` means "the content carries this name in full, so
-        hide the small copy until it scrolls away", and it is right for
-        `PageCrown`, which draws both. A socketed sub-page draws neither: `Screen`
-        renders its heading in content only when there is NO way out (a
-        destination under a standing shell crown), precisely because a sub-page's
-        crown is supposed to be the one place its name appears. Both halves were
-        individually correct and together they meant every sub-page inside a
-        Shell was a back arrow, two action chips and nothing saying where you
-        were — until you scrolled, on a page that often has nothing to scroll.
+        ⚠️ `collapses` IS NOT A TASTE, IT IS "IS THE NAME ALSO IN THE CONTENT" —
+        and it has been wrong in both directions here. `true` with the content
+        drawing no heading left every sub-page inside a Shell as a back arrow,
+        two chips and nothing saying where you were, until you scrolled, on a
+        page that often has nothing to scroll. `false` with the content drawing
+        one is the same name twice, at two sizes, four lines apart. `Screen`
+        draws the display heading on a sub-page now — the same composition
+        `PageCrown` has always had — so this collapses, and the screen that
+        measured the crossing is what answers `carried`.
       */
       back: claim.back,
       leave: claim.leave,
       name: claim.title,
       under: claim.under,
-      collapses: false,
+      collapses: true,
+      /* ⚠️ NOT `undefined` — a collapsing crown that is never told throws, and
+         a claim published before the first reading legitimately has no answer
+         yet. "Not yet" and "not scrolled" are the same picture. */
+      carried: claim.carried ?? false,
       also: claim.also.slice(0, 2) as unknown as readonly [Slot, Slot],
       does: product.foot === "nav" ? claim.does : undefined,
     };
@@ -861,16 +900,21 @@ export const useChromeFoot = (): Foot => React.useContext(ChromeFoot);
 export function CrownSocketProvider({
   onClaim,
   foot,
+  row,
   children,
 }: {
   readonly onClaim: (claim: CrownClaim | null) => void;
   /** ⚠️ See `Foot`. */
   readonly foot: Foot;
+  /** ⚠️ The crown a socketed screen's name hands over to — see `CrownRow`. */
+  readonly row?: React.RefObject<HTMLElement | null>;
   readonly children: React.ReactNode;
 }) {
   return (
     <CrownSocket.Provider value={onClaim}>
-      <ChromeFoot.Provider value={foot}>{children}</ChromeFoot.Provider>
+      <CrownRow.Provider value={row ?? null}>
+        <ChromeFoot.Provider value={foot}>{children}</ChromeFoot.Provider>
+      </CrownRow.Provider>
     </CrownSocket.Provider>
   );
 }
@@ -891,6 +935,13 @@ export function useCrownSocket(claim: CrownClaim): boolean {
     claim.under,
     Boolean(claim.back),
     claim.leave,
+    /* ⚠️ IN THE SIGNATURE, OR THE CROWN NEVER TAKES THE NAME. This is the one
+       value in a claim that changes after mount without anything else changing
+       with it — a boolean crossed once on scroll — so left out, the memo holds
+       and the socket above is never told. `useHandedOver` fires it at most twice
+       per visit, and its hysteresis is what stops a page resting on the line
+       from republishing on every frame. */
+    Boolean(claim.carried),
     claim.also.map((a) => [a.id, a.label, Boolean(a.dot)]),
     claim.does
       ? [claim.does.label, Boolean(claim.does.disabled), claim.does.tone]
@@ -902,6 +953,7 @@ export function useCrownSocket(claim: CrownClaim): boolean {
     return {
       title: now().title,
       under: now().under,
+      carried: now().carried,
       leave: now().leave,
       back: now().back ? () => now().back?.() : undefined,
       also: now().also.map((a) => ({

@@ -10,7 +10,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  beneath, defineApp, isUnder, refuseApp, screenFor, type AppSpec,
+  beneath, defineApp, isUnder, refuseApp, screenFor, upFrom, type AppSpec,
 } from "../src/manifest.js";
 import { operationsFor } from "../src/collection.js";
 import { collection } from "../src/collection.js";
@@ -822,5 +822,53 @@ describe("which screen an address belongs to", () => {
     /* ⚠️ Nothing at all for an address this screen does not own, rather than a
        confident slice of somebody else's path. */
     expect(beneath("/thing", "/where/p-a1")).toEqual([]);
+  });
+});
+
+/**
+ * WHAT IS ABOVE A SCREEN — the arrow in its crown, and where its record goes
+ * when it is put away.
+ *
+ * ⚠️ ONE QUESTION, SO ONE WALK. The renderer derived this twice: once to decide
+ * where a deleted record leaves to, and it was about to derive it again for the
+ * back control. Two walks is how the arrow and the disappearing record come to
+ * land in different places on the same screen — and neither is visible without
+ * clicking both.
+ */
+describe("what is above a screen", () => {
+  const SCREENS = [
+    { route: "/", id: "home", nav: "primary" as const },
+    { route: "/stock", id: "stock", nav: "primary" as const, of: "stock" },
+    { route: "/things", id: "things", nav: "none" as const, of: "product",
+      body: { shape: "list" } },
+    { route: "/thing", id: "product", nav: "none" as const, of: "product",
+      body: { shape: "detail" } },
+    { route: "/report", id: "report", nav: "none" as const, body: { shape: "figure" } },
+  ];
+
+  it("leads a record's screen back to where that record was listed", () => {
+    expect(upFrom(SCREENS, SCREENS[3]!)?.id).toBe("things");
+  });
+
+  /* ⚠️ THE FIVE THE BAR NAVIGATES BETWEEN ARE NOT SOMEWHERE YOU WENT. A back
+     arrow on a destination is a way out of a place you did not enter, and it
+     would take the account with it — `crownFor` leads with a face or with a way
+     out, never both. */
+  it("gives a destination nothing above it", () => {
+    expect(upFrom(SCREENS, SCREENS[0]!)).toBeUndefined();
+    expect(upFrom(SCREENS, SCREENS[1]!)).toBeUndefined();
+  });
+
+  /* ⚠️ AND HOME IS THE FALLBACK RATHER THAN NOTHING. A screen reached from a
+     search or a shortcut has no listing above it and still has to be leavable. */
+  it("falls back to the app's own root", () => {
+    expect(upFrom(SCREENS, SCREENS[4]!)?.id).toBe("home");
+  });
+
+  /* ⚠️ AND A LISTING IS NEVER ABOVE ITSELF, which `s !== screen` is the whole of
+     — a list screen for a collection matches its own condition, so without it
+     the catalogue's back arrow reloaded the catalogue. */
+  it("never leads a listing back to itself", () => {
+    expect(upFrom(SCREENS, SCREENS[2]!)?.id).toBe("home");
   });
 });

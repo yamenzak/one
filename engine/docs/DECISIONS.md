@@ -4012,3 +4012,52 @@ that it is not on a shelf yet. That is the next step, and a list cannot offer it
 shows; a route belonging to one product written into the platform; a flow that
 ends on a list of what it just added to; or an affordance offered by a screen and
 refused by the door.
+
+## D106 — A screen about one thing is named by that thing, and leaving it is derived
+
+**A page about the clear casting resin was headed "Product".** That is
+`ScreenSpec.label`, and it is the right word in the three other places it is
+read — the nav item, the shortcut tile, the sentence in a permission refusal —
+because none of those is about a particular row. On the page itself it is a
+heading answering a question nobody asked, with the biggest type on the screen
+spent on the category of the thing somebody is already looking at.
+
+**The name has to come from the door, on the screen's own answer.** The engine
+already resolved it (`namesIn`) — inside `aside`, the payload for DELETING one,
+sent only where the caller holds the update grant. So a member who may read a
+product and not change it opened a page with no name available at all, and the
+"fix" would have been to widen a delete sheet's gate. A fact about the record
+belongs on the record's answer; `Drawn.name` is that, and the kind moves UNDER
+the name where it is a fact rather than a title.
+
+**A screen somebody WENT to leads back, and the manifest already said which.**
+`nav: "primary"` is one of the five the bar navigates between; everything else is
+somewhere they arrived. So the way out is `upFrom` — the listing for the screen's
+own collection, or the product's root — and it is deliberately NOT the browser's
+history, which is right when there is any and leaves the product entirely when a
+link was opened cold, with nothing inside the page able to tell those apart. It
+is the same answer as where a record's screen goes when the record is put away:
+one walk, because two let the arrow and the disappearing record disagree.
+
+**And the crown then takes the name on scroll, replacing the workspace and the
+product.** That pair is what a DESTINATION's crown says, and it is worth saying
+there; on a page about one particular thing it is answering a question nobody is
+asking, and both cannot have the middle slot. The heading is read on arrival,
+scrolls away, and the crown picks it up small — which is what `PageCrown` has
+always done outside a shell, and what a socketed screen could not do because the
+name and the row are in different files. The row travels down through the crown
+socket and the crossing travels back up in the claim, through one
+`useHandedOver`.
+
+**The hand-off had a browser suite and it measured the wrong composition.**
+`handover.mount.tsx` drives `PageCrown`, which nothing a customer opens goes
+through: every declared screen in every product is socketed under a Shell.
+A second mount was the whole fix, and it caught both halves — a `carried` left
+out of the claim's signature (the crown is never told, so the name disappears at
+the top of the page) and a heading condition that draws nothing on a sub-page.
+
+**Therefore never:** a page titled by the kind of thing it is about; a fact about
+a record travelling inside the payload for deleting it; a way back written as a
+route rather than derived from the manifest; a `collapses` set without checking
+whether the content draws the heading; or a browser harness that exercises a
+composition the product does not ship.

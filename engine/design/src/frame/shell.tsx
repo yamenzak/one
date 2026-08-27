@@ -507,6 +507,14 @@ export function Shell(props: ShellProps) {
     ever seen in the wrong place.
   */
   const [claim, setClaim] = React.useState<CrownClaim | null>(null);
+  /*
+    ⚠️ AND THE ROW GOES BACK DOWN, because a socketed screen's name hands over to
+    THIS crown and cannot measure it. `useHandedOver` takes the larger of the
+    row's height and the hem's, and the row wins on any phone with a notch — the
+    safe area is added to the crown and not to the veil — so a screen guessing at
+    the constant hands over late on exactly the devices this is used on.
+  */
+  const row = React.useRef<HTMLElement>(null);
 
   /*
     ⚠️ WHAT IS AT THE FOOT, DECIDED BY WHAT THE SCREEN IS — see `Foot`. One of
@@ -597,6 +605,7 @@ export function Shell(props: ShellProps) {
         second, from every screen in the product.
       */}
       <Crown
+        ref={row}
         bleed="edge"
         width="work"
         {...crownFor(claim, {
@@ -733,7 +742,9 @@ export function Shell(props: ShellProps) {
         */}
         <TellingProvider>
           <main className="flex flex-1 min-w-0 flex-col">
-            <CrownSocketProvider onClaim={setClaim} foot={foot}>{children}</CrownSocketProvider>
+            <CrownSocketProvider onClaim={setClaim} foot={foot} row={row}>
+              {children}
+            </CrownSocketProvider>
           </main>
         </TellingProvider>
       </div>

@@ -77,6 +77,28 @@ export interface Drawn {
    */
   readonly edits: Fields;
   /**
+   * WHAT THIS RECORD IS CALLED — the one name, for whoever draws the screen.
+   *
+   * ⚠️ A SCREEN ABOUT ONE THING IS NAMED BY THAT THING, AND THE MANIFEST CANNOT
+   * SAY SO. `ScreenSpec.label` is the word for the KIND — "Product" — because it
+   * is written once and read by a nav item, a shortcut tile and a permission
+   * refusal, none of which is about a particular row. A page titled "Product"
+   * over a page about the clear casting resin is a heading that answers a
+   * question nobody asked.
+   *
+   * ⚠️ AND IT USED TO TRAVEL INSIDE `aside`, WHICH IS THE PAYLOAD FOR DELETING
+   * ONE. Same string, resolved by the same `namesIn`, sent only where the caller
+   * `holds` the update grant — so a member who may read a product and not change
+   * it opened a page with no name on it, and the fix would have been to widen a
+   * delete sheet's gate. A fact about the record belongs on the record's answer.
+   *
+   * ⚠️ `null` WHERE THERE IS NO RECORD OR NOTHING NAMES IT — a list screen, an
+   * address still resolving, a collection of rows with no text field on them.
+   * The caller falls back to the screen's own label, which is the honest answer
+   * to "one of these, unnamed".
+   */
+  readonly name: string | null;
+  /**
    * WHETHER THIS RECORD CAN BE PUT ASIDE, AND WHAT TO CALL IT WHEN ASKING — see
    * `Aside`.
    *
@@ -410,6 +432,20 @@ export async function drawnFor(
   }
 
   /*
+    ⚠️ THE ONE RESOLVER, ASKED ONCE — see `namesIn` and `Drawn.name`. The trash
+    listed a note by its title while the sheet asking to delete it printed an
+    identifier, because one guessed and the other read the declaration; asking
+    here and handing the answer to both is what stops a third caller re-deriving
+    it slightly differently.
+  */
+  const names = of && held ? namesIn(of) : null;
+  const name = names && held
+    ? String(held[names] ?? "") || String(held["id"] ?? "") || null
+    : held
+      ? String(held["id"] ?? "") || null
+      : null;
+
+  /*
     ⚠️ THE TWO WAYS A RECORD LEAVES, ANSWERED ONCE PER SCREEN — see
     `Drawn.aside`. Both go through `<collection>:write`, which is the same grant
     the generated update asks for: putting a record out of the way is a change to
@@ -418,10 +454,7 @@ export async function drawnFor(
   const aside: Aside | null = of && held && holds(permissionFor(of, "update"))
     ? {
       of: of.label.one,
-      /* ⚠️ THE ONE RESOLVER — see `namesIn`. The trash listed a note by its
-         title while the sheet asking to delete it printed an identifier,
-         because one guessed and the other read the declaration. */
-      name: String((namesIn(of) && held[namesIn(of)!]) || String(held["id"] ?? "")),
+      name: name ?? String(held["id"] ?? ""),
       bin: operationsFor(of).includes(verbId(of.id, "delete")),
       already: held["aside"] === "frozen" || held["aside"] === "binned"
         ? held["aside"]
@@ -429,7 +462,7 @@ export async function drawnFor(
     }
     : null;
 
-  return { record: held ?? null, views, acts, picks, edits, aside };
+  return { record: held ?? null, views, acts, picks, edits, name, aside };
 }
 
 /**

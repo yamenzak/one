@@ -682,6 +682,46 @@ export const beneath = (route: string, path: string): readonly string[] => {
   return rest ? rest.split("/").filter(Boolean) : [];
 };
 
+/**
+ * WHAT IS ABOVE THIS SCREEN — where a way back leads, derived from the manifest.
+ *
+ * ⚠️ A SCREEN SOMEBODY WENT TO HAS A WAY BACK AND A DESTINATION DOES NOT, and
+ * that distinction is already declared: `nav: "primary"` is one of the five the
+ * bar navigates BETWEEN, and everything else is somewhere you arrived. So a
+ * product's detail screen gets an arrow and its Stock tab does not, without
+ * either of them saying so.
+ *
+ * ⚠️ THE COLLECTION'S OWN LISTING FIRST, WHICH IS THE ONE PLACE SOMEBODY COULD
+ * HAVE COME FROM. `onAside` in the renderer already derived exactly this to
+ * decide where a screen goes when its record is put away, with a comment saying
+ * why a route written by hand would be a second spelling of an address the
+ * manifest holds — and a second copy of that walk is how the arrow and the
+ * disappearing record come to disagree about where "back" is.
+ *
+ * ⚠️ AND THE APP'S ROOT IS THE FALLBACK RATHER THAN NOTHING. A screen reached
+ * from a search or a shortcut has no listing above it and still has to be
+ * leavable; home is where every product's nav starts, so it is the honest "up"
+ * — and it is `undefined` for the root itself, which has nothing above it at all.
+ *
+ * ⚠️ IT IS NOT THE BROWSER'S HISTORY, DELIBERATELY. History back is right when
+ * there is any and wrong when a link was opened cold — it leaves the product
+ * entirely, which is the one thing a back arrow inside an app must never do —
+ * and nothing can tell the two cases apart from inside the page.
+ */
+export const upFrom = <T extends {
+  readonly route: string;
+  readonly of?: string;
+  readonly nav?: "primary" | "none";
+  readonly body?: { readonly shape: string } | undefined;
+}>(screens: readonly T[], screen: T): T | undefined => {
+  if (screen.nav === "primary" || screen.route === "/") return undefined;
+  const listing = screen.of
+    ? screens.find((s) =>
+      s !== screen && s.of === screen.of && s.body?.shape === "list")
+    : undefined;
+  return listing ?? screens.find((s) => s.route === "/");
+};
+
 /* --------------------------------------------------------------- derived --- */
 
 /**

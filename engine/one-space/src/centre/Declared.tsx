@@ -36,7 +36,8 @@ const Create = React.lazy(() => import("@engine/design/create")
    browser bundle — so what both ends need is declared once, in the layer both
    are allowed to reach. */
 import {
-  BLOCKS, PLATFORM_PROBLEMS, SCREEN_PATH, askedOf, fillOf, isGroup, problem, verbId, viewsIn,
+  BLOCKS, PLATFORM_PROBLEMS, SCREEN_PATH, askedOf, fillOf, isGroup, problem, upFrom, verbId,
+  viewsIn,
   type Fields, type Fill, type GuideBook, type MilestoneBook, type Problem, type Raised,
   type ScreenSpec,
   type SurfaceSpec, type Viewed,
@@ -75,6 +76,8 @@ interface Drawn {
   }>>;
   /** ⚠️ Which of the subject's fields this screen may change — see `Drawn.edits`. */
   readonly edits: Fields;
+  /** ⚠️ What this record is called — see `Drawn.name`. `null` where nothing does. */
+  readonly name: string | null;
   /** ⚠️ Whether this record can be put aside, and its words — see `Drawn.aside`. */
   readonly aside: {
     of: string; name: string; bin: boolean; already: "frozen" | "binned" | null;
@@ -379,6 +382,30 @@ export function Declared({ screen, screens, at, go, currency, app }: {
       : undefined
   ), [edits, screen.of, subject, run]);
 
+  /**
+   * WHAT IS ABOVE THIS SCREEN — see `upFrom`.
+   *
+   * ⚠️ IT ANSWERS TWO THINGS AND THAT IS WHY IT IS ONE WALK: the way back in the
+   * crown, and where the screen goes when its record is put away. Derived twice
+   * they would land in different places on the same screen, and nobody would
+   * notice without pressing both.
+   *
+   * ⚠️ AND THE DESTINATION IS DERIVED, NOT NAMED. The list screen for this
+   * collection is the one place a person could have arrived from; a route typed
+   * here would be a second spelling of an address the manifest holds.
+   *
+   * ⚠️ AND A DESTINATION GETS `undefined`, WHICH IS THE WHOLE SWITCH. A screen
+   * with a way out is a sub-page: the shell's crown stands down, the avatar is
+   * replaced by the way back, and the screen's own name is what the crown takes
+   * once the heading has scrolled away. `Screen` and `crownFor` do all of that
+   * from this one value.
+   */
+  const above = React.useMemo(() => upFrom(screens, screen), [screens, screen]);
+  const back = React.useMemo(
+    () => (above ? () => { go(above.route); } : undefined),
+    [above, go],
+  );
+
   /*
     ⚠️ THE RECORD LEAVES AND SO DOES THE SCREEN, WHICH IS THE HALF A SHEET
     CANNOT DO FOR ITSELF. Binned or frozen, this record is off every list; a
@@ -387,11 +414,9 @@ export function Declared({ screen, screens, at, go, currency, app }: {
     happen" shape read from the other end. So the screen goes back to where the
     record was listed, and `forget` clears the lists that are now shorter.
 
-    ⚠️ AND THE DESTINATION IS DERIVED, NOT NAMED. The list screen for this
-    collection is the one place a person could have arrived from; a route typed
-    here would be a second spelling of an address the manifest holds. Where the
-    product declares none — a record only ever reached from a search — the
-    screen stays and re-reads, and the row it is about then says it is aside.
+    ⚠️ AND WHERE THE PRODUCT DECLARES NOWHERE ABOVE — a record only ever reached
+    from a search — the screen stays and re-reads, and the row it is about then
+    says it is aside.
   */
   const onAside = React.useCallback((how: "frozen" | "binned") => {
     void (async () => {
@@ -402,10 +427,10 @@ export function Declared({ screen, screens, at, go, currency, app }: {
       if (!said.ok) { tell.failed(said.problem); return; }
       tell.did(how === "binned" ? "Moved to trash" : "Put away");
       forget();
-      const listing = screens.find((s) => s.of === screen.of && s.body?.shape === "list");
-      if (listing) go(listing.route); else got.again();
+      /* ⚠️ THE SAME PLACE THE ARROW GOES — see `above`. */
+      if (above) go(above.route); else got.again();
     })();
-  }, [screen.of, subject, screens, go, got, tell]);
+  }, [screen.of, subject, above, go, got, tell]);
 
   const has: Has = React.useMemo(() => ({
     ...(got.of.status === "ready" && got.of.data.record
@@ -473,9 +498,31 @@ export function Declared({ screen, screens, at, go, currency, app }: {
     measuring a frame no customer gets, and reporting one rhythm because in the
     fixture there was one. The board is right; this was the copy that drifted.
   */
+  /*
+    ⚠️ A SCREEN ABOUT ONE THING IS NAMED BY THAT THING — see `Drawn.name`. The
+    manifest's `label` is the word for the KIND, because it is also the nav item,
+    the shortcut tile and the sentence in a permission refusal, none of which is
+    about a particular row; over a page about the clear casting resin it is a
+    heading answering a question nobody asked. The kind moves UNDER the name,
+    where it is a fact about what is on the screen rather than the screen's own
+    title, and it is dropped where it would only repeat the words above it.
+
+    ⚠️ AND THE FALLBACK IS THE LABEL, NOT AN IDENTIFIER. A list screen has no
+    record, an address still resolving has not got one yet, and a collection with
+    nothing that names a row legitimately answers `null` — all three are "one of
+    these", which is what the kind's own word says.
+  */
+  const titled = got.of.status === "ready" ? got.of.data.name : null;
+  const kind = titled && titled !== screen.label ? screen.label : undefined;
+
   if (!body) return null;
   return (
-    <Screen shape={body.shape} title={screen.label}>
+    <Screen
+      shape={body.shape}
+      title={titled ?? screen.label}
+      {...(kind ? { under: kind } : {})}
+      {...(back ? { back } : {})}
+    >
       <Body body={body} has={has} />
       {asking && acts[asking] ? (
         <Doing

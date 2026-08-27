@@ -169,6 +169,44 @@ describe("a screen is handed its record and its views together", () => {
   });
 
   /*
+    ⚠️ WHAT THE RECORD IS CALLED, ON THE SCREEN'S OWN ANSWER — see `Drawn.name`.
+    A screen about one thing is named by that thing, and the manifest cannot say
+    so: `ScreenSpec.label` is the word for the KIND, because it is also the nav
+    item and the shortcut tile. So a page about the cold room was headed
+    "Place" — a heading answering a question nobody asked.
+  */
+  it("says what the record is called", async () => {
+    const got = await drawnFor(shard(), APP, place, TENANT, all, cold);
+    if ("needs" in got) throw new Error(got.needs);
+    expect(got.name).toBe("Cold room");
+  });
+
+  /*
+    ⚠️ AND TO SOMEBODY WHO MAY ONLY READ, WHICH IS WHY IT IS NOT INSIDE `aside`.
+    The same string was already resolved by the same `namesIn` — in the payload
+    for DELETING one, sent only where the caller holds the update grant. So a
+    member with `stock` read and no write opened a page with no name on it, and
+    the fix would have been to widen a delete sheet's gate. The two are asserted
+    together because the split is the whole point.
+  */
+  it("names the record for a reader who may not change it", async () => {
+    const got = await drawnFor(shard(), APP, place, TENANT, only("stock:read", "supplier:read"),
+      cold);
+    if ("needs" in got) throw new Error(got.needs);
+    expect(got.name).toBe("Cold room");
+    expect(got.aside).toBeNull();
+  });
+
+  /* ⚠️ AND `null` RATHER THAN AN IDENTIFIER WHERE THERE IS NO RECORD. A list
+     screen is about a collection; the caller falls back to the screen's own
+     label, which is the honest answer to "one of these". */
+  it("has no name where there is no record", async () => {
+    const got = await drawnFor(shard(), APP, place, TENANT, all);
+    if ("needs" in got) throw new Error(got.needs);
+    expect(got.name).toBeNull();
+  });
+
+  /*
     ⚠️ THE ACTS TRAVEL WITH THE SCREEN, AND ONLY THE ONES IT OFFERS. Sending the
     catalogue would put every operation in the product on the wire for a screen
     with one button on it; sending none would mean the browser cannot draw a form

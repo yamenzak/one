@@ -578,20 +578,51 @@ describe("the shell", () => {
       product,
     );
     expect(out.name).toBe("Priya Raman");
-    /*
-      ⚠️ AND IT SHOWS THE NAME AT REST, WHICH THIS PINNED THE OTHER WAY ROUND.
-      `collapses` means "the content carries this name in full", and a socketed
-      sub-page's content carries no heading at all — `Screen` draws one only for
-      a destination, because a sub-page's crown is meant to BE the name. Asserted
-      as `true`, this test was pinning the bug: every sub-page inside a Shell was
-      a back arrow, two chips and nothing saying where you were.
-    */
-    expect(out.collapses).toBe(false);
     expect(out.back).toBeTruthy();
     /* ⚠️ The account does NOT lead a sub-page — the way out does, and a crown
        refuses both at once. */
     expect(out.who).toBeUndefined();
     expect(out.also?.map((a) => a.id)).toEqual(["edit"]);
+  });
+
+  /*
+    ⚠️ AND IT COLLAPSES, WHICH THIS HAS NOW BEEN PINNED BOTH WAYS ROUND — because
+    `collapses` is not a taste, it is "is this name ALSO in the content", and the
+    answer changed when `Screen` started drawing a display heading on a sub-page.
+    Pinned `true` while the content drew none, every sub-page inside a Shell was a
+    back arrow, two chips and nothing saying where you were. Pinned `false` now,
+    it is the same name at two sizes four lines apart. The assertion is only ever
+    as true as the other half, which is why the other half is asserted next.
+  */
+  it("collapses a sub-page's name, and reports the crossing the screen measured", () => {
+    const one = { back: () => {}, title: "Priya Raman", also: [] };
+    expect(crownFor(one, product).collapses).toBe(true);
+    /* ⚠️ NEVER `undefined` — a collapsing crown that is never told throws, and a
+       claim published before the first reading legitimately has no answer yet.
+       "Not measured" and "not scrolled" are the same picture. */
+    expect(crownFor(one, product).carried).toBe(false);
+    expect(crownFor({ ...one, carried: true }, product).carried).toBe(true);
+  });
+
+  /*
+    ⚠️ AND THE OTHER HALF: THE SCREEN DRAWS THE NAME IT IS COLLAPSING. Asserted
+    on the markup rather than on a prop, because the fault this pair exists to
+    stop is a name that is nowhere — which is invisible in either component alone
+    and obvious the moment both are rendered.
+  */
+  it("puts a sub-page's name in the content, not only in the crown", () => {
+    const out = html(
+      <Shell
+        screens={SCREENS} here="/thing/n1" held={new Set(["note:read"])} onGo={() => {}}
+        crown={crown}
+      >
+        <Screen shape="detail" title="Casting resin, clear" back={() => {}}>
+          <p>a fact</p>
+        </Screen>
+      </Shell>,
+    );
+    expect(out).toContain("<h1");
+    expect(out).toContain("Casting resin, clear");
   });
 
   it("keeps the product's crown for a destination, and takes its actions", () => {

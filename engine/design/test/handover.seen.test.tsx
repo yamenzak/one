@@ -28,14 +28,30 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 let browser: Browser;
 let css: string;
 let code: string;
+/** ⚠️ The SHIPPED composition — see `socketed.mount.tsx`. A second code path. */
+let socketed: string;
 beforeAll(async () => {
   css = stylesheet();
   code = await mounted(join(HERE, "handover.mount.tsx"));
+  socketed = await mounted(join(HERE, "socketed.mount.tsx"));
   browser = await chromium.launch();
 }, 180_000);
 afterAll(async () => { await browser?.close(); });
 
 const PHONE = { width: 412, height: 900 };
+
+/** ⚠️ One page per mount, because the two are two different compositions. */
+const opened = async (bundle: string) => {
+  const page = await browser.newPage({ viewport: PHONE });
+  await page.setContent(
+    `<!doctype html><html data-theme="dark"><head><style>${css}</style></head>`
+    + `<body><div id="root"></div>`
+    + `<script type="module">${bundle}</script></body></html>`,
+  );
+  await page.waitForSelector("h1");
+  await page.waitForTimeout(400);
+  return page;
+};
 
 /** ⚠️ Both places dim through an ancestor, so an element's own `opacity` is not
     what anybody sees — the chain to the root is. */
@@ -140,5 +156,96 @@ describe("the name a title card hands to the crown", () => {
     expect(nowhere.map((s) => s.y),
       "the name is in neither place at these scroll offsets — dissolved out of the "
       + "page by the hem and not yet in the crown").toEqual([]);
+  }, 120_000);
+});
+
+/**
+ * THE SAME RULE ON THE COMPOSITION A CUSTOMER ACTUALLY GETS.
+ *
+ * ⚠️ IT IS A SECOND SUITE BECAUSE IT IS A SECOND CODE PATH — see
+ * `socketed.mount.tsx`. `PageCrown` measures a crossing between two halves it
+ * draws itself; a screen inside a `Shell` draws the name, the shell draws the
+ * row, and the answer travels back up through the crown socket. Three files
+ * instead of one, and the rule has to come out the same.
+ *
+ * ⚠️ AND THE PRODUCT SHIPS ONLY THE SECOND ONE. Every declared screen in every
+ * app is socketed; nothing a customer opens goes through `PageCrown`. A harness
+ * that exercised the easy path alone would have reported this hand-off working
+ * while every product's sub-pages lost their names — which is exactly the shape
+ * of the fault the first suite was written for.
+ */
+describe("the name a sub-page hands to the shell's crown", () => {
+  it("is on the page or in the crown, at every point of the scroll", async () => {
+    const page = await opened(socketed);
+
+    const steps = await page.evaluate(async ([veil, walkSrc]) => {
+      const opacityOf = eval(`(${walkSrc})`) as (el: Element) => number;
+      const wait = () => new Promise((go) => { setTimeout(go, 80); });
+      const scroller = document.scrollingElement!;
+      const crown = document.querySelector('[data-hem="top"]') as HTMLElement;
+      const heading = document.querySelector("h1")!;
+      const carried = Array.from(crown.querySelectorAll("*")).find((el) => (
+        el.children.length === 0
+        && (el.textContent ?? "").trim() === "Casting resin, clear"));
+
+      const out: { y: number; page: number; crown: number; bottom: number }[] = [];
+      for (let y = 0; y <= 520; y += 20) {
+        scroller.scrollTo(0, y);
+        await wait();
+        out.push({
+          y,
+          bottom: Math.round(heading.getBoundingClientRect().bottom - (veil as number)),
+          page: Number(opacityOf(heading).toFixed(2)),
+          crown: carried ? Number(opacityOf(carried).toFixed(2)) : 0,
+        });
+      }
+      return out;
+    }, [HEM_HOLD * 16, WALK] as const);
+    await page.close();
+
+    expect(steps.some((s) => s.crown > 0.5), "the shell's crown never took the name")
+      .toBe(true);
+    expect(steps.some((s) => s.bottom > 0 && s.page > 0.5),
+      "the heading was never legible on the page").toBe(true);
+
+    const nowhere = steps.filter((s) => !(s.bottom > 0 && s.page > 0.5) && s.crown <= 0.5);
+    expect(nowhere.map((s) => s.y),
+      "the name is in neither place at these scroll offsets").toEqual([]);
+  }, 120_000);
+
+  /*
+    ⚠️ AND THE WORKSPACE PAIR LEAVES WITH IT, WHICH IS THE HALF THE OTHER SUITE
+    CANNOT ASK ABOUT. A destination's crown says which workspace and which
+    product; on a page about one particular thing that pair is answering a
+    question nobody asked, and both cannot be in the middle slot at once. The
+    swap is the feature — the pair is gone from the moment the sub-page opens,
+    and what arrives in its place is the record's own name.
+  */
+  it("has the workspace and the product nowhere in a sub-page's crown", async () => {
+    const page = await opened(socketed);
+    const said = await page.evaluate(() => {
+      const crown = document.querySelector('[data-hem="top"]') as HTMLElement;
+      return (crown.textContent ?? "");
+    });
+    await page.close();
+    expect(said).not.toContain("Acme Corp");
+    expect(said).not.toContain("OneInventory");
+  }, 120_000);
+
+  /*
+    ⚠️ AND THE WAY OUT IS THERE INSTEAD OF THE ACCOUNT. A crown leads with a face
+    or with a way out and refuses both at once, so this is the same fact from the
+    other side — but it is worth its own assertion, because a sub-page whose
+    arrow never rendered is a page somebody can only leave by using the browser's
+    own, which on a workspace installed as an app is not on the screen at all.
+  */
+  it("leads with the way back", async () => {
+    const page = await opened(socketed);
+    const led = await page.evaluate(() => {
+      const crown = document.querySelector('[data-hem="top"]') as HTMLElement;
+      return Boolean(crown.querySelector('[aria-label="Back"]'));
+    });
+    await page.close();
+    expect(led, "a sub-page's crown has no way out in it").toBe(true);
   }, 120_000);
 });

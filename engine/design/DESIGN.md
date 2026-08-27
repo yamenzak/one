@@ -313,11 +313,46 @@ inbox would be gone from every screen in the product.
 
 | the screen | has a way out | what happens |
 |---|---|---|
-| a **sub-page** — somewhere you *went* | yes | it owns the row: back, its name, its actions. **The product's crown stands down.** The account and the inbox are one tap behind it. |
-| a **destination** — somewhere you *are* | no | the product's crown stands. The screen's name becomes a heading in the content, and it hands the crown its **actions**. |
+| a **sub-page** — somewhere you *went* | yes | it owns the row: back where the account was, its actions, and its name **once the heading below has scrolled away**. **The product's crown stands down.** The account and the inbox are one tap behind it. |
+| a **destination** — somewhere you *are* | no | the product's crown stands, keeping the account and the workspace/product pair. The screen's name is a heading in the content and stays there, and the screen hands the crown its **actions**. |
 
 That is what a phone has always done with a pushed view, and it is the only
 split under which nothing is lost at either end.
+
+⚠️ **BOTH DRAW THE DISPLAY HEADING; ONLY A SUB-PAGE HANDS IT OVER.** `collapses`
+is not a taste, it is the question *is this name also in the content* — and it
+has been wrong here in both directions. Set while the content drew no heading,
+every sub-page inside a Shell was a back arrow, two chips and nothing saying
+where you were. Unset while the content draws one, it is the same name at two
+sizes four lines apart, permanently. The heading is the composition a name that
+big is FOR: read on arrival, scrolled away, picked up small by the crown — and
+the workspace/product pair, which answers a question nobody is asking on a page
+about one particular thing, is what it replaces.
+
+⚠️ **AND THE CROSSING IS MEASURED ACROSS THE SOCKET.** `PageCrown` draws the name
+and the row and measures between them; a socketed screen draws the name, the
+shell draws the row, and neither can see the other. So the row travels DOWN
+through the socket (`useCrownRow`) and the answer travels back UP in the claim
+(`CrownClaim.carried`), through one `useHandedOver`. A second threshold on the
+socketed side would hand over at a different moment from the one every other
+page uses, on the half of the product that is every page a customer opens.
+
+⚠️ **`carried` HAS TO BE IN THE CLAIM'S SIGNATURE.** It is the one value in a
+claim that changes after mount with nothing else changing beside it — a boolean
+crossed once on scroll — so left out of the memo, the socket above is never told
+and the crown never takes the name at all. Nothing throws; the name simply
+disappears at the top of the page, which is the fault the whole hand-off exists
+to prevent.
+
+⚠️ **WHERE A WAY OUT COMES FROM IS THE MANIFEST, NOT THE SCREEN** — `upFrom` in
+the kernel. `nav: "primary"` is one of the five the bar navigates between, so it
+gets no arrow; everything else is somewhere somebody arrived, and leads back to
+the listing for its own collection or, failing that, to the product's root. It
+is deliberately **not** the browser's history: history back is right when there
+is any and leaves the product entirely when a link was opened cold, and nothing
+inside the page can tell those two apart. It is also the same answer for where a
+record's screen goes when the record is put away — one walk, because two let the
+arrow and the disappearing record land in different places.
 
 ⚠️ **A destination's actions come first in the trail** and the product's fill
 what is left. A destination's own acts are what somebody came to the screen to

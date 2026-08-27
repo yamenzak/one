@@ -569,16 +569,22 @@ moved off near-black the same day (D99), which took page-to-card from 1.03:1 to
 1.23:1 and is what makes a card read as a card here at all. It is written once in
 `design/src/tokens/ground.ts` and every product on the engine wears it.
 
-⚠️ **AND ITS TITLE STILL READS "Product" RATHER THAN THE PRODUCT'S NAME.** The
-frame is handed the SCREEN's label, which on a detail screen is the one word on
-the page that is not about the thing somebody opened — and it is the live path as
-well as the fixture (`AppSurface.tsx`, the `Section` around a declared body).
-Nothing new needs declaring: a collection already says which field names a row
-(`CollectionSpec.names`). What is missing is a channel — the browser holds this
-app's SCREENS and not its collections, so the name has to come back with the
-record from the door that already resolved both. It is a contract change to what
-a screen read answers with, which is why it is written down here rather than
-half-done.
+**AND IT IS TITLED BY THE PRODUCT NOW, NOT BY THE WORD "Product"** (D106). This
+section used to describe the gap and the channel it needed, and the channel is
+what was built: the screen door answers `Drawn.name`, resolved once by `namesIn`
+from the collection's own `names` declaration. Nothing in this app declares it —
+the collection already said which field names a row, and the browser holds this
+app's screens rather than its collections, so the name comes back with the record
+from the door that had both. The kind moves under the name, where "Product" is a
+fact about what is on the screen instead of the screen's own title.
+
+**And it leads back rather than to the account.** `nav: "none"` already said this
+screen is somewhere somebody went, so the frame puts the way out where the avatar
+is on a destination, and the crown takes the product's name once the heading has
+scrolled past it — replacing the workspace/product pair, which on a page about
+one particular tin is answering a question nobody asked. All of it is the
+`detail` shape's, so the next screen of that shape in this product or any other
+arrives with the three already done.
 
 ⚠️ **THE ENGINE UNDERNEATH IS UNTOUCHED, WHICH IS WHY THIS IS A SHORT SECTION
 RATHER THAN A SHORT PRODUCT.** Part I is what this product does and Part II is
