@@ -1441,6 +1441,17 @@ const SEES = {
 const OPS = [WRITE, SEES];
 
 /**
+ * ⚠️ THE SAME PAIR, EACH DEMANDING A GRANT — for `fills_permission_wrong` only.
+ * The fixtures above deliberately carry none, because every other rule here is
+ * about a step and the write's INPUT, and a permission on them would be a field
+ * forty assertions ignore.
+ */
+const GRANTED = [
+  { ...WRITE, permission: "thing:write" },
+  { ...SEES, permission: "thing:read" },
+];
+
+/**
  * ⚠️ A STAND-IN FOR THE ASKING REGISTRY, AND IT IS NOT THE BODY'S — see `ASKS`.
  * A body block is FED bindings and draws; a step's block is HANDED what the flow
  * holds and answers back. Checked against the wrong one a step naming `Listing`
@@ -1481,6 +1492,39 @@ const flow = (over: Record<string, unknown> = {}) => ({
 
 const told = (s: Parameters<typeof refuseStory>[0]) =>
   refuseStory(s, OPS, ASKING).map((p) => p.why);
+
+/*
+  ⚠️ THE FILL'S GRANT IS THE ONE COMPOSITION COULD NOT SEE, AND IT WAS A TYPE
+  THAT STOPPED IT. `operations` was `{ id, input, output }` — no permission in
+  the shape — so this rule was not merely unwritten, it was inexpressible. The
+  failure it lets through is quieter than the write's: a mismatched write refuses
+  at the last press, which somebody reports; a mismatched fill just asks every
+  question, which reads as the product not having the feature.
+*/
+describe("the fill's grant against the one the flow is offered on", () => {
+  const offered = (permission: string): Parameters<typeof refuseStory>[0] => ({
+    ...flow({ fills: { by: "thing.see", with: { shots: "shots" } } }),
+    permission,
+  });
+
+  it("refuses a reader demanding a grant the flow's audience was not offered", () => {
+    expect(refuseStory(offered("thing:write"), GRANTED, ASKING).map((p) => p.why))
+      .toContain("fills_permission_wrong");
+  });
+
+  it("says nothing when the two match", () => {
+    const same = [{ ...WRITE, permission: "thing:write" }, { ...SEES, permission: "thing:write" }];
+    expect(refuseStory(offered("thing:write"), same, ASKING).map((p) => p.why))
+      .not.toContain("fills_permission_wrong");
+  });
+
+  /* ⚠️ A SCREEN THAT NAMES NO GRANT HAS NOTHING TO COMPARE AGAINST, and inventing
+     one would refuse a correct declaration for being unopinionated. */
+  it("says nothing about a flow that names no permission of its own", () => {
+    expect(told(flow({ fills: { by: "thing.see", with: { shots: "shots" } } })))
+      .not.toContain("fills_permission_wrong");
+  });
+});
 
 describe("a flow that composes", () => {
   it("refuses nothing about a story whose steps reach its write", () => {

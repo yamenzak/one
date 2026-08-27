@@ -38,6 +38,7 @@
 
 import type { FieldKind, Fields } from "./field.js";
 import type { CollectionSpec } from "./collection.js";
+import type { Permission } from "./operation.js";
 import { FIELD_NAME, NAME } from "./collection.js";
 
 /* ------------------------------------------------------------------ shape --- */
@@ -1935,6 +1936,7 @@ export type StoryRefusal =
   | "when_field_unknown" | "when_reaches_a_record"
   | "story_fills_unknown" | "story_fills_nothing"
   | "fills_takes_unknown" | "fills_given_unknown" | "fills_given_unanswered"
+  | "fills_permission_wrong"
   | "story_cannot_finish";
 
 export interface StoryProblem {
@@ -1950,6 +1952,12 @@ const blanksIn = (said: string): readonly string[] =>
 export function refuseStory(
   screen: {
     readonly id: string;
+    /**
+     * ⚠️ WHO IS OFFERED THE FLOW, WHICH IS THE ANCHOR THE FILL IS JUDGED AGAINST
+     * — see `fills_permission_wrong`. Without it this function could check the
+     * SHAPE of a fill and never the question of whether the audience can run it.
+     */
+    readonly permission?: Permission;
     readonly story?: {
       readonly writes: string;
       readonly fills?: {
@@ -1964,7 +1972,21 @@ export function refuseStory(
       }[];
     };
   },
-  operations: readonly { readonly id: string; readonly input: Fields; readonly output: Fields }[],
+  /**
+   * ⚠️ AND THEIR PERMISSIONS, WHICH THIS DELIBERATELY DID NOT TAKE. Typed as
+   * `{ id, input, output }` it could not see a permission at all — so the fill's
+   * was checked at composition by nothing, and a story offered on one grant could
+   * name a reader demanding another. The failure is silent degradation: the run
+   * 403s, the person is told the pictures could not be read, and answers every
+   * question by hand. A parameter's type is a statement about which rules are
+   * even expressible, and this one ruled out the rule that mattered.
+   */
+  operations: readonly {
+    readonly id: string;
+    readonly input: Fields;
+    readonly output: Fields;
+    readonly permission?: Permission;
+  }[],
   /**
    * ⚠️ THE ASKING REGISTRY, NOT THE BODY'S — see `ASKS`. A body block is FED
    * bindings and draws; a step's block is HANDED what the flow holds and answers
@@ -1997,6 +2019,30 @@ export function refuseStory(
       + "arrive and every step would be asked, which is the flow this one exists to replace");
   }
   if (fills) {
+    /*
+      ⚠️ THE FILL'S OWN GRANT, AGAINST THE ONE THE FLOW IS OFFERED ON. This is
+      `story_permission_wrong` one operation over, and it fails more quietly: the
+      write's mismatch is a refusal at the last press, which somebody reports;
+      the fill's is a flow that simply asks every question, which reads as the
+      product not having the feature.
+
+      ⚠️ EXACT EQUALITY, BECAUSE THIS DEPLOYMENT HAS NO IMPLICATION BETWEEN
+      GRANTS. The gate is `permissions.has(op.permission)` — a flat membership
+      test — so holding `product:write` says nothing about holding
+      `product:read`. A rule admitting "weaker" permissions would need an order
+      that does not exist, and would pass exactly the pairs that 403.
+    */
+    /* ⚠️ A PUBLIC FILL IS NEVER WRONG, and `PUBLIC` is a symbol rather than a
+       string — so it is normalised out rather than compared. Anybody who reached
+       the flow is signed in, which is all `PUBLIC` asks of them. */
+    const wants = typeof fills.permission === "string" ? fills.permission : "";
+    const offered = typeof screen.permission === "string" ? screen.permission : "";
+    if (wants && offered && wants !== offered) {
+      at("fills_permission_wrong",
+        `is offered on "${offered}" and is filled by ${fills.id}, which demands `
+        + `"${wants}" — the reader would be refused and every step asked by hand, which `
+        + "reads as the feature not existing");
+    }
     /* ⚠️ THE JOIN IS THE SHARED KEYS AND NOTHING ELSE CHECKS IT. An operation
        that runs, spends credits and answers into a flow that drops every value
        is green in every suite: the run succeeded, the flow worked, and the
