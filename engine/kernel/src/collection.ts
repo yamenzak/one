@@ -175,6 +175,31 @@ export const operationsFor = (spec: CollectionSpec): readonly string[] =>
   CRUD.filter((verb) => !(spec.without ?? []).includes(verb)).map((verb) => verbId(spec.id, verb));
 
 /**
+ * WHICH FIELD SAYS WHAT ONE RECORD IS CALLED — the declaration, or a guess.
+ *
+ * ⚠️ `names` IS THE ANSWER AND THE GUESS IS THE FALLBACK, in that order, in one
+ * place. Two readings of "what is this row called" is how a screen and a sheet
+ * come to disagree about the same record: the trash listed a note by its title
+ * while the sheet asking to delete it printed an identifier, because one guessed
+ * and the other read the declaration and neither did both.
+ *
+ * ⚠️ AND THE GUESS IS THE FIRST TEXT FIELD, WHICH IS RIGHT BECAUSE OF WHAT A
+ * COLLECTION IS. Almost every one leads with the thing's own name — a list has
+ * to show something — so a collection that never declared `names` still reads as
+ * words rather than as an id. Where it is wrong the row carries its collection
+ * and its date as well, which is enough to decide.
+ *
+ * ⚠️ A PICKER DOES NOT USE IT, AND THAT IS NOT AN OVERSIGHT — see `choicesOf`.
+ * Its rows are a CHOICE BETWEEN similar things, so a guessed field that is not
+ * unique draws two options reading identically and there is no way to tell which
+ * is which. A row in a list is not a choice; a dropdown is.
+ */
+export const namesIn = (spec: CollectionSpec): string | null =>
+  (spec.names && spec.names in spec.fields ? spec.names : null)
+  ?? Object.entries(spec.fields).find(([, f]) => f.kind === "text")?.[0]
+  ?? null;
+
+/**
  * ONE GENERATED VERB'S ID, FROM A COLLECTION'S ID ALONE.
  *
  * ⚠️ THE BROWSER NEEDS IT AND HAS NO `CollectionSpec` — which is the whole

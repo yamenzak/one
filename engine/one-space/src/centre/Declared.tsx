@@ -72,6 +72,10 @@ interface Drawn {
   }>>;
   /** ⚠️ Which of the subject's fields this screen may change — see `Drawn.edits`. */
   readonly edits: Fields;
+  /** ⚠️ Whether this record can be put aside, and its words — see `Drawn.aside`. */
+  readonly aside: {
+    of: string; name: string; bin: boolean; already: "frozen" | "binned" | null;
+  } | null;
 }
 
 /**
@@ -155,6 +159,10 @@ export function Declared({ screen, screens, at, go, currency, app }: {
     for nothing.
   */
   const [asking, setAsking] = React.useState<string | null>(null);
+  /* ⚠️ EVERY ACT SAYS SO — see `Telling`. Putting a record aside is the one act
+     on this screen whose outcome is that the screen leaves, so without a
+     sentence the only evidence it worked is a page that changed. */
+  const tell = useTelling();
   /*
     ⚠️ WHAT SOMEBODY NARROWED THIS SCREEN TO, HELD HERE AND SENT WITH THE READ —
     see `PickSpec`. It is not in the address on purpose: narrowing a list is a
@@ -352,6 +360,34 @@ export function Declared({ screen, screens, at, go, currency, app }: {
       : undefined
   ), [edits, screen.of, subject, run]);
 
+  /*
+    ⚠️ THE RECORD LEAVES AND SO DOES THE SCREEN, WHICH IS THE HALF A SHEET
+    CANNOT DO FOR ITSELF. Binned or frozen, this record is off every list; a
+    re-read would draw it exactly as it was, on a page whose whole subject has
+    just been put away — which is the "answered 200 over a change that did not
+    happen" shape read from the other end. So the screen goes back to where the
+    record was listed, and `forget` clears the lists that are now shorter.
+
+    ⚠️ AND THE DESTINATION IS DERIVED, NOT NAMED. The list screen for this
+    collection is the one place a person could have arrived from; a route typed
+    here would be a second spelling of an address the manifest holds. Where the
+    product declares none — a record only ever reached from a search — the
+    screen stays and re-reads, and the row it is about then says it is aside.
+  */
+  const onAside = React.useCallback((how: "frozen" | "binned") => {
+    void (async () => {
+      const said = how === "binned"
+        ? await api.post(verbId(screen.of!, "delete"), { id: String(subject?.["id"] ?? "") })
+        : await api.post("bin.freeze",
+          { collection: screen.of, id: String(subject?.["id"] ?? "") });
+      if (!said.ok) { tell.failed(said.problem); return; }
+      tell.did(how === "binned" ? "Moved to trash" : "Put away");
+      forget();
+      const listing = screens.find((s) => s.of === screen.of && s.body?.shape === "list");
+      if (listing) go(listing.route); else got.again();
+    })();
+  }, [screen.of, subject, screens, go, got, tell]);
+
   const has: Has = React.useMemo(() => ({
     ...(got.of.status === "ready" && got.of.data.record
       ? { record: got.of.data.record }
@@ -366,8 +402,11 @@ export function Declared({ screen, screens, at, go, currency, app }: {
     ...(currency ? { currency } : {}),
     named,
     ...(editing ? { edits: editing } : {}),
+    ...(got.of.status === "ready" && got.of.data.aside
+      ? { aside: got.of.data.aside, onAside }
+      : {}),
     ...(wantsBook ? { book } : {}),
-  }), [got.of, ids, onGo, onDo, currency, picked, named, wantsBook, book, editing]);
+  }), [got.of, ids, onGo, onDo, currency, picked, named, wantsBook, book, editing, onAside]);
 
   if (screen.story) {
     return (

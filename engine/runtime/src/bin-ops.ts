@@ -21,7 +21,7 @@
  */
 
 import type { AppSpec, CollectionSpec } from "@engine/kernel";
-import { BIN_DAYS, PUBLIC, eraseBy, permissionFor } from "@engine/kernel";
+import { BIN_DAYS, PUBLIC, eraseBy, namesIn, permissionFor } from "@engine/kernel";
 import type { Resolved } from "./compose.js";
 import type { PlatformCtx } from "./member-ops.js";
 import { setAside } from "./records.js";
@@ -39,16 +39,6 @@ export interface Binned {
   readonly at: string;
   readonly by: string | null;
 }
-
-/**
- * ⚠️ THE FIRST TEXT FIELD IS WHAT A RECORD IS CALLED, and it is a guess this
- * makes once rather than a `title` every collection would have to declare. Every
- * collection in this product leads with the thing's name because a list has to
- * show something, so the guess is right — and where it is wrong the row still
- * carries its collection and its date, which is enough to decide.
- */
-const namesIn = (spec: CollectionSpec): string | null =>
-  Object.entries(spec.fields).find(([, f]) => f.kind === "text")?.[0] ?? null;
 
 /**
  * ⚠️ WHAT IS IN THE BIN, ACROSS EVERY COLLECTION — one query per collection,

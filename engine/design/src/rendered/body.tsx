@@ -28,6 +28,7 @@
  */
 
 import * as React from "react";
+import { Button, Drawer } from "@heroui/react";
 import type {
   Binding, BlockSpec, Fields, Format, GroupSpec, GuideBook, Layout, MilestoneBook, Placed, Presence,
   Raised, Read, SurfaceSpec, Viewed,
@@ -43,6 +44,7 @@ import { Money } from "../parts/surfaces.js";
 import { Tally } from "../parts/tally.js";
 import { PARTS } from "./parts.js";
 import { Edit, type Refusal } from "./edit.js";
+import { PutAside } from "../parts/aside.js";
 import { Lead, Resuming } from "../chart/figures.js";
 import { glyphOf } from "../frame/shell.js";
 
@@ -92,15 +94,6 @@ export interface Has {
    */
   readonly currency?: string | undefined;
   /**
-   * WHAT THE SCREEN IS NARROWED TO, BY PICK ID — see `PickSpec`.
-   *
-   * ⚠️ HELD BY THE CALLER RATHER THAN BY THIS COMPONENT, because changing it is a
-   * REFETCH. The narrowing reaches an asked view's input on the worker, so a
-   * value kept here would move a control and leave the rows it filters exactly
-   * where they were — which is the "control that narrows nothing" the kernel
-   * refuses one shape earlier.
-   */
-  /**
    * CHANGING ONE FACT FROM THE ROW SHOWING IT — see `BlockSpec.edits`.
    *
    * ⚠️ THE DECLARATION AND THE WRITE, WHICH IS EVERYTHING `Edit` NEEDS AND
@@ -118,6 +111,34 @@ export interface Has {
     readonly fields: Fields;
     readonly onSave: (field: string, value: unknown) => Promise<Refusal>;
   } | undefined;
+  /**
+   * THE TWO WAYS THIS RECORD LEAVES — see `Leaving`.
+   *
+   * ⚠️ THE DOOR'S ANSWER, NOT A DECLARATION. Every detail screen has the same
+   * two, so the manifest says nothing about them; what the browser cannot work
+   * out is the collection's own word, what this record is called, and whether
+   * the collection has a delete at all.
+   *
+   * ⚠️ AND `null` COVERS THREE TRUE THINGS WITH ONE ABSENCE: no record, not
+   * arrived, or may not write. All three end in nothing to press.
+   */
+  readonly aside?: {
+    readonly of: string;
+    readonly name: string;
+    readonly bin: boolean;
+    readonly already: "frozen" | "binned" | null;
+  } | undefined;
+  /** ⚠️ What the confirmed sheet runs — see `Leaving`. */
+  readonly onAside?: ((how: "frozen" | "binned") => void) | undefined;
+  /**
+   * WHAT THE SCREEN IS NARROWED TO, BY PICK ID — see `PickSpec`.
+   *
+   * ⚠️ HELD BY THE CALLER RATHER THAN BY THIS COMPONENT, because changing it is a
+   * REFETCH. The narrowing reaches an asked view's input on the worker, so a
+   * value kept here would move a control and leave the rows it filters exactly
+   * where they were — which is the "control that narrows nothing" the kernel
+   * refuses one shape earlier.
+   */
   readonly picked?: Readonly<Record<string, string>> | undefined;
   /** ⚠️ The rows a collection-backed narrowing offers — see `Drawn.picks`. */
   readonly picks?: Readonly<Record<string, readonly { id: string; label: string }[]>> | undefined;
@@ -667,7 +688,55 @@ export function Body({ body, has }: BodyProps) {
       >
         {rest.map((p, i) => wrap(p, has, i, body.layout))}
       </Arranged>
+      <Leaving has={has} />
     </>
+  );
+}
+
+/**
+ * THE TWO WAYS A RECORD LEAVES, AT THE FOOT OF THE SCREEN IT IS ABOUT.
+ *
+ * ⚠️ AT THE BOTTOM, AND THAT IS THE PLACEMENT DECISION. The way to remove
+ * something should be arrived at rather than landed on: everything the record IS
+ * comes first, and by the time somebody reaches this they have read it. In the
+ * crown it would sit a thumb's width from Back on every detail screen in the
+ * product.
+ *
+ * ⚠️ AND IT IS DERIVED, NOT DECLARED — see `Drawn.aside`. Every detail screen in
+ * every product has the same two ways out; a manifest saying so per screen would
+ * be the same three lines on forty of them, thirty-nine right and one forgotten.
+ * The door answers `null` where there is nothing to press, which covers "this
+ * screen is about no record", "it has not arrived" and "they may not write" with
+ * one absence.
+ */
+function Leaving({ has }: { readonly has: Has }) {
+  const aside = has.aside;
+  if (!aside) return null;
+  /* ⚠️ ALREADY ASIDE MEANS THE QUESTION IS THE OTHER ONE — putting it back —
+     and that is the bin screen's, not this one's. Offering to delete a deleted
+     record is a control whose outcome is nothing. */
+  if (aside.already) return null;
+  return (
+    <div className="flex justify-end">
+      <PutAside
+        trigger={
+          <Drawer.Trigger>
+            {/* ⚠️ QUIET, AND THE WORD RATHER THAN A GLYPH. A bin icon alone at
+                the foot of a page is a control somebody has to press to find out
+                about, and this is the one control in the product where finding
+                out by pressing is not acceptable. */}
+            <Button variant="tertiary">{aside.bin ? "Delete" : "Put it away"}</Button>
+          </Drawer.Trigger>
+        }
+        name={aside.name}
+        /* ⚠️ THE COLLECTION'S OWN WORD, MID-SENTENCE — "The product itself is
+           kept". `label.one` is a heading and is capitalised for one. */
+        of={aside.of.toLowerCase()}
+        opens={aside.bin ? "bin" : "freeze"}
+        onBin={() => has.onAside?.("binned")}
+        onFreeze={() => has.onAside?.("frozen")}
+      />
+    </div>
   );
 }
 

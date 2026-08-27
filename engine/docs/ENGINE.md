@@ -416,7 +416,7 @@ and a manifest that does not compose refuses to boot.
 | `present` | how a date, a number, a price and a measurement are written for one reader | 18 | — |
 | `infra` | what a product needs underneath it, and what each kind can promise | 11 | — |
 | `field` | what a value is: its kind, its bounds, what it holds, whether it is the app's to keep | 9 | — |
-| `collection` | what a thing an app keeps is — and the six operations it gets for free | 20 | — |
+| `collection` | what a thing an app keeps is — and the six operations it gets for free | 21 | — |
 | `operation` | one declaration carrying every cross-cutting concern (D12) | 12 | — |
 | `access` | permissions, roles, and what an app may never claim | 15 | — |
 | `reach` | how far one person works inside a workspace — where, as against what (D45) | 4 | — |
@@ -445,7 +445,7 @@ and a manifest that does not compose refuses to boot.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**322 of them**, 321 reached by something today.
+**323 of them**, 322 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 

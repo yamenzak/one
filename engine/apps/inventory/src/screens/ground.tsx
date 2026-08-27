@@ -22,7 +22,7 @@ import { Screen, Shell, ready, whoFace } from "@engine/design";
 import { Body, type Has } from "@engine/design/body";
 import { Create, type Answers } from "@engine/design/create";
 import type { ScreenSpec } from "@engine/kernel";
-import { meteredIds } from "@engine/kernel";
+import { editsIn, meteredIds, namesIn } from "@engine/kernel";
 import { inventory } from "../index.js";
 import { INVENTORY_SESSIONS, INVENTORY_SURFACES } from "./index.js";
 import { COUNTS, LINES, PLACES, THINGS } from "./sample.js";
@@ -160,6 +160,11 @@ export function InventoryGround({ route, onGo, sky, step }: {
                 has={{
                   ...SEEN,
                   ...(here.of ? { record: firstOf(here.of) } : {}),
+                  /* ⚠️ WHAT CAN BE CHANGED AND WHAT CAN BE REMOVED — see
+                     `ableOn`. Both are the door's answers in the deployment; a
+                     board that left them out photographs a detail screen with
+                     no way to correct anything on it. */
+                  ...ableOn(here),
                   named: namedIn(screens),
                   book: BOOK,
                 }}
@@ -260,6 +265,40 @@ const FIRST = CATALOGUE.find((one) => one.storage) ?? CATALOGUE[0]!;
 /** ⚠️ What the board opens for a screen that is ABOUT something — see `Screen.of`. */
 const firstOf = (collection: string): Readonly<Record<string, unknown>> | undefined =>
   collection === "product" ? FIRST : undefined;
+
+/**
+ * WHAT THE DOOR WOULD SAY ABOUT CHANGING AND REMOVING THIS RECORD.
+ *
+ * ⚠️ DERIVED FROM THE MANIFEST, NEVER WRITTEN OUT. Both are the deployment's
+ * answers (`Drawn.edits`, `Drawn.aside`), and a board listing its own would
+ * photograph a screen offering a pencil against a field the door refuses — a
+ * picture of a state the product never shows, which is the fault this whole
+ * board exists to avoid one level up.
+ *
+ * ⚠️ AND THE SAVE IS A NO-OP RATHER THAN ABSENT. Every affordance in the
+ * renderer is gated on the handler being there, so a board without one
+ * photographs a screen with its presses silently removed.
+ */
+const ableOn = (screen: ScreenSpec): Partial<Has> => {
+  const of = (inventory().collections ?? []).find((c) => c.id === screen.of);
+  const record = screen.of ? firstOf(screen.of) : undefined;
+  if (!of || !record || !screen.body) return {};
+  const fields = Object.fromEntries(editsIn(screen.body)
+    .flatMap((name) => (of.fields[name] ? [[name, of.fields[name]!] as const] : [])));
+  const named = namesIn(of);
+  return {
+    ...(Object.keys(fields).length
+      ? { edits: { fields, onSave: async () => undefined } }
+      : {}),
+    aside: {
+      of: of.label.one,
+      name: String((named && record[named]) || String(record["id"] ?? "")),
+      bin: true,
+      already: null,
+    },
+    onAside: () => undefined,
+  };
+};
 
 const SEEN: Has = {
   /*

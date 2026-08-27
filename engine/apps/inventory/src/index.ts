@@ -6616,7 +6616,12 @@ const manifest = (): AppSpec => defineApp({
           {
             group: "What it is",
             of: [
-              { block: "FieldRow",
+              /* ⚠️ AND THE ROW IS WHERE IT IS CORRECTED — see `BlockSpec.edits`.
+                 A catalogue of eight hundred rows was typed by people at a
+                 shelf; the brand is the field that is wrong most often, and
+                 sending somebody to a second screen to fix a word is how a
+                 catalogue comes to be full of near-misses nobody corrects. */
+              { block: "FieldRow", edits: "brand",
                 when: { has: { of: "field", field: "brand" } },
                 bind: {
                   label: { from: { of: "words", says: "Brand" } },
@@ -6624,6 +6629,11 @@ const manifest = (): AppSpec => defineApp({
                 } },
               /* ⚠️ THE UNIT IS THE ONE FACT EVERY NUMBER ABOVE IS IN, so it is
                  read here rather than inferred from the column heading. */
+              /* ⚠️ AND NEITHER THIS NOR THE ROW UNDER IT CARRIES AN `edits`,
+                 WHICH IS THE DECLARATION REFUSING RATHER THAN THE SCREEN BEING
+                 SHY. Both are `settled`: the generated update does not advertise
+                 them, `product.recount` is the way through, and
+                 `refuseSurface` fails the manifest for offering either. */
               { block: "FieldRow",
                 bind: {
                   label: { from: { of: "words", says: "Counted in" } },
@@ -6637,7 +6647,11 @@ const manifest = (): AppSpec => defineApp({
               /* ⚠️ WHEN TO SAY SOMETHING, NOT WHEN TO REFUSE — see `product.par`.
                  Absent for most products, which is why it is drawn only when it
                  is there rather than as an empty row saying nothing. */
-              { block: "FieldRow",
+              /* ⚠️ AND IT IS THE ONE NUMBER HERE SOMEBODY CHANGES OFTEN. A par
+                 is set from experience — it is wrong the first time by
+                 definition, and is corrected the week somebody runs out at the
+                 level they thought was safe. */
+              { block: "FieldRow", edits: "par",
                 when: { has: { of: "field", field: "par" } },
                 bind: {
                   label: { from: { of: "words", says: "Tell me below" } },

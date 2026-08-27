@@ -49,6 +49,47 @@ const drawn = (body: SurfaceSpec, over: Partial<Has> = {}) =>
 const one = (block: SurfaceSpec["blocks"][number]): SurfaceSpec =>
   ({ shape: "detail", layout: { as: "stack" }, blocks: [block] });
 
+/**
+ * ⚠️ THE WAY OUT IS DRAWN BY THE FRAME AND DECLARED BY NOBODY — see `Leaving`.
+ * What is asserted is that the door's answer decides: a screen whose body says
+ * nothing about deleting still offers it, and one the door answered `null` for
+ * offers nothing at all.
+ */
+describe("the two ways a record leaves", () => {
+  const ASIDE = { of: "Product", name: "Casting resin", bin: true, already: null };
+  const plain = one({
+    block: "FieldRow",
+    bind: {
+      label: { from: { of: "words", says: "What it is" } },
+      value: { from: { of: "field", field: "name" } },
+    },
+  });
+
+  it("draws a way out on a body that never mentions one", () => {
+    expect(drawn(plain, { aside: ASIDE })).toContain("Delete");
+  });
+
+  it("draws none where the door said there is none", () => {
+    expect(drawn(plain)).not.toContain("Delete");
+  });
+
+  /* ⚠️ AND NONE ON A RECORD ALREADY ASIDE. Offering to delete something that is
+     in the trash is a control whose outcome is nothing; putting it back is the
+     bin screen's question, not this one's. */
+  it("draws none once the record has already gone aside", () => {
+    expect(drawn(plain, { aside: { ...ASIDE, already: "binned" as const } }))
+      .not.toContain("Delete");
+  });
+
+  /* ⚠️ AND A COLLECTION WITH NO DELETE OFFERS THE OTHER ONE BY NAME. Opening on
+     a question whose button cannot run is worse than not offering it. */
+  it("offers the freeze by name where the collection has no delete", () => {
+    const said = drawn(plain, { aside: { ...ASIDE, bin: false } });
+    expect(said).toContain("Put it away");
+    expect(said).not.toContain("Delete");
+  });
+});
+
 /* ------------------------------------------------------ changing a fact --- */
 
 /**

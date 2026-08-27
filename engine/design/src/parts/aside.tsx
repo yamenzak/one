@@ -46,6 +46,15 @@ export interface PutAsideProps {
   readonly of: string;
   readonly onBin: () => void;
   /**
+   * WHICH QUESTION IT OPENS WITH.
+   *
+   * ⚠️ `freeze` IS FOR A COLLECTION WITH NO DELETE AT ALL — see
+   * `CollectionSpec.without`. There the bin is not a slower way out, it is an
+   * operation that does not exist, and opening on a question whose button
+   * cannot run is worse than not offering it.
+   */
+  readonly opens?: Asking;
+  /**
    * ⚠️ ABSENT WHERE FREEZING MEANS NOTHING, and then the sheet does not mention
    * it. A record nothing else can point at — a draft, a session — has no history
    * to keep resolving, so "keep it out of the way" is a second name for the same
@@ -81,8 +90,8 @@ export const SAYS: Readonly<Record<Asking, {
   },
 };
 
-export function PutAside({ trigger, name, of, onBin, onFreeze }: PutAsideProps) {
-  const [asking, setAsking] = React.useState<Asking>("bin");
+export function PutAside({ trigger, name, of, onBin, onFreeze, opens = "bin" }: PutAsideProps) {
+  const [asking, setAsking] = React.useState<Asking>(opens);
   const said = SAYS[asking];
 
   return (
@@ -91,7 +100,7 @@ export function PutAside({ trigger, name, of, onBin, onFreeze }: PutAsideProps) 
          press of Delete anywhere on the screen opens the wrong question — and it
          is the wrong question in the direction nobody checks, because the sheet
          somebody meant to read carefully is the one they now recognise. */
-      onOpenChange={(open) => { if (!open) setAsking("bin"); }}
+      onOpenChange={(open) => { if (!open) setAsking(opens); }}
     >
       {trigger}
       <Drawer.Backdrop>

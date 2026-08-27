@@ -24,8 +24,8 @@
 
 import type { AppSpec, FieldSpec, Fields, Fill, Reach, ScreenSpec } from "@engine/kernel";
 import {
-  SCREEN_PATH, actsIn, columnsIn, editsIn, eraseBy, fieldsIn, fillsIn, permissionFor, reachFor,
-  viewsIn,
+  SCREEN_PATH, actsIn, columnsIn, editsIn, eraseBy, fieldsIn, fillsIn, namesIn, operationsFor,
+  permissionFor, reachFor, verbId, viewsIn,
 } from "@engine/kernel";
 import { joinRows } from "./joined.js";
 import { readOne } from "./records.js";
@@ -76,6 +76,41 @@ export interface Drawn {
    * first.
    */
   readonly edits: Fields;
+  /**
+   * WHETHER THIS RECORD CAN BE PUT ASIDE, AND WHAT TO CALL IT WHEN ASKING — see
+   * `Aside`.
+   *
+   * ⚠️ DERIVED RATHER THAN DECLARED, WHICH IS WHY IT IS HERE AT ALL. Every
+   * detail screen in every product has the same two ways a record leaves, and a
+   * manifest that had to say so per screen would be a manifest with the same
+   * three lines on forty of them — and thirty-nine right, one forgotten.
+   *
+   * ⚠️ AND THE WORDS TRAVEL WITH IT. The sheet asks "Delete Casting resin,
+   * clear?" using the COLLECTION'S own word for one of them; a browser that had
+   * to work either out would need the manifest, which is the weight D17 refuses.
+   *
+   * ⚠️ `null` IS THE WHOLE ANSWER TO "NO". This screen is about no record, or
+   * the record has not arrived, or this person may not write — three true
+   * things, one outcome: nothing to press.
+   */
+  readonly aside: Aside | null;
+}
+
+/** ⚠️ What the sheet needs to ask its question — see `Drawn.aside`. */
+export interface Aside {
+  /** The collection's own word for one of them — "Product", "Shelf". */
+  readonly of: string;
+  /** What this one is called, from the field the collection says names it. */
+  readonly name: string;
+  /**
+   * ⚠️ FALSE WHERE THE COLLECTION HAS NO `delete` VERB — see
+   * `CollectionSpec.without`. A membership is claimed rather than created and
+   * removed rather than deleted; offering to bin one would be a control with no
+   * operation behind it.
+   */
+  readonly bin: boolean;
+  /** Whether it is already aside, and which way — so the screen can say so. */
+  readonly already: "frozen" | "binned" | null;
 }
 
 export interface Act {
@@ -374,7 +409,27 @@ export async function drawnFor(
     }
   }
 
-  return { record: held ?? null, views, acts, picks, edits };
+  /*
+    ⚠️ THE TWO WAYS A RECORD LEAVES, ANSWERED ONCE PER SCREEN — see
+    `Drawn.aside`. Both go through `<collection>:write`, which is the same grant
+    the generated update asks for: putting a record out of the way is a change to
+    it, not a fifth kind of thing to be granted.
+  */
+  const aside: Aside | null = of && held && holds(permissionFor(of, "update"))
+    ? {
+      of: of.label.one,
+      /* ⚠️ THE ONE RESOLVER — see `namesIn`. The trash listed a note by its
+         title while the sheet asking to delete it printed an identifier,
+         because one guessed and the other read the declaration. */
+      name: String((namesIn(of) && held[namesIn(of)!]) || String(held["id"] ?? "")),
+      bin: operationsFor(of).includes(verbId(of.id, "delete")),
+      already: held["aside"] === "frozen" || held["aside"] === "binned"
+        ? held["aside"]
+        : null,
+    }
+    : null;
+
+  return { record: held ?? null, views, acts, picks, edits, aside };
 }
 
 /**
@@ -396,6 +451,9 @@ const choicesOf = async (
   const spec = (app.collections ?? []).find((c) => c.id === id);
   if (!spec) return [];
   const erase = eraseBy(spec);
+  /* ⚠️ THE DECLARATION ONLY, AND `namesIn`'s GUESS IS DELIBERATELY NOT TAKEN —
+     see its header. These rows are a CHOICE BETWEEN similar things, so a guessed
+     field that is not unique draws two options reading identically. */
   const named = spec.names && spec.names in spec.fields ? spec.names : null;
   const rows = await db.prepare(
     `SELECT id${named ? `, ${column(named)} AS said` : ""} FROM ${table(spec.id)}`

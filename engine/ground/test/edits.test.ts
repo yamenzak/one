@@ -189,3 +189,40 @@ describe("changing one fact changes one fact", () => {
       .toBe(403);
   });
 });
+
+/**
+ * ⚠️ THE TWO WAYS A RECORD LEAVES ARE DERIVED, so the question here is whether
+ * the DOOR works them out — no screen in this app says a word about them, and
+ * that is the point: every detail screen in every product gets both without
+ * declaring either.
+ */
+describe("a screen says whether the record can be put aside", () => {
+  it("names it the way the sheet will ask about it", async () => {
+    const id = await makeNote();
+    const [, said] = await screenFor("note", id);
+    const aside = (said as { aside: { of: string; name: string; bin: boolean } | null }).aside;
+    /* ⚠️ THE COLLECTION'S WORD AND THE RECORD'S OWN NAME. "Delete this?" over a
+       list somebody has scrolled is a question about whichever row they think is
+       selected. */
+    expect(aside?.of).toBe("Note");
+    expect(aside?.name).toBe("Sharpen the saw");
+    expect(aside?.bin).toBe(true);
+  });
+
+  it("says nothing to somebody who may read and not write", async () => {
+    const id = await makeNote();
+    const [, said] = await screenFor("note", id, readerCookie);
+    expect((said as { aside: unknown }).aside).toBe(null);
+  });
+
+  /* ⚠️ AND IT SAYS WHEN THE RECORD IS ALREADY ASIDE, which is what stops the
+     screen offering to delete something that is in the trash — a control whose
+     outcome is nothing. */
+  it("says which way it has already gone", async () => {
+    const id = await makeNote();
+    await post("/api/bin.freeze", { collection: "note", id });
+
+    const [, said] = await screenFor("note", id);
+    expect((said as { aside: { already: string } | null }).aside?.already).toBe("frozen");
+  });
+});
