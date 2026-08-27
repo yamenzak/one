@@ -267,6 +267,27 @@ export interface StorySpec {
    * describe a flow nobody ever walks.
    */
   readonly asks: readonly StepSpec[];
+  /**
+   * WHERE SOMEBODY IS STANDING WHEN THE FLOW IS OVER — a screen this app
+   * declares, opened on the record the write answered with.
+   *
+   * ⚠️ IT EXISTS BECAUSE THE ALTERNATIVE WAS A PRODUCT'S ROUTE TYPED INTO THE
+   * PLATFORM. `Declared.tsx` went to `/products` after every flow in every app,
+   * because the first flow written happened to be a product's — and the second
+   * app's would have landed on a list it does not have. A destination is a fact
+   * about the flow, so it is declared where the flow is.
+   *
+   * ⚠️ AND IT IS THE THING JUST MADE, NOT THE LIST IT JOINS. Landing on a list
+   * of eight hundred rows asks somebody to find what they were holding a second
+   * ago; landing on it is the only screen that can say what is still missing —
+   * which for a new product is that it is not on a shelf yet. That is the whole
+   * next step, and a list cannot offer it.
+   *
+   * ⚠️ ABSENT IS A REAL ANSWER: the flow ends where it started, which is right
+   * for one that records something rather than making it — a count, a delivery,
+   * anything whose subject is the screen somebody was already on.
+   */
+  readonly lands?: string;
 }
 
 /**
@@ -1326,7 +1347,9 @@ export function refuseApp(spec: AppSpec): readonly Refusal[] {
           + "the name of a variable is not a fact about the product");
       }
     }
-    for (const p of refuseStory(s, spec.operations, ASKS, Object.keys(spec.settings ?? {}))) {
+    for (const p of refuseStory(
+      s, spec.operations, ASKS, Object.keys(spec.settings ?? {}), screenIds,
+    )) {
       at(p.of, `${p.why}: ${p.detail}`);
     }
   }

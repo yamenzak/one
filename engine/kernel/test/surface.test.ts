@@ -1650,6 +1650,38 @@ describe("what a flow starts already answered", () => {
   });
 });
 
+/**
+ * ⚠️ WHERE A FLOW ENDS IS DECLARED BECAUSE THE ALTERNATIVE WAS A PRODUCT'S ROUTE
+ * IN THE PLATFORM — see `StorySpec.lands`. The browser went to `/products` after
+ * every flow in every app; the second app's would have landed on a list it does
+ * not have, silently, on a route that draws nothing.
+ */
+describe("where a flow ends", () => {
+  const ending = (lands: string) =>
+    refuseStory(flow({ lands }), OPS, ASKING, [], ["thing", "things"]).map((p) => p.why);
+
+  it("accepts a screen this app declares", () => {
+    expect(ending("thing")).toEqual([]);
+  });
+
+  it("refuses one it does not", () => {
+    expect(ending("nowhere")).toContain("lands_nowhere");
+  });
+
+  /* ⚠️ AND A FLOW THAT NAMES NOWHERE IS NOT WRONG. It ends where it started,
+     which is right for one that records something rather than making it. */
+  it("says nothing about a flow that names no destination", () => {
+    expect(refuseStory(flow(), OPS, ASKING, [], ["thing"])).toEqual([]);
+  });
+
+  /* ⚠️ AND AN EMPTY LIST CHECKS NOTHING RATHER THAN REFUSING EVERYTHING — the
+     same shape `heroes` takes. A caller that has not been updated does not get
+     every flow reported as broken. */
+  it("checks nothing when it was handed no screens", () => {
+    expect(refuseStory(flow({ lands: "nowhere" }), OPS, ASKING)).toEqual([]);
+  });
+});
+
 describe("a flow that composes", () => {
   it("refuses nothing about a story whose steps reach its write", () => {
     expect(refuseStory(flow(), OPS, ASKING)).toEqual([]);

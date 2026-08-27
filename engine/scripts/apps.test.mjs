@@ -219,6 +219,42 @@ for (const file of CONFIGS) {
 }
 if (!suites) ok(`suites: ${CONFIGS.length} vitest config(s), each giving every test its own world`);
 
+/* --------------------------------------------------- and the other way --- */
+
+/**
+ * ⚠️ AND THE PLATFORM MUST NOT NAME A PRODUCT'S ROUTE, WHICH IS THE SAME RULE
+ * READ FROM THE OTHER END. `Declared.tsx` renders whatever screens an app
+ * declares — it is the one file in the deployment that is about every product
+ * at once — and it ended every flow with `go("/products")`, because the first
+ * flow anybody wrote happened to be a product's. The second app's flow would
+ * have finished by moving somebody to a route it does not have: no error, no
+ * failing test, a blank page after the one press that mattered.
+ *
+ * ⚠️ THE CHECK IS A PATH LITERAL, because that is the only shape the mistake
+ * takes. A destination in these files is a screen's ID resolved through the
+ * manifest (`Has.onGo`, `StorySpec.lands`); a string starting with a slash is
+ * somebody spelling out an address the manifest already holds.
+ */
+const RENDERS_ANY_APP = ["one-space/src/centre/Declared.tsx", "one-space/src/centre/AppSurface.tsx"];
+
+let named = 0;
+for (const file of RENDERS_ANY_APP) {
+  const code = readFileSync(join(ENGINE, file), "utf8")
+    /* ⚠️ COMMENTS FIRST. This file's own header quotes the route it exists to
+       have removed, and a guard that read its own argument as the offence would
+       be one nobody could write the explanation for. */
+    .replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+  for (const [, path] of code.matchAll(/["'`](\/[a-z][\w-]*)["'`]/g)) {
+    named++;
+    fail(`${file}: names the route "${path}".\n` +
+         `       This file draws every product's screens. A destination here is a screen's\n` +
+         `       ID through the manifest — a path is one product's address in the platform.`);
+  }
+}
+if (!named) {
+  ok(`routes: ${RENDERS_ANY_APP.length} file(s) that draw any app, none naming one's address`);
+}
+
 console.log(bad
   ? `\napps: ${bad} finding(s) — an app doing what the platform is for.`
   : `\napps: manifests declare, the platform does, and composition waits for a request.`);

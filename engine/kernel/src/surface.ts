@@ -2034,6 +2034,8 @@ export type StoryRefusal =
   | "fills_takes_unknown" | "fills_given_unknown" | "fills_given_unanswered"
   | "fills_permission_wrong"
   | "starts_takes_unknown" | "starts_not_a_setting"
+  /* ⚠️ A flow that ends somewhere that is not a screen — see `StorySpec.lands`. */
+  | "lands_nowhere"
   | "story_cannot_finish";
 
 export interface StoryProblem {
@@ -2058,6 +2060,7 @@ export function refuseStory(
     readonly story?: {
       readonly writes: string;
       readonly starts?: Readonly<Record<string, string>>;
+      readonly lands?: string;
       readonly fills?: {
         readonly by: string;
         readonly with: Readonly<Record<string, string>>;
@@ -2101,6 +2104,12 @@ export function refuseStory(
    * rather than the book.
    */
   settings: readonly string[] = [],
+  /**
+   * ⚠️ EVERY SCREEN THIS APP DECLARES — see `StorySpec.lands`. A flow ending at
+   * a screen that is not there leaves somebody on a blank route with the thing
+   * they just made nowhere in sight, and nothing throws.
+   */
+  screens: readonly string[] = [],
 ): readonly StoryProblem[] {
   const told = screen.story;
   if (!told) return [];
@@ -2115,6 +2124,17 @@ export function refuseStory(
      against, so it stops rather than reporting each field as unknown. */
   const write = operations.find((o) => o.id === told.writes);
   if (!write) return out;
+
+  /* --- where it ends ------------------------------------------------------ */
+
+  /* ⚠️ CHECKED ONLY WHERE A LIST WAS GIVEN, for the reason `heroes` defaults to
+     empty and refuses: a caller that forgets does not get flows UNCHECKED, it
+     gets a loud refusal on the first one that declares a destination. */
+  if (told.lands && screens.length && !screens.includes(told.lands)) {
+    at("lands_nowhere",
+      `ends at "${told.lands}", which is not a screen this app declares — the flow `
+      + "would finish by moving somebody to a blank route");
+  }
 
   /* --- what starts already answered -------------------------------------- */
 

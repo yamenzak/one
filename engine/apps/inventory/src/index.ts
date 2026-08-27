@@ -6785,6 +6785,19 @@ const manifest = (): AppSpec => defineApp({
       permission: "product:write", tone: "neutral",
       story: {
         writes: "product.register",
+        /*
+          ⚠️ ON THE PRODUCT IT JUST MADE — see `StorySpec.lands`. It landed on
+          the catalogue, which asks somebody to find in eight hundred rows the
+          thing they were holding a second ago; and the catalogue cannot say the
+          one thing that is true of a product a minute old, which is that it is
+          not on a shelf yet. Its own page leads with exactly that.
+
+          ⚠️ AND REGISTERING IS NOT FINISHING. Barcodes, suppliers, the packing
+          ladder and the two shelf lives are asked for by nobody in this flow —
+          the product page draws every one of them, and landing there is what
+          makes the next five minutes possible instead of a second search.
+        */
+        lands: "product",
         /* ⚠️ THE READER IS HANDED THE PICTURES THE FIRST STEP TOOK — see
            `FillsSpec.with`. It takes `images` and the write keeps `shots`; two
            operations written apart name the same thing differently, and without

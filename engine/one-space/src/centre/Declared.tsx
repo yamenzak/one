@@ -35,7 +35,8 @@ const Create = React.lazy(() => import("@engine/design/create")
    are allowed to reach. */
 import {
   BLOCKS, SCREEN_PATH, askedOf, fillOf, isGroup, verbId, viewsIn,
-  type Fields, type Fill, type GuideBook, type MilestoneBook, type Raised, type ScreenSpec,
+  type Fields, type Fill, type GuideBook, type MilestoneBook, type Problem, type Raised,
+  type ScreenSpec,
   type SurfaceSpec, type Viewed,
 } from "@engine/kernel";
 import type { Answers } from "@engine/design/create";
@@ -214,6 +215,22 @@ export function Declared({ screen, screens, at, go, currency, app }: {
     got.again();
     return null;
   }, [got]);
+
+  /*
+    ⚠️ WHAT A WRITE ANSWERED WITH, WHICH `run` DELIBERATELY DOES NOT CARRY. Every
+    caller of `run` wants one of two things: whether it landed, or the record it
+    made. Widening `Ran` to hold both would put a value in front of every caller
+    that has no use for it and no idea it is optional — so the flow, which is the
+    one caller that needs the id, asks for it here.
+  */
+  const made = React.useCallback(async (
+    id: string, input: Record<string, unknown>,
+  ): Promise<{ readonly id: string } | Problem> => {
+    const said = await api.post(id, input);
+    if (!said.ok) return said.problem;
+    forget();
+    return { id: String((said.value as { id?: unknown })?.id ?? "") };
+  }, []);
 
   /*
     ⚠️ AN OPERATION THAT TAKES NOTHING RUNS ON THE PRESS — see `asks`. And one
@@ -415,7 +432,8 @@ export function Declared({ screen, screens, at, go, currency, app }: {
           screen={screen}
           acts={acts}
           run={run}
-          go={go}
+          made={made}
+          onGo={onGo}
           chose={app.chose ?? {}}
           metered={app.metered ?? []}
         />
@@ -458,11 +476,19 @@ export function Declared({ screen, screens, at, go, currency, app }: {
  * ⚠️ AND THE STEP IS STATE, NOT A ROUTE — see `Story`. A URL per step would make
  * each one shareable, bookmarkable and reloadable into a form with nothing in it.
  */
-function Flow({ screen, acts, run, go, chose, metered }: {
+function Flow({ screen, acts, run, made, onGo, chose, metered }: {
   readonly screen: ScreenSpec;
   readonly acts: Drawn["acts"];
   readonly run: (id: string, input: Record<string, unknown>) => Promise<Ran>;
-  readonly go: (route: string) => void;
+  /**
+   * ⚠️ WHAT THE WRITE ANSWERED WITH — see `made`. A flow is the one caller that
+   * needs the record's id: it ends by opening the thing it just made.
+   */
+  readonly made: (
+    id: string, input: Record<string, unknown>,
+  ) => Promise<{ readonly id: string } | Problem>;
+  /** ⚠️ A screen's id and the record — see `Has.onGo`. Never a route. */
+  readonly onGo: (screen: string, record?: string) => void;
   /** ⚠️ What this workspace chose, for the settings this flow starts from. */
   readonly chose: Readonly<Record<string, unknown>>;
   /** ⚠️ Which of this product's operations spend credits — see `meteredIds`. */
@@ -618,12 +644,22 @@ function Flow({ screen, acts, run, go, chose, metered }: {
         op: told.writes,
         onDo: () => {
           void (async () => {
-            const said = await run(told.writes, held);
+            const said = await made(told.writes, held);
             /* ⚠️ A REFUSAL KEEPS THE DRAFT AND NAMES THE FIELDS — `Problem.fields`
                is what puts each sentence under the control it is about, and
                `Create` carries it to the step that asks for it. */
-            if (said) { setRefused(said.fields ?? {}); return; }
-            go("/products");
+            if ("code" in said) { setRefused(said.fields ?? {}); return; }
+            /*
+              ⚠️ WHERE THE FLOW SAYS, ON WHAT IT JUST MADE — see `StorySpec.lands`.
+              This was `go("/products")`: one product's route, written into the
+              platform, taken by every flow in every app. The second app's would
+              have landed on a list it does not have.
+
+              ⚠️ AND A FLOW THAT NAMES NOWHERE STAYS PUT rather than guessing. It
+              is the right shape for one that records something — a count, a
+              delivery — whose subject is the screen somebody was already on.
+            */
+            if (told.lands) onGo(told.lands, said.id || undefined);
           })();
         },
       }}
