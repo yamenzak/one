@@ -576,6 +576,32 @@ export function Story({
     return () => { globalThis.removeEventListener("popstate", back); };
   }, [onGo]);
 
+  /*
+    ⚠️ A STEP'S OWN REQUIREMENT IS STATED WHEN SOMEBODY TRIES TO PASS IT, NOT
+    BEFORE. The first question of every flow whose control is a required field
+    opened with "Sheet is needed before this can be saved" under an empty box
+    nobody had touched, beside a Next that was already dim — a screen telling
+    somebody off for not having done the thing they had arrived to do. It read
+    as correct to every test, because the sentence IS correct; what was wrong was
+    saying it unprompted.
+
+    ⚠️ AND THE DEBT ON ANOTHER STEP IS UNAFFECTED, WHICH IS THE CASE THE SENTENCE
+    WAS WRITTEN FOR. "Something three screens back is missing" has to be said the
+    moment somebody reaches the review, because there is nothing else on that
+    screen to explain why the write will not go. Only `mine` waits.
+
+    ⚠️ SO NEXT STOPS BEING DIM AND STARTS ANSWERING. A control that is present
+    and refuses without saying why is the offer-and-refuse this frame's own dock
+    comment argues against; pressed on an unmet step it now says what is missing
+    and stays put, which is a press that did something.
+  */
+  const [tried, setTried] = React.useState<ReadonlySet<string>>(new Set());
+  /* ⚠️ `owedElsewhere` IS THE TEST FOR "NOT MINE", and it is the same branch the
+     rendering below already takes — so the sentence that navigates somewhere is
+     never the one being withheld, by construction rather than by a second
+     condition that could disagree with it. */
+  const owned = owedElsewhere || (here && tried.has(here.id)) ? short : undefined;
+
   if (!here) return null;
 
   return (
@@ -587,13 +613,19 @@ export function Story({
          the whole flow from step five would throw away five screens of answers
          on the press that means "undo the last one". */
       back={i === 0 ? leave : () => { go(i - 1); }}
+      /* ⚠️ THE LAST STEP STILL REFUSES, because its debt is somebody else's step
+         and is already on the screen — see `owedElsewhere`. Only the forward
+         press changed, and only where the requirement has not been said yet. */
       does={last
         ? { ...does, disabled: does.disabled === true || Boolean(short) }
         : {
           op: does.op,
           label: next,
-          onDo: () => { go(i + 1); },
-          disabled: does.disabled === true || Boolean(short),
+          onDo: () => {
+            if (short) { setTried((was) => new Set([...was, here.id])); return; }
+            go(i + 1);
+          },
+          disabled: does.disabled === true,
         }}
       /* ⚠️ NO BACK ON THE FIRST STEP — see `ScreenProps.step`. Nothing is behind
          it, and a control that is present and refuses reads as broken. */
@@ -645,18 +677,18 @@ export function Story({
           ? <NoteRow icon={glyphOf("money")}>Reading this spends credits.</NoteRow>
           : null}
 
-        {short
+        {owned
           ? owedElsewhere
             ? (
               <ActionRow
                 icon={glyphOf("alert")}
                 tone="warning"
-                label={short}
+                label={owned}
                 under={owedElsewhere.ask}
                 onDo={() => { jump(owedElsewhere.id); }}
               />
             )
-            : <NoteRow icon={glyphOf("alert")}>{short}</NoteRow>
+            : <NoteRow icon={glyphOf("alert")}>{owned}</NoteRow>
           : null}
       </Stack>
     </Screen>

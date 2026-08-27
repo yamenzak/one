@@ -316,17 +316,35 @@ describe("the review is built out of what the steps say", () => {
 });
 
 describe("what the flow will not let past", () => {
-  /* ⚠️ HELD AGAINST THE STEP THAT OWNS THE FIELD, which is what makes the steps
-     worth having — one sentence at the foot of a form sends somebody on the last
-     screen hunting three screens back. */
-  it("says which field is missing, on the step that asks for it", () => {
-    expect(drawn("named", {})).toContain("Name is needed before this can be saved");
+  /*
+    ⚠️ THE STEP SOMEBODY IS STANDING ON SAYS NOTHING UNTIL THEY TRY TO PASS IT.
+    This asserted the opposite, and what it was pinning is a flow that opens by
+    telling somebody off: every story whose first step is a required field drew
+    "Name is needed before this can be saved" under a control nobody had touched.
+    WHEN the sentence appears is not answerable without a browser, which is why
+    the rest of this rule lives in `asking.seen.test.tsx`.
+  */
+  it("says nothing about the step somebody is standing on", () => {
+    expect(drawn("named", {})).not.toContain("Name is needed before this can be saved");
+  });
+
+  /*
+    ⚠️ AND THE DEBT ON SOMEBODY ELSE'S STEP IS SAID AT ONCE, WHICH IS THE CASE
+    THE SENTENCE WAS WRITTEN FOR. On the review there is nothing else to explain
+    why the write will not go, and the sentence is also the way to the field —
+    so it is a row that navigates rather than a note. Withholding this one would
+    take the whole feature with it.
+  */
+  it("names a debt on another step, from the review, as the way there", () => {
+    const out = drawn("review", {});
+    expect(out).toContain("Name is needed before this can be saved");
+    expect(out).toContain("What is it?");
   });
 
   /* ⚠️ AND THE DOOR'S OWN WORDS BEAT OURS, because a refusal is about the value
      that was actually sent. */
   it("prefers the door's refusal to the missing-field sentence", () => {
-    const out = drawn("named", {}, { refused: { name: "That name is taken" } });
+    const out = drawn("review", {}, { refused: { name: "That name is taken" } });
     expect(out).toContain("That name is taken");
     expect(out).not.toContain("Name is needed before this can be saved");
   });
