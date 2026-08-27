@@ -23,13 +23,13 @@ import { Body, type Has } from "@engine/design/body";
 import { Create, type Answers } from "@engine/design/create";
 import type { ScreenSpec } from "@engine/kernel";
 import {
-  editsIn, meteredIds, namesIn, operationsFor, upFrom, verbId,
+  editsIn, meteredIds, namesIn, opensOn, operationsFor, upFrom, verbId,
 } from "@engine/kernel";
 import { inventory } from "../index.js";
 import { INVENTORY_SESSIONS, INVENTORY_SURFACES } from "./index.js";
 import {
-  BUYING, COUNTED, COUNTS, DAILY, DISAGREES, LEFT, LINES, PLACES, RUNNING, THINGS, TOLD,
-  WRONG,
+  BUYING, COUNTED, COUNTS, DAILY, DISAGREES, LEFT, LINES, MOVING, PLACES, RUNNING, THINGS,
+  TOLD, WRONG,
 } from "./sample.js";
 
 /** ⚠️ Every permission a screen names, so none of them is undrawable here. */
@@ -197,6 +197,8 @@ export function InventoryGround({ route, onGo, sky, step }: {
                      board that left them out photographs a detail screen with
                      no way to correct anything on it. */
                   ...ableOn(here),
+                  /* ⚠️ WHICH SEGMENT OPENS — see `pickedOn`. */
+                  ...pickedOn(here),
                   named: namedIn(screens),
                   book: BOOK,
                 }}
@@ -373,6 +375,24 @@ const ableOn = (screen: ScreenSpec): Partial<Has> => {
   };
 };
 
+/**
+ * ⚠️ WHICH SEGMENT IS DRAWN, DERIVED FROM THE SCREEN RATHER THAN CHOSEN HERE —
+ * see `PickSpec.opens` and `Declared.tsx`, which seeds a real read the same way.
+ * A board has no door to re-ask, so a narrowing has to be held; holding ONE
+ * value for every screen is what makes it wrong. Two screens narrow by period
+ * and they open on different ones on purpose — a report is a rate and wants a
+ * month, a log is what happened and wants the week somebody remembers — so a
+ * fixed `{ span: "month" }` photographed the log under a heading it disagreed
+ * with, and the picture was the only place that showed.
+ */
+const pickedOn = (screen: ScreenSpec): Partial<Has> => {
+  const picks = screen.body?.picks ?? [];
+  const held = Object.fromEntries(picks
+    .map((pick) => [pick.id, opensOn(pick)] as const)
+    .filter(([, value]) => value !== ""));
+  return Object.keys(held).length ? { picked: held, onPick: () => undefined } : {};
+};
+
 const SEEN: Has = {
   /*
     ⚠️ A NO-OP, AND IT IS NOT NOTHING. Every affordance in the renderer is gated
@@ -416,21 +436,14 @@ const SEEN: Has = {
        has nothing to say about. */
     "counted-here": rows(COUNTED.map((one) => ({ ...one }))),
     "what-disagrees": rows(DISAGREES.map((one) => ({ ...one }))),
+    /* ⚠️ THE SENTENCE IS THE OPERATION'S, NOT A COLUMN — see `MOVING`. */
+    "every-movement": rows(MOVING.map((one) => ({ ...one }))),
     "recorded": rows(TOLD.map((one) => ({ ...one }))),
     "what-to-buy": rows(BUYING.map((one) => ({ ...one }))),
     "what-left": rows(LEFT.map((one) => ({ ...one }))),
     "what-was-wrong": rows(WRONG.map((one) => ({ ...one }))),
     "day-by-day": rows(DAILY.map((one) => ({ ...one }))),
   },
-  /*
-    ⚠️ THE NARROWING, HELD RATHER THAN LIVE — see `PickSpec`. A board has no door
-    to re-ask, so what this fixes is which segment is DRAWN, and it has to be the
-    one the numbers above are of. Without it the control falls back to the
-    declaration's own default, which is right today and is a second place for the
-    answer to come from.
-  */
-  picked: { span: "month" },
-  onPick: () => undefined,
 };
 
 /**

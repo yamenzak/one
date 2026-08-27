@@ -16,7 +16,7 @@
    with its own wording photographs a sentence the product does not say — which
    is the one failure a picture cannot reveal, because it looks correct. */
 import { dayPlus, type Day } from "@engine/kernel";
-import { saysDue } from "../ledger.js";
+import { saysDue, saysMove } from "../ledger.js";
 
 export type Tracking = "listed" | "counted" | "batched" | "itemised" | "assembled";
 
@@ -368,4 +368,37 @@ export const DISAGREES: readonly Disagrees[] = [
   { product: "t-screw", name: "Screws, M4 × 20", says: "26 found, 2 more than the books",
     delta: 2 },
   { product: "t-paper", name: "A4 paper", says: "2 on the books, none found", delta: -2 },
+];
+
+/**
+ * A MORNING OF MOVEMENTS, AS THE HISTORY READS THEM BACK.
+ *
+ * ⚠️ THE SHAPE IS `stock.history`'S ANSWER, NOT THE `ledger` TABLE'S — the row's
+ * middle slot is a SENTENCE the operation composed, because the verb depends on
+ * the move and the direction on the sign. A fixture built out of columns would
+ * photograph the right headings over the wrong reading.
+ *
+ * ⚠️ AND THE TRANSFER IS TWO ROWS, which is the pair the sentence exists to tell
+ * apart: the same carton, the same verb, opposite signs, opposite words. A
+ * sample with only one half photographs the one case that cannot go wrong.
+ */
+export interface Moving {
+  readonly id: string;
+  readonly product: string;
+  readonly name: string;
+  readonly says: string;
+  readonly at: string;
+}
+
+export const MOVING: readonly Moving[] = [
+  { id: "lg-1", product: "t-glove", name: "Nitrile gloves, blue",
+    says: saysMove("taken", -40, "A3 — flammables"), at: "2026-08-27T08:41:00.000Z" },
+  { id: "lg-2", product: "t-resin", name: "Casting resin, clear",
+    says: saysMove("moved", 6, "Bench"), at: "2026-08-27T08:12:00.000Z" },
+  { id: "lg-3", product: "t-resin", name: "Casting resin, clear",
+    says: saysMove("moved", -6, "A3 — flammables"), at: "2026-08-27T08:12:00.000Z" },
+  { id: "lg-4", product: "t-screw", name: "Screws, M4 × 20",
+    says: saysMove("adjusted", -3, "B1"), at: "2026-08-26T16:55:00.000Z" },
+  { id: "lg-5", product: "t-paper", name: "A4 paper",
+    says: saysMove("received", 24, "Bench"), at: "2026-08-26T09:02:00.000Z" },
 ];

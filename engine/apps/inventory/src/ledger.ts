@@ -286,3 +286,36 @@ export const saysDue = (days: number, by: string): string => {
      "how long". */
   return `${when} · ${by}`;
 };
+
+/**
+ * WHAT ONE MOVEMENT READS AS, IN THE WORDS SOMEBODY WOULD USE FOR IT.
+ *
+ * ⚠️ A HISTORY ROW IS THREE FACTS AND A `Listing` HAS THREE SLOTS, one of which
+ * is the product and one of which is when. What happened, how many, and where
+ * therefore have to be ONE phrase — and a declaration cannot make one: the verb
+ * depends on the move, and for three of the five the DIRECTION depends on the
+ * sign. "moved −12" and "moved 12" are a carton leaving and the same carton
+ * arriving, written as one row each, and a screen that printed the enum would
+ * make them identical.
+ *
+ * ⚠️ AND THE SIGN IS READ RATHER THAN PRINTED. A minus in front of a number is a
+ * fact about the ledger's arithmetic, not about the shelf; what happened at the
+ * shelf is that somebody took twelve out of it.
+ *
+ * ⚠️ `undone` NAMES ITSELF, because it is the one move that is about another
+ * move. A row reading "Received 6" where the truth is "somebody undid taking 6"
+ * is a history that cannot be reconciled with the ledger it is a view of.
+ */
+export const saysMove = (move: Move, delta: number, where: string): string => {
+  const many = Math.abs(delta);
+  const out = delta < 0;
+  if (move === "received") return `Received ${many} into ${where}`;
+  if (move === "taken") return `Took ${many} from ${where}`;
+  if (move === "moved") {
+    return out ? `Carried ${many} out of ${where}` : `Carried ${many} into ${where}`;
+  }
+  if (move === "adjusted") {
+    return out ? `Corrected down ${many} on ${where}` : `Corrected up ${many} on ${where}`;
+  }
+  return out ? `Undone, ${many} off ${where}` : `Undone, ${many} back on ${where}`;
+};

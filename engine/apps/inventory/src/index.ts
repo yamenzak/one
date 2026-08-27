@@ -20,7 +20,7 @@ import {
 } from "@engine/kernel";
 import {
   LADDER, MOVES, applyMove, crossedOn, daysLeft, effectiveExpiry, promotes, refuseMove,
-  saysDue, standingOf,
+  saysDue, saysMove, standingOf,
   type Move, type Tracking,
 } from "./ledger.js";
 /* ⚠️ ONLY THE TWO WORDS, BECAUSE THE MANIFEST DECLARES AND DOES NOT DECIDE. The
@@ -1050,7 +1050,18 @@ const ledger = collection({
   without: ["create", "update", "delete"],
   reachBy: "location",
   fields: {
-    move: field.enum({ label: "What happened", required: true, holds: "none", values: [...MOVES] }),
+    /* ⚠️ THE WORDS ARE HERE BECAUSE A CLOSED SET IS NOT COPY — the same rule
+       `capture` beside it follows, and the one `keys` in the gate exists for. A
+       screen printing the value shows somebody "adjusted" where the product's own
+       vocabulary says "Corrected". */
+    move: field.enum({
+      label: "What happened", required: true, holds: "none",
+      labels: {
+        received: "Received", taken: "Taken", adjusted: "Corrected",
+        undone: "Undone", moved: "Carried",
+      },
+      values: [...MOVES],
+    }),
     product: field.ref({ label: "Product", required: true, holds: "none", to: "product" }),
     location: field.ref({ label: "Location", required: true, holds: "none", to: "location" }),
     /* ⚠️ WHICH DELIVERY MOVED, WHERE THERE IS ONE. A recall names a lot and asks
@@ -5769,6 +5780,113 @@ const report = operation<{ today: string; span?: string }, Reported>({
   },
 });
 
+/**
+ * EVERY MOVEMENT, MOST RECENT FIRST — the record the report is a summary OF.
+ *
+ * ⚠️ IT IS AN OPERATION RATHER THAN THE GENERATED `ledger.list` BECAUSE A ROW HAS
+ * TO READ AS A SENTENCE. A `Listing` has three slots; one is the product and one
+ * is when, so what happened, how many and where are one phrase — and a
+ * declaration cannot build one, because the verb depends on the move and the
+ * DIRECTION depends on the sign. See `saysMove`.
+ *
+ * ⚠️ AND THE PERIOD IS A RANGE, WHICH A `Match` WILL NEVER BE. "The last seven
+ * days" is the way anybody actually reads a log, and equality cannot say it.
+ *
+ * ⚠️ `ledger:read`, THE HISTORY'S OWN GRANT. Somebody who may see what is on a
+ * shelf has not been given the record of who took it off one.
+ */
+interface Happened {
+  readonly id: string;
+  readonly product: string;
+  readonly name: string;
+  readonly says: string;
+  readonly capture: string;
+  readonly at: string;
+}
+
+const history = operation<
+  { today: string; span?: string; product?: string },
+  { items: readonly Happened[]; total: number }
+>({
+  id: "stock.history",
+  kind: "read",
+  summary: "Who moved what, and when",
+  input: {
+    today: field.day({ label: "Today", required: true, holds: "none" }),
+    span: field.enum({
+      label: "Over", values: ["week", "month", "quarter"], holds: "none",
+    }),
+    /* ⚠️ OPTIONAL, so one operation answers the workspace's history and one
+       product's. Two would be one query written twice and one sentence composed
+       twice, which is where the two come to read differently. */
+    product: field.ref({ label: "Product", holds: "none", to: "product" }),
+  },
+  output: {
+    items: field.json({ label: "Movements", holds: "none" }),
+    total: field.number({ label: "How many there are", holds: "none" }),
+  },
+  permission: "ledger:read",
+  idempotency: { mode: "none" },
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const db = c.db as Db;
+    const until = input.today;
+    const since = dayPlus(until as Day, -((SPANS[input.span ?? "month"] ?? 30) - 1));
+    const of = input.product ? " AND product = ?" : "";
+    const forOne = input.product ? [input.product] : [];
+
+    /* ⚠️ THE ROWS AND HOW MANY THERE ARE, TOGETHER — neither needs the other, and
+       a page that says "50" over a workspace with four hundred movements is this
+       product's ceiling reported as a fact about the week. */
+    const [rows, counted] = await Promise.all([
+      db.prepare(
+        `SELECT id, move, product, location, delta, capture, at FROM ledger
+          WHERE tenant_id = ? AND day >= ? AND day <= ?${of}${only(c).sql}
+          ORDER BY at DESC, id DESC LIMIT ?`)
+        .bind(c.tenantId, since, until, ...forOne, ...only(c).bound, MOST)
+        .all<{
+          id: string; move: string; product: string; location: string;
+          delta: number; capture: string; at: string;
+        }>(),
+      db.prepare(
+        `SELECT COUNT(*) AS n FROM ledger
+          WHERE tenant_id = ? AND day >= ? AND day <= ?${of}${only(c).sql}`)
+        .bind(c.tenantId, since, until, ...forOne, ...only(c).bound)
+        .first<{ n: number }>(),
+    ]);
+
+    /* ⚠️ ONE LOOKUP FOR EVERY NAME ON THE SCREEN, like the report's and the
+       count's. A history of identifiers is a history nobody can read. */
+    const named = new Map((await db.prepare(
+      `SELECT id, name FROM product WHERE tenant_id = ?`)
+      .bind(c.tenantId).all<{ id: string; name: string }>())
+      .results.map((row) => [String(row.id), String(row.name)]));
+    const places = new Map((await db.prepare(
+      `SELECT id, name FROM location WHERE tenant_id = ?`)
+      .bind(c.tenantId).all<{ id: string; name: string }>())
+      .results.map((row) => [String(row.id), String(row.name)]));
+
+    return {
+      total: counted?.n ?? rows.results.length,
+      items: rows.results.map((row) => ({
+        id: String(row.id),
+        product: String(row.product),
+        name: named.get(String(row.product)) ?? "—",
+        says: saysMove(
+          String(row.move) as Move,
+          Number(row.delta),
+          places.get(String(row.location)) ?? "somewhere",
+        ),
+        /* ⚠️ SCANNED OR KEYED, WHICH IS THE RECORDED SHARE ONE ROW AT A TIME. The
+           report says what fraction of what left was written down as it happened;
+           this says which of these particular movements was. */
+        capture: String(row.capture ?? ""),
+        at: String(row.at),
+      })),
+    };
+  },
+});
+
 /* ⚠️ INCLUSIVE OF BOTH ENDS, because "the first to the seventh" is seven days to
    everybody who is not a computer — and a rate divided by six would report
    consumption about seventeen per cent high. */
@@ -6297,7 +6415,7 @@ const manifest = (): AppSpec => defineApp({
     identify, readLabel, seeProduct, readNote, askInWords,
     openRun, loadRun, endRun, releaseRun, failRun, recallRun, liftHold, lateResult,
     openJob, closeJob, traceJob,
-    labelPlaces, labelThings, shelf, report, seeImport, doImport,
+    labelPlaces, labelThings, shelf, report, history, seeImport, doImport,
   ],
 
   /*
@@ -6448,6 +6566,18 @@ const manifest = (): AppSpec => defineApp({
       asked: {
         operation: "count.differences", take: "items",
         fills: { count: "record" },
+      } },
+    /*
+      ⚠️ THE RECORD THE REPORT IS A SUMMARY OF, and it is asked for the same two
+      reasons the report is: a row has to read as a SENTENCE ("Took 6 from Bay
+      four"), which a declaration cannot build because the verb depends on the
+      move and the direction on the sign — and the period is a RANGE, which a
+      `Match` will never be.
+    */
+    { id: "every-movement", of: "ledger",
+      asked: {
+        operation: "stock.history", take: "items", total: "total",
+        fills: { today: "today", span: { picked: "span" } },
       } },
   ],
 
@@ -6878,6 +7008,11 @@ const manifest = (): AppSpec => defineApp({
             says: "Nothing has moved yet",
             under: "Take something off a shelf and this starts counting",
           },
+          /* ⚠️ THE RECORD THE FIGURE IS MADE OF, ONE PRESS AWAY. A share nobody
+             can drill into is a number somebody has to take on trust, and the
+             history is the only place the arithmetic can be checked against what
+             actually happened. */
+          leads: ["history"],
           bind: {
             value: { from: { of: "first", view: "recorded", field: "sharePct" } },
             of: { from: { of: "words", says: "Written down when it happened" } },
@@ -7365,6 +7500,62 @@ const manifest = (): AppSpec => defineApp({
       tile on the home and a screen of its own; a list of every count ever taken
       is history, and history is a different question.
     */
+    /*
+      EVERY MOVEMENT, WHICH IS THE RECORD EVERY FIGURE IN THIS PRODUCT IS MADE OF.
+
+      ⚠️ `ledger:read` GATED THE REPORT AND NOTHING ELSE, so the one question the
+      recorded share raises — who took this, and when — was answered nowhere. A
+      number nobody can drill into is a number somebody has to take on trust,
+      which is the opposite of what an auditable inventory is for.
+
+      ⚠️ IT IS ITS OWN SCREEN RATHER THAN A SECTION ON THE PRODUCT PAGE, and the
+      door decides that rather than taste: a screen is refused WHOLE if any
+      collection it reads is outside the caller's grants, so one `ledger` view on
+      the product page would 403 the product page for every floor worker in the
+      building.
+
+      ⚠️ AND IT IS REACHED FROM THE FIGURE IT EXPLAINS — see the report's hero.
+    */
+    { id: "history", route: "/history", label: "History", nav: "none", icon: "clock",
+      permission: "ledger:read",
+      body: {
+        shape: "list",
+        layout: { as: "stack" },
+        picks: [{
+          id: "span",
+          label: "Over",
+          options: [
+            { value: "week", label: "7 days" },
+            { value: "month", label: "30 days" },
+            { value: "quarter", label: "90 days" },
+          ],
+          /* ⚠️ SEVEN HERE AND THIRTY ON THE REPORT, and the difference is what
+             each is for. A report is a rate and wants a month; a log is what
+             happened, and what happened last week is the part anybody remembers
+             enough to check. */
+          opens: "week",
+        }],
+        blocks: [{
+          block: "Listing",
+          shows: [
+            { field: "name", label: "Product" },
+            /* ⚠️ WHAT HAPPENED, HOW MANY AND WHERE, AS ONE PHRASE — see
+               `saysMove`. Three columns is what a phone row has, and two of them
+               are already the product and the clock. */
+            { field: "says", label: "What happened" },
+            { field: "at", label: "When", as: "when" },
+          ],
+          goes: { to: "product", by: "product" },
+          nothing: {
+            says: "Nothing has moved",
+            under: "No stock came in or went out in this period",
+          },
+          bind: {
+            label: { from: { of: "words", says: "Movements" } },
+            of: { from: { of: "view", view: "every-movement" } },
+          },
+        }],
+      } },
     /*
       THE SHELF SOMEBODY IS STANDING AT, WITH A PHONE.
 

@@ -467,7 +467,7 @@ generated ones) — plus every platform guard in `pnpm engine:gate`.
 
 ## Part III — the screen index
 
-**Ten, and every one of them is drawn by the engine from the declaration.** The
+**Eleven, and every one of them is drawn by the engine from the declaration.** The
 surface was emptied whole on 2026-08-26 and is being rebuilt one screen at a
 time, each designed from what somebody standing in front of it is trying to do
 rather than ported from what stood there before.
@@ -482,6 +482,7 @@ follows and the shape every screen is drawn to.
 | `/products` | Products | primary | `product:read` | `declared` | `declared` |
 | `/places` | Places | primary | `location:read` | `declared` | `declared` |
 | `/report` | Reports | primary | `ledger:read` | `declared` | `declared` |
+| `/history` | History | — | `ledger:read` | `declared` | `declared` |
 | `/counts` | Being counted | — | `stock:read` | `declared` | `declared` |
 | `/count` | Count | — | `stock:read` | `declared` | `declared` |
 | `/product` | Product | — | `product:read` | `declared` | `declared` |
@@ -532,6 +533,25 @@ list it backs was a page somebody scrolls past a hundred cartons of gloves to
 find the one carton of anything that matters. `standing` narrows it, absent means
 what runs out, and `fine` is still askable — a change to what it says by default
 rather than to what it can say.
+
+**And the recorded share can be drilled into.** `ledger:read` gated the report
+and nothing else, so "who took this, and when" — the question the share raises —
+was answered nowhere, and a number nobody can check is a number somebody has to
+take on trust. `/history` is every movement, newest first, reached from the
+report's own figure.
+
+⚠️ **A ROW IS A SENTENCE, WHICH IS WHY IT IS AN OPERATION AND NOT THE GENERATED
+LIST.** A `Listing` has three slots and two are already the product and the
+clock, so what happened, how many and where are one phrase — and a declaration
+cannot build one: the verb depends on the move, and for three of the five the
+DIRECTION depends on the sign. A transfer is two rows sharing one cause, and
+"Carried 4 out of Back store" beside "Carried 4 into Bench two" is the pair that
+would otherwise print identically. `saysMove` is pure and tested.
+
+⚠️ **AND IT IS ITS OWN SCREEN RATHER THAN A SECTION ON THE PRODUCT PAGE, decided
+by the door rather than by taste.** A screen is refused WHOLE if any collection it
+reads is outside the caller's grants, so one `ledger` view on the product page
+would 403 the product page for every floor worker in the building.
 
 **The count session can be opened, worked and closed from the product, which for
 a long time it could not.** Four operations were built, gated, audited and

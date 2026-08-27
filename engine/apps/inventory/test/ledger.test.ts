@@ -11,7 +11,7 @@
 import { describe, expect, it } from "vitest";
 import { dayPlus, type Day } from "@engine/kernel";
 import {
-  applyMove, crossedOn, daysLeft, effectiveExpiry, promotes, refuseMove, saysDue,
+  applyMove, crossedOn, daysLeft, effectiveExpiry, promotes, refuseMove, saysDue, saysMove,
   standingOf,
 } from "../src/ledger.js";
 
@@ -314,5 +314,46 @@ describe("what a countdown reads as", () => {
      is the thing somebody has to act on before they go home. */
   it("gives today a sentence of its own rather than a zero", () => {
     expect(saysDue(0, "opened")).toBe("Goes off today · opened");
+  });
+});
+
+/**
+ * ⚠️ THE VERB AND THE DIRECTION, AND THE DIRECTION IS THE HALF A DECLARATION
+ * CANNOT DO — see `saysMove`. Three of the five moves mean opposite things at
+ * opposite signs, and a screen printing the enum would draw a carton leaving and
+ * the same carton arriving as identical rows.
+ */
+describe("what one movement reads as", () => {
+  it("names the verb somebody would use", () => {
+    expect(saysMove("received", 40, "Dock")).toBe("Received 40 into Dock");
+    expect(saysMove("taken", -6, "Bay four")).toBe("Took 6 from Bay four");
+  });
+
+  /* ⚠️ THE SIGN IS READ, NEVER PRINTED. A minus in front of a number is a fact
+     about the ledger's arithmetic; what happened at the shelf is that somebody
+     took six out of it. */
+  it("reads the sign rather than printing it", () => {
+    expect(saysMove("taken", -6, "Bay four")).not.toContain("-");
+    expect(saysMove("adjusted", -3, "Bay four")).not.toContain("-");
+  });
+
+  /* ⚠️ THE TWO HALVES OF A TRANSFER ARE ONE ROW EACH, and they have to read
+     differently — see `MOVES`. Same verb, opposite signs, opposite sentences. */
+  it("tells the two halves of a transfer apart", () => {
+    expect(saysMove("moved", -12, "Bay four")).toBe("Carried 12 out of Bay four");
+    expect(saysMove("moved", 12, "Ward 2")).toBe("Carried 12 into Ward 2");
+  });
+
+  it("says which way a correction went", () => {
+    expect(saysMove("adjusted", -3, "Bay four")).toBe("Corrected down 3 on Bay four");
+    expect(saysMove("adjusted", 2, "Bay four")).toBe("Corrected up 2 on Bay four");
+  });
+
+  /* ⚠️ AND AN UNDO NAMES ITSELF, because it is the one move that is about another
+     move. A row reading "Received 6" where the truth is "somebody undid taking
+     6" is a history that cannot be reconciled with the ledger it is a view of. */
+  it("never dresses an undo as the move it reversed", () => {
+    expect(saysMove("undone", 6, "Bay four")).toBe("Undone, 6 back on Bay four");
+    expect(saysMove("undone", -6, "Bay four")).toBe("Undone, 6 off Bay four");
   });
 });

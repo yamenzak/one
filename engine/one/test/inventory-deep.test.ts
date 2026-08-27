@@ -743,3 +743,77 @@ describe("a shelf counted, through the screen", () => {
     expect(upFrom(screens, here)?.id).toBe("counts");
   });
 });
+
+/* -------------------------------------------------------------- the history --- */
+
+/**
+ * THE RECORD EVERY FIGURE IN THIS PRODUCT IS MADE OF.
+ *
+ * ⚠️ `ledger:read` GATED THE REPORT AND NOTHING ELSE, so the question the
+ * recorded share raises — who took this, and when — was answered nowhere. A
+ * number nobody can drill into is a number somebody has to take on trust.
+ */
+describe("who moved what, and when", () => {
+  const seen = async (over: Record<string, string> = {}) => {
+    const query = new URLSearchParams({ today: TODAY, ...over });
+    const res = await at(`/api/screen/history?${query.toString()}`, { headers: { cookie } });
+    return {
+      status: res.status,
+      body: await res.json() as {
+        views: Record<string, { items: Record<string, unknown>[]; count: number }>;
+      },
+    };
+  };
+
+  it("reads every movement back as a sentence, newest first", async () => {
+    const tape = await kindOf("Packing tape", "counted");
+    const store = await placeOf("Back store");
+    const bench = await placeOf("Bench two");
+    ok(await write("stock.receive", {
+      product: tape, location: store, quantity: 24, day: TODAY, capture: "typed",
+    }));
+    ok(await write("stock.take", {
+      product: tape, location: store, quantity: 5, day: TODAY, capture: "scanned",
+    }));
+    ok(await write("stock.move", {
+      product: tape, from: store, to: bench, quantity: 4, day: TODAY, capture: "typed",
+    }));
+
+    const got = await seen();
+    expect(got.status).toBe(200);
+    const rows = got.body.views["every-movement"]?.items ?? [];
+    const mine = rows.filter((one) => one["product"] === tape);
+    /* ⚠️ FOUR ROWS FOR THREE ACTS, because a transfer genuinely changes two
+       balances and is one row at each end — see `MOVES`. */
+    expect(mine.length).toBe(4);
+    const said = mine.map((one) => String(one["says"]));
+    expect(said).toContain("Received 24 into Back store");
+    expect(said).toContain("Took 5 from Back store");
+    /* ⚠️ AND THE TWO HALVES OF THE TRANSFER READ DIFFERENTLY, which is the whole
+       reason the sentence is composed rather than declared. */
+    expect(said).toContain("Carried 4 out of Back store");
+    expect(said).toContain("Carried 4 into Bench two");
+    /* ⚠️ NEWEST FIRST, which is the only order a log has. */
+    expect(String(mine[0]?.["name"])).toBe("Packing tape");
+  });
+
+  /* ⚠️ THE PERIOD IS A RANGE, WHICH IS WHY THIS IS AN OPERATION AND NOT A VIEW
+     OVER THE TABLE — a `Match` is equality and will never say "the last seven
+     days". */
+  it("counts a different period when the screen is narrowed to one", async () => {
+    const week = await seen({ "pick.span": "week" });
+    const quarter = await seen({ "pick.span": "quarter" });
+    expect(week.status).toBe(200);
+    expect(quarter.body.views["every-movement"]?.count)
+      .toBeGreaterThanOrEqual(week.body.views["every-movement"]?.count ?? 0);
+  });
+
+  /* ⚠️ AND THE REPORT LEADS HERE, which is what makes the share checkable rather
+     than something to be believed. */
+  it("is where the recorded share leads", () => {
+    const report = (inventory().screens ?? []).find((one) => one.id === "report");
+    expect(report?.body?.hero?.leads).toEqual(["history"]);
+    const here = (inventory().screens ?? []).find((one) => one.id === "history");
+    expect(here?.permission).toBe("ledger:read");
+  });
+});
