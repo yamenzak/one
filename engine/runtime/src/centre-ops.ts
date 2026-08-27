@@ -21,6 +21,7 @@ import { brandingOf } from "./branding.js";
 import { tenantById } from "./directory.js";
 import { memberFor, rolesFor } from "./membership.js";
 import type { PlatformCtx } from "./member-ops.js";
+import { settingsFor } from "./settings.js";
 import type { Resolved } from "./compose.js";
 
 /** The declarative slice of one app the page may hold. */
@@ -29,6 +30,7 @@ const publicFace = (
   flags: Readonly<Record<string, boolean>>,
   allowance: (key: string) => Allowance,
   mayCall: (spec: AnyOperation) => Gate | null,
+  chose: Readonly<Record<string, unknown>>,
 ) => ({
   id: a.id,
   name: a.name,
@@ -61,6 +63,18 @@ const publicFace = (
   screens: a.screens.filter((s) => (!s.flag || flags[s.flag] === true)
     && (!s.features || s.features.some((k) => included(allowance(k))))),
   settings: a.settings ?? {},
+  /*
+    ⚠️ AND WHAT THIS WORKSPACE ACTUALLY CHOSE, FOR THE SETTINGS A FLOW STARTS
+    FROM — see `StorySpec.starts`. The line above is the DECLARATIONS: what the
+    settings screen draws, with no workspace's answers in it. A story that
+    begins at a chosen default needs the answer, and resolving it in the page
+    would be a second reading of `valueOf` against rows the page does not have.
+
+    ⚠️ ONLY WHAT A STORY NAMES TRAVELS, and an app naming none pays nothing —
+    not the two reads, not the bytes. A book sent whole would grow with every
+    setting anybody adds, on the read every screen in a workspace waits for.
+  */
+  chose,
   notifications: a.notifications ?? {},
   documents: a.documents ?? {},
   processors: a.processors ?? {},
@@ -118,6 +132,25 @@ const publicFace = (
     .filter(([, gate]) => gate !== null)),
 });
 
+/**
+ * ⚠️ THE SETTINGS THIS APP'S STORIES BEGIN AT, RESOLVED — and nothing else.
+ *
+ * ⚠️ AN APP WHOSE STORIES START AT NOTHING DOES NOT PAY FOR THIS. Two D1 reads
+ * per app on the read every screen in a workspace waits for is not a cost to
+ * levy on a manifest that declares no flow at all, and most do not. The empty
+ * return is the common path.
+ */
+async function startingValues(
+  ctx: PlatformCtx, a: AppSpec,
+): Promise<Readonly<Record<string, unknown>>> {
+  const wanted = new Set(a.screens
+    .flatMap((s) => Object.values(s.story?.starts ?? {})));
+  if (!wanted.size) return {};
+
+  const all = await settingsFor(ctx.db, ctx.tenantId as TenantId, a, ctx.accountId);
+  return Object.fromEntries(Object.entries(all).filter(([id]) => wanted.has(id)));
+}
+
 export function centreOps(app: AppSpec): Readonly<Record<string, Resolved>> {
   void app;
   const spec: Resolved = {
@@ -137,13 +170,22 @@ export function centreOps(app: AppSpec): Readonly<Record<string, Resolved>> {
       const ctx = bare as PlatformCtx;
       if (!ctx.accountId) return (ctx.fail as (c: string) => never)("platform.unauthorized");
 
-      const [tenant, member, branding] = await Promise.all([
+      /* ⚠️ RESOLVED BEFORE ANYTHING IS READ, so the settings each one's flows
+         start from can go into the SAME wave as the workspace's own row. */
+      const live = ctx.enabledApps.map((id) => ctx.appOf(id)).filter((a): a is AppSpec => !!a);
+
+      const [tenant, member, branding, chosen] = await Promise.all([
         tenantById(ctx.directory, ctx.tenantId as TenantId),
         memberFor(ctx.db, ctx.tenantId as TenantId, ctx.accountId as never),
         /* ⚠️ THE DIRECTORY, NOT THE SHARD. A workspace's identity is read on
            the pre-auth doors and before any shard is located — see
            `BRANDING_SCHEMA`'s place in `DIRECTORY_MODULES`. */
         brandingOf(ctx.directory, ctx.tenantId as TenantId),
+        /* ⚠️ HERE RATHER THAN IN THE MAP BELOW, AND THE REASON IS DEPTH. Inside
+           the per-app map this is a THIRD wave on the read the curtain waits
+           for — `request-cost.test.ts` budgets this operation at eight and
+           caught it. Nothing it needs comes from the reads beside it. */
+        Promise.all(live.map((a) => startingValues(ctx, a))),
       ]);
       /* ⚠️ ENTITLED TO ONE AT ALL, WHICH IS THE ONLY QUESTION LEFT HERE. It
          used to be two — may they, and did they ask for it on THIS surface —
@@ -153,10 +195,8 @@ export function centreOps(app: AppSpec): Readonly<Record<string, Resolved>> {
          comes off the chrome. */
       const theirs = mayBrand(tenant?.kind ?? "personal") ? branding : null;
 
-      const apps = await Promise.all(ctx.enabledApps
-        .map((id) => ctx.appOf(id))
-        .filter((a): a is AppSpec => !!a)
-        .map(async (a) => publicFace(
+      const apps = await Promise.all(live
+        .map(async (a, i) => publicFace(
           a,
           [...(await ctx.permissionsIn(a.id))],
           Object.keys(await rolesFor(ctx.db, ctx.tenantId as TenantId, a.id, a.access.roles)),
@@ -168,6 +208,7 @@ export function centreOps(app: AppSpec): Readonly<Record<string, Resolved>> {
           /* ⚠️ AND THE SAME WALK, so a control a screen draws and a route the
              gate refuses cannot come apart. */
           ctx.mayCall,
+          chosen[i] ?? {},
         )));
 
       return {

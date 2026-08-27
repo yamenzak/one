@@ -6748,6 +6748,16 @@ const manifest = (): AppSpec => defineApp({
            operations written apart name the same thing differently, and without
            this the bridge is a line inside a screen. */
         fills: { by: "product.see", with: { images: "shots" } },
+        /*
+          ⚠️ WHAT THIS WORKSPACE ALREADY ANSWERED — see `StorySpec.starts`. Both
+          settings say "THE WORKSPACE'S OWN DEFAULTS, NOT THIS FILE'S", and the
+          scan path and the import path honoured that while the one screen a
+          person actually adds a product on did not: it asked "what do you count
+          it in?" with an empty box, at a workspace whose settings screen already
+          says `item`. The answer arrives held, the step settles into the recap,
+          and anybody who disagrees presses the clause and changes it.
+        */
+        starts: { unit: "inventory.default_unit", tracking: "inventory.default_tracking" },
         asks: [
           /* ⚠️ FIRST, BECAUSE EVERYTHING AFTER IT DEPENDS ON WHETHER IT
              HAPPENED. Somebody who photographs the box answers four questions;

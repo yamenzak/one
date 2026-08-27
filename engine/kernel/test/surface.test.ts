@@ -1526,6 +1526,40 @@ describe("the fill's grant against the one the flow is offered on", () => {
   });
 });
 
+/*
+  ⚠️ A SETTING A FLOW BEGINS AT — see `StorySpec.starts`. Both failures here are
+  silent on the screen and identical to each other: an unset workspace default.
+  Somebody sees an empty box, fills it in, and never learns that the answer they
+  saved in settings was supposed to be there.
+*/
+describe("what a flow starts already answered", () => {
+  const starting = (starts: Record<string, string>) => flow({ starts });
+
+  it("refuses an input the write does not take", () => {
+    expect(refuseStory(starting({ colour: "thing.default_unit" }), OPS, ASKING, [
+      "thing.default_unit",
+    ]).map((p) => p.why)).toContain("starts_takes_unknown");
+  });
+
+  it("refuses a setting this app does not declare", () => {
+    expect(refuseStory(starting({ unit: "thing.nope" }), OPS, ASKING, [
+      "thing.default_unit",
+    ]).map((p) => p.why)).toContain("starts_not_a_setting");
+  });
+
+  it("says nothing about an input and a setting that both exist", () => {
+    expect(refuseStory(starting({ unit: "thing.default_unit" }), OPS, ASKING, [
+      "thing.default_unit",
+    ])).toEqual([]);
+  });
+
+  /* ⚠️ AND A FLOW THAT STARTS AT NOTHING IS THE COMMON CASE, so the absent field
+     must cost nothing — including at an app that declares no settings at all. */
+  it("says nothing about a flow that starts at nothing", () => {
+    expect(told(flow())).toEqual([]);
+  });
+});
+
 describe("a flow that composes", () => {
   it("refuses nothing about a story whose steps reach its write", () => {
     expect(refuseStory(flow(), OPS, ASKING)).toEqual([]);

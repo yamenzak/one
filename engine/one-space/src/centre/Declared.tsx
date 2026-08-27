@@ -34,7 +34,7 @@ const Create = React.lazy(() => import("@engine/design/create")
    browser bundle — so what both ends need is declared once, in the layer both
    are allowed to reach. */
 import {
-  BLOCKS, SCREEN_PATH, fillOf, isGroup, viewsIn,
+  BLOCKS, SCREEN_PATH, askedOf, fillOf, isGroup, viewsIn,
   type Fields, type Fill, type GuideBook, type MilestoneBook, type Raised, type ScreenSpec,
   type SurfaceSpec, type Viewed,
 } from "@engine/kernel";
@@ -140,6 +140,8 @@ export function Declared({ screen, screens, at, go, currency, app }: {
     readonly guide: GuideBook;
     readonly milestones: MilestoneBook;
     readonly permissions: readonly string[];
+    /** ⚠️ What this workspace chose, for the settings a flow starts from. */
+    readonly chose?: Readonly<Record<string, unknown>>;
   };
 }) {
   /*
@@ -339,7 +341,7 @@ export function Declared({ screen, screens, at, go, currency, app }: {
   if (screen.story) {
     return (
       <React.Suspense fallback={null}>
-        <Flow screen={screen} acts={acts} run={run} go={go} />
+        <Flow screen={screen} acts={acts} run={run} go={go} chose={app.chose ?? {}} />
       </React.Suspense>
     );
   }
@@ -379,17 +381,51 @@ export function Declared({ screen, screens, at, go, currency, app }: {
  * ⚠️ AND THE STEP IS STATE, NOT A ROUTE — see `Story`. A URL per step would make
  * each one shareable, bookmarkable and reloadable into a form with nothing in it.
  */
-function Flow({ screen, acts, run, go }: {
+function Flow({ screen, acts, run, go, chose }: {
   readonly screen: ScreenSpec;
   readonly acts: Drawn["acts"];
   readonly run: (id: string, input: Record<string, unknown>) => Promise<Ran>;
   readonly go: (route: string) => void;
+  /** ⚠️ What this workspace chose, for the settings this flow starts from. */
+  readonly chose: Readonly<Record<string, unknown>>;
 }) {
   const told = screen.story!;
   const write = acts[told.writes];
-  const [at, setAt] = React.useState(told.asks[0]?.id ?? "review");
-  const [held, setHeld] = React.useState<Answers>({});
-  const [filled, setFilled] = React.useState<ReadonlySet<string>>(new Set());
+
+  /*
+    ⚠️ WHAT THE WORKSPACE ALREADY ANSWERED — see `StorySpec.starts`. A workspace
+    that set "we count in millilitres" has answered "what do you count it in?",
+    and asking again with an empty box is the product forgetting a preference it
+    is still storing. The value goes in as an ANSWER, not as a placeholder, so
+    the step settles into the review and can be opened and changed there — the
+    same shape a model's fill produces, deliberately, because a person should not
+    have to learn two rules for two ways an answer can already be there.
+
+    ⚠️ AND AN UNSET SETTING IS NOT AN ANSWER. `settingsFor` resolves a missing row
+    to the declared fallback, which may legitimately be empty — and a step marked
+    settled on `""` is a question skipped and never asked.
+  */
+  const opens = React.useMemo(() => {
+    const out: Record<string, unknown> = {};
+    for (const [name, id] of Object.entries(told.starts ?? {})) {
+      const value = chose[id];
+      if (value === undefined || value === null || value === "") continue;
+      out[name] = value;
+    }
+    return out as Answers;
+  }, [told.starts, chose]);
+
+  /* ⚠️ THE FIRST STEP THAT IS STILL A QUESTION, AND `askedOf` DECIDES WHICH ONE
+     — the same walk the flow itself uses. Reimplemented here it would be a
+     second opinion about what counts as answered, and the two disagree first on
+     `always`, whose whole meaning is that an arrived value does not settle it. */
+  const opensAt = React.useMemo(() => (
+    askedOf(told.asks, opens, new Set(Object.keys(opens)))[0]?.id ?? "review"
+  ), [told.asks, opens]);
+
+  const [at, setAt] = React.useState(opensAt);
+  const [held, setHeld] = React.useState<Answers>(opens);
+  const [filled, setFilled] = React.useState<ReadonlySet<string>>(new Set(Object.keys(opens)));
   const [refused, setRefused] = React.useState<Readonly<Record<string, string>>>({});
   const [filling, setFilling] = React.useState(false);
   const tell = useTelling();

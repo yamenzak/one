@@ -72,6 +72,29 @@ export const mountScreen = (
   appId: string, route: string, screen: React.ComponentType<AppScreen>,
 ): void => { MOUNTS.set(`${appId}${route}`, screen); };
 
+/**
+ * WHICH OF THE THREE DRAWS THIS SCREEN — a pure function, so that it is a test.
+ *
+ * ⚠️ THERE ARE THREE KINDS OF SCREEN AND ONLY TWO WERE ASKED ABOUT. A body is
+ * READ, a story is WALKED, a session is the app's own code — and this condition
+ * used to be `screen.body` alone, so every declared flow fell past the renderer,
+ * past the mount table it is not in, and into the "this screen ships with…"
+ * notice. Nothing failed anywhere: the manifest composed, every guard passed,
+ * and the shots harness draws a flow directly so the photographs showed it
+ * working. Only opening the product did.
+ *
+ * ⚠️ AND IT IS A FUNCTION RATHER THAN A CONDITION IN THE JSX for that reason. A
+ * condition is checkable by reading it and by nothing else; the day a fourth
+ * kind of screen arrives, this is where the compiler and the test both land.
+ */
+export const drawnBy = (
+  screen: { readonly body?: unknown; readonly story?: unknown } | undefined,
+  mounted: boolean,
+): "declared" | "mounted" | "notice" => {
+  if (screen?.body || screen?.story) return "declared";
+  return mounted ? "mounted" : "notice";
+};
+
 export function AppSurface({ app, route, onGo }: {
   readonly app: CentreApp;
   readonly route: string;
@@ -122,8 +145,14 @@ export function AppSurface({ app, route, onGo }: {
     ⚠️ AND IT DOES NOT WAIT FOR THE PRODUCT'S CHUNK. A declared body needs the
     manifest and the renderer, both of which are already here; holding it behind
     `asked` would pay for a download it does not read.
+
+    ⚠️ AND WHICH OF THE THREE IT IS, IS `drawnBy` — see there. A story is a
+    declared screen too, and this condition asked for a body alone.
   */
-  if (declared?.body) {
+  const Mounted = declared && asked ? MOUNTS.get(`${app.id}${declared.route}`) : undefined;
+  const draws = drawnBy(declared, Boolean(Mounted));
+
+  if (draws === "declared" && declared) {
     return (
       <Allowed may={app.may}>
         {/* ⚠️ THE SAME WAIT THE SCREEN ITSELF DRAWS. The chunk and the screen's
@@ -141,6 +170,7 @@ export function AppSurface({ app, route, onGo }: {
               guide: app.guide,
               milestones: app.milestones,
               permissions: app.permissions,
+              ...(app.chose ? { chose: app.chose } : {}),
             }}
           />
         </React.Suspense>
@@ -148,8 +178,7 @@ export function AppSurface({ app, route, onGo }: {
     );
   }
 
-  const Mounted = declared && asked ? MOUNTS.get(`${app.id}${declared.route}`) : undefined;
-  if (Mounted) {
+  if (draws === "mounted" && Mounted) {
     return (
       /*
         ⚠️ WHAT THE GATE WOULD REFUSE, PUT WHERE EVERY CONTROL CAN REACH IT. It

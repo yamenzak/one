@@ -509,13 +509,16 @@ export async function settingsFor(
   const book = app.settings ?? {};
   if (!Object.keys(book).length) return {};
 
-  const tenantRows = await storedSettings(db, tenantId, app.id, "");
-  /* ⚠️ A caller with no account has no personal rows, and asking for them with
-     an empty id would read the WORKSPACE's — the one confusion this whole
-     function exists to make impossible. */
-  const personRows = accountId
-    ? await storedSettings(db, tenantId, app.id, accountId)
-    : {};
+  /* ⚠️ TOGETHER, BECAUSE NEITHER IS AN INPUT TO THE OTHER. Awaited one after the
+     other this is two waves of latency for two independent reads — and it is on
+     the path of the boot every screen in a workspace waits for. */
+  const [tenantRows, personRows] = await Promise.all([
+    storedSettings(db, tenantId, app.id, ""),
+    /* ⚠️ A caller with no account has no personal rows, and asking for them with
+       an empty id would read the WORKSPACE's — the one confusion this whole
+       function exists to make impossible. */
+    accountId ? storedSettings(db, tenantId, app.id, accountId) : Promise.resolve({}),
+  ]);
 
   const out: Record<string, unknown> = {};
   for (const def of Object.values(book)) {

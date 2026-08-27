@@ -28,6 +28,14 @@ export interface CentreApp {
   readonly hue?: string;
   readonly screens: readonly ScreenSpec[];
   readonly settings: SettingBook;
+  /**
+   * ⚠️ WHAT THIS WORKSPACE CHOSE, FOR THE SETTINGS A FLOW STARTS FROM — and for
+   * no others. The line above is the DECLARATIONS, which is what the settings
+   * screen draws; this is the resolved answer, which is what a story needs to
+   * open a step already filled in. Absent for an app whose stories start at
+   * nothing, which is most of them.
+   */
+  readonly chose?: Readonly<Record<string, unknown>>;
   /** ⚠️ The pages those rows live on — see `AreaDef`. */
   readonly settingAreas: AreaBook;
   readonly notifications: NotificationBook;

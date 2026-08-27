@@ -1937,6 +1937,7 @@ export type StoryRefusal =
   | "story_fills_unknown" | "story_fills_nothing"
   | "fills_takes_unknown" | "fills_given_unknown" | "fills_given_unanswered"
   | "fills_permission_wrong"
+  | "starts_takes_unknown" | "starts_not_a_setting"
   | "story_cannot_finish";
 
 export interface StoryProblem {
@@ -1960,6 +1961,7 @@ export function refuseStory(
     readonly permission?: Permission;
     readonly story?: {
       readonly writes: string;
+      readonly starts?: Readonly<Record<string, string>>;
       readonly fills?: {
         readonly by: string;
         readonly with: Readonly<Record<string, string>>;
@@ -1995,6 +1997,14 @@ export function refuseStory(
    * contract to a table.
    */
   asks: Readonly<Record<string, { readonly answers: readonly string[] }>>,
+  /**
+   * ⚠️ THE SETTING IDS THIS APP DECLARES — see `StorySpec.starts`. A story
+   * starting an input at a setting nothing declares is a value that never
+   * arrives, which is indistinguishable on the screen from the workspace having
+   * left the setting alone. Nothing else here needs the book, so it is the ids
+   * rather than the book.
+   */
+  settings: readonly string[] = [],
 ): readonly StoryProblem[] {
   const told = screen.story;
   if (!told) return [];
@@ -2009,6 +2019,28 @@ export function refuseStory(
      against, so it stops rather than reporting each field as unknown. */
   const write = operations.find((o) => o.id === told.writes);
   if (!write) return out;
+
+  /* --- what starts already answered -------------------------------------- */
+
+  for (const [name, id] of Object.entries(told.starts ?? {})) {
+    /* ⚠️ AN INPUT THE WRITE DOES NOT TAKE IS A VALUE THE FLOW NEVER HOLDS, so
+       the setting is read, sent, and dropped — and the step it was meant for is
+       asked with an empty control while the workspace's answer sits one layer
+       away. */
+    if (!(name in write.input)) {
+      at("starts_takes_unknown",
+        `starts "${name}" at ${id}, and ${write.id} does not take it — the value would be `
+        + "resolved, sent and dropped, and the step asked as though nothing was chosen");
+    }
+    /* ⚠️ AND A SETTING NOTHING DECLARES RESOLVES TO NOTHING, which on the screen
+       is identical to a workspace that left it alone. A typo here is a feature
+       that silently never worked. */
+    if (!settings.includes(id)) {
+      at("starts_not_a_setting",
+        `starts "${name}" at "${id}", which this app does not declare — it would resolve `
+        + "to nothing, and an empty control is what a workspace that chose nothing sees");
+    }
+  }
 
   /* --- the fill --------------------------------------------------------- */
 

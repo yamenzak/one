@@ -17,6 +17,7 @@ import { Opening } from "@engine/design";
 import { Signpost } from "../src/screens/Signpost.js";
 import { Editor } from "../src/centre/Brand.js";
 import { subjectOf } from "../src/space/OneSpace.js";
+import { drawnBy } from "../src/centre/AppSurface.js";
 /* ⚠️ The three screens the deployment's own infrastructure is read on — see
    the last describe in this file. */
 import { Shards } from "../src/console/Shards.js";
@@ -453,3 +454,40 @@ describe("the screens the deployment's own infrastructure is read on", () => {
   });
 });
 
+
+/**
+ * WHICH OF THE THREE DRAWS A DECLARED SCREEN.
+ *
+ * ⚠️ A STORY IS A DECLARED SCREEN AND IT WAS NOT ASKED ABOUT. `AppSurface`
+ * chose the renderer on `screen.body` alone, so every flow in every product
+ * fell past it, past the mount table it is not in, and into the "this screen
+ * ships with…" notice — the honest sentence for a screen nobody has written,
+ * printed over one that was declared, composed, guarded and photographed.
+ *
+ * ⚠️ AND NOTHING ELSE COULD HAVE CAUGHT IT. The manifest composed. Every gate
+ * guard passed. The shots harness draws a flow DIRECTLY, so the photographs
+ * were of the flow working. The one thing that fails is opening the product,
+ * which is why the decision is a function.
+ */
+describe("which of the three draws a declared screen", () => {
+  it("hands a story to the renderer, with no body anywhere", () => {
+    expect(drawnBy({ story: { writes: "x", asks: [] } }, false)).toBe("declared");
+  });
+
+  it("hands a body to the renderer", () => {
+    expect(drawnBy({ body: { blocks: [] } }, false)).toBe("declared");
+  });
+
+  /* ⚠️ A DECLARATION OUTRANKS A MOUNT, and the order is what makes a port a
+     deletion — the file that used to draw the screen stops being reached. */
+  it("prefers the declaration over a mounted component", () => {
+    expect(drawnBy({ body: { blocks: [] } }, true)).toBe("declared");
+    expect(drawnBy({ story: { writes: "x", asks: [] } }, true)).toBe("declared");
+  });
+
+  it("falls to the app's own code, and then to the notice", () => {
+    expect(drawnBy({}, true)).toBe("mounted");
+    expect(drawnBy({}, false)).toBe("notice");
+    expect(drawnBy(undefined, false)).toBe("notice");
+  });
+});

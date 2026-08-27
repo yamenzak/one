@@ -217,6 +217,27 @@ export interface StorySpec {
    */
   readonly writes: string;
   /**
+   * WHICH OF THE WRITE'S INPUTS START AT A SETTING THE WORKSPACE ALREADY CHOSE —
+   * the input's name to the setting's id.
+   *
+   * ⚠️ IT EXISTS BECAUSE A PREFERENCE THAT DOES NOT REACH THE FLOW IS A
+   * PREFERENCE NOBODY SET. OneInventory declares `inventory.default_unit`, whose
+   * own comment reads "the workspace's own defaults, not this file's" — and it
+   * was applied by the scan path and by the import path and NOT by the screen a
+   * person actually adds a product on. The two implicit paths honoured it; the
+   * deliberate one asked, with an empty box, at a workspace that had already
+   * answered exactly that question.
+   *
+   * ⚠️ AND IT ARRIVES AS AN ANSWER RATHER THAN AS A PLACEHOLDER, which is the
+   * difference that matters. A default drawn faintly into a control is a value
+   * somebody has to notice and accept; one that ARRIVES is a step that moves into
+   * the review — the same shape a fill produces, and the reason a flow can
+   * confirm rather than ask. A step declaring `always` is still asked, with the
+   * workspace's answer already chosen, which is right for a decision somebody
+   * must make rather than confirm.
+   */
+  readonly starts?: Readonly<Record<string, string>>;
+  /**
    * AN OPERATION WHOSE OUTPUT ARRIVES AS ANSWERS, BEFORE ANYBODY IS ASKED.
    *
    * ⚠️ THIS IS WHAT TURNS A FLOW FROM ASKING INTO CONFIRMING, AND IT IS THE
@@ -1305,7 +1326,9 @@ export function refuseApp(spec: AppSpec): readonly Refusal[] {
           + "the name of a variable is not a fact about the product");
       }
     }
-    for (const p of refuseStory(s, spec.operations, ASKS)) at(p.of, `${p.why}: ${p.detail}`);
+    for (const p of refuseStory(s, spec.operations, ASKS, Object.keys(spec.settings ?? {}))) {
+      at(p.of, `${p.why}: ${p.detail}`);
+    }
   }
 
   for (const id of unreadViews(views, spec.screens.map((s) => s.body))) {
