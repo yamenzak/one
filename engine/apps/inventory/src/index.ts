@@ -2555,7 +2555,11 @@ const arrive = operation<
   summary: "Put something on a shelf, known or not",
   input: {
     raw: field.text({ label: "Code", required: true, holds: "none", max: 256 }),
-    location: field.text({ label: "Where", required: true, holds: "none" }),
+    /* ⚠️ A REFERENCE, WHICH IS WHAT DRAWS A PLACE PICKER — the same thing
+       `count.open` was missing. Every other shelf field in the product is a
+       `ref`; declared as bare text the form generated over this one asks a
+       person holding a carton to type a location id. */
+    location: field.ref({ label: "Where", required: true, holds: "none", to: "location" }),
     /* ⚠️ IN THE RUNG NAMED BESIDE IT, or in the unit the code implies — one
        carton is one here and the multiplier turns it into thirty. A caller
        sending the multiplied number would double it. */
@@ -6725,6 +6729,58 @@ const manifest = (): AppSpec => defineApp({
             group: null,
             wide: true,
             of: [{ block: "QuickActions", leads: ["add-a-product"] }],
+          },
+          /*
+            ⚠️ RECEIVING IS A ROW ON HOME AND NOT A SCREEN BEHIND A CHIP, and the
+            photograph is what decided it. Given its own route it drew one action
+            on an otherwise empty page — a whole navigation, a title and a way
+            back, to reach a single control — while being the thing somebody does
+            fifty times before lunch. The most frequent act in the product earns
+            zero taps of travel, not one.
+
+            ⚠️ AND IT IS A ROW WHILE ADDING A PRODUCT IS A CHIP, which is the
+            honest difference between them rather than an inconsistency. Adding
+            is a FLOW — ten questions, its own frame, its own way back — so it
+            goes somewhere; receiving is one act with three answers, so it opens
+            a form where it stands. The hero above both says "Receive a delivery
+            and it will be here" over an empty workspace, which was the third
+            promise in this product made by an empty state with no control
+            behind it.
+
+            ⚠️ THE CODE IS TYPED OR SCANNED AND THE FIELD DOES NOT CARE, which is
+            why there is no camera. A warehouse scanner is a keyboard: it types
+            the barcode into whatever is focused and presses enter, so the
+            ordinary text field IS the scanner for most of the hardware people
+            own. A viewfinder is a phone affordance and a block this vocabulary
+            does not have; building the lane around one would have shipped
+            neither.
+
+            ⚠️ AND AN UNKNOWN CODE IS STILL RECEIVED — see `stock.arrive`. The
+            worst outcome here is somebody not recording something because a form
+            wanted a field they did not have, so the thing lands on the shelf
+            under a name taken from its own code and is named afterwards.
+          */
+          {
+            group: null,
+            wide: true,
+            of: [{
+              block: "ActionRow",
+              /* ⚠️ THE DAY AND THE YEAR ARE THE DEVICE'S — see `Fill`. The year
+                 is not a second clock read: a six-digit expiry printed on a box
+                 has its century inferred from a window around now, and the two
+                 have to agree or a box read at midnight on the thirty-first is
+                 dated in one year and expires in another. */
+              does: [{
+                op: "stock.arrive",
+                fills: { day: "today", year: "year", capture: { says: "scanned" } },
+              }],
+              bind: {
+                icon: { from: { of: "words", says: "scan" } },
+                label: { from: { of: "words", says: "Receive a delivery" } },
+                under: { from: { of: "words",
+                  says: "Scan or type the code, say where it went and how many" } },
+              },
+            }],
           },
           /*
             ⚠️ THE FIRST HOUR, DRAWN WHERE THE FIRST HOUR HAPPENS — see `guide`.

@@ -235,6 +235,61 @@ describe("a delivery and the day it runs out", () => {
 
 /* ------------------------------------------------------------------- undo --- */
 
+describe("a delivery put away in one gesture", () => {
+  /*
+    ⚠️ THE OPERATION WAS DRIVEN LONG BEFORE ANYTHING COULD REACH IT. Every
+    assertion above receives by calling `stock.arrive` directly, which proves the
+    handler and says nothing about whether a person can get to it — and for the
+    whole of that time no screen named it. What this drives is the seam that
+    closed that: the act as `/receive` DECLARES it, with its fills resolved the
+    way the browser resolves them, and posted.
+  */
+  it("receives an unknown code through the act the screen declares", async () => {
+    const place = await placeOf("Dock");
+
+    /* ⚠️ OFF HOME, WHERE THE ACT IS — the photograph moved it there from a
+       screen of its own, and a test still reading `/receive` would pass over a
+       screen nobody can open. */
+    const home = inventory().screens?.find((s) => s.route === "/");
+    const blocks = (home?.body?.blocks ?? []).flatMap((b) =>
+      ("of" in b ? b.of : [b]) as { block: string; does?: unknown[] }[]);
+    const act = (blocks.find((b) => b.block === "ActionRow")?.does?.[0]) as
+      { op: string; fills?: Record<string, unknown> } | undefined;
+    expect(act?.op).toBe("stock.arrive");
+    const fills = act?.fills ?? {};
+    /* ⚠️ THE THREE THE SCREEN IS STANDING ON, AND NOT ONE MORE. A fill added
+       here that the person should have been asked for is a form that stops
+       asking — measured against the list rather than spot-checked. */
+    expect(Object.keys(fills).sort()).toEqual(["capture", "day", "year"]);
+
+    const filled = Object.fromEntries(Object.entries(fills).map(([name, from]) =>
+      [name, from === "today" ? TODAY
+        : from === "year" ? Number(TODAY.slice(0, 4))
+          : (from as { says: string }).says]));
+
+    /* ⚠️ A CODE THE WORKSPACE HAS NEVER SEEN, which is the case the whole
+       operation exists for: the thing is on the shelf and in the system before
+       anybody has named it. */
+    const got = ok(await write("stock.arrive", {
+      ...filled, raw: "5012345678900", location: place, quantity: 6,
+    }));
+    expect(got.product).toBeTruthy();
+
+    const lines = ok(await read("stock.list")).items as
+      { product: string; quantity: number }[];
+    expect(lines.filter((l) => l.product === got.product)[0]?.quantity).toBe(6);
+  });
+
+  /* ⚠️ AND THE SHELF IS A REFERENCE, so the form draws a place picker rather
+     than asking somebody holding a carton to type an id. Pinned because it is
+     invisible in every other lane: a text field takes the same value and the
+     door accepts it, so only the person in front of the form ever finds out. */
+  it("asks for the shelf as a place, not as an identifier", () => {
+    const of_ = inventory().operations.find((o) => o.id === "stock.arrive");
+    expect(of_?.input?.["location"]?.to).toBe("location");
+  });
+});
+
 describe("taking back the last thing you did", () => {
   /*
     ⚠️ AN UNDO IS A MOVEMENT, NEVER A DELETION. The wrong number stays visible

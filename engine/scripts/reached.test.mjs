@@ -231,14 +231,22 @@ for (const [app, manifest] of appManifests()) {
  * `unreachable` asks whether a permission is holdable; between them nobody was
  * asking whether an APP's operation has an address. Every lane was green.
  *
- * ⚠️ AND THE QUESTION IS ASKED ONLY OF A SUBJECT THAT ALREADY HAS A SCREEN,
- * which is what makes it answerable during a rebuild. Every screen in this
+ * ⚠️ AND THE QUESTION IS ASKED ONLY OF A SUBJECT THE APP HAS ALREADY REACHED
+ * FOR, which is what makes it answerable during a rebuild. Every screen in this
  * product was emptied on purpose (RW-0) and they are coming back one at a time;
  * asking it of everything would report thirty-odd verbs whose surfaces are not
  * written yet, which is a guard nobody can act on and everybody learns to
- * ignore. A collection the app HAS drawn is one whose verbs it has decided
- * about — so the failure this catches is the sharp one: a screen ships, wires
- * two of its subject's three verbs, and leaves the third addressable by nobody.
+ * ignore. A collection the app has DRAWN, or one whose verbs it has wired ANY
+ * of, is one it has decided about — so the failure this catches is the sharp
+ * one: a screen ships, wires two of its subject's three verbs, and leaves the
+ * third addressable by nobody.
+ *
+ * ⚠️ THE SECOND HALF OF THAT WAS ADDED BECAUSE THE FIRST MISSED THE CASE IT WAS
+ * WRITTEN FOR. `stock` has no screen of its own — receiving and taking live on
+ * the PRODUCT page, which is `of: "product"` — so asking only about drawn
+ * subjects left every stock verb unexamined, and `stock.arrive` sat callable by
+ * nobody through the round that introduced this check. A subject with one verb
+ * wired and six not is exactly the shape here; the narrow rule could not see it.
  *
  * ⚠️ IT FOUND ONE THE DAY IT WAS WRITTEN. `/count` wired `count.tally` and
  * `count.close`, `/counts` listed the sessions — and `count.open` was called
@@ -265,6 +273,16 @@ const WAITING = new Set([
   /* Both need a screen of their own rather than a control on an existing one —
      a bulk import, and the label printer. */
   "inventory/product.import", "inventory/product.label",
+  /* THE RELEASE RAIL, WHOLE. A batch is opened, filled, ended, then held until
+     somebody releases it or fails it — and recalled or lifted afterwards. Seven
+     verbs, one feature, gated on `processes`, and its screens were emptied with
+     everything else. It is the one entry here that is a WHOLE surface rather
+     than a control missing from an existing one, so it goes as a block or not
+     at all. `process.result` is wired, which is what put the subject in this
+     guard's sights in the first place. */
+  "inventory/process.open", "inventory/process.put", "inventory/process.end",
+  "inventory/process.release", "inventory/process.fail", "inventory/process.recall",
+  "inventory/process.lift",
 ]);
 
 /**
@@ -276,6 +294,11 @@ const WAITING = new Set([
 const subjectsIn = (entries) => new Set(entries
   .map(([whole]) => /^\s*\{[^{}]*\bof:\s*"([^"]+)"/.exec(whole)?.[1])
   .filter(Boolean));
+
+/** Every `<collection>.<verb>` the manifest declares as a write, in order. */
+const writesIn = (src) => [...src.matchAll(
+  /id:\s*"([a-z]+)\.([a-z_]+)",\s*\n\s*kind:\s*"write"/g)]
+  .map((m) => [m[1], `${m[1]}.${m[2]}`]);
 
 /**
  * ⚠️ A MENTION THAT IS NOT ITS OWN DECLARATION. An operation is reached by being
@@ -301,15 +324,18 @@ const namesIt = (hay, op) => {
   const held = new Set();
   for (const [app, manifest, entries, from] of SEEN) {
     const src = strip(readFileSync(manifest, "utf8"));
-    const subjects = subjectsIn(entries);
     const hay = `${src}\n${from}`;
+    const writes = writesIn(src);
+    /* ⚠️ DRAWN, OR REACHED FOR — see the header. Either is the app saying it has
+       decided about this collection, and `stock` is only ever the second. */
+    const subjects = new Set([...subjectsIn(entries),
+      ...writes.filter(([, op]) => namesIt(hay, op)).map(([of_]) => of_)]);
     let asked = 0;
     let waiting = 0;
     const orphans = [];
-    for (const [, of_, verb] of src.matchAll(/id:\s*"([a-z]+)\.([a-z_]+)",\s*\n\s*kind:\s*"write"/g)) {
+    for (const [of_, op] of writes) {
       if (!subjects.has(of_)) continue;
       asked++;
-      const op = `${of_}.${verb}`;
       const key = `${app}/${op}`;
       /* ⚠️ EVERY VERB ASKED ABOUT, REACHED OR NOT, because the stale check below
          means "this name is not in the tree" and not "this name is not currently
@@ -339,7 +365,7 @@ const namesIt = (hay, op) => {
       /* ⚠️ THE COUNTDOWN IS SAID OUT LOUD, because "every one of them called" over
          a corpus with seven waiting is a summary that reads better than the tree
          does — which is the failure every guard in this directory is about. */
-      ok(`${app}: ${asked - waiting} of ${asked} verb(s) of a drawn subject called`
+      ok(`${app}: ${asked - waiting} of ${asked} verb(s) of a reached subject called`
         + (waiting ? `, ${waiting} waiting on a surface` : ""));
     }
   }
@@ -347,7 +373,7 @@ const namesIt = (hay, op) => {
      per app, so a walk that found no manifests is a file of assertions that never
      ran and a summary that reports it as a clean sweep. */
   if (!held.size) {
-    fail("reached: no app declares a verb of a subject it draws — this check "
+    fail("reached: no app declares a verb of a subject it has reached for — this check "
       + "asked nothing, and a check that cannot fail is one nobody can rely on.");
   }
   /* ⚠️ AND A NAME FOR SOMETHING THAT IS NOT THERE. An operation renamed or

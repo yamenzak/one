@@ -218,6 +218,41 @@ whole movement** — undoing one half would put the stock back where it left AND
 leave it where it arrived, the same boxes counted twice, from a button whose
 entire promise is that nothing happened.
 
+### Goods in
+
+⚠️ **THE THING DONE FIFTY TIMES BEFORE LUNCH WAS REACHABLE FROM NOWHERE.**
+`stock.arrive` puts a delivery away in ONE write — make the product if the code
+is new, attach the code, open the batch, move the balance — which matters
+because a client doing those in sequence on a warehouse phone leaves a nameless
+product with no code the first time the signal drops, and because one write is
+one queued item offline. It was built, driven end to end, and named by no screen
+at all.
+
+⚠️ **IT IS A ROW ON HOME AND NOT A SCREEN, AND THE PHOTOGRAPH IS WHAT DECIDED
+IT.** Given its own route it drew one action on an otherwise empty page — a
+whole navigation, a title and a way back, to reach a single control — while
+being the thing somebody does fifty times before lunch. The most frequent act in
+the product earns zero taps of travel, not one. It sits under **Add a product**,
+and the difference in shape between them is honest rather than an inconsistency:
+adding is a FLOW — ten questions, its own frame, its own way back — so it goes
+somewhere and wears a chevron; receiving is one act with three answers, so it
+opens a form where it stands. The hero above both says "Receive a delivery and
+it will be here" over an empty workspace, which was the third promise in this
+product made by an empty state with no control behind it.
+
+⚠️ **THE CODE IS TYPED OR SCANNED AND THE FIELD DOES NOT CARE, WHICH IS WHY
+THERE IS NO CAMERA.** A warehouse scanner is a keyboard — it types the barcode
+into whatever is focused and presses enter — so an ordinary text field IS the
+scanner for most of the hardware people own. A viewfinder is a phone affordance
+and a block the declared vocabulary does not have; building the lane around one
+would have meant shipping neither.
+
+⚠️ **AND AN UNKNOWN CODE IS STILL RECEIVED.** Take it now, name it later: the
+thing lands on the shelf under a name taken from its own code and marked
+unnamed, and whoever looks after the catalogue names it afterwards. The worst
+outcome in this product is somebody not recording something because a form
+demanded a field they did not have.
+
 ### The way back is beside the act, not in the log
 
 ⚠️ **AND FOR A MONTH THERE WAS NO WAY BACK AT ALL.** `undo` was built,
