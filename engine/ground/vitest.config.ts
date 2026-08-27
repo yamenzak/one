@@ -35,6 +35,18 @@ export default defineWorkersConfig({
       instead of isolation, and it turns a suite that is wrong half the time into
       a suite that is green — which is strictly worse than red, because the next
       real intermittent failure is absorbed by the same line and nobody sees it.
+
+      ⚠️ AND `Isolated storage failed` IS NOT THAT FAULT — it is the POOL's, and
+      it is patched rather than retried. `popStackedStorage` asserted every file
+      in a D1 directory ends in `.sqlite`; SQLite leaves a `-wal`/`-shm` sidecar
+      for as long as a connection is open, so a frame that popped while one was
+      still closing threw out of an after-hook and took a whole FILE with it —
+      about one local run in five, and eventually a red CI. A retry could not
+      have absorbed it anyway: nothing asserts, so there is no test to re-run.
+      `patches/@cloudflare__vitest-pool-workers@0.8.55.patch` drops the two
+      assertions, so the sidecars are copied and unlinked with the database they
+      belong to. Upstream removed the check in 0.22.0; the patch goes when this
+      package is upgraded, which is its own piece of work.
     */
     fileParallelism: false,
     poolOptions: {

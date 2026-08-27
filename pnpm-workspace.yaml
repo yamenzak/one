@@ -7,3 +7,5 @@ packages:
   # The live 4DL products and the packages they share.
   - "apps/*"
   - "packages/*"
+patchedDependencies:
+  '@cloudflare/vitest-pool-workers@0.8.55': patches/@cloudflare__vitest-pool-workers@0.8.55.patch

@@ -1,0 +1,32 @@
+diff --git a/dist/pool/index.mjs b/dist/pool/index.mjs
+index c1899a55d8af8d458f59ea5d5e00476e8bf58623..c9a6f8ddced9d97bf8a35d3bb4614c32980da90b 100644
+--- a/dist/pool/index.mjs
++++ b/dist/pool/index.mjs
+@@ -632,7 +632,12 @@ async function pushStackedStorage(intoDepth, persistPath) {
+       }
+       const namePath = path3.join(keyPath, name);
+       const stackFrameNamePath = path3.join(stackFrameKeyPath, name);
+-      assert2(name.endsWith(".sqlite"), `Expected .sqlite, got ${namePath}`);
++      /* PATCHED: SQLite's -wal/-shm sidecars exist whenever a connection is still
++         open, and this asserted every entry ended in .sqlite — so a storage frame
++         that popped while one was open threw "Isolated storage failed" out of an
++         after-hook, losing a whole file. They are copied and unlinked with the
++         database they belong to instead, which is what a clean close leaves.
++         Fixed upstream: the check is gone in 0.22.0. */
+       await fs.copyFile(namePath, stackFrameNamePath);
+     }
+   }
+@@ -648,7 +653,12 @@ async function popStackedStorage(fromDepth, persistPath) {
+         break;
+       }
+       const namePath = path3.join(keyPath, name);
+-      assert2(name.endsWith(".sqlite"), `Expected .sqlite, got ${namePath}`);
++      /* PATCHED: SQLite's -wal/-shm sidecars exist whenever a connection is still
++         open, and this asserted every entry ended in .sqlite — so a storage frame
++         that popped while one was open threw "Isolated storage failed" out of an
++         after-hook, losing a whole file. They are copied and unlinked with the
++         database they belong to instead, which is what a clean close leaves.
++         Fixed upstream: the check is gone in 0.22.0. */
+       await fs.unlink(namePath);
+     }
+   }
