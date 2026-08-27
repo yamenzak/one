@@ -21,6 +21,7 @@ import type { SurfaceSpec } from "@engine/kernel";
 import { ready, waiting, trouble } from "../src/index.js";
 import { Body, type Has } from "../src/rendered/body.js";
 import { PLATFORM_PROBLEMS, problem } from "@engine/kernel";
+import { Allowed } from "../src/parts/gated.js";
 
 const RECORD = { name: "Sodium chloride", held: 48, worth: 125_00, standing: "held" };
 
@@ -456,5 +457,73 @@ describe("a shortcut wears its mark rather than the name of one", () => {
     /* ⚠️ THE WORD ALONE, not "Add a product" — the label legitimately contains
        it, and an assertion that missed that would pass under the defect. */
     expect(html).not.toMatch(/>add</);
+  });
+});
+
+/**
+ * A ROW'S ACT ASKS THE GATE BEFORE IT IS DRAWN.
+ *
+ * ⚠️ `Screen.does` HAS DONE THIS SINCE IT WAS WRITTEN AND A BLOCK'S `does` DID
+ * NOT, which is the same fault one level down: the verdicts arrive with the boot
+ * — every blocked operation, with which gate blocked it — so a control the door
+ * will refuse is knowable at paint. Drawn anyway it is a row somebody presses, a
+ * sheet they fill in, and a refusal over the top of it. The work is gone, which
+ * is worse than never having offered it.
+ *
+ * ⚠️ AND THE PRODUCT THAT MADE IT URGENT SPLITS EXACTLY HERE. Taking stock and
+ * correcting a number are deliberately different grants — the difference between
+ * an inventory that can be audited and one that reports whatever the last person
+ * said — so one page draws one control the commonest role may press and one it
+ * may not, and without this the two are identical until the press.
+ */
+describe("a row that does something asks the gate first", () => {
+  const ACT: SurfaceSpec = {
+    shape: "detail",
+    layout: { as: "stack" },
+    blocks: [{
+      block: "ActionRow",
+      does: ["stock.adjust"],
+      bind: {
+        label: { from: { of: "words", says: "Correct the number" } },
+        under: { from: { of: "words", says: "Say what it should be" } },
+      },
+    }],
+  };
+
+  it("draws the row pressable where nothing blocks it", () => {
+    const html = renderToStaticMarkup(
+      <Allowed may={{}}><Body body={ACT} has={has({ onDo: () => undefined })} /></Allowed>,
+    );
+    expect(html).toContain("Correct the number");
+    expect(html).toContain("Say what it should be");
+    expect(html).not.toContain("disabled");
+  });
+
+  /* ⚠️ DISABLED AND EXPLAINED, NEVER ABSENT. A row that has silently vanished is
+     a feature somebody goes looking for and concludes is missing. */
+  it("disables it and says which gate refused, in place of the sub-line", () => {
+    const html = renderToStaticMarkup(
+      <Allowed may={{ "stock.adjust": "permission" }}>
+        <Body body={ACT} has={has({ onDo: () => undefined })} />
+      </Allowed>,
+    );
+    expect(html).toContain("Correct the number");
+    expect(html).toContain("disabled");
+    expect(html).toContain("Your role does not include this");
+    /* ⚠️ AND THE INSTRUCTION IS GONE, because an instruction for something that
+       will not happen is the one line on the row that is now untrue. */
+    expect(html).not.toContain("Say what it should be");
+  });
+
+  /* ⚠️ AND A GATE IS NOT ONE ANSWER — see `STOPPED`. "You cannot" and "your plan
+     does not include this" want different words, and a renderer folding them
+     into a boolean can only ever draw the first. */
+  it("says the plan rather than the role where the plan is what stopped it", () => {
+    const html = renderToStaticMarkup(
+      <Allowed may={{ "stock.adjust": "entitlement" }}>
+        <Body body={ACT} has={has({ onDo: () => undefined })} />
+      </Allowed>,
+    );
+    expect(html).toContain("Your plan does not include this");
   });
 });

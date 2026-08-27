@@ -946,7 +946,9 @@ export function NavRow({ icon, face, label, under, aside, onOpen, opens, isDisab
 }
 
 /** A row that DOES something rather than going somewhere — so, no chevron. */
-export function ActionRow({ icon, face, label, under, onDo, tone = "neutral" }: RowBase & {
+export function ActionRow({
+  icon, face, label, under, onDo, tone = "neutral", isDisabled, why,
+}: RowBase & {
   /**
    * ⚠️ OPTIONAL, BECAUSE A ROW IS ALSO A TRIGGER. Used inside `Confirm` the
    * press is react-aria's — the row opens the dialogue and the dialogue owns
@@ -954,6 +956,21 @@ export function ActionRow({ icon, face, label, under, onDo, tone = "neutral" }: 
    * nothing, which is a lie in the shape of a prop.
    */
   readonly onDo?: () => void; readonly tone?: Tone;
+  readonly isDisabled?: boolean;
+  /**
+   * WHY IT IS DISABLED, AND IT REPLACES THE SUB-LINE RATHER THAN JOINING IT.
+   *
+   * ⚠️ A ROW THAT IS OFF AND DOES NOT SAY SO IS THE PRODUCT DECLINING IN
+   * SILENCE. `Screen.does` has carried this since it was written — the gate's
+   * verdict is knowable at paint, so a control that will be refused says which
+   * gate would refuse it — and a row's act had no channel for the same sentence.
+   *
+   * ⚠️ AND IT TAKES THE SUB-LINE'S PLACE BECAUSE THE SUB-LINE IS NOW WRONG.
+   * "Say where it went and how many" under a control nobody can press is an
+   * instruction for something that will not happen; what a person needs there is
+   * the one fact that would change it.
+   */
+  readonly why?: string;
 }) {
   return (
     /*
@@ -969,18 +986,23 @@ export function ActionRow({ icon, face, label, under, onDo, tone = "neutral" }: 
       data-row
       variant="ghost"
       className={`justify-start ${ROW.free} ${ROW.wrap} ${ROW.flush} ${ROW.press} ${ROW.tap}`}
+      isDisabled={isDisabled}
       onPress={onDo}
     >
       {/* ⚠️ `data-ink`, NEVER `text-danger` — see `TONE_CSS`. The utility is the
           library's raw fill colour and it is short of the contrast floor as ink;
           the attribute is the channel that was tuned against every surface a
           row lands on. */}
+      {/* ⚠️ AND A BLOCKED ROW IS NEVER IN THE DANGER VOICE. Red is what says "this
+          destroys something"; on a control nobody can press it reads as an alarm
+          about the refusal rather than as the refusal. */}
       <span
         className={`flex w-full items-center ${ROW.gap} ${ROW.pad} ${ROW.tap}`}
-        {...(tone === "danger" ? { "data-ink": "danger" } : {})}
+        {...(tone === "danger" && !isDisabled ? { "data-ink": "danger" } : {})}
       >
         <Lead icon={icon} face={face} />
-        <Body label={label} under={under} />
+        {/* ⚠️ THE REASON TAKES THE SUB-LINE — see `why`. */}
+        <Body label={label} under={why ?? under} />
       </span>
     </Button>
   );

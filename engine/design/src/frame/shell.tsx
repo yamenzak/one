@@ -35,7 +35,7 @@ import {
    the outside, and lucide's path order is not something to build on. */
 import {
   BellMark, CalendarMark, CheckMark, FlagMark, InboxMark, KeyMark, LayersMark, LeaveMark,
-  RefreshMark, ScanMark, SearchMark, ShareMark, ShieldMark, TallyMark,
+  MoveMark, RefreshMark, ScanMark, SearchMark, ShareMark, ShieldMark, TallyMark,
 } from "../parts/marks.js";
 import { Page } from "./page.js";
 import { TellingProvider } from "./telling.js";
@@ -62,7 +62,7 @@ const GLYPHS: Readonly<Record<string, React.ReactNode>> = {
      means somebody looking for a thing they cannot see; a double-check is the
      mark on a delivered message. Both were on a bottom bar, one apart, against
      destinations that mean the opposite. See `marks.tsx`. */
-  scan: <ScanMark />, tally: <TallyMark />,
+  scan: <ScanMark />, tally: <TallyMark />, move: <MoveMark />,
   people: <Users />, users: <Users />,
   /* ⚠️ A WORKSPACE IS A BUSINESS AND A PERSON IS ONE PERSON, and both were
      landing on the neutral mark — an anonymous circle in a menu, which is the
@@ -195,6 +195,9 @@ export const LIVELY: Readonly<Record<string, string>> = {
   check: "draw",
   search: "seek",
   scan: "read", tally: "count",
+  /* ⚠️ THE ARROW CROSSES AND COMES BACK — see `MoveMark`. A carry is not an
+     exit, so the character that leaves and returns is the right one. */
+  move: "depart",
   /* The whole mark moving IS the purpose. */
   settings: "turn", cog: "turn", clock: "turn",
   money: "flip", coins: "flip", bank: "flip", card: "flip",

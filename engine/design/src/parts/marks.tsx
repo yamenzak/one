@@ -409,3 +409,40 @@ export const TallyMark = () => (
     </g>
   </Mark>
 );
+
+/**
+ * TWO SHELVES AND SOMETHING GOING FROM ONE TO THE OTHER.
+ *
+ * ⚠️ A TRANSFER HAD NO MARK, AND THE THREE NEAREST ALL SAY SOMETHING ELSE. A
+ * refresh is two arrows going round, which means "ask again"; a share is a line
+ * reaching outward, which means "give it to somebody"; a pair of opposed arrows
+ * means "swap". Carrying a carton from the back store to a ward shelf is none of
+ * those, and it is the verb this product went to the trouble of keeping separate
+ * from taking — so drawing it as a refresh would have undone that at the one
+ * point a person actually reads.
+ *
+ * ⚠️ THE SHELVES ARE THE SUBJECT, WHICH IS WHY THEY ARE DRAWN AT ALL. An arrow
+ * on its own is direction; an arrow BETWEEN two places is a transfer, and the
+ * two short bars are what makes the difference legible at 24px without a label.
+ *
+ * ⚠️ AND THE ARROW IS THE PART, so the mark says what the act does: the shelves
+ * hold still because a transfer does not move them. `depart` is the character —
+ * the arrow crosses, leaves, and comes back from the other side — which is
+ * exactly a carry rather than a one-way exit, and it is already in the
+ * vocabulary rather than a nineteenth keyframe written for one mark.
+ */
+export const MoveMark = () => (
+  <Mark>
+    <g data-part="shelves">
+      <path d="M3 19h5" />
+      <path d="M16 19h5" />
+    </g>
+    <g data-part="arrow">
+      {/* ⚠️ AN ARC RATHER THAN A STRAIGHT LINE, because a box carried between two
+          shelves is lifted and set down. A horizontal arrow at the same height
+          as the bars reads as a ruler. */}
+      <path d="M6 14a6.5 6.5 0 0 1 12 0" />
+      <path d="m15 11.5 3 3 3-3" />
+    </g>
+  </Mark>
+);

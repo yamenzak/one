@@ -1136,4 +1136,55 @@ describe("the door answers every screen it draws", () => {
     const acts = (await drawn("add-a-product")).body.acts as Record<string, unknown>;
     expect(Object.keys(acts)).toContain("product.see");
   });
+
+  /*
+    ⚠️ ALL FOUR WAYS STOCK MOVES, ON THE ONE SCREEN THAT IS ABOUT A PRODUCT. For
+    a day only `receive` was reachable anywhere in this product — an inventory
+    where stock goes up and never comes down, in which every balance is the sum
+    of what arrived and no number on any screen is true after the first morning.
+    Taking is the most frequent thing anybody does with an inventory and it was
+    the thing this one could not do.
+
+    ⚠️ AND THE ASSERTION IS THE ACTS THE DOOR SENDS RATHER THAN THE MANIFEST'S
+    OWN BLOCKS, because those two agreeing is the whole question. A body may
+    name an operation the app does not declare; the composer refuses that, and
+    what this covers is the other direction — an act declared, composed, and
+    dropped on the way to the browser, where a screen draws a row that opens a
+    form with nothing in it.
+  */
+  it("sends every way stock moves, on the product screen", async () => {
+    const said = await drawn("product");
+    expect(said.status, JSON.stringify(said.body)).toBe(200);
+    const acts = said.body.acts as Record<string, { input?: Record<string, unknown> }>;
+    for (const op of ["stock.take", "stock.receive", "stock.move", "stock.adjust"]) {
+      expect(Object.keys(acts), `${op} is not on the product screen`).toContain(op);
+    }
+    /* ⚠️ AND EACH ARRIVES WITH ITS INPUT, or the form it opens is a sheet of
+       nothing. `stock.move` is the one that asks a third question — a transfer
+       has two ends — so it is the one an empty input would be least visible on. */
+    expect(Object.keys(acts["stock.move"]?.input ?? {})).toContain("to");
+    expect(Object.keys(acts["stock.take"]?.input ?? {})).toContain("quantity");
+  });
+
+  /*
+    ⚠️ AND THE PICKERS ARRIVE WITH THE ROWS, WHICH IS WHAT MAKES THESE FORMS
+    ANSWERABLE. Every one of the four asks which shelf; a `ref` with no choices
+    behind it draws a text box, and a text box on that question asks somebody
+    standing at a shelf to type the identifier of the shelf they are touching.
+  */
+  it("sends the shelves each of them asks about", async () => {
+    /* ⚠️ MADE HERE RATHER THAN RELIED ON FROM AN EARLIER TEST — every test in
+       this suite gets its own storage stack, so a shelf another one created is
+       genuinely not there. A fixture that assumed otherwise would assert against
+       an empty world and pass or fail for the wrong reason. */
+    await write("location.create", { name: "Cold room", kind: "room" });
+
+    const acts = (await drawn("product")).body.acts as Record<string, {
+      choices?: Record<string, readonly { id: string; label: string }[]>;
+    }>;
+    const where = acts["stock.take"]?.choices?.["location"];
+    expect(where?.length, "no shelves to pick from").toBeGreaterThan(0);
+    expect(where!.some((one) => one.label === "Cold room"),
+      "a shelf is offered by its identifier rather than its name").toBe(true);
+  });
 });

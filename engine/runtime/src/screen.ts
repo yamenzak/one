@@ -438,12 +438,18 @@ export async function drawnFor(
     here and handing the answer to both is what stops a third caller re-deriving
     it slightly differently.
   */
+  /*
+    ⚠️ AND `null` RATHER THAN THE IDENTIFIER WHERE NOTHING NAMES A ROW — which is
+    the difference between the two callers, and this answered both the same way
+    for a day. A `stock` line is a product on a shelf: every field it has is a
+    reference or a number, so `namesIn` correctly finds nothing, and an id here
+    would be `stk_0mtb…` set at the size of the screen as a page's own title. The
+    sheet below still falls back to it, because "Delete stk_0mtb…?" at least
+    names the thing being deleted; a heading does not have that excuse, and the
+    screen's own label is the honest answer to "one of these".
+  */
   const names = of && held ? namesIn(of) : null;
-  const name = names && held
-    ? String(held[names] ?? "") || String(held["id"] ?? "") || null
-    : held
-      ? String(held["id"] ?? "") || null
-      : null;
+  const name = names && held ? String(held[names] ?? "") || null : null;
 
   /*
     ⚠️ THE TWO WAYS A RECORD LEAVES, ANSWERED ONCE PER SCREEN — see

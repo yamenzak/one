@@ -207,6 +207,36 @@ describe("a screen is handed its record and its views together", () => {
   });
 
   /*
+    ⚠️ AND `null` WHERE NOTHING NAMES A ROW, WHICH IS NOT THE SAME AS THE SHEET'S
+    ANSWER. A join table is every field a reference or a number, so `namesIn`
+    correctly finds nothing — and an identifier here is `shl_0mtb…` set at the
+    size of the screen as a page's own title. The delete sheet still falls back
+    to it, because "Delete shl_0mtb…?" at least names what is going; a heading
+    does not have that excuse.
+  */
+  it("has no name where the collection names no field, and the sheet still does", async () => {
+    const joined = made("holding", "stock", {
+      shelf: field.ref({ label: "Shelf", required: true, holds: "none", to: "shelf" }),
+      quantity: field.number({ label: "How many", required: true, holds: "none" }),
+    });
+    const app = {
+      ...APP, collections: [...(APP.collections ?? []), joined],
+    } as unknown as AppSpec;
+    const on: ScreenSpec = {
+      ...place, id: "holding", of: "holding",
+      body: { ...place.body!, blocks: [] },
+    } as unknown as ScreenSpec;
+    await applySchema(shard(), [schemaFor(app)]);
+    const one = await put(shard(), joined, TENANT, { shelf: cold, quantity: 3 }, null, NOW);
+    if ("why" in one) throw new Error(one.why);
+
+    const got = await drawnFor(shard(), app, on, TENANT, all, one.id);
+    if ("needs" in got) throw new Error(got.needs);
+    expect(got.name).toBeNull();
+    expect(got.aside?.name).toBe(one.id);
+  });
+
+  /*
     ⚠️ THE ACTS TRAVEL WITH THE SCREEN, AND ONLY THE ONES IT OFFERS. Sending the
     catalogue would put every operation in the product on the wire for a screen
     with one button on it; sending none would mean the browser cannot draw a form

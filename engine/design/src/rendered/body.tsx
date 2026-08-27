@@ -38,6 +38,9 @@ import { Arranged, spanning } from "../parts/arrange.js";
 import { Group, QuickActions } from "../parts/surfaces.js";
 import { Region, ready, type Loaded } from "../parts/state.js";
 import { Lookup, Segmented } from "../parts/forms.js";
+/* ⚠️ THE SAME VERDICTS `Screen.does` READS — see `Placed`. A second opinion
+   about access is how a product comes to offer a button that answers 403. */
+import { sayGate, useGate } from "../parts/gated.js";
 import { SPACE } from "../tokens/metrics.js";
 import { Num, Size, Unit, When } from "../parts/said.js";
 import { Money } from "../parts/surfaces.js";
@@ -594,6 +597,30 @@ function Placed({ block, has }: { readonly block: BlockSpec; readonly has: Has }
      act to the door, not to the press, so the id is all this needs. */
   const id = act === undefined ? undefined : opOf(act);
   if (id && has.onDo) props["onPress"] = () => has.onDo?.(id);
+  /*
+    ⚠️ AND THE GATE IS ASKED BEFORE IT IS DRAWN, WHICH `Screen.does` HAS ALWAYS
+    DONE AND A BLOCK'S `does` DID NOT. The verdicts arrive with the boot — every
+    blocked operation, with which gate blocked it — so a control the door will
+    refuse is knowable at paint. Drawn anyway it is a row somebody presses, a
+    sheet they fill in, and a refusal over the top of it: the work is gone, which
+    is worse than never having offered it.
+
+    ⚠️ AND IT IS THE SHARPEST ACCESS RULE IN AN INVENTORY THAT MADE THIS URGENT.
+    Taking stock and correcting a number are deliberately different grants, so a
+    product page offering both draws one control the commonest role can press and
+    one it cannot — and without this, the two are indistinguishable until the
+    press.
+
+    ⚠️ DISABLED AND EXPLAINED, NEVER ABSENT. A row that has silently vanished is
+    a feature somebody goes looking for; `sayGate` is the library's own line for
+    each of the nine, so the words are the design system's rather than each
+    screen's.
+  */
+  const stopped = useGate(id);
+  if (stopped) {
+    props["isDisabled"] = true;
+    props["why"] = sayGate(stopped);
+  }
 
   /* ⚠️ THE PENCIL IS ADDED TO THE ROW'S OWN PROPS — see `Editable`. It is not a
      slot: nothing in the declaration binds it, and the registry's guard would

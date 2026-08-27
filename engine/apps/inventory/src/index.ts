@@ -6638,20 +6638,98 @@ const manifest = (): AppSpec => defineApp({
             was reached from a session screen written by hand; this is a declared
             body offering one, which is what makes the rest of them portable.
           */
+          /*
+            ⚠️ AND THE FOUR ARE THE PRODUCT, WHICH FOR A DAY WAS ONE. Only
+            `receive` was reachable — an inventory where stock goes up and never
+            comes down, in which every balance is the sum of what arrived and no
+            number on any screen is true after the first morning. Taking is the
+            most frequent thing anybody does with an inventory and it was the
+            thing this one could not do.
+
+            ⚠️ TAKING FIRST, AND THE ORDER IS FREQUENCY RATHER THAN LIFECYCLE.
+            Receiving happens on a delivery; taking happens all day. A list
+            ordered by the story of a box — arrives, moves, is used, is corrected
+            — puts the commonest act third, which is a decision made by narrating
+            rather than by watching.
+
+            ⚠️ EVERY ONE OF THEM IS THE SAME THREE FILLS. The product is the
+            record somebody is standing on, the day is the device's, and `typed`
+            is what distinguishes a quantity somebody keyed from one a camera
+            read — so what is left to ask is the two questions a person actually
+            has. `stock.move` asks three, because a transfer has two ends.
+
+            ⚠️ AND CORRECTING IS BEHIND A DIFFERENT GRANT FROM THE OTHER THREE,
+            which is this product's sharpest access rule and the reason the gate
+            had to reach a block's act before this card could exist. Somebody on
+            the floor takes things all day and must never be able to make a
+            number agree with what they took. Drawn without asking, the row is
+            identical to the three beside it until the press.
+          */
           {
-            group: null,
-            of: [{
-              block: "ActionRow",
-              does: [{
-                op: "stock.receive",
-                fills: { product: "record", day: "today", capture: { says: "typed" } },
-              }],
-              bind: {
-                icon: { from: { of: "words", says: "box" } },
-                label: { from: { of: "words", says: "Put some on a shelf" } },
-                under: { from: { of: "words", says: "Say where it went and how many" } },
+            group: "What to do with it",
+            of: [
+              {
+                block: "ActionRow",
+                does: [{
+                  op: "stock.take",
+                  fills: { product: "record", day: "today", capture: { says: "typed" } },
+                }],
+                bind: {
+                  icon: { from: { of: "words", says: "remove" } },
+                  label: { from: { of: "words", says: "Take some off a shelf" } },
+                  under: { from: { of: "words", says: "Say which shelf and how many" } },
+                },
               },
-            }],
+              {
+                block: "ActionRow",
+                does: [{
+                  op: "stock.receive",
+                  fills: { product: "record", day: "today", capture: { says: "typed" } },
+                }],
+                bind: {
+                  icon: { from: { of: "words", says: "box" } },
+                  label: { from: { of: "words", says: "Put some on a shelf" } },
+                  under: { from: { of: "words", says: "Say where it went and how many" } },
+                },
+              },
+              /*
+                ⚠️ A TRANSFER IS ITS OWN VERB, AND CARRYING A CARTON AS A TAKE
+                PLUS A RECEIVE IS WHAT MAKES A USAGE REPORT A SENTENCE ABOUT A
+                TROLLEY. Both halves land in the history as consumption, so "we
+                used 600 tablets this month" is made partly of stock that went
+                nowhere — and the one measure that says how fast things actually
+                go is the one it ruins.
+              */
+              {
+                block: "ActionRow",
+                does: [{
+                  op: "stock.move",
+                  fills: { product: "record", day: "today", capture: { says: "typed" } },
+                }],
+                bind: {
+                  icon: { from: { of: "words", says: "move" } },
+                  label: { from: { of: "words", says: "Carry some somewhere else" } },
+                  under: { from: { of: "words", says: "Off one shelf and onto another" } },
+                },
+              },
+              {
+                block: "ActionRow",
+                does: [{
+                  op: "stock.adjust",
+                  fills: { product: "record", day: "today", capture: { says: "typed" } },
+                }],
+                bind: {
+                  icon: { from: { of: "words", says: "edit" } },
+                  label: { from: { of: "words", says: "Correct a number" } },
+                  /* ⚠️ THE REASON IS SAID HERE BECAUSE THE HANDLER DEMANDS ONE
+                     AND THE FORM WOULD OTHERWISE ASK FOR IT WITH NO EXPLANATION.
+                     An adjustment with nothing behind it is the number changing
+                     by itself, and a shrinkage report made of those says only
+                     that the product is not trusted. */
+                  under: { from: { of: "words", says: "Say what it should be, and why" } },
+                },
+              },
+            ],
           },
           {
             group: "What it is",
