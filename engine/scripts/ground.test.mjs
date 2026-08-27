@@ -648,6 +648,38 @@ if (!cold) ok(`warm: the neutral ladder carries a hue, and no surface writes a c
   }
 }
 
+/*
+  ⚠️ AN ATTRIBUTE THE STYLESHEET DOES NOT DEFINE PAINTS NOTHING, IN SILENCE.
+  `data-chrome` is how a floating surface asks the palette for its ground, and
+  the sheet answers `[data-chrome="true"]` and nothing else. One component wrote
+  `"glass"` — no selector matched, so the update pill was drawn with no ground at
+  all: two buttons and a sentence floating over whatever the page had behind
+  them. Nothing can catch that at runtime, because a selector that matches
+  nothing is indistinguishable from one nobody wrote.
+
+  ⚠️ THE VALUES COME FROM THE SHEET, NOT FROM A LIST HERE. `ambience.ts` is where
+  the rule is written; a second copy of the allowed set is the drift this exists
+  to catch, one file over.
+*/
+const SHEET = readFileSync(join(ENGINE, "design/src/tokens/ambience.ts"), "utf8");
+const DEFINED = new Set(
+  [...SHEET.matchAll(/\[data-chrome="([^"]+)"\]/g)].map((m) => m[1]),
+);
+let inert = 0;
+for (const file of FILES) {
+  const code = readFileSync(file, "utf8");
+  for (const [, value] of code.matchAll(/data-chrome="([^"]+)"/g)) {
+    if (DEFINED.has(value)) continue;
+    inert++;
+    fail(`${file.slice(ENGINE.length + 1)}: \`data-chrome="${value}"\` matches no rule in the stylesheet.\n`
+      + `       It defines ${[...DEFINED].map((v) => `"${v}"`).join(", ")}. A surface asking for a\n`
+      + `       ground that is not there is drawn with none, and nothing reports it.`);
+  }
+}
+if (!inert) {
+  ok(`chrome: every \`data-chrome\` names a ground the sheet defines (${[...DEFINED].join(", ")})`);
+}
+
 console.log(bad
   ? `\nground: ${bad} finding(s) — an edge, or a boundary that needs one.`
   : `\nground: no borders, no shadows, one monochrome interface, one coloured data.`);

@@ -19,7 +19,7 @@
 
 import * as React from "react";
 import {
-  Await, Trouble, Waiting, ready, trouble, useTelling, waiting, type Loaded,
+  Await, Screen, Trouble, Waiting, ready, trouble, useTelling, waiting, type Loaded,
 } from "@engine/design";
 import { Doing, asks, type Ran } from "@engine/design/doing";
 /* ⚠️ NOT THROUGH THE BARREL, WHICH IS THE RENDERER'S OWN RULE. `@engine/design`
@@ -458,9 +458,24 @@ export function Declared({ screen, screens, at, go, currency, app }: {
     );
   }
 
+  /*
+    ⚠️ A DECLARED BODY GOES IN A `Screen`, AND THE DEPLOYMENT WAS THE ONE PLACE
+    IT DID NOT. `Body` places blocks; the rhythm BETWEEN them, the gutter, the
+    reading width, the shape's own skeleton and the arrival stagger are all the
+    frame's — `Arriving` is the `data-blocks` stack that carries the first two.
+    Mounted bare, the hero and the blocks under it were not siblings in anything
+    with a gap, so they touched, while the grid inside kept its own 24: one
+    column, two rhythms, and the seam exactly where a screen is read first.
+
+    ⚠️ AND THE FIXTURE ALWAYS DID THIS, which is why nothing caught it. The board
+    wraps a declared body in a `Screen` and says so in a comment — "mounting a
+    body bare leaves every one of them off" — so the browser sweep has been
+    measuring a frame no customer gets, and reporting one rhythm because in the
+    fixture there was one. The board is right; this was the copy that drifted.
+  */
   if (!body) return null;
   return (
-    <>
+    <Screen shape={body.shape} title={screen.label}>
       <Body body={body} has={has} />
       {asking && acts[asking] ? (
         <Doing
@@ -477,7 +492,7 @@ export function Declared({ screen, screens, at, go, currency, app }: {
           run={(input: Record<string, unknown>) => run(asking, { ...input, ...filled(asking) })}
         />
       ) : null}
-    </>
+    </Screen>
   );
 }
 

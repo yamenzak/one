@@ -284,6 +284,42 @@ if (opens < 0) {
   ok("mounting: a screen change replaces the component that draws it");
 }
 
+/*
+  ⚠️ A DECLARED BODY GOES IN A `Screen`, IN THE FIXTURE **AND** IN THE
+  DEPLOYMENT. `Body` places blocks and nothing else: the rhythm between them, the
+  gutter, the reading width, the shape's skeleton and the arrival stagger are all
+  the frame's. The board has wrapped one since it was written and says so; the
+  deployment did not, so the hero and the blocks under it were not siblings in
+  anything with a gap and sat touching, while the grid inside kept its own — one
+  column, two rhythms, on the screen a product is read on first.
+
+  ⚠️ AND IT IS A SOURCE CHECK BECAUSE NO BROWSER SUITE MOUNTS THE SHIPPED
+  COMPOSITION. Every sweep mounts a ground, or a shell whose child is inert on
+  purpose — so `AppSurface → Declared → Body` is measured by nothing, and the
+  fixture reported one rhythm while a phone showed two. Until something drives
+  that path, the cheapest true statement is that both callers frame a body the
+  same way.
+*/
+const FRAMES_A_BODY = [
+  "one-space/src/centre/Declared.tsx",
+  "apps/inventory/src/screens/ground.tsx",
+];
+let bare = 0;
+for (const file of FRAMES_A_BODY) {
+  const code = readFileSync(join(ENGINE, file), "utf8");
+  if (!code.includes("<Body")) {
+    fail(`${file}: draws no <Body>, so this guard covers nothing.\n` +
+         `       It moved — point this at the file that draws one.`);
+    bare++;
+  } else if (!code.includes("<Screen")) {
+    fail(`${file}: draws a <Body> outside any <Screen>.\n` +
+         `       The frame carries the rhythm between blocks, the gutter, the reading\n` +
+         `       width and the shape's skeleton — see the note above this check.`);
+    bare++;
+  }
+}
+if (!bare) ok(`framing: ${FRAMES_A_BODY.length} caller(s) draw a declared body inside its frame`);
+
 console.log(bad
   ? `\napps: ${bad} finding(s) — an app doing what the platform is for.`
   : `\napps: manifests declare, the platform does, and composition waits for a request.`);

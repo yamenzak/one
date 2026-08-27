@@ -56,7 +56,14 @@ export function Renewal({ shown, onReload, onLater }: {
            right to: two numbers for one shape drift the first time one moves. */
         className={`pointer-events-auto flex items-center ${SPACE.snug}
           ${ISLAND_PAD} rounded-full`}
-        data-chrome="glass"
+        /* ⚠️ `"true"`, WHICH IS THE ONLY VALUE THE STYLESHEET DEFINES. This
+           said `"glass"` — a value `[data-chrome="true"]` does not match — so
+           the pill was drawn with no ground under it at all: the words and two
+           buttons floating over whatever the page had there. An attribute
+           selector that matches nothing fails in perfect silence, which is why
+           it read as a component that had forgotten its background rather than
+           as a typo. */
+        data-chrome="true"
         /* ⚠️ THE ONE ARRIVAL, SPREAD. It is a data attribute the motion engine
            reads, not a duration this file gets to pick — `motion.ts` owns when
            and how long, so a second answer here is a second arrival. */
