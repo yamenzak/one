@@ -30,8 +30,8 @@
 import * as React from "react";
 import { Button } from "@heroui/react";
 import type {
-  Binding, BlockSpec, Fields, Format, GroupSpec, GuideBook, Layout, MilestoneBook, Placed, Presence,
-  Raised, Read, SurfaceSpec, Viewed,
+  Binding, BlockSpec, Column, Fields, Format, GroupSpec, GuideBook, Layout, MilestoneBook, Placed,
+  Presence, Raised, Read, SurfaceSpec, Viewed,
 } from "@engine/kernel";
 import { BLOCKS, goOf, isGroup, opOf, opensOn, reached, remaining } from "@engine/kernel";
 import { Arranged, spanning } from "../parts/arrange.js";
@@ -220,6 +220,30 @@ const DRAWN: Record<Format, (v: unknown, has: Has) => React.ReactNode> = {
   unit: (v) => <Unit of={String(v)} />,
   tally: (v) => <Tally value={Number(v)} />,
 };
+
+/**
+ * WHAT A PHONE ROW CARRIES AT ITS END — see the fold in `Listing`.
+ *
+ * ⚠️ THE END SLOT HAS NO HEADING OVER IT, WHICH CHANGES WHAT A BOOLEAN MEANS
+ * THERE. In the table half a column sits under its own label and "Yes" is
+ * exactly right — `DRAWN.plain` records why at length. Folded into a row the
+ * label is gone, so `/counts` read "B1 · 2026-08-24 · Yes": a word answering a
+ * question the row does not ask, and one nobody can resolve without opening the
+ * session to find out what was being asked.
+ *
+ * ⚠️ SO A BOOLEAN AT THE END MARKS THE EXCEPTION AND SAYS NOTHING OTHERWISE. The
+ * column's own name is the answer when the value is true — a blind count reads
+ * "Blind" — and a false one draws nothing at all, because half a list ending in
+ * "No" is a column of noise about the ordinary case. The declaration already
+ * holds the word; the fold was throwing it away.
+ *
+ * ⚠️ AND ONLY A BOOLEAN. Every other value is said the way the table says it, by
+ * the same formatter, because a number folded into a row is still a number.
+ */
+const endOf = (col: Column, row: Readonly<Record<string, unknown>>, has: Has) =>
+  (typeof row[col.field] === "boolean"
+    ? (row[col.field] ? col.label : null)
+    : DRAWN[col.as ?? "plain"](row[col.field], has));
 
 const rowsOf = (has: Has, view: string) => {
   const held = has.views[view];
@@ -503,7 +527,7 @@ function Placed({ block, has }: { readonly block: BlockSpec; readonly has: Has }
     props["asRow"] = (row: Readonly<Record<string, unknown>>) => ({
       name: String(row[first!.field] ?? ""),
       ...(second ? { under: DRAWN[second.as ?? "plain"](row[second.field], has) } : {}),
-      ...(third ? { aside: DRAWN[third.as ?? "plain"](row[third.field], has) } : {}),
+      ...(third ? { aside: endOf(third, row, has) } : {}),
     });
   }
   /*

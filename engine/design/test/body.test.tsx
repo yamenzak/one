@@ -29,9 +29,12 @@ const has = (over: Partial<Has> = {}): Has => ({
   record: RECORD,
   views: {
     shelves: ready({
+      /* ⚠️ ONE TRUE AND ONE FALSE, because a fixture where the flag agrees on
+         every row passes whichever way the fold reads it. */
       items: [
-        { id: "s1", name: "Cold room" }, { id: "s2", name: "Bay four" },
-        { id: "s3", name: "Trolley" },
+        { id: "s1", name: "Cold room", sealed: true },
+        { id: "s2", name: "Bay four", sealed: false },
+        { id: "s3", name: "Trolley", sealed: false },
       ],
       /* ⚠️ NOT THREE. The `count` binding below asserts the SCREEN reports how
          many there are rather than how many came back — a view is bounded, and a
@@ -175,6 +178,38 @@ describe("a binding reaches the prop it names", () => {
        rows — and asserting on the heading would be asserting that a Suspense
        fallback rendered. */
     expect(html, "the list drew none of its three rows").toContain("Cold room");
+  });
+
+  /*
+    ⚠️ THE END OF A ROW HAS NO HEADING, SO A BOOLEAN THERE SAYS ITS OWN NAME.
+    The table half draws the column under its label, where "Yes" is exactly
+    right; folded into a phone row the label is gone and `/counts` read
+    "B1 · 2026-08-24 · Yes" — a word answering a question the row does not ask.
+    What is asserted is both halves of the rule at once, because a fold that
+    printed the label unconditionally would satisfy the first assertion alone.
+  */
+  it("says a flag's own name at the end of a row, and nothing when it is off", () => {
+    const html = drawn(one({
+      block: "Listing",
+      shows: [
+        { field: "name", label: "Shelf" },
+        { field: "id", label: "Code" },
+        { field: "sealed", label: "Sealed" },
+      ],
+      nothing: { says: "No shelves yet" },
+      bind: {
+        label: { from: { of: "words", says: "Shelves" } },
+        of: { from: { of: "view", view: "shelves" } },
+      },
+    }));
+    /* ⚠️ COUNTED, NOT LOOKED FOR. One row of three is sealed, so the word
+       appears ONCE — and it is the count that carries both halves of the rule:
+       a fold that kept Yes/No reads nought, and one that printed the label on
+       every row reads three. Asserting presence alone passes the second, which
+       is a fold labelling every row with a fact two of them do not have. */
+    const said = html.split("Sealed").length - 1;
+    expect(said, `"Sealed" appears ${said} time(s) over three rows, one sealed`)
+      .toBe(1);
   });
 
   /*

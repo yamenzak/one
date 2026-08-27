@@ -111,6 +111,14 @@ Read these as tests you can apply to a screenshot without knowing the codebase.
 
 - A label is one to three words. A row's second line, if it exists at all, is
   a **fact** — a state, a count, a date — never an explanation of the row.
+- **A row's END has no heading over it, so what sits there has to say what it
+  is.** A date reads as a date and a number as a number, but a flag does not: a
+  count session's list read "B1 · 2026-08-24 · Yes", which is a word answering a
+  question the row never asks. A boolean at the end says the column's own name
+  when it is true — "Blind" — and **nothing at all when it is false**, because
+  half a list ending in "No" is a column of noise about the ordinary case. The
+  table half keeps Yes and No, because there the column is under its label and
+  they are exactly right.
 - No product vocabulary. Nobody outside the building knows what a *tenant*, an
   *entitlement*, a *sub-processor* or a *shard* is. If the operator console must
   use a word like that, it is the one place allowed, and only because its reader
