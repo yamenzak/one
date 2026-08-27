@@ -32,7 +32,7 @@ import type {
   Binding, BlockSpec, Format, GroupSpec, GuideBook, Layout, MilestoneBook, Placed, Presence, Raised,
   Read, SurfaceSpec, Viewed,
 } from "@engine/kernel";
-import { BLOCKS, goOf, isGroup, opOf } from "@engine/kernel";
+import { BLOCKS, goOf, isGroup, opOf, reached, remaining } from "@engine/kernel";
 import { Arranged, spanning } from "../parts/arrange.js";
 import { Group, QuickActions } from "../parts/surfaces.js";
 import { Region, ready, type Loaded } from "../parts/state.js";
@@ -462,7 +462,14 @@ function Placed({ block, has }: { readonly block: BlockSpec; readonly has: Has }
         return {
           id: to,
           label: said.label,
-          ...(said.icon ? { icon: said.icon } : {}),
+          /* ⚠️ THE NODE, NOT THE NAME — see `glyphOf`. A manifest names its mark
+             as a string and every component that takes one takes a `ReactNode`,
+             so passing it through renders the WORD in the circle a glyph should
+             be in: `QuickActions` photographed with "add" set as text. React
+             will not complain about a string where a node was wanted, because a
+             string IS a node. `leadsOn` one screen below did this correctly and
+             this did not, which is the whole argument for a shared resolver. */
+          ...(said.icon ? { icon: glyphOf(said.icon) } : {}),
           onDo: () => has.onGo?.(to),
         };
       })
@@ -519,7 +526,34 @@ function Placed({ block, has }: { readonly block: BlockSpec; readonly has: Has }
 
 /* ---------------------------------------------------------------- the body --- */
 
+/**
+ * A BLOCK THAT WILL DRAW NOTHING, KNOWN BEFORE IT IS PLACED.
+ *
+ * ⚠️ A CELL AROUND NOTHING IS AN EMPTY CARD, and it is worse than a missing one
+ * because it reads as a screen that failed to load something. Both book blocks
+ * remove themselves when there is nothing to say — a finished checklist, a
+ * congratulation already given — and that is correct inside the component and
+ * too late outside it: the `Group` around it has already drawn a surface, and a
+ * grid cell is already holding a space. Photographed on Stock, the milestones
+ * were a bare rounded bar between the checklist and the figures.
+ *
+ * ⚠️ IT ASKS THE SAME PURE FUNCTIONS THE COMPONENTS DO, so there is no second
+ * opinion about emptiness to drift from the first. Anything else is drawn: a
+ * block whose data has not arrived is WAITING, which is a skeleton rather than
+ * a silence, and this must never hide one.
+ */
+const silent = (placed: Placed, has: Has): boolean => {
+  if (isGroup(placed)) return placed.of.every((b) => silent(b, has));
+  const entry = BLOCKS[placed.block];
+  if (!entry?.book || !has.book) return false;
+  return entry.book === "guide"
+    ? !has.book.raised
+      || !remaining(has.book.guide, has.book.raised, has.book.held).length
+    : !reached(has.book.milestones, has.book.counts, has.book.already).length;
+};
+
 const wrap = (placed: Placed, has: Has, key: number, layout: Layout) => {
+  if (silent(placed, has)) return null;
   if (!("when" in placed) || !placed.when || holds(placed.when, has)) {
     const inner = isGroup(placed)
       ? (

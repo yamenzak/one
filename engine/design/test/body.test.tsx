@@ -267,3 +267,102 @@ describe("the declaration's structure survives into the markup", () => {
     expect(html.indexOf("The side thing")).toBeGreaterThan(html.indexOf("<aside"));
   });
 });
+
+/* ---------------------------------------------------------------- silence --- */
+
+/**
+ * A BOOK BLOCK WITH NOTHING TO SAY TAKES NO CELL.
+ *
+ * ⚠️ THE COMPONENT RETURNING `null` IS TOO LATE, AND ONLY A PHOTOGRAPH SHOWED
+ * IT. `Guide` and `Milestones` both remove themselves when there is nothing
+ * left — that is their own rule and it is right — but by then the `Group` around
+ * them has drawn a surface and the grid has held a cell. Stock photographed with
+ * a bare rounded bar between the checklist and the figures, which reads as
+ * something that failed to load.
+ *
+ * ⚠️ AND WAITING IS NEVER SILENCE. `raised: null` is "not known yet", which is a
+ * skeleton; treated as "nothing done" it would draw a full checklist at a
+ * workspace that has finished, and treated as empty it would hide the block on
+ * every cold load.
+ */
+describe("a book block with nothing to say takes no cell", () => {
+  const STEP = {
+    id: "first", label: "Add a product", why: "It is what everything points at.",
+    done: "product.created", link: "/add", order: 1,
+  };
+  const MARK = {
+    id: "fifty", label: "Fifty products", said: "Worth searching now.",
+    on: "product.created", after: 50, tone: "info" as const, icon: "box",
+  };
+  const book = (over: Partial<NonNullable<Has["book"]>> = {}) => ({
+    guide: { first: STEP }, milestones: { fifty: MARK },
+    raised: { workspace: [], person: [] },
+    counts: {}, already: [], held: new Set<string>(), onGo: () => undefined,
+    ...over,
+  });
+
+  /* ⚠️ `Group` is what leaves the empty bar behind, so the assertion is about
+     the wrapper rather than about the component's own markup. */
+  const GROUPED = (block: string): SurfaceSpec => ({
+    shape: "detail",
+    layout: { as: "stack" },
+    blocks: [{ group: "Getting started", of: [{ block }] }],
+  });
+
+  it("draws the group while there is a step left", () => {
+    expect(drawn(GROUPED("Guide"), { book: book() })).toContain("Getting started");
+  });
+
+  it("draws no group once every step is ticked", () => {
+    expect(drawn(GROUPED("Guide"), {
+      book: book({ raised: { workspace: ["product.created"], person: [] } }),
+    })).not.toContain("Getting started");
+  });
+
+  /* ⚠️ NOT KNOWN YET IS NOT NOTHING — see `Has.book`. */
+  it("draws no group before what has been done is known", () => {
+    expect(drawn(GROUPED("Guide"), { book: book({ raised: null }) }))
+      .not.toContain("Getting started");
+  });
+
+  it("draws the group only where a milestone has been reached", () => {
+    expect(drawn(GROUPED("Milestones"), { book: book() }))
+      .not.toContain("Getting started");
+    expect(drawn(GROUPED("Milestones"), {
+      book: book({ counts: { "product.created": 50 } }),
+    })).toContain("Getting started");
+  });
+
+  /* ⚠️ AND A CONGRATULATION ALREADY GIVEN IS NOT A REASON TO KEEP A CARD. */
+  it("draws no group for a milestone already said", () => {
+    expect(drawn(GROUPED("Milestones"), {
+      book: book({ counts: { "product.created": 50 }, already: ["fifty"] }),
+    })).not.toContain("Getting started");
+  });
+});
+
+/**
+ * ⚠️ A SHORTCUT'S MARK IS A NODE, NOT THE NAME OF ONE — see `glyphOf`. A
+ * manifest names its icon as a string; a component that takes a `ReactNode` will
+ * accept the string without complaint and render the WORD. `QuickActions`
+ * photographed with "add" set as text inside the circle its glyph belongs in.
+ */
+describe("a shortcut wears its mark rather than the name of one", () => {
+  const LEADS: SurfaceSpec = {
+    shape: "detail",
+    layout: { as: "stack" },
+    blocks: [{ block: "QuickActions", leads: ["add-a-product"] }],
+  };
+
+  it("draws the glyph and never the icon's name", () => {
+    const html = drawn(LEADS, {
+      named: () => ({ label: "Add a product", icon: "add" }),
+      onGo: () => undefined,
+    });
+    expect(html).toContain("Add a product");
+    expect(html).toContain("<svg");
+    /* ⚠️ THE WORD ALONE, not "Add a product" — the label legitimately contains
+       it, and an assertion that missed that would pass under the defect. */
+    expect(html).not.toMatch(/>add</);
+  });
+});

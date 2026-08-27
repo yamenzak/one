@@ -6339,6 +6339,34 @@ const manifest = (): AppSpec => defineApp({
             wide: true,
             of: [{ block: "QuickActions", leads: ["add-a-product"] }],
           },
+          /*
+            ⚠️ THE FIRST HOUR, DRAWN WHERE THE FIRST HOUR HAPPENS — see `guide`.
+            The book was declared with no screen placing the block, which is a
+            checklist that composes, ticks correctly, and is reachable at no
+            address in the product. `Guide` takes no bindings on purpose: the
+            steps are the manifest's and what has been DONE is the platform's own
+            read, so a slot here would be a screen restating a list that is
+            already the source.
+
+            ⚠️ IT DRAWS NOTHING ONCE EVERY STEP IS TICKED, which is why it can sit
+            above the figures rather than below them. A checklist that stayed
+            would be a permanent reminder of something handled in week one, at the
+            top of the screen somebody opens every morning for a year.
+
+            ⚠️ AND ABOVE THE TILES BECAUSE IT IS ABOUT DOING RATHER THAN READING.
+            On the one morning it exists, the four figures under it are all zero,
+            and a screen leading with four zeroes over a list of what to do about
+            them has the order backwards.
+          */
+          { group: null, wide: true, of: [{ block: "Guide" }] },
+          /*
+            ⚠️ AND RECOGNITION IS SAID ONCE, WHERE THE THING HAPPENED. Both
+            milestones this product declares are about the shelves — the first
+            thing on one, and the fiftieth product — so this is the screen they
+            belong on. `reached` filters what has already been said, so it draws
+            nothing on all but a handful of loads in a workspace's life.
+          */
+          { group: null, wide: true, of: [{ block: "Milestones" }] },
           {
             group: null,
             of: [{
@@ -7179,17 +7207,64 @@ const manifest = (): AppSpec => defineApp({
   notifications: {
   },
 
-  /* ⚠️ EVERY STEP IS TICKED BY AN EVENT THIS APP ACTUALLY RAISES. A step whose
-     `done` nothing emits is a box that can never be crossed off, and the
-     manifest refuses one at composition rather than letting it sit there. */
   /*
-    ⚠️ EMPTY, BECAUSE A STEP THAT LEADS NOWHERE IS NOT A STEP. The guide is what
-    a workspace is walked through on its first day and every entry names a screen
-    to go and do it on. With no screens there is no walk, and a checklist of
-    things somebody cannot reach is the worst possible first impression of a
-    product — it reads as broken rather than as unfinished.
+    THE FIRST HOUR, AND IT IS THE PRODUCT'S STORYLINE IN FOUR LINES.
+
+    ⚠️ EVERY STEP IS TICKED BY AN EVENT THIS APP ACTUALLY RAISES, and the
+    manifest refuses one whose `done` nothing emits — so this list cannot
+    describe a walk the product does not have. That is what makes it the right
+    place to keep the storyline rather than a paragraph in a document: a
+    paragraph can promise a step that was never built.
+
+    ⚠️ THE PRODUCT COMES BEFORE THE PLACE, AND THAT IS THE ORDER SOMEBODY
+    ACTUALLY ARRIVES IN. "First, define your locations" is an enterprise
+    onboarding wizard: it asks for a map of a building from somebody standing in
+    it holding a box. What they came to do is record the box. The catalogue
+    entry is a thing they can make on their own, in a minute, and it is what
+    every other record in the product points at.
+
+    ⚠️ AND A PLACE IS ASKED FOR WHERE IT IS NEEDED, which is the first quantity.
+    A product with nowhere to be is a catalogue entry — true, useful, and
+    visibly incomplete on its own page, which says "Not on any shelf". That
+    sentence is the step, so the second line here is a recap of a decision the
+    screen already put in front of somebody rather than an instruction issued in
+    advance.
+
+    ⚠️ THE LAST ONE IS THEIRS, NOT THE WORKSPACE'S — see `StepDef.who`. Taking
+    something off a shelf is done by each pair of hands: ticked from the
+    workspace, somebody invited on their first morning opens a finished
+    checklist and is taught nothing. The three before it are setup, done once,
+    by anybody, for everybody.
+
+    ⚠️ AND EVERY STEP NAMES THE GRANT IT NEEDS, so nobody is shown work they
+    would be refused. A `user` holds `stock:move` and neither `product:write`
+    nor `location:write` — their checklist is one line long, which is the honest
+    length of it.
   */
   guide: {
+    "add-a-product": {
+      id: "add-a-product", label: "Add your first product",
+      why: "The catalogue is what every other record here points at.",
+      done: "product.created", link: "/add", needs: "product:write", order: 1,
+    },
+    "name-a-place": {
+      id: "name-a-place", label: "Name somewhere things live",
+      why: "A shelf, a cold room, a van — anywhere you can point at.",
+      done: "location.created", link: "/places", needs: "location:write", order: 2,
+    },
+    "put-it-somewhere": {
+      id: "put-it-somewhere", label: "Put something on a shelf",
+      why: "Until then the catalogue is a list of things you own none of.",
+      done: "stock.received", link: "/", needs: "stock:move", order: 3,
+    },
+    /* ⚠️ THEIRS, AND IT IS THE ONE EVERYBODY DOES. The three above happen once;
+       this is the work — and it is the step that proves to somebody new that
+       the numbers on these screens are the ones in their hands. */
+    "take-something": {
+      id: "take-something", label: "Take something off a shelf",
+      why: "The count moves as you work, so nobody has to remember to update it.",
+      done: "stock.taken", link: "/", needs: "stock:move", who: "person", order: 4,
+    },
   },
 
   milestones: {

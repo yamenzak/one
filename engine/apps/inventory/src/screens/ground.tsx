@@ -161,6 +161,7 @@ export function InventoryGround({ route, onGo, sky, step }: {
                   ...SEEN,
                   ...(here.of ? { record: firstOf(here.of) } : {}),
                   named: namedIn(screens),
+                  book: BOOK,
                 }}
               />
             </Screen>
@@ -169,6 +170,37 @@ export function InventoryGround({ route, onGo, sky, step }: {
     </Shell>
   );
 }
+
+/**
+ * THE FIRST MORNING, AS A FIXTURE — see `guide`.
+ *
+ * ⚠️ THE MANIFEST'S OWN BOOKS, NEVER A PLAUSIBLE COPY. A board writing its own
+ * four steps would photograph a checklist that agrees with nothing: the whole
+ * point of `BlockEntry.book` is that the steps are the declaration's, so a
+ * fixture restating them is the drift this arrangement exists to make
+ * impossible.
+ *
+ * ⚠️ ONE STEP TICKED, WHICH IS THE ONLY INTERESTING STATE. Nothing done draws
+ * four identical rows and says nothing about what a tick looks like; everything
+ * done draws nothing at all, because a finished checklist removes itself. A
+ * workspace that has added its first product and not yet named a place is where
+ * every one of them actually is for an hour or so.
+ *
+ * ⚠️ AND `held` IS THE KEEPER'S GRANTS, because a step nobody could do is
+ * filtered out — see `remaining`. Given the `user` role's two, the photograph
+ * would be of a one-line checklist, which is correct and is not what this board
+ * is for.
+ */
+const BOOK = {
+  guide: inventory().guide ?? {},
+  milestones: inventory().milestones ?? {},
+  raised: { workspace: ["product.created"], person: [] },
+  counts: { "product.created": 1 },
+  /* ⚠️ Both said, so the recognition does not sit permanently on a board. */
+  already: Object.keys(inventory().milestones ?? {}),
+  held: new Set(inventory().access.roles["keeper"] ?? []),
+  onGo: () => undefined,
+};
 
 /**
  * THE SAMPLE WORLD A DECLARED SCREEN READS.

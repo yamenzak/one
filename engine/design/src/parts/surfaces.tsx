@@ -1331,6 +1331,46 @@ export function QuickActions({ actions }: {
      cannot wrap at a different point than the row it stands in. What it cannot
      share is the circle — see `QUICK_CIRCLE`. */
   const bones = useBones();
+
+  /*
+    ⚠️ ONE SHORTCUT IS NOT A CLUSTER, AND DRAWN AS ONE IT IS A MISTAKE THE
+    PHOTOGRAPH SHOWS AND NOTHING ELSE DOES. A cluster is a ROW OF CHOICES: three
+    or four equal circles somebody picks between, centred because no one of them
+    leads. With one there is no choice — it is the screen's primary action —
+    and the cluster's own geometry works against it in both directions. The
+    64px label column is sized so four fit a phone, so "Add a product" wraps
+    onto two lines and then three; the centring puts a 44px circle alone in the
+    middle of a card that is 1000px wide on a desk.
+
+    ⚠️ SO IT IS A ROW: the mark, the words beside it, and the chevron that says
+    it goes somewhere. Full width, left-aligned, one tap target rather than a
+    circle with a caption near it — which is also the shape every list on every
+    other screen in the product already uses for "press this to go there".
+  */
+  const only = actions.length === 1 ? actions[0] : undefined;
+  if (only) {
+    return bones
+      ? <Skeleton className="block h-14 w-full rounded-full" />
+      : (
+        /* ⚠️ THE SAME PIECES EVERY OTHER ROW IN THE SYSTEM IS MADE OF — `Lead`
+           for the mark, the label, the chevron — so a screen with one shortcut
+           and a screen with a list are recognisably one design rather than two.
+           A bespoke circle-and-caption here would be a second row grammar. */
+        <Button
+          data-row
+          variant="ghost"
+          className={`justify-start ${ROW.free} ${ROW.wrap} ${ROW.flush} ${ROW.press} ${ROW.tap}`}
+          onPress={only.onDo}
+        >
+          <span className={`flex w-full items-center ${ROW.gap} ${ROW.pad} ${ROW.tap}`}>
+            <Lead icon={only.icon} />
+            <span className={`${TYPE.label} grow text-left`}>{only.label}</span>
+            <span aria-hidden="true" className={TYPE.note}>›</span>
+          </span>
+        </Button>
+      );
+  }
+
   return (
     /* ⚠️ Four must FIT a phone. At 80px wide with a 24px gap they came to 392px
        against 390 available, so the fourth wrapped to its own line — which reads
