@@ -1382,7 +1382,14 @@ const receive = operation<MoveInput, Moved>({
   permission: "stock:move",
   idempotency: { mode: "key" },
   emits: ["stock.received"],
-  outcome: { message: "Received.", tone: "success", invalidates: ["stock.list", "ledger.list"] },
+  outcome: {
+    message: "Received.", tone: "success", invalidates: ["stock.list", "ledger.list"],
+    /* ⚠️ THE WAY BACK, BESIDE THE CONFIRMATION — see `Outcome.back` and
+       `stock.undo`. `movement` is the ledger row this answered with, which is
+       why `moveOutput` carries one at all. */
+    back: { operation: "stock.undo", says: "Undo",
+      from: { movement: { said: "movement" }, day: "today" } },
+  },
   fails: ["inventory.short", "inventory.moved", "platform.not_found"],
   /* ⚠️ THE AUDIT ROW IS WHAT SURVIVES THE PROJECTION. A balance is rebuilt from
      the ledger; who moved it is the platform's record of the request, and both
@@ -1400,7 +1407,14 @@ const take = operation<MoveInput, Moved>({
   permission: "stock:move",
   idempotency: { mode: "key" },
   emits: ["stock.taken"],
-  outcome: { message: "Taken.", tone: "success", invalidates: ["stock.list", "ledger.list"] },
+  outcome: {
+    message: "Taken.", tone: "success", invalidates: ["stock.list", "ledger.list"],
+    /* ⚠️ THE WAY BACK, BESIDE THE CONFIRMATION — see `Outcome.back` and
+       `stock.undo`. `movement` is the ledger row this answered with, which is
+       why `moveOutput` carries one at all. */
+    back: { operation: "stock.undo", says: "Undo",
+      from: { movement: { said: "movement" }, day: "today" } },
+  },
   fails: ["inventory.short", "inventory.moved", "platform.not_found"],
   audit: (input) => ({ subject: input.product, verb: "took" }),
   handler: (ctx, input) => stockMove(ctx as Ctx, "taken", input),
@@ -1421,6 +1435,13 @@ const adjust = operation<MoveInput, Moved>({
   permission: "stock:adjust",
   idempotency: { mode: "key" },
   emits: ["stock.adjusted"],
+  /* ⚠️ AND IT IS THE ONE MOVEMENT WITH NO WAY BACK OFFERED, DELIBERATELY. The
+     other four are things a thumb does — the wrong shelf, the wrong number, a
+     scan that fired twice — and a correction is not: it demanded a written
+     reason, which is a sentence somebody composed about what was wrong. Undoing
+     it would take the reason out of the ledger along with the number, leaving a
+     shrinkage report that cannot explain itself; correcting a correction is
+     another correction, with its own reason, and the record stays readable. */
   outcome: { message: "Corrected.", tone: "warning", invalidates: ["stock.list", "ledger.list"] },
   fails: ["inventory.short", "inventory.moved", "platform.invalid", "platform.not_found"],
   audit: (input) => ({ subject: input.product, verb: "corrected" }),
@@ -1614,7 +1635,14 @@ const shift = operation<ShiftInput, Moved & { arrived: number }>({
   permission: "stock:move",
   idempotency: { mode: "key" },
   emits: ["stock.moved"],
-  outcome: { message: "Moved.", tone: "success", invalidates: ["stock.list", "ledger.list"] },
+  outcome: {
+    message: "Moved.", tone: "success", invalidates: ["stock.list", "ledger.list"],
+    /* ⚠️ THE WAY BACK, BESIDE THE CONFIRMATION — see `Outcome.back` and
+       `stock.undo`. `movement` is the ledger row this answered with, which is
+       why `moveOutput` carries one at all. */
+    back: { operation: "stock.undo", says: "Undo",
+      from: { movement: { said: "movement" }, day: "today" } },
+  },
   fails: [
     "inventory.short", "inventory.moved", "inventory.held", "inventory.no_rung",
     "platform.not_found", "platform.invalid", "platform.out_of_reach",
@@ -2548,7 +2576,14 @@ const arrive = operation<
   permission: "stock:move",
   idempotency: { mode: "key" },
   emits: ["stock.received", "product.created"],
-  outcome: { message: "Received.", tone: "success", invalidates: ["stock.list", "ledger.list"] },
+  outcome: {
+    message: "Received.", tone: "success", invalidates: ["stock.list", "ledger.list"],
+    /* ⚠️ THE WAY BACK, BESIDE THE CONFIRMATION — see `Outcome.back` and
+       `stock.undo`. `movement` is the ledger row this answered with, which is
+       why `moveOutput` carries one at all. */
+    back: { operation: "stock.undo", says: "Undo",
+      from: { movement: { said: "movement" }, day: "today" } },
+  },
   fails: ["inventory.unreadable", "inventory.short", "inventory.moved", "platform.not_found"],
   audit: (input) => ({ subject: input.raw, verb: "received" }),
   async handler(ctx, input) {

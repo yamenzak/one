@@ -411,12 +411,46 @@ export function NoticeHost() {
 }
 
 /**
+ * ONE CONTROL A CONFIRMATION MAY CARRY — see `notice.ok`.
+ *
+ * ⚠️ ONE, AND ONLY ON A CONFIRMATION. A toast with two controls is a dialogue
+ * somebody has to read, placed over the screen they were working on and
+ * dismissed by a timer; a failure with a control is "retry", which is a
+ * different feature with a different lifetime and belongs where the failure is.
+ * What is left is the one shape that earns the room: something happened, and
+ * here is the way back out of it.
+ */
+export interface Undo {
+  /** A verb, in the words of what it does. */
+  readonly says: string;
+  readonly run: () => void;
+}
+
+/**
+ * ⚠️ LONG ENOUGH TO NOTICE AND REACH, AND NO LONGER. The library's own timeout is
+ * 4s, which is the right length for a sentence nobody has to act on and too
+ * short for one they do: a way back that expires while somebody is still
+ * deciding is worse than none, because they saw the offer and it was withdrawn.
+ * Doubled to 8s — roughly the span of "wait, that was the wrong shelf" — and no
+ * further, because a confirmation that outstays it sits over the next scan.
+ *
+ * ⚠️ IT IS ONLY SET WHERE THERE IS SOMETHING TO REACH FOR. An ordinary
+ * confirmation keeps the library's 4s; widening every toast to make room for the
+ * few that carry a control is how a product comes to feel slow.
+ */
+const REACHABLE_MS = 8_000;
+
+/**
  * The outcome of something the person just did, in one sentence.
  * `ok` confirms, `warn` qualifies, `fail` reports — and a failure that a
  * surface can show in place belongs there instead, as `Trouble`.
  */
 export const notice = {
-  ok: (says: string) => { Toast.toast.success(says); },
+  ok: (says: string, back?: Undo) => {
+    Toast.toast.success(says, back
+      ? { actionProps: { children: back.says, onPress: back.run }, timeout: REACHABLE_MS }
+      : undefined);
+  },
   warn: (says: string) => { Toast.toast.warning(says); },
   fail: (says: string) => { Toast.toast.danger(says); },
 } as const;

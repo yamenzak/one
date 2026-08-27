@@ -48,7 +48,7 @@ import { PLATFORM_HOLDINGS, refuseLegal } from "./legal.js";
 import type { NotificationBook } from "./notify.js";
 import { deadLinks, unaddressable, unraisable } from "./notify.js";
 import type { AnyOperation } from "./operation.js";
-import { refuseOperation, unreachable, unrecordedWrites } from "./operation.js";
+import { PUBLIC, isSilent, refuseOperation, unreachable, unrecordedWrites } from "./operation.js";
 import type { ProblemCatalog } from "./problem.js";
 import type { ReachDef } from "./reach.js";
 import { refuseReach } from "./reach.js";
@@ -1216,6 +1216,68 @@ export function refuseApp(spec: AppSpec): readonly Refusal[] {
   for (const o of spec.operations) {
     for (const code of unknownProblems(catalog, o.fails ?? [])) {
       at(`operation ${o.id}`, `says it can fail with "${code}", which no catalogue has`);
+    }
+  }
+
+  /*
+    ⚠️ A WAY BACK THAT WOULD FAIL ON THE ONE PRESS IT EXISTS FOR — see
+    `Outcome.back`. Every fault here is invisible until somebody makes a mistake
+    and reaches for the button, which is the worst possible moment to discover
+    that its input never resolved: the reversal 400s, the confirmation is gone,
+    and what is left on the shelf is whatever the mistake put there.
+
+    ⚠️ AND THE ANSWER IS THE ONLY THING IT CAN READ, which is why `said` is
+    checked against `output` rather than against anything on the screen. A write
+    reversible from the browser has to HAND BACK the handle — `stock.receive`
+    answers with the ledger row it wrote — and an operation that answers nothing
+    cannot be taken back by a button no matter how the button is worded.
+  */
+  for (const o of spec.operations) {
+    const said = o.outcome;
+    const back = said && !isSilent(said) ? said.back : undefined;
+    if (!back) continue;
+    const where = `operation ${o.id}`;
+    if (!back.says.trim()) {
+      at(where, "offers a way back with no words on it — a control that says nothing "
+        + "is one nobody knows the outcome of");
+    }
+    const undoes = spec.operations.find((x) => x.id === back.operation);
+    if (!undoes) {
+      at(where, `takes itself back with "${back.operation}", which this app does not `
+        + "declare — a generated verb cannot reverse a write, because reversing one "
+        + "is a rule rather than a shape");
+      continue;
+    }
+    if (undoes.kind !== "write") {
+      at(where, `takes itself back with ${undoes.id}, which is a ${undoes.kind} — `
+        + "pressing it would report success and change nothing");
+    }
+    /* ⚠️ THE REVERSAL IS A DOOR OF ITS OWN, AND IT ANSWERS TO ITS OWN KEY. That
+       is correct and it is also why this is only a warning-shaped check rather
+       than a silent equality: a reversal MAY ask for more than the write did
+       (an operator undoing a member's move), but one that asks for LESS would
+       be a way around the gate the write itself stands behind. */
+    if (o.permission !== PUBLIC && undoes.permission === PUBLIC) {
+      at(where, `is gated on "${String(o.permission)}" and takes itself back with `
+        + `${undoes.id}, which is public — the way back would be a door around the `
+        + "one the write stands behind");
+    }
+    const takes = undoes.input ?? {};
+    for (const name of Object.keys(back.from)) {
+      if (name in takes) continue;
+      at(where, `fills "${name}" on ${undoes.id}, which does not take it — `
+        + `it takes ${Object.keys(takes).join(", ") || "nothing"}`);
+    }
+    for (const [name, wants] of Object.entries(takes)) {
+      if (!wants.required || name in back.from) continue;
+      at(where, `leaves "${name}" empty on ${undoes.id}, which requires it — the press `
+        + "would be refused at the door for a value the screen was holding all along");
+    }
+    for (const [name, from] of Object.entries(back.from)) {
+      if (from === "today") continue;
+      if (from.said in (o.output ?? {})) continue;
+      at(where, `fills "${name}" from "${from.said}", which it does not answer — `
+        + `it answers ${Object.keys(o.output ?? {}).join(", ") || "nothing"}`);
     }
   }
 

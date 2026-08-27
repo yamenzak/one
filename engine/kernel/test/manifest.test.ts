@@ -15,7 +15,7 @@ import {
 import { operationsFor } from "../src/collection.js";
 import { collection } from "../src/collection.js";
 import { field } from "../src/field.js";
-import { operation, PUBLIC, type AnyOperation } from "../src/operation.js";
+import { operation, PUBLIC, type AnyOperation, type Outcome } from "../src/operation.js";
 
 const note = collection({
   id: "note",
@@ -902,5 +902,100 @@ describe("what is above a screen", () => {
     const other = [...SCREENS, { route: "/places", id: "places", nav: "none" as const,
       body: opens("place") }];
     expect(upFrom(other, other[3]!)?.id).toBe("things");
+  });
+});
+
+/**
+ * A WAY BACK THAT WOULD FAIL ON THE ONE PRESS IT EXISTS FOR — see
+ * `Outcome.back`.
+ *
+ * ⚠️ EVERY FAULT HERE IS INVISIBLE UNTIL SOMEBODY MAKES A MISTAKE. The button is
+ * drawn, the manifest composes, every suite passes — and the first person to
+ * reach for it is somebody who has just put stock on the wrong shelf and is
+ * about to be told the reversal was refused for a value the screen was holding
+ * all along. That is the worst possible moment to discover any of this, which is
+ * why all seven are refused at composition instead.
+ */
+describe("a write that can be taken back", () => {
+  /** A reversal shaped like `stock.undo`: the handle, and the day it happens. */
+  const undo = (over: Record<string, unknown> = {}) => operation({
+    id: "note.unpublish",
+    kind: "write",
+    summary: "Take it back.",
+    input: {
+      of: field.text({ label: "Of", required: true, holds: "none" }),
+      day: field.day({ label: "On", required: true, holds: "none" }),
+    },
+    output: { id: field.text({ label: "Id", holds: "none" }) },
+    permission: "note:write",
+    idempotency: { mode: "none" },
+    outcome: { message: "Taken back.", tone: "success" },
+    audit: (input: { of: string }) => ({ subject: input.of, verb: "took back" }),
+    async handler() { return { id: "n1" }; },
+    ...over,
+  }) as unknown as AnyOperation;
+
+  /** `stub`, wearing a way back — the shape the four movements ship. */
+  const takesBack = (back: Outcome["back"]) => operation({
+    id: "note.publish",
+    kind: "write",
+    summary: "Publish one.",
+    input: { id: field.text({ label: "Id", required: true, holds: "none" }) },
+    output: { id: field.text({ label: "Id", holds: "none" }) },
+    permission: "note:write",
+    idempotency: { mode: "none" },
+    outcome: { message: "Published.", tone: "success", back },
+    async handler() { return { id: "n1" }; },
+  }) as unknown as AnyOperation;
+
+  const withBack = (back: Outcome["back"], reversal = undo()) =>
+    app({ operations: [takesBack(back), reversal] });
+
+  const sound: NonNullable<Outcome["back"]> = { operation: "note.unpublish", says: "Undo",
+    from: { of: { said: "id" }, day: "today" } };
+
+  it("accepts one whose every field resolves", () => {
+    expect(refuseApp(withBack(sound))).toEqual([]);
+  });
+
+  it("refuses a reversal the app does not declare", () => {
+    expect(whyOf(withBack({ ...sound, operation: "note.retract" })))
+      .toContain("which this app does not declare");
+  });
+
+  it("refuses a reversal that is a read", () => {
+    const reading = undo({ id: "note.unpublish", kind: "read", outcome: { why: "It reads." } });
+    expect(whyOf(withBack(sound, reading))).toContain("which is a read");
+  });
+
+  /* ⚠️ THE ONE REFUSAL THAT IS ABOUT ACCESS RATHER THAN ABOUT WIRING. A gated
+     write whose reversal is public is a door around the gate: anybody who can
+     reach the reversing operation can undo work they were never allowed to do. */
+  it("refuses a public reversal of a gated write", () => {
+    const open = undo({ permission: PUBLIC });
+    expect(whyOf(withBack(sound, open))).toContain("a door around the");
+  });
+
+  it("refuses a fill the reversal does not take", () => {
+    expect(whyOf(withBack({ ...sound, from: { ...sound.from, why: { said: "id" } } })))
+      .toContain("which does not take it");
+  });
+
+  /* ⚠️ THE HALF THAT LOOKS HARMLESS AND IS THE COMMON ONE. Leaving a required
+     field out reads as "the reversal will work it out", and what actually
+     happens is a 400 at the door for a value the answer was carrying. */
+  it("refuses a required field left empty", () => {
+    expect(whyOf(withBack({ ...sound, from: { of: { said: "id" } } })))
+      .toContain("which requires it");
+  });
+
+  it("refuses a fill from something the write does not answer", () => {
+    expect(whyOf(withBack({ ...sound, from: { ...sound.from, of: { said: "movement" } } })))
+      .toContain("which it does not answer");
+  });
+
+  it("refuses a way back with no words on it", () => {
+    expect(whyOf(withBack({ ...sound, says: "  " })))
+      .toContain("a way back with no words on it");
   });
 });

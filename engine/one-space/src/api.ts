@@ -146,8 +146,15 @@ let outcomes: Readonly<Record<string, Outcome>> = {};
  * holds them, and importing either would point the dependency the wrong way.
  * One handler, installed once, exactly as an expired session is.
  */
-let onWritten: ((outcome: Outcome) => void) | null = null;
-export const whenWritten = (run: (outcome: Outcome) => void): void => { onWritten = run; };
+/* ⚠️ THE ANSWER GOES WITH IT, BECAUSE A WAY BACK IS FILLED FROM IT — see
+   `Outcome.back`. The handle a reversal needs is a value that did not exist
+   until this call returned (`stock.receive` answers with the ledger row it
+   wrote), so a handler given only the sentence could offer the button and have
+   nothing to press it with. */
+let onWritten:
+  ((outcome: Outcome, answer: unknown) => void) | null = null;
+export const whenWritten =
+  (run: (outcome: Outcome, answer: unknown) => void): void => { onWritten = run; };
 
 /** ⚠️ Every enabled product's book merged into one, because the door answers by
     operation id and an operation belongs to exactly one of them. */
@@ -365,7 +372,7 @@ async function call<T>(
       is one per keystroke.
     */
     const said = method === "POST" ? outcomes[id] : undefined;
-    if (said) onWritten?.(said);
+    if (said) onWritten?.(said, value);
     /* ⚠️ KEPT ONLY WHERE THE COLLECTION SAID SO. Keeping every answer would put
        a copy of a workspace's records on every device that ever opened it, for
        a capability nobody declared. */

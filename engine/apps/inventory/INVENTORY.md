@@ -218,6 +218,31 @@ whole movement** — undoing one half would put the stock back where it left AND
 leave it where it arrived, the same boxes counted twice, from a button whose
 entire promise is that nothing happened.
 
+### The way back is beside the act, not in the log
+
+⚠️ **AND FOR A MONTH THERE WAS NO WAY BACK AT ALL.** `undo` was built,
+rule-complete and reachable from nothing — no screen named it, and every suite
+was green. The obvious home is the history, and it is wrong twice: `/history`
+answers to `ledger:read`, which the person who mis-scans does not hold, so the
+one role that needs the button cannot open the screen it would be on; and a
+reversal is not something somebody goes looking for. They know within a second
+and they are holding the phone that did it.
+
+So the four movements that a thumb can get wrong — **receiving, taking, carrying
+and scanning in** — offer **Undo** on the confirmation itself, for eight seconds,
+which is about the span of "wait, that was the wrong shelf". It is declared
+(`Outcome.back`, D109), not written: the operation names its own reversal and
+where that reversal's input comes from, and the press goes through the door so
+`undo`'s own rules answer it. Refusing somebody else's movement, one that is no
+longer the last on its line, or one from an hour ago is `undo`'s business and
+never the button's.
+
+⚠️ **A CORRECTION OFFERS NONE, AND THAT IS THE DECISION.** It demanded a written
+reason — a sentence somebody composed about what was wrong — and undoing it would
+take that out of the ledger with the number, leaving a shrinkage report that
+cannot explain itself. Correcting a correction is another correction, with its
+own reason, and the record stays readable.
+
 ⚠️ **TAKING AND CORRECTING ARE DIFFERENT GRANTS, AND IT IS THE PRODUCT'S
 SHARPEST ACCESS RULE.** Somebody on the floor takes things all day and must never
 be able to make a number agree with what they took — that is the difference

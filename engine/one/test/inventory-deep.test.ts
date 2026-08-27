@@ -258,6 +258,50 @@ describe("taking back the last thing you did", () => {
     expect(history.filter((r) => r.product === product)).toHaveLength(2);
   });
 
+  /*
+    ⚠️ AND THE BUTTON IS DECLARED, WHICH IS THE HALF NOTHING PROVED FOR A MONTH.
+    `stock.undo` shipped rule-complete — own movement, last on its line, inside
+    the hour — and reachable from NOTHING: no screen named it, no outcome
+    offered it, and every suite above was green. What this drives is the seam
+    that closes that (`Outcome.back`): the way back is resolved from the
+    operation's DECLARATION against its REAL answer, exactly as the browser
+    does, and posted. A fixture agreeing with itself would prove neither half.
+  */
+  it("takes a movement back through the way back it declares", async () => {
+    const place = await placeOf("Dock");
+    const product = await kindOf("Cement, 20 kg", "counted");
+    const got = ok(await write("stock.receive", {
+      product, location: place, quantity: 12, day: TODAY, capture: "typed",
+    }));
+
+    const said = inventory().operations.find((o) => o.id === "stock.receive")!.outcome;
+    const back = said && !("why" in said) ? said.back : undefined;
+    expect(back?.operation).toBe("stock.undo");
+    expect(back?.says).toBe("Undo");
+
+    /* ⚠️ THE BROWSER'S OWN RESOLUTION, IN THREE LINES — `today` or a field of
+       the answer, and nothing else can be named. A `said` naming something the
+       operation does not answer would land here as `undefined`, which is the
+       shape `refuseApp` refuses at composition and this would catch anyway. */
+    const input = Object.fromEntries(Object.entries(back!.from).map(([name, from]) =>
+      [name, from === "today" ? TODAY : String(got[from.said])]));
+    expect(input).toEqual({ movement: String(got.movement), day: TODAY });
+
+    ok(await write("stock.undo", input));
+
+    const lines = ok(await read("stock.list")).items as { product: string; quantity: number }[];
+    expect(lines.filter((l) => l.product === product)[0]?.quantity ?? 0).toBe(0);
+  });
+
+  /* ⚠️ AND A CORRECTION OFFERS NONE, DELIBERATELY — see `stock.adjust`. It
+     demanded a written reason, so undoing it would take that sentence out of
+     the ledger along with the number. Pinned because the absence is a decision
+     and an absence nothing asserts is indistinguishable from an oversight. */
+  it("offers no way back on a correction", () => {
+    const said = inventory().operations.find((o) => o.id === "stock.adjust")!.outcome;
+    expect(said && !("why" in said) ? said.back : undefined).toBeUndefined();
+  });
+
   /* ⚠️ AND IT IS THE LAST ONE ONLY. Anything since means the number people are
      working from has moved on, so it is a correction with a reason on it. */
   it("refuses an undo that is no longer the last thing", async () => {

@@ -167,13 +167,13 @@ part that is not. Refresh with `node engine/scripts/docs.test.mjs --write`.
 |---|---|---|
 | `tokens/` | colour, type, spacing, motion, the chrome and hem rules | 94 |
 | `scene/` | the ambience engine — families, marks, the world behind a screen | 1 |
-| `frame/` | page, shape, crown, nav, dock, overlays — what wraps a screen | 74 |
+| `frame/` | page, shape, crown, nav, dock, overlays — what wraps a screen | 75 |
 | `parts/` | rows, cards, lists, controls, the four outcomes | 229 |
 | `rendered/` | whole surfaces drawn from a kernel declaration | 47 |
 | `chart/` | the data vocabulary — a number as a shape | 45 |
 | `measure/` | what a screen actually lays out, in a real browser — the harness every app sweeps its own screens with | 1 |
 
-**491 exports.** Every one is reachable as `import { … } from "@engine/design"`;
+**492 exports.** Every one is reachable as `import { … } from "@engine/design"`;
 there is no deep import, and a guard says so.
 
 ### `tokens/`
@@ -194,7 +194,7 @@ there is no deep import, and a guard says so.
 - `frame/arrival.tsx` — `Arrival`, `AsideRoute`, `LegalLine`, `Mark`, `MarkSize`
 - `frame/chrome.tsx` — `Docked`, `Island`
 - `frame/crown.tsx` — `Crown`, `CrownClaim`, `crownFor`, `CrownProps`, `CrownSocketProvider`, `Foot`, `LeaveChip`, `PageCrown`, `Slot`, `useChromeFoot`, `useCrownRow`, `useCrownSocket`, `useHandedOver`
-- `frame/overlay.tsx` — `Confirm`, `Dialog`, `Menu`, `MenuItem`, `notice`, `NoticeHost`, `Over`, `Peek`, `Tray`
+- `frame/overlay.tsx` — `Confirm`, `Dialog`, `Menu`, `MenuItem`, `notice`, `NoticeHost`, `Over`, `Peek`, `Tray`, `Undo`
 - `frame/page.tsx` — `Band`, `BandProps`, `Bleed`, `Page`, `PageProps`, `useNight`, `useScenery`
 - `frame/reading.tsx` — `Reading`, `ReadingProvider`, `useReading`
 - `frame/renewal.tsx` — `Renewal`

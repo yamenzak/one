@@ -14,7 +14,7 @@ import type {
   AreaBook, DocumentBook, Gate, GuideBook, Instant, MilestoneBook, NotificationBook, Offline,
   Outcome, ScreenSpec, SettingBook, NeedBook, SubProcessorBook,
 } from "@engine/kernel";
-import { notice, ready, trouble, waiting, type Loaded } from "@engine/design";
+import { notice, ready, trouble, waiting, type Loaded, type Undo } from "@engine/design";
 import { api, forget, known, whenWritten } from "../api.js";
 import { keyOf } from "../offline.js";
 
@@ -321,6 +321,60 @@ export { forget };
 export const useCentre = () => useLoad<CentreView>("centre.view");
 
 /**
+ * ⚠️ THE DEVICE'S OWN CALENDAR DAY, AND IT IS READ HERE RATHER THAN SENT. A
+ * shelf life is counted where the shelf is: the worker has no way to know what
+ * day it is where somebody is standing, and its own calendar would call a box
+ * expired the evening before it is — or, west of Greenwich, current for a few
+ * more hours after it is not.
+ *
+ * ⚠️ ONE HOME, BECAUSE TWO WOULD BE TWO CALENDARS. A screen fills a form from
+ * it and a reversal fills its input from it; a second copy is a second place for
+ * the padding, the timezone and the January-the-first edge to be got right.
+ */
+export const today = (): string => {
+  const at = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}`;
+};
+
+/**
+ * THE WAY BACK, RESOLVED AGAINST THE ANSWER THE WRITE JUST GAVE — see
+ * `Outcome.back`.
+ *
+ * ⚠️ IT GOES THROUGH THE DOOR, WHICH IS WHY THE PRESS CAN BE REFUSED. Reversing
+ * in the browser would draw a balance the server never agreed to, on the one
+ * press where being wrong costs a recount — so this posts the reversing
+ * operation and lets its own rules answer. `stock.undo` refuses somebody else's
+ * movement, one that is no longer the last on its line, and one from an hour
+ * ago; none of that is the button's to know, and all of it reaches the person
+ * as the ordinary problem the door raises.
+ *
+ * ⚠️ AND A FIELD THE ANSWER DOES NOT CARRY WITHDRAWS THE OFFER RATHER THAN
+ * SENDING AN EMPTY ONE. `refuseApp` refuses a `back` whose fills name nothing
+ * the operation answers, so this is the belt — but the braces have to be a
+ * missing BUTTON and not a button that fails, because the press is the moment
+ * somebody has already decided they made a mistake.
+ */
+const backOf = (outcome: Outcome, answer: unknown): Undo | undefined => {
+  const back = outcome.back;
+  if (!back) return undefined;
+  const said = (answer ?? {}) as Record<string, unknown>;
+  const input: Record<string, unknown> = {};
+  for (const [name, from] of Object.entries(back.from)) {
+    const value = from === "today" ? today() : said[from.said];
+    if (value === undefined || value === null || value === "") return undefined;
+    input[name] = value;
+  }
+  return {
+    says: back.says,
+    /* ⚠️ THE ANSWER IS DROPPED ON PURPOSE. The reversal declares its OWN outcome
+       — "Taken back." — which this same handler raises when it returns, so
+       reading its answer here would be a second sentence about one press. */
+    run: () => { void api.post(back.operation, input); },
+  };
+};
+
+/**
  * WHAT A WRITE SAYS, AND WHAT IT MAKES STALE — installed once, here.
  *
  * ⚠️ HERE RATHER THAN IN THE DOOR, because both halves belong to this file's
@@ -333,14 +387,16 @@ export const useCentre = () => useLoad<CentreView>("centre.view");
  * the failure mode the whole seam exists to avoid: a confirmation that works on
  * the screens somebody wired and is silent on the rest.
  */
-whenWritten((outcome) => {
+whenWritten((outcome, answer) => {
   /* ⚠️ THE TONE DECIDES THE CHANNEL. A `warning` outcome shown as a success is
      the product telling somebody that something went well when the operation
      said otherwise. `neutral` and `info` are ordinary confirmations. */
-  const say = outcome.tone === "danger" ? notice.fail
-    : outcome.tone === "warning" ? notice.warn
-      : notice.ok;
-  say(outcome.message);
+  if (outcome.tone === "danger") notice.fail(outcome.message);
+  else if (outcome.tone === "warning") notice.warn(outcome.message);
+  /* ⚠️ AND ONLY A CONFIRMATION CARRIES THE WAY BACK — see `notice`. A warning
+     already says the write did something other than what was asked, and
+     offering to reverse THAT is offering to reverse an unknown. */
+  else notice.ok(outcome.message, backOf(outcome, answer));
   /* ⚠️ THE READS THE WRITE MADE STALE, WHEREVER THEY ARE. A screen re-reads
      itself; this is for the answers ELSEWHERE that the same write changed, which
      is the half no screen can do for itself. */

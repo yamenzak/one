@@ -62,4 +62,5 @@ export const MOUNT = {
   opening: ENTRY,
   confirm: join(HERE, "confirm.mount.tsx"),
   aside: join(HERE, "aside.mount.tsx"),
+  notice: join(HERE, "notice.mount.tsx"),
 } as const;

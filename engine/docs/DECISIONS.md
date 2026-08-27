@@ -4181,3 +4181,68 @@ affordances no customer is given — the same fault as the fixture that kept
 permissive than the door; a way back written from anything but the link that was
 followed; two device facts where one derives from the other; or one contract read
 in two places.
+
+## D109 — A way back belongs beside the act, and an operation reached by nothing has no way to be offered
+
+**`stock.undo` shipped rule-complete and reachable from nothing.** It refuses a
+movement that is not yours, one that is no longer the last on its line, and one
+made more than an hour ago; it reverses both halves of a transfer, far shelf
+first, so a failure lands before the near half moves; it is one-shot, because the
+row it writes names what it cancels. All of that was built, tested end to end and
+correct — and no screen named it, no outcome offered it, and every suite in the
+repository was green. The engine's own `capability.test.mjs` could not see it:
+that guard asks whether a PACKAGE's exports are imported, and this is an APP's
+operation, which is a different question nothing was asking.
+
+**The reason it had no surface is that there was nowhere to put one.** A history
+screen is the obvious place and it is the wrong one twice over. It answers to
+`ledger:read`, which the person who mis-scans does not hold — a `user` has
+`stock:move` and neither of the reading keys — so the one role that needs the way
+back cannot open the screen it would be on. And a reversal is not a thing
+somebody goes looking for: they know within a second, they are holding the phone
+that did it, and three taps into a log is not where the mistake is.
+
+**So an outcome may carry one control, and that is the whole feature.**
+`Outcome.back` names a reversing operation, what the button says, and where its
+input comes from. It is a declaration for the same reason `goes` is: an id the
+kernel checks, the permission gate reads and the agent surface already exposes,
+rather than a handler in a manifest. The press posts through the door, so the
+reversal's own rules answer it — refusing an hour-old movement is `stock.undo`'s
+business and never the button's, and a browser that reversed optimistically would
+draw a balance the server never agreed to, on the one press where being wrong
+costs a recount.
+
+**`Given` is deliberately not `Fill`.** A screen's fill reads what the screen is
+standing on — the record, a column of it, the day, the year, a narrowing. A
+reversal reads what the write just ANSWERED, which is none of those five and is a
+value that did not exist a moment ago. Reusing `Fill` would mean adding a sixth
+source meaningless to every view and refusing the other five here: two
+vocabularies wearing one name. Two sources is the whole of it — a field of the
+answer, and the device's day.
+
+**And the answer had to be carried through the seam to make any of it possible.**
+`whenWritten` was handed the sentence alone, so a handler could draw the button
+and have nothing to press it with. `stock.receive` answers with the ledger row it
+wrote, which is why `moveOutput` carries a `movement` at all; the browser fills
+from that and posts.
+
+⚠️ **EIGHT REFUSALS, AND EVERY ONE OF THEM IS INVISIBLE UNTIL SOMEBODY MAKES A
+MISTAKE.** A fill naming a field the operation does not answer, a required input
+left empty, a reversal the app does not declare, one that is a read: each draws
+the button, composes, passes every suite, and fails at the door on the one press
+it exists for — which is the moment somebody has already decided they were wrong.
+The sharpest is not a wiring fault at all: a gated write whose reversal is public
+is a door around the gate the write stands behind.
+
+**The correction is the one movement with no way back, deliberately.** Receiving,
+taking, carrying and scanning are things a thumb does — the wrong shelf, the
+wrong number, a scan that fired twice. An adjustment demanded a written reason,
+so it is a sentence somebody composed about what was wrong; undoing it would take
+that out of the ledger along with the number, and leave a shrinkage report that
+cannot explain itself. Correcting a correction is another correction.
+
+**Therefore never:** a capability whose only address is an operation id; a way
+back that reverses in the browser; a control whose input is resolved from
+anything but the answer that produced it; or an absence that nothing asserts —
+"no undo here" is a decision, and a decision no test pins is indistinguishable
+from an oversight.

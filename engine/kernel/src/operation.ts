@@ -91,11 +91,65 @@ export type Audit<I> =
  */
 export type ToolPolicy = true | { readonly why: string };
 
+/**
+ * WHERE THE REVERSING CALL'S INPUT COMES FROM — see `Outcome.back`.
+ *
+ * ⚠️ TWO SOURCES, AND IT IS DELIBERATELY NOT `Fill`. A screen's fill reads what
+ * the screen is standing ON: the record it is about, a column of that record,
+ * the day, the year, what somebody narrowed it to. A reversal reads what the
+ * write just ANSWERED — which is none of those five, and is a value that did not
+ * exist a moment ago. Overloading `Fill` would mean adding a sixth source that
+ * means nothing to a view and refusing the other five here, which is two
+ * vocabularies wearing one name.
+ *
+ * ⚠️ `said` IS A FIELD OF THE `output` THE OPERATION DECLARES, checked at
+ * composition against exactly that. A write that can be taken back has to hand
+ * back the handle — `stock.receive` answers with the ledger row it wrote — and a
+ * reversal naming a field the answer does not carry is a button that fails on
+ * the one press it exists for.
+ *
+ * ⚠️ AND `today` IS THE DEVICE'S DAY, for the reason `Fill` gives at length: the
+ * server does not know what day it is where somebody is standing. It is the one
+ * value here that is not out of the answer, and it is here because the reversing
+ * movement is itself dated where it happens.
+ */
+export type Given = "today" | { readonly said: string };
+
 export interface Outcome {
   readonly message: string;
   readonly tone: Tone;
   /** Which reads go stale. The client refetches them and nothing polls. */
   readonly invalidates?: readonly string[];
+  /**
+   * THE WAY BACK, OFFERED WITH THE CONFIRMATION.
+   *
+   * ⚠️ A REVERSAL BELONGS BESIDE THE ACT, NOT IN A LOG. Somebody who scans the
+   * wrong shelf knows within a second and is holding the phone that did it — and
+   * the alternative is a history screen, which asks a different permission,
+   * takes three taps, and is not where the mistake is. `stock.undo` shipped
+   * rule-complete and reachable from nothing at all for exactly this reason:
+   * there was no way to say "and here is the button".
+   *
+   * ⚠️ IT NAMES AN OPERATION, NEVER A HANDLER. Same rule `goes` follows one
+   * module over: an id the kernel checks, the permission gate reads and the
+   * agent surface already exposes. What taking it back MEANS is the reversing
+   * operation's own business, including refusing — `stock.undo` will not take
+   * back somebody else's movement, one that is no longer the last on its line,
+   * or one from an hour ago, and none of that is the button's to know.
+   *
+   * ⚠️ AND THE PRESS CAN BE REFUSED, WHICH IS THE POINT OF ROUTING IT THROUGH
+   * THE DOOR. An undo that reversed optimistically in the browser would show a
+   * balance the server never agreed to, on the one press where being wrong costs
+   * a recount.
+   */
+  readonly back?: {
+    /** The write that reverses this one. */
+    readonly operation: string;
+    /** What the button says — a verb, in the words of what it does. */
+    readonly says: string;
+    /** Its input, per field. Every required field of it must be named here. */
+    readonly from: Readonly<Record<string, Given>>;
+  };
 }
 
 /**

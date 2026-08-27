@@ -44,7 +44,7 @@ import {
 } from "@engine/kernel";
 import type { Answers } from "@engine/design/create";
 import { api, forget } from "../api.js";
-import { useLoad } from "./data.js";
+import { today, useLoad } from "./data.js";
 
 /**
  * HOW FAR THIS WORKSPACE HAS GOT — the platform's one answer, for every product.
@@ -83,19 +83,6 @@ interface Drawn {
     of: string; name: string; bin: boolean; already: "frozen" | "binned" | null;
   } | null;
 }
-
-/**
- * ⚠️ THE DEVICE'S OWN CALENDAR DAY, AND IT IS READ HERE RATHER THAN SENT. A
- * shelf life is counted where the shelf is: the worker has no way to know what
- * day it is where somebody is standing, and its own calendar would call a box
- * expired the evening before it is — or, west of Greenwich, current for a few
- * more hours after it is not.
- */
-const today = (): string => {
-  const at = new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}`;
-};
 
 /**
  * ⚠️ AN ABSENT VIEW IS EMPTY, NOT MISSING. The door runs only the views a body
