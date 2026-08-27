@@ -142,6 +142,8 @@ export function Declared({ screen, screens, at, go, currency, app }: {
     readonly permissions: readonly string[];
     /** ⚠️ What this workspace chose, for the settings a flow starts from. */
     readonly chose?: Readonly<Record<string, unknown>>;
+    /** ⚠️ Which of its operations spend credits — see `meteredIds`. */
+    readonly metered?: readonly string[];
   };
 }) {
   /*
@@ -341,7 +343,14 @@ export function Declared({ screen, screens, at, go, currency, app }: {
   if (screen.story) {
     return (
       <React.Suspense fallback={null}>
-        <Flow screen={screen} acts={acts} run={run} go={go} chose={app.chose ?? {}} />
+        <Flow
+          screen={screen}
+          acts={acts}
+          run={run}
+          go={go}
+          chose={app.chose ?? {}}
+          metered={app.metered ?? []}
+        />
       </React.Suspense>
     );
   }
@@ -381,13 +390,15 @@ export function Declared({ screen, screens, at, go, currency, app }: {
  * ⚠️ AND THE STEP IS STATE, NOT A ROUTE — see `Story`. A URL per step would make
  * each one shareable, bookmarkable and reloadable into a form with nothing in it.
  */
-function Flow({ screen, acts, run, go, chose }: {
+function Flow({ screen, acts, run, go, chose, metered }: {
   readonly screen: ScreenSpec;
   readonly acts: Drawn["acts"];
   readonly run: (id: string, input: Record<string, unknown>) => Promise<Ran>;
   readonly go: (route: string) => void;
   /** ⚠️ What this workspace chose, for the settings this flow starts from. */
   readonly chose: Readonly<Record<string, unknown>>;
+  /** ⚠️ Which of this product's operations spend credits — see `meteredIds`. */
+  readonly metered: readonly string[];
 }) {
   const told = screen.story!;
   const write = acts[told.writes];
@@ -529,6 +540,10 @@ function Flow({ screen, acts, run, go, chose }: {
       filled={filled}
       refused={refused}
       {...(filling ? { filling } : {})}
+      /* ⚠️ THE READER SPENDS THE WORKSPACE'S MONEY, AND THE STEP THAT FEEDS IT
+         HAS TO SAY SO. It runs by itself the moment the photographs are there,
+         so there is no button to put the sentence on — see `CreateProps.spends`. */
+      {...(told.fills && metered.includes(told.fills.by) ? { spends: true } : {})}
       {...(write.choices ? { choices: write.choices } : {})}
       does={{
         label: "Add it",

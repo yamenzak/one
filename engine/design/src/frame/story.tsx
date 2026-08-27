@@ -158,6 +158,20 @@ export interface Ask {
    * is every clause on the one screen the whole arrangement exists for.
    */
   readonly settled?: boolean;
+  /**
+   * ANSWERING THIS STEP SPENDS CREDITS — see `CreateProps.spends`.
+   *
+   * ⚠️ A CONTROL THAT SPENDS MONEY SAYS SO BEFORE IT IS PRESSED, and in a flow
+   * with a fill the press that spends is not a button called anything. It is
+   * whichever step feeds the reader: the answers complete, the run starts by
+   * itself, and the first anybody hears of it is a smaller balance on a screen
+   * they were not on.
+   *
+   * ⚠️ ON ONE STEP, NEVER ON THE FLOW. The same sentence at the top of six
+   * screens is furniture by the second one, and it would be a warning about a
+   * press that costs nothing on five of them.
+   */
+  readonly spends?: boolean;
   readonly children: React.ReactNode;
 }
 
@@ -622,6 +636,15 @@ export function Story({
         {/* ⚠️ AND WHERE THE DEBT IS SOMEBODY ELSE'S STEP, THE SENTENCE IS THE WAY
             THERE. A refusal naming a field on a screen the person is not looking
             at is a refusal they have to go hunting for. */}
+        {/*
+          ⚠️ UNDER THE CONTROL, NOT OVER IT — see `Ask.spends`. What it is about
+          is the thing directly above it; at the top of the screen it would be a
+          banner, and a banner is read once and then never again.
+        */}
+        {here.spends
+          ? <NoteRow icon={glyphOf("money")}>Reading this spends credits.</NoteRow>
+          : null}
+
         {short
           ? owedElsewhere
             ? (

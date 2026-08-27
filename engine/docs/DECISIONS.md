@@ -3870,3 +3870,52 @@ sideways, at full size, and a model reading a label was silently worse at it.
 by removing the thing that failed; a retry that is a picker; a per-file limit
 standing in for a limit on the total; or bytes discarded at the moment they are
 sent.
+
+---
+
+## D103 — The camera is the switch, and the switch has to say what it costs
+
+There is no setting for whether a flow's AI fill runs. There is a sentence on the
+step that feeds it: *Reading this spends credits.* `meteredIds` derives which
+operations spend, `StorySpec.fills` names which one a flow calls, and `Create`
+works out which step's answers set it running.
+
+**Why not a switch.** A workspace-level "use AI: on/off" is a row on a settings
+page that the person adding a product is not looking at, set by somebody who is
+not them, months earlier. It fails the rule the settings book is founded on — a
+setting no code reads is a switch that changes nothing, and a setting nobody
+visits is one step worse, because it looks like a control.
+
+**And the decision is already in the flow, per product, where it belongs.** The
+fill is fed by one step; skipping that step is the off switch. `given` returns
+null on an empty list, no run happens, and the remaining questions are simply
+asked. That is a per-product choice made by the person holding the box, which is
+strictly better than a per-workspace one made by somebody else in advance.
+
+**What was actually missing was the sentence.** The flow spent the workspace's
+money and said nothing: somebody photographs a box, seconds pass, five questions
+turn into one review, and the first anybody hears of the charge is a smaller
+balance on a screen they were not on. Every rule this repository has about
+runaway cost is about a loop; this is the quieter case — a cost that is correct,
+authorised by nobody, and repeated once per product.
+
+**It goes on ONE step and it is the step that feeds the reader.** A fill has no
+button: it runs by itself the moment `fills.with` is complete. Told to the flow
+as a whole the sentence would appear on all five screens, which is how a warning
+becomes furniture; put on the wrong step it warns about a press that costs
+nothing while the one that costs stays silent. `Create` matches the VALUES of
+`fills.with` — what the flow holds — not its keys, which are what the reader
+calls them.
+
+**It is a boolean, not a figure.** What a run costs is known after the tokens are
+counted. A number before the press would be a guess printed as a price, and the
+reserve is a ceiling rather than an estimate (D-reserve). *That* it costs is the
+honest fact available at the moment somebody is deciding, and it is enough.
+
+**And it stops once the answers are in.** After the fill has run, a sentence
+saying it will spend credits is a warning about the past.
+
+**Therefore never:** a control that spends money and says nothing before it is
+pressed; a per-workspace switch standing in for a per-use decision the flow
+already offers; a cost warning on every screen of a flow; or a price quoted
+before the thing that determines it has happened.

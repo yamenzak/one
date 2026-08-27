@@ -111,6 +111,22 @@ export interface CreateProps {
    * to stop applying.
    */
   readonly filling?: boolean;
+  /**
+   * THE FILL SPENDS CREDITS — see `meteredIds`.
+   *
+   * ⚠️ THE STEP THAT FEEDS IT IS THE STEP THAT SAYS SO, AND IT IS WORKED OUT
+   * HERE. A fill runs by itself the moment what it is handed is complete, so
+   * the press that spends the money is on whichever step answers `fills.with`
+   * — never on a button called anything. Told to the flow as a whole this
+   * would be a sentence on every screen in it, which is how a warning becomes
+   * furniture; told to the wrong step it warns about a press that costs
+   * nothing while the one that costs says nothing.
+   *
+   * ⚠️ AND IT IS A BOOLEAN RATHER THAN A FIGURE. What a run costs is known
+   * after the tokens are counted, and a number before the press would be a
+   * guess printed as a price.
+   */
+  readonly spends?: boolean;
   /** ⚠️ What the review leads with — a picture is the fastest check available. */
   readonly lead?: React.ReactNode;
   readonly note?: React.ReactNode;
@@ -248,7 +264,7 @@ const emptyFor = (kind: Fields[string]["kind"]): unknown => {
 
 export function Create({
   story, takes, at, onGo, title, does, leave, held, onSet,
-  filled, refused = {}, choices = {}, blocks = ASKING, filling, lead, note,
+  filled, refused = {}, choices = {}, blocks = ASKING, filling, spends, lead, note,
 }: CreateProps) {
   const arrived = filled ?? new Set<string>();
 
@@ -274,6 +290,27 @@ export function Create({
     () => new Set(askedOf(story.asks, held, arrived).map((s) => s.id)),
     [story.asks, held, arrived],
   );
+
+  /**
+   * WHICH STEP'S ANSWER SETS THE FILL RUNNING — see `spends`.
+   *
+   * ⚠️ THE SOURCES, NOT THE FILL'S OWN INPUT NAMES. `fills.with` reads
+   * `{ images: "shots" }` — what the READER calls it on the left, what the FLOW
+   * holds on the right — and the step that answers is the one holding `shots`.
+   * Matched on the left it would find nothing and the warning would appear on no
+   * step at all, silently, which is the shape of every bug in this file's history.
+   *
+   * ⚠️ AND A STEP ANSWERS THROUGH ITS BLOCK AS WELL AS ITS FIELDS. A camera is
+   * the commonest thing a fill is fed, and it is never in `takes`.
+   */
+  const feeds = React.useMemo(() => {
+    const wants = new Set(Object.values(story.fills?.with ?? {}));
+    if (!wants.size) return null;
+    return story.asks.find((step) => [
+      ...(step.takes ?? []),
+      ...(step.block ? ASKS[step.block]?.answers ?? [] : []),
+    ].some((name) => wants.has(name)))?.id ?? null;
+  }, [story.fills, story.asks]);
 
   /* ⚠️ AND A STEP GOES TO THE FRAME AS TWO SEPARATE FACTS — see `Ask.settled`.
      Folded into one, "its answer arrived" reads as "it does not apply", and the
@@ -315,6 +352,10 @@ export function Create({
       ask: step.ask,
       ...(step.under ? { under: step.under } : {}),
       when: stepApplies(step.when, held),
+      /* ⚠️ ON THE STEP THAT FEEDS THE FILL, AND ONLY WHILE IT IS STILL THE
+         DECISION. Once the answers are in, the money is spent and a sentence
+         saying it will be is a warning about the past. */
+      ...(spends && feeds === step.id && !filling && !arrived.size ? { spends: true } : {}),
       ...(asked.has(step.id) || opened.has(step.id) ? {} : { settled: true }),
       says: clause.text,
       ...(short ? { short } : {}),

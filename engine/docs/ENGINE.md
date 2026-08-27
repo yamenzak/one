@@ -417,7 +417,7 @@ and a manifest that does not compose refuses to boot.
 | `infra` | what a product needs underneath it, and what each kind can promise | 11 | — |
 | `field` | what a value is: its kind, its bounds, what it holds, whether it is the app's to keep | 9 | — |
 | `collection` | what a thing an app keeps is — and the six operations it gets for free | 18 | — |
-| `operation` | one declaration carrying every cross-cutting concern (D12) | 11 | — |
+| `operation` | one declaration carrying every cross-cutting concern (D12) | 12 | — |
 | `access` | permissions, roles, and what an app may never claim | 15 | — |
 | `reach` | how far one person works inside a workspace — where, as against what (D45) | 4 | — |
 | `gate` | the eight gates, in the order that decides which sentence somebody reads first | 3 | — |
@@ -445,7 +445,7 @@ and a manifest that does not compose refuses to boot.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**318 of them**, 317 reached by something today.
+**319 of them**, 318 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -1180,6 +1180,7 @@ its own header, cited by other files, and doing nothing.
 | D100 | A step names what it asks for, so a flow is a declaration and not a file | 4 |
 | D101 | A string with two jobs is two strings, and a recap is read rather than scanned | 0 |
 | D102 | A file has five states and a picker knows one of them | 0 |
+| D103 | The camera is the switch, and the switch has to say what it costs | 0 |
 <!-- /generated -->
 
 ---

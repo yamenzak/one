@@ -57,6 +57,13 @@ export interface CentreApp {
   /** ⚠️ What each write says when it worked, and what it makes stale. */
   readonly outcomes?: Readonly<Record<string, Outcome>>;
   /**
+   * ⚠️ WHICH OPERATIONS SPEND CREDITS — see `meteredIds`. A screen cannot work
+   * this out: what makes one metered is a field on a declaration the browser
+   * never holds. Absent is "none of them", which is where a client that forgets
+   * the field lands and is also true of most products.
+   */
+  readonly metered?: readonly string[];
+  /**
    * ⚠️ WHICH GATE WOULD STOP AN OPERATION, FOR THIS CALLER — the server's own
    * walk, so a control a screen draws and a route the gate refuses cannot come
    * apart. ABSENT MEANS ALLOWED: only what is blocked travels, which is also

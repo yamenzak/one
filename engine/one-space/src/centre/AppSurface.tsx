@@ -171,6 +171,7 @@ export function AppSurface({ app, route, onGo }: {
               milestones: app.milestones,
               permissions: app.permissions,
               ...(app.chose ? { chose: app.chose } : {}),
+              ...(app.metered ? { metered: app.metered } : {}),
             }}
           />
         </React.Suspense>

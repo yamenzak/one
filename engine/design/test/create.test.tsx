@@ -331,3 +331,40 @@ describe("what the flow will not let past", () => {
     expect(out).not.toContain("Name is needed before this can be saved");
   });
 });
+
+/**
+ * WHAT THE PRESS THAT SPENDS MONEY SAYS BEFORE IT IS PRESSED.
+ *
+ * ⚠️ A FILL RUNS BY ITSELF, SO THERE IS NO BUTTON TO PUT THE SENTENCE ON. The
+ * moment the photographs are there the reader is called and the workspace's
+ * wallet is charged — the press that spends is on whichever step feeds it, and
+ * nothing about that step announces itself.
+ */
+describe("a step that spends credits says so", () => {
+  it("marks the step whose answers feed the reader", () => {
+    expect(drawn("shot", {}, { spends: true })).toContain("spends credits");
+  });
+
+  /* ⚠️ ON ONE STEP, NEVER ON THE FLOW. The same sentence at the top of five
+     screens is furniture by the second, and on four of them it is a warning
+     about a press that costs nothing. */
+  it("says nothing on a step the reader is not fed from", () => {
+    expect(drawn("named", {}, { spends: true })).not.toContain("spends credits");
+    expect(drawn("counted", {}, { spends: true })).not.toContain("spends credits");
+  });
+
+  /* ⚠️ AND ONLY WHILE IT IS STILL THE DECISION. Once the answers are in, the
+     money is spent and a sentence saying it will be is about the past. */
+  it("stops saying it once the reader has answered", () => {
+    expect(drawn("shot", {}, { spends: true, filled: new Set(["name"]) }))
+      .not.toContain("spends credits");
+    expect(drawn("shot", {}, { spends: true, filling: true }))
+      .not.toContain("spends credits");
+  });
+
+  /* ⚠️ A FILL THAT COSTS NOTHING SAYS NOTHING — the flow is handed the fact
+     rather than assuming it, because most operations are not metered. */
+  it("says nothing about a fill that is not metered", () => {
+    expect(drawn("shot")).not.toContain("spends credits");
+  });
+});

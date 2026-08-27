@@ -22,6 +22,7 @@ import { Screen, Shell, ready, whoFace } from "@engine/design";
 import { Body, type Has } from "@engine/design/body";
 import { Create, type Answers } from "@engine/design/create";
 import type { ScreenSpec } from "@engine/kernel";
+import { meteredIds } from "@engine/kernel";
 import { inventory } from "../index.js";
 import { INVENTORY_SESSIONS, INVENTORY_SURFACES } from "./index.js";
 import { COUNTS, LINES, PLACES, THINGS } from "./sample.js";
@@ -287,8 +288,17 @@ function Walked({ screen, step }: {
   readonly step?: string;
 }) {
   const told = screen.story!;
-  const [at, setAt] = React.useState(step ?? told.asks[0]?.id ?? "review");
-  const [held, setHeld] = React.useState<Answers>(DRAFT);
+  const opens = step ?? told.asks[0]?.id ?? "review";
+  /*
+    ⚠️ THE FIRST STEP IS PHOTOGRAPHED BEFORE THE READER HAS ANSWERED, and every
+    step after it afterwards — because that is the order they actually happen in.
+    Drawn from the filled draft, step one shows a flow whose questions have all
+    been answered by a model somebody has not yet given a photograph to, and the
+    one sentence that only appears BEFORE the money is spent never appears at all.
+  */
+  const first = opens === told.asks[0]?.id;
+  const [at, setAt] = React.useState(opens);
+  const [held, setHeld] = React.useState<Answers>(first ? {} : DRAFT);
   return (
     <Create
       story={told}
@@ -303,7 +313,11 @@ function Walked({ screen, step }: {
       onSet={(name, value) => { setHeld((was) => ({ ...was, [name]: value })); }}
       /* ⚠️ WHAT THE MODEL ANSWERED, SO THE SKIPPING IS VISIBLE. Without it every
          step is asked and the flow photographs as the form it replaced. */
-      filled={FILLED}
+      filled={first ? new Set() : FILLED}
+      /* ⚠️ THE READER IS METERED, WHICH IS A FACT ABOUT `product.see` AND NOT
+         ABOUT THIS BOARD — `meteredIds` derives it in the deployment. Hardcoded
+         `true` here would photograph a sentence the product might not say. */
+      {...(told.fills && METERED.includes(told.fills.by) ? { spends: true } : {})}
       does={{ label: "Add it", op: told.writes, onDo: () => undefined }}
     />
   );
@@ -330,6 +344,9 @@ const DRAFT: Answers = {
   unit: "tin",
   tracking: "batched",
 };
+
+/** ⚠️ Which of this product's operations spend credits — derived, never listed. */
+const METERED = meteredIds(inventory().operations ?? []);
 
 /** ⚠️ Everything above that ARRIVED rather than being typed — see `Create.filled`. */
 const FILLED = new Set(["name", "brand", "unit", "tracking"]);

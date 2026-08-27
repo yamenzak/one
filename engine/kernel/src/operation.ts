@@ -268,6 +268,29 @@ export const outcomeBook = (
   );
 
 /**
+ * WHICH OF AN APP'S OPERATIONS SPEND CREDITS — derived from the one fact that
+ * makes them metered, which is that they declare a model to run.
+ *
+ * ⚠️ A CONTROL THAT SPENDS MONEY HAS TO SAY SO BEFORE IT IS PRESSED. Every AI
+ * operation here reserves against the workspace's wallet and settles what it
+ * used; a screen that draws the control and says nothing takes the decision
+ * away from the person making it, and the first they hear of it is a smaller
+ * balance on a screen they were not on.
+ *
+ * ⚠️ AND IT IS DERIVED RATHER THAN WRITTEN, because a sentence an app types is
+ * a claim it can forget to remove and can make about an operation that costs
+ * nothing. This cannot be either: the same field that makes the run metered is
+ * the field this reads.
+ *
+ * ⚠️ THE IDS, NOT AN ESTIMATE. What a run costs is known after the tokens are
+ * counted — a figure before the press would be a guess printed as a price. The
+ * honest fact available at that moment is THAT it costs, and that is enough for
+ * somebody deciding whether to press.
+ */
+export const meteredIds = (ops: readonly AnyOperation[]): readonly string[] =>
+  ops.filter((o) => o.ai !== undefined).map((o) => o.id);
+
+/**
  * The route an operation answers on.
  *
  * ⚠️ ONE SHAPE, NO PATH PARAMETERS, AND THE ID IS THE PATH. REST invents a

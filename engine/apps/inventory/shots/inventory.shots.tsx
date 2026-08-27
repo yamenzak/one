@@ -61,9 +61,19 @@ const DECLARED: readonly string[] = (INVENTORY().screens ?? []).map((one) => one
  * naming `/add` by hand is a list somebody has to remember, and the whole reason
  * the routes above are read off the manifest is that nobody does.
  */
+/*
+  ⚠️ THE FIRST STEP AND THE LAST, BECAUSE THEY ARE THE TWO DIFFERENT SCREENS A
+  FLOW HAS. The review is where a model's work is checked; the opening step is
+  where somebody decides to spend credits on it, and the sentence that says so
+  is only ever on that one — a sweep that photographed the review alone had no
+  picture of the half that costs money.
+*/
 const FLOWS = (INVENTORY().screens ?? [])
   .filter((one) => one.story)
-  .map((one) => ({ route: one.route, at: "review" }));
+  .flatMap((one) => [
+    { route: one.route, at: one.story?.asks[0]?.id ?? "review" },
+    { route: one.route, at: "review" },
+  ]);
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const OUT = join(HERE, "..", "shots-out");

@@ -16,7 +16,9 @@
  */
 
 import type { Allowance, AnyOperation, AppSpec, Gate, TenantId } from "@engine/kernel";
-import { PUBLIC, included, mayBrand, offlineBook, outcomeBook, sellableKeys } from "@engine/kernel";
+import {
+  PUBLIC, included, mayBrand, meteredIds, offlineBook, outcomeBook, sellableKeys,
+} from "@engine/kernel";
 import { brandingOf } from "./branding.js";
 import { tenantById } from "./directory.js";
 import { memberFor, rolesFor } from "./membership.js";
@@ -112,6 +114,13 @@ const publicFace = (
     and the list a write invalidates is often on neither of them.
   */
   outcomes: outcomeBook(a.operations),
+  /*
+    ⚠️ AND WHICH OF THEM SPEND CREDITS — see `meteredIds`. A control that costs
+    money has to say so before it is pressed, and the screen cannot work it out:
+    what makes an operation metered is a field on a declaration the browser
+    never holds.
+  */
+  metered: meteredIds(a.operations),
   /*
     ⚠️ WHICH GATE WOULD STOP EACH OPERATION, FOR THIS CALLER, RIGHT NOW — and it
     is the SAME walk the request's own gate ran. Without it a screen decides for
