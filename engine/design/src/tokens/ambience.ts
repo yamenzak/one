@@ -1094,6 +1094,29 @@ export function ambienceStylesheet(): string {
     `[data-island="true"] {`,
     `  background-color: var(--tier-dock); color: var(--dock-ink);`,
     `  border-radius: 9999px; }`,
+    /*
+      ⚠️ A PILL IS A PILL ONLY WHILE THE BOX IS WIDE, AND THE RAIL'S IS NOT. The
+      browser clamps a radius to half the shorter side — the same arithmetic
+      `ISLAND_ITEM` relies on to make a square item a circle — so `9999px` on the
+      desktop rail's 192 × 188 plate drew a CIRCLE with five destinations in it.
+      The first and the last fell off the curve: measured in light, "Stock" and
+      "Places" sat half on the plate and half on the page, in the plate's ink.
+      The bar at the foot of a phone is 360 × 64 and is unaffected, which is why
+      this stood — the same declaration is right at one width and a rendering
+      fault at the other.
+
+      ⚠️ THE MATERIAL IS STILL THE DOCK'S, WHICH IS THE POINT OF `data-island`.
+      What the rail was borrowing wrongly is GEOMETRY, not colour: a plate that
+      floats over a page is the same plate at both widths and the shell says so
+      at length. So the column takes the card rung and nothing else changes.
+
+      ⚠️ AND IT PADS, BECAUSE AN ITEM AT A CORNER STILL CLIPS. A 24px corner over
+      a row whose own pill reaches the plate's edge shaves the top-left of the
+      first destination — the circle's fault at a twelfth of the size, which is
+      the version nobody photographs and everybody half-sees.
+    */
+    `[data-island="true"][data-column="true"] {`,
+    `  border-radius: calc(var(--radius) * 2); padding: var(--radius); }`,
     /* ⚠️ THE PLATE'S OWN INK, NOT `--muted`. That token is calibrated against the
        PAGE's ground and is a near-black in the light theme — on the plate it is
        a glyph nobody can see. An alpha on the dock's own ink follows the plate

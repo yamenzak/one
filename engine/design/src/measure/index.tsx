@@ -270,7 +270,14 @@ const pageMounting = (live: Live, css: string, theme: "dark" | "light"): string 
  * measured empty reports no overflow and no small controls — a green sweep of a
  * blank document, which is the failure this whole harness exists to catch.
  */
-async function show(
+/**
+ * ⚠️ EXPORTED BECAUSE A MEASUREMENT THIS PACKAGE DOES NOT ALREADY OFFER STILL
+ * HAS TO PUT THE SCREEN IN A BROWSER THE SAME WAY. Every reading here goes
+ * through this one document — the stylesheet, the theme stamp, the wait for
+ * something to be on the page — and a caller building its own is a second answer
+ * to which sheet ships, which is what the header of  says at length.
+ */
+export async function show(
   page: { setContent: (html: string) => Promise<void>;
     waitForFunction: (fn: () => boolean, arg?: unknown, opts?: { timeout: number }) => Promise<unknown>;
     evaluate: <T>(fn: () => T | Promise<T>) => Promise<T> },

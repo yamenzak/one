@@ -682,7 +682,11 @@ export function Shell(props: ShellProps) {
           aria-label="Sections"
           className={`hidden md:flex sticky ${RAIL_TOP} h-fit w-56 shrink-0 flex-col ${PAD}`}
         >
-          <div data-island="true" className={`flex flex-col ${SPACE.hair}`}>
+          {/* ⚠️ THE PLATE'S GEOMETRY IS THE RAIL'S AND ITS MATERIAL IS THE
+              DOCK'S — see the `[data-column]` rule. A pill is a pill only while
+              the box is wide; this one is as tall as it is wide, and the browser
+              drew a circle with five destinations falling off it. */}
+          <div data-island="true" data-column="true" className={`flex flex-col ${SPACE.hair}`}>
             {inBar.map((s) => {
               /*
                 ⚠️ THE ONE THE ADDRESS BELONGS TO, AND THE SHELL HAS ALREADY
