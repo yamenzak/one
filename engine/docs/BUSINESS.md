@@ -342,6 +342,167 @@ one is the reports' business, not a generated view's.
 
 ---
 
+## The chart of accounts, in full — B7 made concrete
+
+B7 says a country is data. This is what that means in rows, and it is written out
+here because the chart is the first thing OneBook builds and the decision that is
+hardest to walk back.
+
+### The one thing that is hard-coded
+
+**Every journal balances to zero.** A sale credits revenue and debits receivable
+in every jurisdiction on earth, and no country has ever legislated otherwise.
+That is the whole of what is universal, and it is therefore the whole of what
+belongs in code.
+
+### The five roots, which are not a national convention
+
+`asset · liability · equity · income · expense`. A workspace may name them
+anything and nest anything under them; it may not invent a sixth, because a
+balance sheet and a profit-and-loss statement are made of exactly these and a
+sixth root is a figure that appears on neither.
+
+### ⚠️ Roles are the seam, and they are the whole design
+
+**A posting rule never names an account. It names a role.**
+
+> A goods receipt debits `stock` and credits `stock_pending`.
+> An invoice against it debits `stock_pending` and `tax_input`, and credits `payable`.
+
+A German workspace has `1400 Forderungen aus L+L` tagged `receivable`; a UK one
+has `Trade Debtors`; a workspace that deleted the template and built its own
+chart from nothing has whatever *they* tagged. **The posting code is identical in
+all three**, and that is what makes a wrong template a cosmetic problem rather
+than a structural one.
+
+Sixteen roles, and a template that does not cover every one of them is a
+workspace where the first goods receipt has nowhere to post:
+
+| Role | What posts to it |
+|---|---|
+| `receivable` | what customers owe us |
+| `payable` | what we owe suppliers |
+| `bank` · `cash` | money in a bank, money in a drawer |
+| `stock` | the value of goods on hand |
+| `stock_pending` | goods received and not yet invoiced — the liability between the two |
+| `cogs` | what those goods cost when they were sold |
+| `income` · `expense` | the default revenue and the default cost, where nothing more specific applies |
+| `tax_input` · `tax_output` | tax we paid and may reclaim; tax we charged and owe |
+| `rounding` | the difference a rounding rule creates, in both directions |
+| `discount` | what was given away rather than earned |
+| `opening` | where a business's existing balances land when it arrives mid-life |
+| `suspense` | where a posting goes when the rule cannot decide |
+| `retained` | where the year's profit closes to |
+
+⚠️ **`suspense` IS NOT AN ADMISSION OF DEFEAT, IT IS THE ALTERNATIVE TO A SILENT
+WRONG ANSWER.** Every real ledger has one. Without it, a posting that cannot
+resolve either refuses the operation that caused it — making one product's
+misconfiguration another product's outage, which `hears` exists to prevent — or
+it guesses, and a guessed account is a figure nobody can find later.
+
+⚠️ **AND A ROLE CAN BE MOVED, NEVER DELETED.** A workspace may point `income` at a
+different account any time; it may not leave the role unassigned, because then
+the failure is a receipt that silently does not post.
+
+### The template is data, and it is copied once
+
+A country template is a JSON tree in the repository. Each node:
+
+```
+{ code?: string, name: string, type: Root, role?: Role, children?: Node[] }
+```
+
+When OneBook is switched on for a workspace it reads the workspace's country
+(already stored — `createTenant` takes it), finds the template for it, falls back
+to the universal one, and **copies the rows in**. It records `seeded_from` and
+`seeded_version`, and from that instant **the rows are the workspace's own and
+nothing ever rewrites them**.
+
+That last clause is the one to hold on to. A template that keeps being "applied"
+is a template that can overwrite a chart somebody has been posting to for two
+years.
+
+`code` is optional, unique within a workspace when present, and **never read by
+any posting rule**. France's Plan Comptable Général prescribes account numbers by
+law and Germany's SKR03/04 are conventions everybody follows; the UK and the US
+prescribe nothing. Shipping the numbers where they exist is help; depending on
+them would make the two halves of the world different code.
+
+### How a workspace changes it
+
+| Lever | Cost |
+|---|---|
+| Rename anything | Nothing. The role is what the engine reads, the name is what a person reads |
+| Add, nest, or **close** an account | Nothing. Closed rather than deleted once anything has posted — a deleted account is a hole in a report |
+| Move a role to another account | One row. Every future posting follows |
+| Seed from another country's template, or none | The country is a *default*, not a constraint |
+| Import the accountant's spreadsheet | What most businesses past year one actually want |
+
+### ⚠️ Why shipping a half-finished template is safe here
+
+This is the question that decides how many countries we ship on day one, and the
+answer is a consequence of the role seam rather than of confidence.
+
+**A template we got wrong produces a workspace with badly-named accounts and
+correct books.** The names are wrong, the numbering may be unconventional, and a
+local accountant will want changes — all of which are renames and additions
+somebody makes in an afternoon. What cannot be wrong is the posting, because the
+posting reads roles.
+
+In a system where the rules name accounts directly, the same mistake is a
+migration. That is the difference this design buys, and it is why the honest
+plan is:
+
+1. **One universal template that works anywhere**, in plain English, covering all
+   sixteen roles. This is the fallback and it is never wrong, only generic.
+2. **Country templates as they are verified**, each a data file and a registry
+   line. ERPNext ships 76; we should ship the handful we can actually check,
+   because a template nobody has shown to an accountant in that country is worse
+   than none — it looks authoritative and is not.
+3. **Improve them over time.** A better template reaches NEW workspaces
+   immediately and existing ones not at all, which is correct: their chart is
+   theirs.
+
+⚠️ **AND `account.topUp` IS WHAT KEEPS THE THIRD POINT FROM BEING A DEAD END.**
+An additive-only operation: it adds the accounts a newer template version has
+that this workspace lacks, and it renames nothing, moves nothing and deletes
+nothing. That is what lets a workspace seeded from a thin early template pick up
+the sixteen accounts we later learned their country needs, without any risk to
+the chart they have been posting to. Safe by construction, because the only thing
+it can do is add.
+
+### What varies by country, ranked by how much it actually costs us
+
+| Varies | Where it lives | If we get it wrong |
+|---|---|---|
+| Account names and numbering | the template | a rename. Cosmetic |
+| Which tax accounts exist | the template | add an account, tag the role |
+| Fiscal year start | a setting: month and day | a report covers the wrong twelve months until changed |
+| Rounding rule | a setting, with a stated default | pennies, in one direction, findably |
+| **Tax rules** | **not the chart at all** | **wrong numbers on a legal document** |
+
+⚠️ **THE CHART IS THE EASY FIFTH OF INTERNATIONALISATION AND SHOULD NOT BE
+MISTAKEN FOR THE WHOLE.** Eighty rows of data is not what makes ERPNext need a
+regional override per country. Tax is: a rule keyed by *(what, to whom, from
+where, to where, when)* returning zero or more `{account, rate, basis}` lines.
+A `vat_rate` column on a product does not survive the second country, and no
+amount of chart-of-accounts work substitutes for getting that shape right.
+
+### Deliberately out of scope, and stated so it is a choice
+
+- **Multi-currency.** D117 gives a workspace one currency and re-labels rather
+  than converts, so there is no `exchange` role and no FX gain-or-loss account. A
+  business invoicing in three currencies is not this product yet, and half of one
+  would be worse than none.
+- **Consolidation across workspaces.** One workspace, one set of books.
+- **Statutory statement formats.** The five roots and the roles are enough for a
+  trial balance, a plain P&L and a plain balance sheet. A statement laid out the
+  way a particular country's filing requires is a report mapping, and it is a
+  later thing that needs no schema change — a node can carry a `statement` hint
+  when somebody actually needs one filed.
+
+---
+
 ## Part III — the plan
 
 Four stages. The order is chosen so each is useful alone and the risky primitive
@@ -383,12 +544,15 @@ The one new engine primitive.
   over.
 - OneInventory's `buying` migrates onto it. Carriage from D118 generalises.
 
-### Stage 4 — OneBooks
+### Stage 4 — OneBook
 
-- Chart of accounts, seeded from a country template and editable.
-- Posting rules as workspace data, over the `hears` seam from stage 1.
+- The chart of accounts — see the full design above. Sixteen roles, five roots,
+  a universal template plus whatever country templates are actually verified, and
+  `account.topUp` so a thin early template is not a dead end.
+- Posting rules as workspace data, over the `hears` seam from stage 1, naming
+  **roles** rather than accounts.
 - Journal, with balances derived. Trial balance, P&L, balance sheet as reports.
-- Tax rules as lookups.
+- Tax rules as lookups — the hard half, and the one the chart does not touch.
 
 Only now, when there are events worth posting and documents worth posting them
 from.
@@ -397,23 +561,31 @@ from.
 
 ## What has to be decided before stage 1
 
-Three questions this plan does not settle, each of which changes the shape:
+Three questions this plan did not settle. **Two are now answered**, and the
+answers are kept here rather than deleted, because a question that turns out to
+have an obvious answer reads as a question nobody asked.
 
-1. **Is OneBooks installable, or an always-present engine service?** The
-   recommendation is installable — a workshop counting stock should not be handed
-   a chart of accounts — but that makes "what is my inventory worth" and "what is
-   in my accounts" two different answers in one workspace, and somebody will ask
-   why.
+1. ~~**Is OneBook installable, or an always-present engine service?**~~
+   **ANSWERED — D121: neither.** It is a product like the others: one membership
+   buys every product, so OneBook is included, on by default, and switchable off
+   by a workspace that does not want a chart of accounts. The worry behind the
+   question — a workshop counting stock being handed accounting it never asked
+   for — is answered by the switch, not by the price.
 
 2. **Does OneInventory's `buying` really migrate, or does the rail start clean?**
    Migrating is correct and is a schema change on a shipped module with live
    data. Starting clean is cheaper and leaves two purchase-order concepts in one
    deployment, which is the duplication this whole plan exists to prevent.
 
-3. **How does an app reference a party without importing OneParty?** Stage 2
-   cannot start until this has an answer, and the answer is probably a kernel
-   contract — the same way `field.money` is the kernel's and the currency is the
-   workspace's.
+3. ~~**How does an app reference a party without importing OneParty?**~~
+   **ANSWERED — D120: three declarations and no imports.** `shared: true` on the
+   owning collection, `borrows: ["party"]` on the borrower, and `hears` for the
+   event. All three are resolved by the deployment rather than by either app, so
+   neither product's source ever names the other. `apps.test.mjs` refuses the
+   import — by package name and by a relative path out of the tree —
+   `shadow.test.mjs` refuses a second app declaring the table, and eleven
+   business concepts are reserved to the product that owns them so the collision
+   is caught on the FIRST app rather than the second.
 
 ---
 
