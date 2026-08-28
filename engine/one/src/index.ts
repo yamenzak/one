@@ -51,6 +51,7 @@ import {
 } from "@engine/runtime";
 import { inventory } from "@engine/inventory";
 import { oneParty } from "@engine/party";
+import { oneBook } from "@engine/book";
 
 /* ------------------------------------------------------------------ what --- */
 
@@ -82,6 +83,13 @@ const APPS: Readonly<Record<string, () => AppSpec>> = {
     refuses a deployment that serves the one without the other.
   */
   party: once(() => under(LEGAL, oneParty())),
+  /*
+    ⚠️ THE BOOKS, AND THEY ARE A PRODUCT LIKE THE OTHERS (D121) RATHER THAN AN
+    ENGINE SERVICE. One membership buys every product, so accounting is included
+    and on by default — and a workshop that only counts stock turns it off in one
+    switch rather than being sold a tier without it.
+  */
+  book: once(() => under(LEGAL, oneBook())),
 };
 
 /**
@@ -97,7 +105,7 @@ const APPS: Readonly<Record<string, () => AppSpec>> = {
  * answering for the workspaces an operator put it in, and comes out of THIS list
  * — one line, in review, rather than an unmounting that breaks them.
  */
-const SELLS: readonly string[] = ["inventory", "party"];
+const SELLS: readonly string[] = ["inventory", "party", "book"];
 
 /**
  * ONE MEMBERSHIP — WHAT THIS DEPLOYMENT SELLS, IN ONE LIST.

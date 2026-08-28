@@ -15,6 +15,7 @@
   "dependencies": {
     "@engine/inventory": "workspace:*",
     "@engine/party": "workspace:*",
+    "@engine/book": "workspace:*",
     "@engine/kernel": "workspace:*",
     "@engine/runtime": "workspace:*"
   },

@@ -1,0 +1,31 @@
+{
+  "name": "@engine/book",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "OneBook — the books, in any country. A chart of accounts seeded from a template, and posting rules that name a role rather than an account.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit",
+    "clean": "rm -rf .turbo *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@engine/kernel": "workspace:*",
+    "@engine/design": "workspace:*",
+    "@heroui/react": "^3.0.5",
+    "react": "^19.2.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.0"
+  }
+}
