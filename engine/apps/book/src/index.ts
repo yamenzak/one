@@ -25,7 +25,7 @@
  */
 
 import {
-  area, collection, defineApp, field, newId, operation, setting,
+  area, collection, defineApp, field, job as declareJob, newId, operation, setting,
   type AppSpec,
 } from "@engine/kernel";
 
@@ -536,6 +536,149 @@ const SAYS: Readonly<Record<string, string>> = {
   nothing_moves: "Nothing moves in this entry",
 };
 
+/* -------------------------------------------------------------- the totals --- */
+
+interface Standing { readonly id: string; readonly name: string; readonly code: string | null; readonly balance: number }
+
+/**
+ * WHAT EVERY ACCOUNT COMES TO — the trial balance, and the oldest check in
+ * accounting.
+ *
+ * ⚠️ IT IS A `SUM`, AND B2's CLAIM IS ONLY TRUE IF NOTHING ELSE IS. Every figure
+ * here is added up from the lines at the moment it is asked for; there is no
+ * stored total anywhere for it to disagree with, which is why this cannot drift
+ * and why no repair subsystem is needed for it to be believed.
+ *
+ * ⚠️ AND THE WHOLE LEDGER SUMS TO NOTHING, WHICH IS THE POINT OF THE SCREEN. A
+ * trial balance is not a report about the business, it is a report about the
+ * BOOKS: if the total is anything but zero, something wrote a line outside an
+ * entry and every other figure is suspect.
+ */
+const trial = operation<
+  Record<string, never>,
+  { items: Standing[]; whole: { total: number }[] }
+>({
+  id: "book.trial",
+  kind: "read",
+  summary: "What every account comes to",
+  input: {},
+  output: {
+    items: field.json({ label: "Accounts", holds: "none" }),
+    whole: field.json({ label: "The whole ledger", holds: "none" }),
+  },
+  permission: "journal:read",
+  idempotency: { mode: "none" },
+  fails: [],
+  async handler(ctx) {
+    const c = ctx as Ctx;
+    const rows = await (c.db as Db).prepare(
+      `SELECT a.id AS id, a.name AS name, a.code AS code,
+              COALESCE(SUM(p.amount), 0) AS balance
+         FROM account a LEFT JOIN posting p
+           ON p.account = a.id AND p.tenant_id = a.tenant_id
+        WHERE a.tenant_id = ?
+        GROUP BY a.id
+        ORDER BY a.code IS NULL, a.code ASC, a.name ASC`)
+      .bind(c.tenantId)
+      .all<Standing>();
+
+    /* ⚠️ ONLY THE ACCOUNTS THAT HOLD SOMETHING. A trial balance listing thirty
+       zeroes is a screen somebody has to read past to find the four figures
+       that matter; the chart is where every account is listed. */
+    const items = (rows.results ?? []).filter((row) => row.balance !== 0);
+    const total = items.reduce((sum, row) => sum + row.balance, 0);
+    /*
+      ⚠️ THE FIGURE AND NO SENTENCE BESIDE IT, AND THAT IS THE SLOT'S DOING RATHER
+      THAN A PREFERENCE. A hero's label takes words or a field, never a computed
+      answer — so a conditional sentence here would have been a string no screen
+      could reach. The screen names the figure "Out by" instead, which makes zero
+      read as the good answer without anything having to say so.
+    */
+    return { items, whole: [{ total }] };
+  },
+});
+
+/**
+ * WHAT ONE ACCOUNT COMES TO.
+ *
+ * ⚠️ THE SAME SUM, ASKED OF ONE ROW, RATHER THAN A SECOND ANSWER. It would have
+ * been cheaper to have the account page add its own lines up in the browser, and
+ * that is exactly how a screen comes to disagree with a report — two narrowings
+ * of one question, written apart, drifting the first time either is edited.
+ */
+const standing = operation<{ account: string }, { standing: { balance: number }[] }>({
+  id: "book.standing",
+  kind: "read",
+  summary: "What one account comes to",
+  input: { account: field.text({ label: "Account", required: true, holds: "none" }) },
+  output: { standing: field.json({ label: "Standing", holds: "none" }) },
+  permission: "journal:read",
+  idempotency: { mode: "none" },
+  fails: [],
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const row = await (c.db as Db).prepare(
+      `SELECT COALESCE(SUM(amount), 0) AS balance
+         FROM posting WHERE tenant_id = ? AND account = ?`)
+      .bind(c.tenantId, input.account)
+      .first<{ balance: number }>();
+    return { standing: [{ balance: row?.balance ?? 0 }] };
+  },
+});
+
+/* ------------------------------------------------------------- the sweep --- */
+
+/**
+ * WHAT THE BOOKS COULD NOT PLACE, TOLD TO SOMEBODY.
+ *
+ * ⚠️ THIS EXISTS BECAUSE `hears` CANNOT SPEAK. A posting raised by an event is
+ * delivered after the write, with no session, no screen and no notification seam
+ * — so when a role has no home and the money lands in suspense, the only trace is
+ * a row nobody is looking at. That is the one genuinely dangerous silence in this
+ * product: the books balance, every screen is green, and money is sitting
+ * somewhere it does not belong.
+ *
+ * ⚠️ SO THE JOB IS THE VOICE THE SEAM DOES NOT HAVE. It asks one question a night
+ * — is anything in suspense — and tells whoever keeps the books. Nothing else
+ * about it is clever, and it should not become clever: a sweep that started
+ * checking six things is a sweep whose failure means six unasked questions.
+ */
+const suspenseSweep = declareJob({
+  id: "book.suspense",
+  label: "Money the books could not place",
+  why: "Tells whoever keeps the books if anything has landed in suspense, which is money sitting somewhere it does not belong.",
+  /* ⚠️ EARLY MORNING UTC, AND IT IS A COMPROMISE SAID TO BE ONE — the same one
+     OneInventory's sweep makes. A workspace's day starts wherever it is standing
+     and the platform has no per-workspace timezone to run against. */
+  schedule: "0 6 * * *",
+  scope: "per-tenant",
+  /* ⚠️ RETRY IS SAFE BECAUSE THE ANSWER IS A SUM. A second attempt reads the same
+     rows and reaches the same figure; the only cost is a repeated note in the
+     narrow case where the first attempt failed after telling somebody. */
+  onFail: { then: "retry", times: 3 },
+  rerunnable: true,
+  emits: ["book.suspended"],
+  budgetSeconds: 15,
+  async work(ctx) {
+    const db = ctx.db as Db;
+    const row = await db.prepare(
+      `SELECT COALESCE(SUM(p.amount), 0) AS held
+         FROM posting p JOIN account a ON a.id = p.account AND a.tenant_id = p.tenant_id
+        WHERE p.tenant_id = ? AND a.role = 'suspense'`)
+      .bind(ctx.tenantId)
+      .first<{ held: number }>();
+
+    const held = row?.held ?? 0;
+    /* ⚠️ NOTHING IN SUSPENSE IS THE ORDINARY NIGHT, AND IT SAYS SO RATHER THAN
+       reporting nothing at all — a run that touched nothing and a run that did
+       not happen look identical in the console otherwise. */
+    if (held === 0) return { touched: 0, detail: "nothing in suspense" };
+
+    await ctx.tell?.("book.suspended", { amount: String(held) });
+    return { touched: 1, detail: "money is sitting in suspense" };
+  },
+});
+
 /* --------------------------------------------------------------- the app --- */
 
 const manifest = (): AppSpec => defineApp({
@@ -634,7 +777,7 @@ const manifest = (): AppSpec => defineApp({
 
   collections: [account, journal, posting, rule],
 
-  operations: [start, extend, post],
+  operations: [start, extend, post, trial, standing],
 
   /*
     ⚠️ ONE EVENT, AND THE COUNT IS HONEST RATHER THAN A START. `buying.received`
@@ -704,6 +847,39 @@ const manifest = (): AppSpec => defineApp({
           },
         );
       },
+    },
+  },
+
+  jobs: { "book.suspense": suspenseSweep },
+
+  /*
+    ⚠️ ONE NOTIFICATION, AND IT IS THE ONE THE `hears` SEAM CANNOT RAISE ITSELF.
+    Everything else this product does is a person pressing something and being
+    told on the spot; the only thing that happens while nobody is looking is a
+    posting landing somewhere it does not belong.
+
+    ⚠️ THE AUDIENCE IS A PERMISSION, NEVER A ROLE. A workspace that makes a role
+    of its own must still be told, and a book addressed to `keeper` stops
+    reaching anybody the moment somebody does that — silently, with the dispatch
+    reporting success over an empty audience.
+  */
+  notifications: {
+    "book.suspended": {
+      id: "book.suspended",
+      label: "Money the books could not place",
+      /* ⚠️ THE FIGURE IS IN THE LINE, because "something is in suspense" is a
+         sentence somebody has to open the app to act on, and £4.20 and £42,000
+         are two different mornings. */
+      summary: "{amount} is sitting in suspense",
+      category: "action",
+      author: "theirs",
+      tone: "warning",
+      icon: "money",
+      needs: "journal:read",
+      on: "book.suspended",
+      link: "/trial",
+      variables: ["amount"],
+      channels: ["inbox", "email"],
     },
   },
 
@@ -783,6 +959,19 @@ const manifest = (): AppSpec => defineApp({
        and is never stored (B2) — see `balanceOf` in `posting.ts`. */
     { id: "landed-here", of: "posting", where: [{ field: "account", is: { here: "record" } }] },
     { id: "rules", of: "posting-rule", limit: 50 },
+    /*
+      ⚠️ ASKED, BECAUSE THIS SCREEN'S SUBJECT IS ARITHMETIC AND A `Match` IS
+      EQUALITY — see `ViewSpec.asked`. A balance is a SUM over lines and will
+      never be a column, which is the whole of B2's claim; a view that could only
+      narrow rows could list the postings and never say what they come to.
+    */
+    { id: "trial-lines", of: "posting", asked: { operation: "book.trial", take: "items" } },
+    { id: "trial-total", of: "posting", asked: { operation: "book.trial", take: "whole" } },
+    /* ⚠️ THE SAME SUM ASKED OF ONE ROW, not a second answer computed in the
+       browser — two narrowings of one question drift the first time either is
+       edited, and then a screen disagrees with a report. */
+    { id: "standing-here", of: "posting",
+      asked: { operation: "book.standing", take: "standing", fills: { account: "record" } } },
   ],
 
   screens: [
@@ -898,8 +1087,23 @@ const manifest = (): AppSpec => defineApp({
             ],
           },
           /*
-            ⚠️ WHAT LANDED HERE, AND IT IS THE ONLY QUESTION ANYBODY OPENS AN
-            ACCOUNT TO ASK. A chart row on its own says what an account is FOR;
+            ⚠️ WHAT IT COMES TO, ABOVE THE LINES IT IS MADE OF. The figure is the
+            answer; the lines are the working. A page that led with the working
+            would be a page somebody scrolls to find the one number they came for.
+          */
+          {
+            group: null,
+            of: [{
+              block: "Stat",
+              bind: {
+                value: { from: { of: "first", view: "standing-here", field: "balance" }, as: "money" },
+                label: { from: { of: "words", says: "Balance" } },
+                mark: { from: { of: "words", says: "money" } },
+              },
+            }],
+          },
+          /*
+            ⚠️ WHAT LANDED HERE, AND IT IS THE WORKING BEHIND THE FIGURE ABOVE. A chart row on its own says what an account is FOR;
             this says what it has been used for, which is what somebody is
             looking at when they wonder whether the books are right.
           */
@@ -943,6 +1147,61 @@ const manifest = (): AppSpec => defineApp({
             }],
           },
         ],
+      } },
+
+    /*
+      THE TRIAL BALANCE — the oldest check in accounting, and the one report that
+      is about the BOOKS rather than about the business.
+
+      ⚠️ THE HERO IS THE WHOLE LEDGER'S TOTAL, AND ZERO IS THE GOOD ANSWER. If it
+      is anything else, a line was written outside an entry and every other figure
+      on every other screen is suspect — so it leads, rather than sitting at the
+      bottom of a column somebody has to add up themselves.
+
+      ⚠️ AND THE FIGURE CARRIES ITS OWN SENTENCE, because a bare `0` on a financial
+      screen reads as something that failed to load. `book.trial` answers with the
+      words beside the number for exactly that reason.
+    */
+    { id: "trial", route: "/trial", label: "Trial balance", nav: "primary", icon: "chart",
+      permission: "journal:read", tone: "neutral",
+      body: {
+        shape: "list",
+        layout: { as: "stack" },
+        hero: {
+          as: "figure",
+          nothing: {
+            says: "Nothing to balance yet",
+            under: "It fills as the books are kept",
+          },
+          bind: {
+            value: { from: { of: "first", view: "trial-total", field: "total" }, as: "money" },
+            /* ⚠️ "OUT BY", SO ZERO READS AS THE GOOD ANSWER. A figure of zero
+               labelled "Total" looks like something that failed to load; the same
+               zero labelled "Out by" is the books saying they are right. */
+            of: { from: { of: "words", says: "Out by" } },
+            mark: { from: { of: "words", says: "check" } },
+          },
+        },
+        blocks: [{
+          block: "Listing",
+          /* ⚠️ ONLY THE ACCOUNTS HOLDING SOMETHING — see `book.trial`. A column
+             of thirty zeroes is a screen somebody reads past to find the four
+             figures that matter, and the chart is where every account lives. */
+          shows: [
+            { field: "name", label: "Account" },
+            { field: "code", label: "Number" },
+            { field: "balance", label: "Balance", as: "money" },
+          ],
+          goes: { to: "account", by: "id" },
+          nothing: {
+            says: "Every account is empty",
+            under: "Post an entry and it will appear here",
+          },
+          bind: {
+            label: { from: { of: "words", says: "Trial balance" } },
+            of: { from: { of: "view", view: "trial-lines" } },
+          },
+        }],
       } },
 
     /*

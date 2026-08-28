@@ -215,3 +215,65 @@ describe("the posting rules", () => {
     expect(of("posting-rule")?.fields.enabled?.kind).toBe("bool");
   });
 });
+
+/* ---------------------------------------------------------- what it comes to --- */
+
+describe("the trial balance", () => {
+  /*
+    ⚠️ ASKED RATHER THAN NARROWED, AND THAT IS THE WHOLE OF B2'S CLAIM SURVIVING
+    CONTACT WITH A SCREEN. A balance is a SUM and will never be a column, so a
+    view that could only match rows could list the postings and never say what
+    they come to.
+  */
+  it("asks an operation rather than matching rows", () => {
+    const asked = app.views?.filter((one) => one.asked) ?? [];
+    expect(asked.map((one) => one.id).sort())
+      .toEqual(["standing-here", "trial-lines", "trial-total"]);
+  });
+
+  /* ⚠️ ONE SUM, ASKED TWO WAYS — never a second answer computed in a browser.
+     Two narrowings of one question drift the first time either is edited. */
+  it("uses one operation for the whole ledger and one for a single account", () => {
+    expect(app.operations.find((one) => one.id === "book.trial")).toBeTruthy();
+    expect(app.operations.find((one) => one.id === "book.standing")).toBeTruthy();
+  });
+
+  it("is a destination, because it is the check somebody comes to make", () => {
+    const screen = app.screens.find((one) => one.id === "trial");
+    expect(screen?.nav).toBe("primary");
+    expect(screen?.permission).toBe("journal:read");
+  });
+});
+
+describe("the nightly sweep", () => {
+  /*
+    ⚠️ IT EXISTS BECAUSE `hears` CANNOT SPEAK. A posting raised by an event has no
+    session, no screen and no notification seam — so money landing in suspense
+    leaves a row nobody is looking at, on books that balance, with every screen
+    green. That is the one genuinely dangerous silence in this product.
+  */
+  it("is the voice the hears seam does not have", () => {
+    expect(app.jobs?.["book.suspense"]).toBeTruthy();
+    expect(app.jobs?.["book.suspense"]?.emits).toEqual(["book.suspended"]);
+  });
+
+  it("tells somebody, with the figure in the line", () => {
+    const told = app.notifications?.["book.suspended"];
+    expect(told?.on).toBe("book.suspended");
+    expect(told?.summary).toContain("{amount}");
+    expect(told?.variables).toContain("amount");
+  });
+
+  /* ⚠️ THE AUDIENCE IS A PERMISSION, NEVER A ROLE — a workspace that invents a
+     role of its own must still be told. */
+  it("addresses a permission rather than a role", () => {
+    expect(app.notifications?.["book.suspended"]?.needs).toBe("journal:read");
+  });
+
+  /* ⚠️ AND THE LINK IS A DECLARED ROUTE. A notification that outlived its screen
+     is a row in an inbox that leads nowhere, on a day something happened. */
+  it("leads somewhere that exists", () => {
+    const where = app.notifications?.["book.suspended"]?.link;
+    expect(app.screens.map((one) => one.route)).toContain(where);
+  });
+});
