@@ -15,8 +15,8 @@
 import type { Block } from "@engine/design";
 
 export const SHAPES: Readonly<Record<string, readonly Block[]>> = {
-  "/space/console/telling": [{"head":0,"rows":2,"height":256},{"head":52,"rows":1,"height":208}],
-  "/space/told": [{"head":0,"rows":2,"height":168}],
-  "/space/w/*/brand": [{"head":52,"rows":6,"height":1016}],
+  "/space/console/telling": [{"head":0,"rows":3,"height":281},{"head":53,"rows":1,"height":217}],
+  "/space/told": [{"head":28,"rows":1,"height":133},{"head":28,"rows":2,"height":205},{"head":28,"rows":0,"height":60}],
+  "/space/w/*/brand": [{"head":53,"rows":5,"height":962}],
   "/space/workspaces": [{"head":0,"rows":1,"height":96}],
 };

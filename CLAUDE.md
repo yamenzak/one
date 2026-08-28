@@ -61,10 +61,20 @@ every app draws with, named **OneDesign**, router-free — and **`engine/ground`
 the PROVING GROUND. **One** is the DEPLOYMENT built on it: `engine/one` is the
 worker that answers every door for every product, `engine/one-space` is the page a
 person opens at the root, `id.` and `setup.`. A product is a manifest inside it,
-and **OneInventory is the only one** — the coaching app that proved stage 9 left
+and there are **three**: **OneInventory** (what is on the shelf), **OneParty**
+(who a workspace deals with — one address book for every product) and **OneBook**
+(the chart of accounts and the journal). The coaching app that proved stage 9 left
 the tree on 2026-08-16 to be rewritten under a new name. So "One" is what a
 customer types and "OneEngine" is what a contributor imports, and the day there is
 a second deployment the split is what makes that cheap.
+
+⚠️ **AND ONE MEMBERSHIP BUYS ALL THREE (D121).** A workspace starts with every
+product switched on; what a plan sells is SIZE, never which products you may
+open. **The products do not import each other** — the seam is three declarations
+(D120): `shared: true` on the owner, `borrows` on the borrower, `hears` for an
+event. What crosses is a record's `name` and nothing else (D122), enforced by the
+kernel for a declared path and by `borrowed.test.mjs` for a handwritten
+statement. [engine/docs/BUSINESS.md](engine/docs/BUSINESS.md) is the round's plan.
 
 ⚠️ **`engine/ground` IS NOT A PRODUCT, AND THAT IS ENFORCED BY WHERE IT LIVES.**
 It is the smallest complete app — one notebook over a SAMPLE world, declaring

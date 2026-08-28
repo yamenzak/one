@@ -149,7 +149,18 @@ const cookie = cookieOf(exchanged);
 console.log("  session:", exchanged.status, cookie ? "cookie set" : "NO COOKIE", JSON.stringify(exchanged.json).slice(0, 160));
 if (!cookie) throw new Error("no session cookie");
 
-const made = await call("setup.localhost", "/api/me.tenant.create", { name: "Northwind Strength", slug: SLUG, country: "DE" }, cookie);
+/* ⚠️ `apps` IS NOT OPTIONAL AND WAS MISSING HERE. Founding narrows what was
+   asked for to what the deployment sells and refuses an empty result — "a
+   workspace with no product is a name, an address and nothing to open". Without
+   it every call 400'd on `Choose at least one`, so every workspace-scoped shot
+   below photographed a 404 under a correct heading and the run still said
+   `done`. The list is the catalogue's own, so a product added to the deployment
+   is photographed without anybody editing this line. */
+const offered = await get("id.localhost", "/api/me.products", cookie);
+const wants = (offered.json?.items ?? []).map((one) => one.id).filter(Boolean);
+const made = await call("setup.localhost", "/api/me.tenant.create",
+  { name: "Northwind Strength", slug: SLUG, country: "DE", apps: wants }, cookie);
+console.log("  wants:", JSON.stringify(wants));
 console.log("  workspace:", made.status, JSON.stringify(made.json).slice(0, 200));
 
 /* ⚠️ THE AGREEMENTS GATE STANDS IN FRONT OF EVERY SIGNED-IN SCREEN, which is
@@ -210,6 +221,14 @@ const SHOTS = [
   { id: "space-home", host: "id.localhost", path: "/space", auth: true },
   { id: "space-workspaces", host: "id.localhost", path: "/space/workspaces", auth: true },
   { id: "workspace", host: `${SLUG}.localhost`, path: "/", auth: true },
+  /* ⚠️ ONE SCREEN PER PRODUCT, BECAUSE A PRODUCT NOBODY PHOTOGRAPHS IS ONE
+     NOBODY LOOKS AT. Everything above is the platform's own surface; these are
+     what a workspace actually opens, drawn entirely by the renderer from three
+     manifests. The party list is the sharpest of the three — it is the record
+     OneInventory borrows a name from, and seeing both is the seam. */
+  { id: "app-parties", host: `${SLUG}.localhost`, path: "/party/parties", auth: true },
+  { id: "app-accounts", host: `${SLUG}.localhost`, path: "/book/accounts", auth: true },
+  { id: "app-suppliers", host: `${SLUG}.localhost`, path: "/inventory/suppliers", auth: true },
 ];
 
 const { chromium } = await playwright();
