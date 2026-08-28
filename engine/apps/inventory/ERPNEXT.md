@@ -409,7 +409,7 @@ Ordered by how much a real warehouse would miss it.
 
 | # | Capability | Note |
 |---|---|---|
-| 1 | **Valuation and stock value** | Four methods, a FIFO queue per row, landed-cost redistribution, and a GL seam. OneInventory records quantity and no money at all. |
+| 1 | ~~**Valuation and stock value**~~ | **Closed.** OneInventory holds a moving-average rate per (product × place × batch) in thousandths of a minor unit, values every movement at the chokepoint, and spreads an order's carriage by value at receipt. What is still ERPNext's: the other three methods, a FIFO queue per row, and the GL seam. See D119 for why each is refused. |
 | 2 | **Back-dated entries and reposting** | The single largest subsystem in the module. OneInventory's ledger is append-only in real time and has no concept of inserting into the past. |
 | 3 | **A warehouse tree** | OneInventory has `location` with a `within` parent, but no roll-up: a view over a parent does not include children. |
 | 4 | **Reservation** | Committing stock to a demand before it moves. OneInventory has no notion of a demand at all. |
@@ -438,12 +438,14 @@ that treats the phone as the primary device.
 **Three of these are load-bearing for anyone selling to a warehouse, and we
 should decide about them deliberately rather than by omission.**
 
-1. **Stock value.** "What is my inventory worth" is the second question every
-   business asks after "what do I have", and it is the one an accountant asks
-   first. We currently cannot answer it. Note that a *valuation* does not require
-   a general ledger — a moving-average rate per (product × place) and a value on
-   the balance is a fraction of ERPNext's machinery and answers most of the
-   question.
+1. ~~**Stock value.**~~ **Built, 2026-08-28.** The reasoning below was right and
+   is kept because it is why the shape is what it is: a *valuation* does not
+   require a general ledger, and a moving-average rate plus a value on the
+   balance is a fraction of ERPNext's machinery that answers most of the
+   question. What shipped is exactly that — a rate per (product × place ×
+   BATCH), in milli so a sub-penny rate is exact, derived on read rather than
+   accumulated, plus carriage spread by value. D119 records the method and the
+   three refused; D118 records the carriage.
 
 2. **The warehouse tree that rolls up.** We already have the parent link; what
    we do not have is a view that sums a subtree. That is the difference between
@@ -457,9 +459,12 @@ should decide about them deliberately rather than by omission.**
 
 - **The repost subsystem** exists because ERPNext allows back-dated entry. If we
   refuse back-dating outright — as we already effectively do — we never need any
-  of it. That refusal is worth writing down as a decision rather than leaving as
-  an absence, because the day somebody asks for "just let me fix yesterday's
-  count" is the day the whole subsystem starts being built by accident.
+  of it. **That refusal is D119 now**, written down deliberately rather than left
+  as an absence, because the day somebody asks for "just let me fix yesterday's
+  count" is the day the whole subsystem starts being built by accident. What the
+  refusal costs is said there too: a workspace that finds in March that January
+  was invoiced wrong corrects the shelf TODAY, with a reason, as a visible
+  movement — January's reports do not change.
 
 - **Thirteen stock-entry purposes on one document.** That is what happens when a
   form grows a `purpose` field instead of the product growing verbs.

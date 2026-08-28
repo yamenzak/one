@@ -1161,8 +1161,17 @@ out on purpose.
 ⚠️ **IT IS A CATALOGUE, NOT A ROADMAP.** ERPNext's stock module exists to feed a
 general ledger, and about a third of it is accounting machinery that only makes
 sense if you are also the accounting system. Its own last section names the three
-gaps that are load-bearing — **stock value**, **a warehouse tree that rolls up**,
-and **reservation** — and the two that are traps.
+gaps that are load-bearing and the two that are traps.
+
+**Where those five stand, as of 2026-08-28:**
+
+| | |
+|---|---|
+| **Stock value** | **Built.** A moving average per (product × place × batch), in milli, derived on read, with carriage spread by value. D119, D118. |
+| **A warehouse tree that rolls up** | **Open.** `location` has a `within` parent and `stock.lines` walks the closure for its OWN narrowing — but no generated view sums a subtree, so "Cold store has 400 across nine bays" is not a question a screen can ask. |
+| **Reservation** | **Open, and it is the sales side's.** Committing stock to a demand before it moves needs a demand, and this product has no notion of one. Without it two people promise the same case. |
+| **The repost subsystem** | **Refused, in writing.** D119 — and what the refusal costs is said there rather than discovered later. |
+| **Thirteen purposes on one document** | **Refused.** Five verbs, each with its own refusals. Do not merge them. |
 
 ## What is not built
 
