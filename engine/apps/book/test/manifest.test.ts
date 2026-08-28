@@ -13,6 +13,7 @@ import { describe, expect, it } from "vitest";
 import { oneBook } from "../src/index.js";
 import { CHARTS } from "../src/charts.js";
 import { ROLES, ROOTS } from "../src/roles.js";
+import { RULES, refuseRule } from "../src/posting.js";
 
 const app = oneBook();
 const of = (id: string) => app.collections.find((one) => one.id === id);
@@ -107,5 +108,110 @@ describe("topping the chart up", () => {
 
   it("refuses on a workspace whose books were never opened", () => {
     expect(extend?.fails).toContain("book.not_open");
+  });
+});
+
+/* --------------------------------------------------------------- the ledger --- */
+
+describe("the journal", () => {
+  /*
+    ⚠️ ONE SIGNED COLUMN — see `posting.ts`. Two stored columns can disagree with
+    themselves (a row with both filled is a real defect in real systems and needs
+    a check nobody writes); one cannot. The screens draw two columns from the sign.
+  */
+  it("stores one signed amount rather than a debit and a credit", () => {
+    const line = of("posting")?.fields ?? {};
+    expect(line.amount?.kind).toBe("money");
+    expect(line.debit).toBeUndefined();
+    expect(line.credit).toBeUndefined();
+  });
+
+  /* ⚠️ NO STORED BALANCE ANYWHERE (B2, and D119 one domain over). A total that
+     can disagree with the lines under it is what grows a repair subsystem. */
+  it("stores no balance on an account", () => {
+    const fields = of("account")?.fields ?? {};
+    for (const wrong of ["balance", "total", "debits", "credits", "opening"]) {
+      expect(fields[wrong]).toBeUndefined();
+    }
+  });
+
+  /*
+    ⚠️ THE DAY IT BELONGS TO IS NOT THE DAY IT WAS TYPED. A bookkeeper posts
+    Friday's invoice on Monday and the reports are about Friday; the platform's
+    own `at` records the second thing.
+  */
+  it("dates an entry by the day it belongs to", () => {
+    expect(of("journal")?.fields.day?.kind).toBe("day");
+  });
+
+  /* ⚠️ B1: OneBook may not point at another product's tables, so what it keeps
+     is the identifier it was told — enough to look up, not enough to couple. */
+  it("keeps another product's reference as a string, never a ref", () => {
+    expect(of("journal")?.fields.ref?.kind).toBe("text");
+    expect(of("journal")?.fields.source?.kind).toBe("text");
+  });
+
+  it("refuses an entry that does not balance, by its own name", () => {
+    const op = app.operations.find((one) => one.id === "journal.post");
+    expect(op?.fails).toContain("book.unbalanced");
+    expect(op?.fails).toContain("book.no_account");
+  });
+
+  /*
+    ⚠️ SHAPING THE CHART AND POSTING TO IT ARE DIFFERENT GRANTS. Somebody entering
+    the week's invoices posts all day and must never be able to move what an
+    account is FOR.
+  */
+  it("separates posting from shaping the chart", () => {
+    expect(app.access.permissions).toContain("journal:write");
+    expect(app.access.permissions).toContain("account:write");
+    expect(app.access.roles.user).toContain("journal:write");
+    expect(app.access.roles.user).not.toContain("account:write");
+  });
+});
+
+describe("what OneBook hears", () => {
+  /*
+    ⚠️ ONEINVENTORY KNOWS NOTHING ABOUT ANY OF THIS. It raises the event it always
+    raised; this app declares it listens. A workspace without OneBook leaves the
+    event unheard, which is the ordinary case rather than a fault.
+  */
+  it("listens for the delivery, and says why in a sentence", () => {
+    expect(Object.keys(app.hears ?? {})).toEqual(["buying.received"]);
+    expect(app.hears?.["buying.received"]?.why).toContain("delivery");
+  });
+
+  /* ⚠️ NO IMPORT ANYWHERE — the seam is three declarations (D120). The guard
+     that enforces it is `apps.test.mjs`; this is the app's own statement. */
+  it("names the event it hears and nothing else of the other product", () => {
+    expect(app.hears?.["buying.received"]).toBeTruthy();
+    expect(app.collections.map((one) => one.id)).not.toContain("buying");
+  });
+});
+
+describe("the posting rules", () => {
+  it("ships rules that would pass their own check", () => {
+    for (const one of RULES) expect(refuseRule(one)).toBeNull();
+  });
+
+  /*
+    ⚠️ ONE RULE, AND THE COUNT IS HONEST. It is the only event in this deployment
+    whose ANSWER carries money — see `RULES` for what is absent and why each
+    absence would be WRONG rather than merely missing.
+  */
+  it("ships only rules for events that carry a figure", () => {
+    expect(RULES.map((one) => one.event)).toEqual(["buying.received"]);
+  });
+
+  it("names roles rather than accounts, so the chart is the lever", () => {
+    for (const one of RULES) {
+      for (const side of one.sides) expect(ROLES).toContain(side.role);
+    }
+  });
+
+  /* ⚠️ OFF IS A FIRST-CLASS ANSWER — a workspace whose accountant posts
+     purchases by hand turns it off and nothing else changes. */
+  it("can be turned off", () => {
+    expect(of("posting-rule")?.fields.enabled?.kind).toBe("bool");
   });
 });

@@ -30,7 +30,10 @@ import {
 } from "@engine/kernel";
 
 import { CHARTS, chartById, chartFor } from "./charts.js";
-import { ROLES, ROOTS, missing, rowsOf, type Held, type Node } from "./roles.js";
+import { ROLES, ROOTS, missing, rowsOf, type Held, type Node, type Role } from "./roles.js";
+import {
+  RULES, fire, refuseEntry, type Line, type Rule,
+} from "./posting.js";
 
 /* ------------------------------------------------------------------ shapes --- */
 
@@ -131,6 +134,105 @@ const account = collection({
   },
 });
 
+/**
+ * ONE ENTRY IN THE JOURNAL — the header, and its lines are below.
+ *
+ * ⚠️ THE JOURNAL IS THE PRIMITIVE, NOT A BALANCE (B2). A wallet holds a figure;
+ * accounting holds balanced entries and DERIVES every figure from them by adding
+ * lines up. Storing a running total means storing a number that can disagree with
+ * what it is made of, and every system that stores one grows a subsystem to
+ * repair it. It is D119's rule one domain over: derived, never accumulated.
+ */
+const journal = collection({
+  id: "journal",
+  label: { one: "Entry", many: "Journal" },
+  scope: { of: "tenant" },
+  permission: "journal",
+  retention: null,
+  onClose: { then: "purge" },
+  searchable: ["memo"],
+  names: "memo",
+  fields: {
+    /* ⚠️ THE DAY IT BELONGS TO, WHICH IS NOT THE DAY IT WAS TYPED. A bookkeeper
+       posts Friday's invoice on Monday, and the reports are about Friday. The
+       platform's own `at` records when the row was written. */
+    day: field.day({ label: "Date", required: true, holds: "none" }),
+    memo: field.text({ label: "What it was", required: true, holds: "none", max: 200 }),
+    /*
+      ⚠️ WHICH EVENT RAISED IT, OR NOTHING FOR AN ENTRY SOMEBODY TYPED. This is
+      the field that answers "why is this account moving" — the question B2 says
+      a person should be able to ask on a screen rather than by reading somebody
+      else's source.
+    */
+    source: field.text({ label: "Raised by", holds: "none", max: 80 }),
+    /* ⚠️ THE RECORD IN THE OTHER PRODUCT, AS A STRING RATHER THAN A REF. OneBook
+       may not point at OneInventory's tables — that is the whole of B1 — so what
+       it keeps is the identifier it was told, which is enough to look up and not
+       enough to couple. */
+    ref: field.text({ label: "Reference", holds: "none", max: 120 }),
+  },
+});
+
+/**
+ * ONE LINE OF ONE ENTRY.
+ *
+ * ⚠️ ONE SIGNED COLUMN — see `posting.ts`. Debit is positive, credit is negative,
+ * and the screens draw two columns from the sign. Two stored columns can disagree
+ * with themselves; one cannot.
+ */
+const posting = collection({
+  id: "posting",
+  label: { one: "Line", many: "Lines" },
+  scope: { of: "tenant" },
+  permission: "journal",
+  retention: null,
+  onClose: { then: "purge" },
+  names: "memo",
+  fields: {
+    journal: field.ref({ label: "Entry", required: true, holds: "none", to: "journal" }),
+    account: field.ref({ label: "Account", required: true, holds: "none", to: "account" }),
+    amount: field.money({
+      label: "Amount", required: true, holds: "none",
+      help: "Positive is a debit, negative is a credit.",
+    }),
+    memo: field.text({ label: "What it was", required: true, holds: "none", max: 200 }),
+  },
+});
+
+/**
+ * A POSTING RULE — workspace data, and the answer to "why is this moving" (B2).
+ *
+ * ⚠️ IT IS A ROW RATHER THAN A BRANCH IN A HANDLER, and that is the whole point.
+ * ERPNext answers the same question with `make_gl_entries` across twenty-eight
+ * files; this answers it with a list somebody can read on a screen, turn off, and
+ * point at a different account.
+ *
+ * ⚠️ THE SIDES NAME ROLES AND THE WORKSPACE OWNS THE CHART, so the lever that
+ * matters most is not this table at all — it is which account carries which role.
+ * A workspace that wants purchases landing somewhere else moves a tag.
+ */
+const rule = collection({
+  id: "posting-rule",
+  label: { one: "Posting rule", many: "Posting rules" },
+  scope: { of: "tenant" },
+  permission: "journal",
+  retention: null,
+  onClose: { then: "purge" },
+  names: "memo",
+  fields: {
+    /* ⚠️ THE EVENT IT LISTENS FOR, AND OneBook HAS TO KNOW WHAT IT MEANS. A rule
+       for an event nothing declares would never fire; a rule for one whose answer
+       OneBook cannot read would post the wrong number. Both are why the shipped
+       set is short and honest rather than long and hopeful. */
+    event: field.text({ label: "When", required: true, holds: "none", max: 80 }),
+    memo: field.text({ label: "Posts", required: true, holds: "none", max: 200 }),
+    /* ⚠️ OFF IS A FIRST-CLASS ANSWER. A workspace whose accountant posts
+       purchases by hand turns this off and nothing else changes. */
+    enabled: field.bool({ label: "On", holds: "none" }),
+    sides: field.json({ label: "Sides", holds: "none" }),
+  },
+});
+
 /* ------------------------------------------------------------- operations --- */
 
 interface Starting { readonly chart: string }
@@ -213,6 +315,22 @@ const start = operation<Starting, Started>({
     if (held) return c.fail("book.already_open");
 
     const made = await put(c, db, chart.accounts, null);
+
+    /*
+      ⚠️ THE RULES ARE SEEDED WITH THE CHART, BECAUSE THEY ARE USELESS APART FROM
+      IT. A rule names roles and a role is a tag on an account, so seeding rules
+      into a workspace with no chart would be seeding rows that can only ever
+      post to suspense.
+    */
+    for (const one of RULES) {
+      await db.prepare(
+        `INSERT INTO posting_rule (id, tenant_id, event, memo, enabled, sides, at, by)
+          VALUES (?, ?, ?, ?, 1, ?, ?, ?)`)
+        .bind(newId("rul"), c.tenantId, one.event, one.memo,
+          JSON.stringify(one.sides), c.now, c.accountId ?? null)
+        .run();
+    }
+
     return { chart: chart.id, accounts: made };
   },
 });
@@ -273,6 +391,151 @@ const extend = operation<Record<string, never>, Extended>({
   },
 });
 
+/* ------------------------------------------------------------- the ledger --- */
+
+interface Posting { readonly day: string; readonly memo: string; readonly lines: unknown }
+interface Posted { readonly journal: string; readonly lines: number }
+interface AccountRow { readonly id: string; readonly role: string | null; readonly closed: number }
+
+/** ⚠️ Only what the writer below needs — see `writeEntry`. */
+interface Written {
+  readonly day: string;
+  readonly memo: string;
+  readonly source?: string | null;
+  readonly ref?: string | null;
+  readonly lines: readonly Line[];
+}
+
+/**
+ * THE ONE PLACE A JOURNAL ENTRY IS WRITTEN.
+ *
+ * ⚠️ ONE WRITER, BECAUSE THE INVARIANT IS ONE. A hand-typed entry and one raised
+ * by an event are the same rows under the same rule, and two write paths would be
+ * two places for "does it balance" to be asked — with the second one, written
+ * later, in a hurry, by somebody who assumed the first had already asked.
+ */
+async function writeEntry(
+  c: Pick<Ctx, "tenantId" | "now" | "accountId">, db: Db, of: Written,
+): Promise<Posted> {
+  const id = newId("jnl");
+  await db.prepare(
+    `INSERT INTO journal (id, tenant_id, day, memo, source, ref, at, by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+    .bind(id, c.tenantId, of.day, of.memo, of.source ?? null, of.ref ?? null,
+      c.now, c.accountId ?? null)
+    .run();
+
+  for (const line of of.lines) {
+    await db.prepare(
+      `INSERT INTO posting (id, tenant_id, journal, account, amount, memo, at, by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+      .bind(newId("pst"), c.tenantId, id, line.account, line.amount,
+        line.memo ?? of.memo, c.now, c.accountId ?? null)
+      .run();
+  }
+  return { journal: id, lines: of.lines.length };
+}
+
+/** ⚠️ Every role-tagged account in one read, rather than one query per side. */
+async function rolesOf(db: Db, tenantId: string): Promise<Map<string, string>> {
+  const rows = await db.prepare(
+    "SELECT id, role, closed FROM account WHERE tenant_id = ? AND role IS NOT NULL")
+    .bind(tenantId).all<AccountRow>();
+  const out = new Map<string, string>();
+  /* ⚠️ A CLOSED ACCOUNT IS NOT A HOME. Closing one means nothing new lands
+     there, and a role still pointing at it would post to it anyway — so the role
+     reads as unhomed and `fire` sends the side to suspense, where somebody will
+     find it. */
+  for (const row of rows.results) {
+    if (row.role && !row.closed) out.set(row.role, row.id);
+  }
+  return out;
+}
+
+/**
+ * AN ENTRY SOMEBODY TYPED.
+ *
+ * ⚠️ THE BOOKS HAVE TO BE USABLE BY A BOOKKEEPER ON DAY ONE, whatever any other
+ * product emits. Every accounting system is ultimately a person and a journal;
+ * the rules are what save them typing the ordinary ones.
+ */
+const post = operation<Posting, Posted>({
+  id: "journal.post",
+  kind: "write",
+  summary: "Write an entry into the journal",
+  input: {
+    day: field.day({ label: "Date", required: true, holds: "none" }),
+    memo: field.text({ label: "What it was", required: true, holds: "none", max: 200 }),
+    /* ⚠️ A LIST, BECAUSE AN ENTRY IS ITS LINES. Two, three or ten; a receipt with
+       tax on it is three, and any shape that assumed two would be wrong on the
+       first invoice. */
+    lines: field.json({ label: "Lines", holds: "none" }),
+  },
+  output: {
+    journal: field.text({ label: "Entry", holds: "none" }),
+    lines: field.number({ label: "Lines", holds: "none" }),
+  },
+  permission: "journal:write",
+  idempotency: { mode: "key" },
+  emits: ["journal.posted"],
+  outcome: { message: "Posted.", tone: "success", invalidates: ["journal.list"] },
+  fails: ["platform.invalid", "book.unbalanced", "book.no_account"],
+  audit: (input) => ({ subject: input.memo, verb: "posted" }),
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const db = c.db as Db;
+
+    const raw = Array.isArray(input.lines) ? input.lines : [];
+    const lines: Line[] = raw.map((one) => {
+      const row = (one ?? {}) as Record<string, unknown>;
+      return {
+        account: String(row.account ?? ""),
+        amount: Number(row.amount ?? 0),
+        ...(row.memo ? { memo: String(row.memo) } : {}),
+      };
+    });
+
+    /*
+      ⚠️ THE REFUSAL NAMES WHICH MISTAKE IT WAS. "One side typed" and "the two
+      sides differ" are different things to be told, and reporting both as
+      "unbalanced" tells the first person something true and useless.
+    */
+    const wrong = refuseEntry(lines);
+    if (wrong === "unbalanced") {
+      return c.fail("book.unbalanced", {}, { fields: { lines: "The two sides differ" } });
+    }
+    if (wrong) {
+      return c.fail("platform.invalid", {}, { fields: { lines: SAYS[wrong] ?? "Check the lines" } });
+    }
+
+    /* ⚠️ EVERY ACCOUNT CHECKED BEFORE ANYTHING IS WRITTEN. Half an entry is
+       worse than none: it balances to nothing and can never be found by the
+       report that would have shown it. */
+    const held = await db.prepare(
+      "SELECT id, role, closed FROM account WHERE tenant_id = ?")
+      .bind(c.tenantId).all<AccountRow>();
+    const open = new Map(held.results.map((row) => [row.id, !row.closed] as const));
+    for (const line of lines) {
+      if (!open.has(line.account)) {
+        return c.fail("book.no_account", {}, { fields: { lines: "One line names no account" } });
+      }
+      if (!open.get(line.account)) {
+        return c.fail("book.no_account", {}, { fields: { lines: "One account is closed" } });
+      }
+    }
+
+    return writeEntry(c, db, { day: input.day, memo: input.memo, lines });
+  },
+});
+
+/** ⚠️ One sentence per refusal, so the field says which mistake it was. */
+const SAYS: Readonly<Record<string, string>> = {
+  no_lines: "An entry needs lines",
+  one_line: "An entry needs both sides",
+  not_whole: "Amounts are whole units",
+  nothing_moves: "Nothing moves in this entry",
+};
+
 /* --------------------------------------------------------------- the app --- */
 
 const manifest = (): AppSpec => defineApp({
@@ -296,25 +559,55 @@ const manifest = (): AppSpec => defineApp({
   hue: "oklch(0.74 0.13 155)",
 
   access: {
-    permissions: ["account:read", "account:write"],
+    permissions: [
+      "account:read", "account:write",
+      /*
+        ⚠️ SHAPING THE CHART AND POSTING TO IT ARE DIFFERENT GRANTS. Somebody
+        entering the week's invoices posts all day and must never be able to move
+        what an account is FOR — that is the difference between a bookkeeper and
+        whoever decides how the business is measured, and it is the same rule
+        OneInventory draws between taking stock and correcting it.
+      */
+      "journal:read", "journal:write",
+    ],
     roles: {
       /* ⚠️ Opens the books, shapes the chart, closes an account. */
-      keeper: ["account:read", "account:write"],
+      keeper: ["account:read", "account:write", "journal:read", "journal:write"],
       /* ⚠️ Reads the chart — which is what somebody coding an invoice needs and
          all they need. */
-      user: ["account:read"],
-      viewer: ["account:read"],
+      user: ["account:read", "journal:read", "journal:write"],
+      viewer: ["account:read", "journal:read"],
     },
     presets: [
       {
         id: "alone", name: "On your own",
         said: "One person keeping the books. Opens them and shapes the chart.",
-        permissions: ["account:read", "account:write"],
+        permissions: [
+      "account:read", "account:write",
+      /*
+        ⚠️ SHAPING THE CHART AND POSTING TO IT ARE DIFFERENT GRANTS. Somebody
+        entering the week's invoices posts all day and must never be able to move
+        what an account is FOR — that is the difference between a bookkeeper and
+        whoever decides how the business is measured, and it is the same rule
+        OneInventory draws between taking stock and correcting it.
+      */
+      "journal:read", "journal:write",
+    ],
       },
       {
         id: "bookkeeper", name: "Keeps the books",
         said: "Shapes the chart and closes what is no longer used.",
-        permissions: ["account:read", "account:write"],
+        permissions: [
+      "account:read", "account:write",
+      /*
+        ⚠️ SHAPING THE CHART AND POSTING TO IT ARE DIFFERENT GRANTS. Somebody
+        entering the week's invoices posts all day and must never be able to move
+        what an account is FOR — that is the difference between a bookkeeper and
+        whoever decides how the business is measured, and it is the same rule
+        OneInventory draws between taking stock and correcting it.
+      */
+      "journal:read", "journal:write",
+    ],
       },
       {
         id: "reads", name: "Reads them",
@@ -339,9 +632,80 @@ const manifest = (): AppSpec => defineApp({
   */
   entitlements: {},
 
-  collections: [account],
+  collections: [account, journal, posting, rule],
 
-  operations: [start, extend],
+  operations: [start, extend, post],
+
+  /*
+    ⚠️ ONE EVENT, AND THE COUNT IS HONEST RATHER THAN A START. `buying.received`
+    is B2's own example and the only event in this deployment whose ANSWER
+    currently carries money — see `RULES` in `posting.ts` for what is absent and
+    why each absence would be WRONG rather than merely missing.
+
+    ⚠️ ONEINVENTORY KNOWS NOTHING ABOUT ANY OF THIS. It raises the event it always
+    raised; this app declares that it listens. A workspace without OneBook leaves
+    the event simply unheard, which is the ordinary case and not a fault.
+
+    ⚠️ AND IT CANNOT REFUSE THE RECEIPT. `hears` is delivered after the write and
+    swallows its own failures (D120) — an accounting entry is a CONSEQUENCE of a
+    goods receipt, and refusing the receipt because a chart of accounts is
+    misconfigured would make one product's setup another product's outage.
+  */
+  hears: {
+    "buying.received": {
+      why: "A delivery arrives: the stock is worth something and nobody has invoiced for it yet.",
+      async handler(ctx, raised) {
+        const db = ctx.db as Db;
+        const held = await db.prepare(
+          "SELECT id, event, memo, enabled, sides FROM posting_rule WHERE tenant_id = ? AND event = ?")
+          .bind(ctx.tenantId, raised.event)
+          .first<{ memo: string; enabled: number; sides: string }>();
+        /* ⚠️ NO RULE OR A RULE TURNED OFF IS SILENCE, NOT A FAILURE. A workspace
+           whose accountant posts purchases by hand turned it off on purpose. */
+        if (!held || !held.enabled) return;
+
+        let sides: Rule["sides"] = [];
+        try { sides = JSON.parse(held.sides) as Rule["sides"]; } catch { return; }
+
+        const roles = await rolesOf(db, ctx.tenantId);
+        const out = fire({ event: raised.event, sides }, {
+          answer: raised.answer,
+          accountFor: (role: Role) => roles.get(role) ?? null,
+        });
+        /*
+          ⚠️ TWO KINDS OF NOT-POSTING, AND ONLY ONE OF THEM IS ORDINARY. A receipt
+          with no price on it has nothing to post — `landed` is `money | null` on
+          the operation that raised this — and a rule whose figure is zero is a
+          day when nothing happened. Both are silence, correctly.
+
+          ⚠️ EVERYTHING ELSE IS A WORKSPACE WHOSE BOOKS HAVE QUIETLY STOPPED
+          POSTING, and it throws so that somebody sees it. `heard()` catches,
+          logs which app heard what and threw, and lets the receipt stand — which
+          is the whole design of the seam: the goods are on the shelf either way,
+          and the operator gets told the accounting behind them is broken.
+        */
+        if (!out.ok) {
+          if (out.why === "no_amount" || out.why === "nothing_moves") return;
+          throw new Error(`posting rule for ${raised.event} could not fire: ${out.why}`);
+        }
+
+        await writeEntry(
+          { tenantId: ctx.tenantId, now: ctx.now, accountId: ctx.by ?? undefined },
+          db,
+          {
+            day: String(raised.input.day ?? ctx.now.slice(0, 10)),
+            memo: held.memo,
+            source: raised.event,
+            /* ⚠️ THE ORDER'S OWN IDENTIFIER, AS A STRING. OneBook may not point
+               at OneInventory's tables (B1), so what it keeps is what it was
+               told — enough to look up, not enough to couple. */
+            ref: String(raised.input.buying ?? ""),
+            lines: out.lines,
+          },
+        );
+      },
+    },
+  },
 
   settingAreas: {
     books: area({
@@ -391,12 +755,34 @@ const manifest = (): AppSpec => defineApp({
       title: "The books are not open yet",
       detail: "Start them from a chart of accounts first.",
     },
+    /*
+      ⚠️ THE ONE REFUSAL THE WHOLE PRODUCT RESTS ON, and it says the figures
+      rather than the rule. Somebody looking at an entry that will not post wants
+      to know by how much and on which side, which is what they will fix.
+    */
+    "book.unbalanced": {
+      status: 409, retryable: false, tone: "warning",
+      title: "The two sides do not agree",
+      detail: "Every entry adds up to nothing. Check the amounts.",
+    },
+    "book.no_account": {
+      status: 409, retryable: false, tone: "warning",
+      title: "One line has nowhere to go",
+      detail: "Every line names an account that is open. Check the lines.",
+    },
   },
 
   views: [
     { id: "chart", of: "account", limit: 100 },
     /* ⚠️ NARROWED TO THE RECORD THE SCREEN IS ABOUT — see `Value.here`. */
     { id: "under-this", of: "account", where: [{ field: "parent", is: { here: "record" } }] },
+    { id: "entries", of: "journal", limit: 50 },
+    { id: "lines-of-this", of: "posting", where: [{ field: "journal", is: { here: "record" } }] },
+    /* ⚠️ EVERY POSTING THAT LANDED HERE, which is the answer to the only
+       question anybody opens an account to ask. The BALANCE is a sum of these
+       and is never stored (B2) — see `balanceOf` in `posting.ts`. */
+    { id: "landed-here", of: "posting", where: [{ field: "account", is: { here: "record" } }] },
+    { id: "rules", of: "posting-rule", limit: 50 },
   ],
 
   screens: [
@@ -511,6 +897,31 @@ const manifest = (): AppSpec => defineApp({
                 } },
             ],
           },
+          /*
+            ⚠️ WHAT LANDED HERE, AND IT IS THE ONLY QUESTION ANYBODY OPENS AN
+            ACCOUNT TO ASK. A chart row on its own says what an account is FOR;
+            this says what it has been used for, which is what somebody is
+            looking at when they wonder whether the books are right.
+          */
+          {
+            group: "What landed here",
+            of: [{
+              block: "Listing",
+              shows: [
+                { field: "memo", label: "What it was" },
+                { field: "amount", label: "Amount", as: "money" },
+              ],
+              goes: { to: "entry", by: "journal" },
+              nothing: {
+                says: "Nothing has posted here",
+                under: "It will fill as the books are kept",
+              },
+              bind: {
+                label: { from: { of: "words", says: "What landed here" } },
+                of: { from: { of: "view", view: "landed-here" } },
+              },
+            }],
+          },
           {
             group: "Under it",
             of: [{
@@ -531,6 +942,169 @@ const manifest = (): AppSpec => defineApp({
               },
             }],
           },
+        ],
+      } },
+
+    /*
+      THE JOURNAL — every entry, newest first.
+
+      ⚠️ IT IS A DESTINATION RATHER THAN A REPORT, because a journal is what a
+      bookkeeper LIVES in. The reports are groupings of these lines and arrive
+      later; this is the thing they are groupings of.
+    */
+    { id: "journal", route: "/journal", label: "Journal", nav: "primary", icon: "note",
+      permission: "journal:read", tone: "neutral",
+      body: {
+        shape: "list",
+        layout: { as: "stack" },
+        blocks: [
+          {
+            group: null,
+            of: [{ block: "QuickActions", leads: ["write-an-entry", "rules"] }],
+          },
+          {
+            group: null,
+            of: [{
+              block: "Listing",
+              /* ⚠️ THE MEMO LEADS BECAUSE THE LEADING COLUMN IS THE ROW'S NAME
+                 WHEN THE LIST FOLDS ONTO A PHONE, and a date is not a name.
+                 Somebody scanning a journal is looking for what an entry WAS. */
+              shows: [
+                { field: "memo", label: "What it was" },
+                { field: "day", label: "Date", as: "when" },
+                /* ⚠️ WHICH EVENT RAISED IT, OR BLANK FOR ONE SOMEBODY TYPED —
+                   which is B2's "why is this account moving", answered in a
+                   column rather than by reading somebody else's source. */
+                { field: "source", label: "Raised by" },
+              ],
+              goes: "entry",
+              nothing: {
+                says: "Nothing posted yet",
+                under: "Write an entry, or let a delivery post one for you",
+              },
+              bind: {
+                label: { from: { of: "words", says: "Journal" } },
+                of: { from: { of: "view", view: "entries" } },
+              },
+            }],
+          },
+        ],
+      } },
+
+    { id: "entry", route: "/entry", label: "Entry", nav: "none", icon: "note",
+      permission: "journal:read", of: "journal",
+      body: {
+        shape: "detail",
+        layout: { as: "stack" },
+        blocks: [
+          {
+            group: "What it was",
+            of: [
+              { block: "FieldRow",
+                bind: {
+                  label: { from: { of: "words", says: "Date" } },
+                  value: { from: { of: "field", field: "day" }, as: "when" },
+                } },
+              { block: "FieldRow",
+                when: { has: { of: "field", field: "source" } },
+                bind: {
+                  label: { from: { of: "words", says: "Raised by" } },
+                  value: { from: { of: "field", field: "source" } },
+                } },
+              { block: "FieldRow",
+                when: { has: { of: "field", field: "ref" } },
+                bind: {
+                  label: { from: { of: "words", says: "Reference" } },
+                  value: { from: { of: "field", field: "ref" } },
+                } },
+            ],
+          },
+          /* ⚠️ THE LINES ARE THE ENTRY. Everything above is a label on them. */
+          {
+            group: "The lines",
+            of: [{
+              block: "Listing",
+              shows: [
+                { field: "account.name", label: "Account" },
+                { field: "memo", label: "What it was" },
+                { field: "amount", label: "Amount", as: "money" },
+              ],
+              goes: { to: "account", by: "account" },
+              nothing: {
+                says: "No lines",
+                under: "An entry always has lines. Tell us if you see this",
+              },
+              bind: {
+                label: { from: { of: "words", says: "The lines" } },
+                of: { from: { of: "view", view: "lines-of-this" } },
+              },
+            }],
+          },
+        ],
+      } },
+
+    /*
+      THE POSTING RULES — B2's "why is this account moving", as a list.
+
+      ⚠️ THE WHOLE POINT IS THAT IT IS A SCREEN. ERPNext answers the same question
+      with `make_gl_entries` across twenty-eight files; this answers it with rows
+      somebody can read, turn off, and point at a different account by moving a
+      tag on the chart.
+    */
+    { id: "rules", route: "/rules", label: "Posting rules", nav: "none", icon: "settings",
+      permission: "journal:read", tone: "neutral",
+      body: {
+        shape: "list",
+        layout: { as: "stack" },
+        blocks: [{
+          block: "Listing",
+          shows: [
+            { field: "memo", label: "Posts" },
+            { field: "event", label: "When" },
+            { field: "enabled", label: "On" },
+          ],
+          nothing: {
+            says: "No rules yet",
+            under: "They arrive with the chart when the books are opened",
+          },
+          bind: {
+            label: { from: { of: "words", says: "Posting rules" } },
+            of: { from: { of: "view", view: "rules" } },
+          },
+        }],
+      } },
+
+    /*
+      WRITING ONE BY HAND.
+
+      ⚠️ EVERY ACCOUNTING SYSTEM IS ULTIMATELY A PERSON AND A JOURNAL. The rules
+      save somebody typing the ordinary entries; they never remove the need to be
+      able to type one — a correction, an opening balance, a thing no product in
+      the workspace knows about.
+    */
+    { id: "write-an-entry", route: "/write", label: "Write an entry",
+      nav: "none", icon: "add",
+      permission: "journal:write", tone: "neutral",
+      story: {
+        writes: "journal.post",
+        lands: "journal",
+        asks: [
+          { id: "when", ask: "What date does it belong to?",
+            under: "Dated", takes: ["day"],
+            says: { as: "dated {day}" } },
+          { id: "what", ask: "What was it?",
+            under: "For", takes: ["memo"],
+            says: { as: "for {memo}" } },
+          /*
+            ⚠️ THE LINES ARE ONE STEP BECAUSE THEY ARE ONE THOUGHT. An entry is
+            not a sequence of questions — it is a set of amounts that have to add
+            up to nothing, and asking for them one at a time would let somebody
+            complete four steps and be refused on the fifth for a reason that was
+            about all five.
+          */
+          { id: "lines", ask: "Which accounts move, and by how much?",
+            under: "Moving", takes: ["lines"], always: true,
+            says: { as: "across {lines} lines" } },
         ],
       } },
 
