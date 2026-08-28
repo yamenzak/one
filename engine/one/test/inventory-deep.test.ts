@@ -1144,3 +1144,174 @@ describe("buying it in", () => {
     expect(await onHandOf(product)).toBe(0);
   });
 });
+
+/**
+ * WHAT THE SHELF IS WORTH, DRIVEN.
+ *
+ * ⚠️ EVERY FAILURE HERE IS A NUMBER THAT LOOKS LIKE MONEY AND IS NOT. A
+ * valuation is believed on sight — nobody re-derives it — so every way of being
+ * wrong is a way of being wrong silently, in a report somebody takes to their
+ * accountant. `costing.test.ts` proves the arithmetic; this proves it is
+ * actually reached, on the rows the product writes.
+ */
+describe("what a movement does to a line's worth", () => {
+  const shelved = async (name: string) => {
+    const place = idOf(await write("location.create", { name: `${name} shelf`, kind: "room" }));
+    const product = idOf(await write("product.create", {
+      name, unit: "item", tracking: "counted",
+    }));
+    return { place, product };
+  };
+
+  /**
+   * ⚠️ THE LINE'S OWN RATE, IN MILLI, OFF THE ROW — and read through the
+   * GENERATED list rather than `stock.lines`, which names its columns by hand
+   * and does not carry it. That is a real gap and it is the value pass's to
+   * close; asserting through the bespoke read would pin the gap instead.
+   */
+  const rateOf = async (product: string): Promise<number | null> => {
+    const said = await read("stock.list");
+    expect(said.status, JSON.stringify(said.body)).toBe(200);
+    const rows = (said.body.items as { product: string; rate: number | null }[])
+      .filter((one) => one.product === product);
+    expect(rows).toHaveLength(1);
+    return rows[0]?.rate ?? null;
+  };
+
+  const movesOf = async (product: string): Promise<{ move: string; value: number | null }[]> => {
+    const said = await read("ledger.list", { product });
+    expect(said.status, JSON.stringify(said.body)).toBe(200);
+    return (said.body.items as { product: string; move: string; value: number | null }[])
+      .filter((one) => one.product === product);
+  };
+
+  /*
+    ⚠️ THE TOTAL BECOMES A RATE, DIVIDED ONCE, ON THE SERVER. £120 for ten is
+    £12.00 each — 12000 milli — and the person holding the delivery note types
+    the number that is on it rather than dividing by ten in their head.
+  */
+  it("takes the line's total and holds the rate per unit", async () => {
+    const { place, product } = await shelved("Anchor bolt");
+    const got = await write("stock.receive", {
+      product, location: place, quantity: 10, day: TODAY, capture: "typed", cost: 12000,
+    });
+    expect(got.status, JSON.stringify(got.body)).toBe(200);
+    expect(await rateOf(product)).toBe(1200 * 1000);
+  });
+
+  /*
+    ⚠️ THE BLEND IS WEIGHTED BY WHAT IS ALREADY THERE. Ten at £12 then ten at £8
+    is £10 each, not £8 — an average that took the newest price would reprice a
+    warehouse on one small delivery.
+  */
+  it("blends a second delivery into the first, weighted by quantity", async () => {
+    const { place, product } = await shelved("Shackle");
+    await write("stock.receive", {
+      product, location: place, quantity: 10, day: TODAY, capture: "typed", cost: 12000 });
+    await write("stock.receive", {
+      product, location: place, quantity: 10, day: TODAY, capture: "typed", cost: 8000 });
+    expect(await rateOf(product)).toBe(1000 * 1000);
+  });
+
+  /* ⚠️ AND A DELIVERY WITH NO PRICE LEAVES THE RATE ALONE. Receiving stock
+     without knowing what it cost is the ordinary case; reading that as "it was
+     free" would drag the shelf's rate to nothing one delivery at a time. */
+  it("leaves the rate alone when nobody said what it cost", async () => {
+    const { place, product } = await shelved("Cleat");
+    await write("stock.receive", {
+      product, location: place, quantity: 4, day: TODAY, capture: "typed", cost: 4000 });
+    await write("stock.receive", {
+      product, location: place, quantity: 4, day: TODAY, capture: "typed" });
+    expect(await rateOf(product)).toBe(1000 * 1000);
+  });
+
+  /*
+    ⚠️ WHAT LEFT COST IS RECORDED WHEN IT LEFT, AND THE RATE DOES NOT MOVE. This
+    is the number a sales side will ask for: computed afterwards it would be
+    computed against a rate that has since blended, which is the one arithmetic
+    error in this area nobody notices.
+  */
+  it("records what the stock that left cost, and does not reprice the rest", async () => {
+    const { place, product } = await shelved("Thimble");
+    await write("stock.receive", {
+      product, location: place, quantity: 10, day: TODAY, capture: "typed", cost: 5000 });
+    await write("stock.take", {
+      product, location: place, quantity: 4, day: TODAY, capture: "typed" });
+
+    expect(await rateOf(product)).toBe(500 * 1000);
+    const moves = await movesOf(product);
+    expect(moves.find((m) => m.move === "received")?.value).toBe(5000);
+    expect(moves.find((m) => m.move === "taken")?.value).toBe(-2000);
+  });
+
+  /*
+    ⚠️ MOVING A PALLET MUST NOT CHANGE WHAT A WAREHOUSE IS WORTH, and this is the
+    test that says so end to end. The source loses what it was worth and the
+    destination gains the same money — however differently the two shelves were
+    priced. A destination pricing the arrival at its OWN rate would create or
+    destroy value on every transfer between two shelves holding the same thing.
+  */
+  it("carries the source's rate across a transfer, and the two halves cancel", async () => {
+    const { place, product } = await shelved("Turnbuckle");
+    const other = idOf(await write("location.create", { name: "Far store", kind: "room" }));
+
+    await write("stock.receive", {
+      product, location: place, quantity: 10, day: TODAY, capture: "typed", cost: 30000 });
+    await write("stock.receive", {
+      product, location: other, quantity: 10, day: TODAY, capture: "typed", cost: 10000 });
+
+    const carried = await write("stock.move", {
+      product, from: place, to: other, quantity: 5, day: TODAY, capture: "typed" });
+    expect(carried.status, JSON.stringify(carried.body)).toBe(200);
+
+    const moves = (await movesOf(product)).filter((m) => m.move === "moved");
+    expect(moves).toHaveLength(2);
+    expect(moves.reduce((sum, one) => sum + (one.value ?? 0), 0)).toBe(0);
+  });
+
+  /*
+    ⚠️ FINDING TWO MORE ON A SHELF IS NOT BUYING TWO MORE. Nothing was paid, so
+    nothing reprices; the value follows the count at whatever the shelf is worth
+    per unit, and the difference is a fact somebody should see rather than a
+    rounding the ledger absorbs.
+  */
+  it("moves value at the standing rate on a correction, and reprices nothing", async () => {
+    const { place, product } = await shelved("Bosun's chair");
+    await write("stock.receive", {
+      product, location: place, quantity: 10, day: TODAY, capture: "typed", cost: 20000 });
+    await write("stock.adjust", {
+      product, location: place, quantity: 2, day: TODAY, capture: "typed",
+      reason: "Two more found behind the crate" });
+
+    expect(await rateOf(product)).toBe(2000 * 1000);
+    expect((await movesOf(product)).find((m) => m.move === "adjusted")?.value).toBe(4000);
+  });
+
+  /* ⚠️ A WORKSPACE THAT HAS NEVER ENTERED A PRICE HAS AN UNKNOWN VALUE, NOT A
+     ZERO — and every row it writes has to preserve that, or "£0" over a full
+     warehouse is what a report says. */
+  it("says nothing rather than nought about stock nobody has priced", async () => {
+    const { place, product } = await shelved("Fender");
+    await write("stock.receive", {
+      product, location: place, quantity: 6, day: TODAY, capture: "typed" });
+    expect(await rateOf(product)).toBeNull();
+    expect((await movesOf(product)).find((m) => m.move === "received")?.value).toBeNull();
+  });
+
+  /* ⚠️ AND THE DELIVERY LANE CARRIES A PRICE TOO. Most stock arrives against an
+     order, so a receipt that could not cost one would leave the value of a
+     warehouse resting on the ad-hoc screen. */
+  it("costs a delivery received against an order", async () => {
+    const supplier = idOf(await write("supplier.create", {
+      name: "Chandlery", contact: "Iris", email: "iris@chandlery.example", leadDays: 3 }));
+    const { place, product } = await shelved("Warp");
+    const buying = idOf(await write("buying.open", { supplier, today: TODAY }));
+    await write("buying.add", { buying, product, quantity: 8 });
+    await write("buying.place", { buying, ref: "CH-91" });
+
+    const had = await write("buying.receive", {
+      buying, product, location: place, quantity: 8, day: TODAY, capture: "typed", cost: 16000 });
+    expect(had.status, JSON.stringify(had.body)).toBe(200);
+    expect(await rateOf(product)).toBe(2000 * 1000);
+  });
+});

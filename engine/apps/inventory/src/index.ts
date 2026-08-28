@@ -32,6 +32,12 @@ import { SIGNALS } from "./hazard.js";
 import {
   factorOf, perOf, readLevels, refuseLevels, rungFor, spell, type Level,
 } from "./packing.js";
+/* ⚠️ WHAT THE SHELF IS WORTH — the arithmetic, pure, with the four refused
+   methods and the reason argued in its own header. The chokepoint decides WHICH
+   verb gets which; every number comes from there. */
+import {
+  MILLI, adjusted, received, taken, type Costed, type Held,
+} from "./costing.js";
 import { PROFILES, wordsFor, type Words } from "./words.js";
 import { columnsFor, planIn, readSheet, tallyIn, type Planned } from "./sheet.js";
 import { dailyIn, lossesIn, reorder, toldIn, usageIn } from "./report.js";
@@ -1115,6 +1121,27 @@ const stock = collection({
        number nobody has touched; hiding staleness is how people stop believing a
        system. */
     seen: field.instant({ label: "Last seen", holds: "none" }),
+    /*
+      ⚠️ WHAT ONE OF THESE IS WORTH, IN MILLI MINOR UNITS — see `costing.ts`. It
+      is a rate rather than a value because a value is `quantity × rate` and
+      storing both is storing one number twice; the derivation is what makes the
+      two impossible to disagree.
+
+      ⚠️ AND IT IS MILLI BECAUSE A WHOLE MINOR UNIT CANNOT HOLD €0.023. A
+      thousand screws would value at €20 against a real €23 — wrong by 13%, in
+      the direction that flatters, on every report.
+
+      ⚠️ `null` UNTIL SOMEBODY SAYS WHAT SOMETHING COST, AND THAT IS NOT NOUGHT.
+      A workspace that has never entered a price has an UNKNOWN value; drawing
+      that as a zero over a full warehouse is the confident empty with a currency
+      symbol on it.
+
+      ⚠️ AND IT IS DRAWN BY NOTHING, deliberately. Milli is a hundredth of what
+      `money` renders, so a rate put in front of somebody is off by a thousand.
+      What a screen shows is the VALUE — `quantity × rate ÷ 1000` — which is a
+      derivation the reads do, never a column.
+    */
+    rate: field.number({ label: "Rate", holds: "none" }),
   },
 });
 
@@ -1181,6 +1208,24 @@ const ledger = collection({
        original. One column rather than four, because the question a reader asks
        is "what caused this", never "which of four kinds of cause". */
     against: field.text({ label: "Against", holds: "none", max: 64 }),
+    /*
+      ⚠️ WHAT THE VALUE MOVED BY, SIGNED, AT THE RATE STANDING WHEN IT MOVED —
+      and that last clause is the whole reason this is a column rather than a
+      calculation. On a take it is the cost of what left; computed afterwards it
+      would be computed against a rate that has since blended, which is the one
+      arithmetic error in this area nobody notices.
+
+      ⚠️ IT DOES NOT HAVE TO RECONCILE WITH THE BALANCE'S OWN VALUE, and not
+      requiring it to is why there is no invariant here to drift. `delta × rate`
+      answers what a shelf is worth NOW; this answers what each movement cost
+      THEN, which is what a cost-of-goods question needs and what a repricing
+      must never rewrite. ERPNext keeps an accumulated stock value beside the
+      derivation and ships six reports whose only job is to find the two
+      disagreeing.
+
+      ⚠️ AND `null` IS "NOBODY HAS SAID", never nought — see `stock.rate`.
+    */
+    value: field.money({ label: "Value", holds: "none" }),
   },
 });
 
@@ -1284,6 +1329,23 @@ const moveInput = {
   /* ⚠️ WHICH DELIVERY MOVED. Absent for everything that is not `batched`, and
      part of the line's identity where it is present — see `stockMove`. */
   batch: field.text({ label: "Batch", holds: "none" }),
+  /*
+    ⚠️ WHAT THIS LINE COST IN TOTAL, NOT WHAT ONE OF THEM COST — the number on
+    the delivery note. A per-unit price asks somebody holding an invoice for
+    "£300, 10 cartons of 30" to divide by three hundred, and the division is the
+    server's to do: it has the rung, so it knows the base quantity, and doing it
+    here is the same one-multiplication rule `packing.ts` exists for.
+
+    ⚠️ AND IT IS OPTIONAL, BECAUSE RECEIVING STOCK WITHOUT KNOWING WHAT IT COST
+    IS THE ORDINARY CASE. What is never done is reading "no price given" as "it
+    was free", which drags a shelf's rate towards nothing one delivery at a time.
+
+    ⚠️ IT IS MEANINGFUL ON A RECEIVE AND ON NOTHING ELSE. A take, a correction,
+    an undo and a transfer all move value at the rate that is already standing;
+    a price on any of them would be somebody repricing a shelf through a verb
+    that is not a purchase, which is `stock.receive`'s job or nobody's.
+  */
+  cost: field.money({ label: "What it cost", holds: "none" }),
 } as const;
 
 interface MoveInput {
@@ -1291,6 +1353,17 @@ interface MoveInput {
   day: string; capture: string; reason?: string; against?: string;
   /** ⚠️ Which delivery. Absent for everything that is not `batched`. */
   batch?: string;
+  /** ⚠️ The LINE's total in minor units, on a receive — see `moveInput.cost`. */
+  cost?: number;
+  /**
+   * ⚠️ THE SOURCE SHELF'S RATE, IN MILLI, ON THE ARRIVING HALF OF A TRANSFER —
+   * and DELIBERATELY NOT ON `moveInput`, so no client has a way to send one. It
+   * travels in milli rather than as a minor-unit total because the round trip
+   * through minor units loses the precision the milli rate exists for: three
+   * units at 2.300 come back as 2.333, and a pallet moved twice is worth
+   * something different each time.
+   */
+  rate?: number | null;
 }
 
 /**
@@ -1313,7 +1386,7 @@ interface MoveInput {
  */
 async function stockMove(
   ctx: Ctx, move: Move, input: MoveInput,
-): Promise<{ id: string; quantity: number; movement: string }> {
+): Promise<Landed> {
   const db = ctx.db as Db;
   /* ⚠️ ASKED HERE, WHICH IS WHY IT IS ASKED ONCE. Every take, receive,
      correction, decant, transfer and undo in this product moves a balance
@@ -1362,10 +1435,10 @@ async function stockMove(
   }
 
   const held = await db.prepare(
-    `SELECT id, quantity FROM stock
+    `SELECT id, quantity, rate FROM stock
       WHERE tenant_id = ? AND product = ? AND location = ? AND batch IS ?`)
     .bind(ctx.tenantId, input.product, input.location, batch)
-    .first<{ id: string; quantity: number }>();
+    .first<{ id: string; quantity: number; rate: number | null }>();
 
   const was = held?.quantity ?? 0;
   const why = refuseMove(move, was, step);
@@ -1374,22 +1447,33 @@ async function stockMove(
   const now = was + step;
   const id = held?.id ?? `stk_${input.product}_${input.location}_${batch ?? ""}`;
 
+  /*
+    ⚠️ THE VALUE MOVES IN THE SAME STATEMENTS AS THE QUANTITY, OR IN NEITHER. A
+    balance that moved with its rate left behind is a shelf whose worth is a
+    number from before the delivery — and it is silent, because both halves look
+    like ordinary rows. That is the same argument the ledger and the projection
+    are already written under, one column further in.
+  */
+  const costed = valueOf(ctx, move, { quantity: was, rate: held?.rate ?? null },
+    input, step);
+
   if (held) {
     /* ⚠️ COMPARE-AND-SET. A zero-change update means somebody else moved this
        line between the read and the write, and the honest answer is to refuse:
        the caller knows what they meant to do and can do it again against the
        number that is actually there. */
     const out = await db.prepare(
-      `UPDATE stock SET quantity = ?, seen = ?, edited_at = ?, edited_by = ?
+      `UPDATE stock SET quantity = ?, rate = ?, seen = ?, edited_at = ?, edited_by = ?
         WHERE id = ? AND tenant_id = ? AND quantity = ?`)
-      .bind(now, ctx.now, ctx.now, ctx.accountId ?? null, held.id, ctx.tenantId, was).run();
+      .bind(now, costed.rate, ctx.now, ctx.now, ctx.accountId ?? null,
+        held.id, ctx.tenantId, was).run();
     if (!out.meta?.changes) ctx.fail("inventory.moved");
   } else {
     await db.prepare(
-      `INSERT INTO stock (id, tenant_id, product, location, batch, quantity, seen, at, by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .bind(id, ctx.tenantId, input.product, input.location, batch, now, ctx.now, ctx.now,
-        ctx.accountId ?? null).run();
+      `INSERT INTO stock (id, tenant_id, product, location, batch, quantity, rate, seen, at, by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .bind(id, ctx.tenantId, input.product, input.location, batch, now, costed.rate,
+        ctx.now, ctx.now, ctx.accountId ?? null).run();
   }
 
   /* ⚠️ THE MOVEMENT'S OWN ID IS ANSWERED, WHICH IS WHAT MAKES UNDO REACHABLE.
@@ -1400,13 +1484,85 @@ async function stockMove(
   await db.prepare(
     `INSERT INTO ledger
       (id, tenant_id, move, product, location, batch, delta, day, reason, capture,
-       against, at, by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+       against, value, at, by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .bind(movement, ctx.tenantId, move, input.product, input.location, batch,
       step, input.day, input.reason ?? null, input.capture, input.against ?? null,
-      ctx.now, ctx.accountId ?? null).run();
+      costed.moved, ctx.now, ctx.accountId ?? null).run();
 
-  return { id, quantity: now, movement };
+  return { id, quantity: now, movement, rate: costed.rate };
+}
+
+/**
+ * WHAT THE CHOKEPOINT ANSWERS ITSELF, WHICH IS ONE FIELD MORE THAN THE WIRE.
+ *
+ * ⚠️ THE RATE IS ANSWERED SO A TRANSFER NEED NOT GO AND READ IT AGAIN. The
+ * arriving half has to blend the SOURCE's rate in — pricing the arrival at the
+ * destination's own would create or destroy value on every move between two
+ * shelves holding the same thing at different prices, which is most of them —
+ * and a second read of the row just written is a race with nothing to gain.
+ *
+ * ⚠️ AND IT IS PROJECTED AWAY BEFORE IT LEAVES — see `answered`. Milli is a
+ * thousandth of what `money` renders, so a rate on the wire is a number three
+ * decimal places from anything a screen could draw.
+ */
+type Landed = Moved & { readonly rate: number | null };
+
+/** ⚠️ The declared output, and nothing the door did not promise — see `Landed`. */
+const answered = (of: Landed): Moved =>
+  ({ id: of.id, quantity: of.quantity, movement: of.movement });
+
+/**
+ * WHAT THIS MOVEMENT DOES TO THE LINE'S WORTH — the arithmetic is `costing.ts`'s
+ * and the choice of which verb gets which is here.
+ *
+ * ⚠️ ONLY A RECEIVE MAY REPRICE, and that is the rule the four other verbs are
+ * defined against. Taking leaves the rate where it was; a correction moves value
+ * at the standing rate because finding two more on a shelf is not buying two
+ * more; an undo is the exact opposite of one movement and reprices nothing; and
+ * a transfer carries the source's rate across, which is what conserves the total
+ * across two differently priced shelves.
+ *
+ * ⚠️ THE TRANSFER'S RATE ARRIVES ON `input.rate`, WHICH NO CLIENT CAN SEND. It
+ * is on the interface `stockMove` takes and not on `moveInput`, so the door has
+ * nothing to accept it through — and that matters, because a rate from outside
+ * would be a caller setting what a shelf is worth without buying anything. The
+ * transfer handler passes it in process, from the half it has just written.
+ *
+ * ⚠️ AND A PRICE ON A VERB THAT IS NOT A PURCHASE IS IGNORED RATHER THAN
+ * REFUSED, because the door already refuses what it can see: `stock.receive` is
+ * the only operation whose screen offers the field. Failing here would turn a
+ * client sending a harmless extra into a movement that did not happen.
+ */
+function valueOf(
+  ctx: Ctx, move: Move, line: Held, input: MoveInput, step: number,
+): Costed {
+  if (move === "received") {
+    /*
+      ⚠️ THE TOTAL BECOMES A RATE HERE, DIVIDED ONCE, AT THE END. `cost` is what
+      the line cost and `step` is what arrived in base units — so the division is
+      against the number the packing ladder already resolved, never against what
+      somebody typed on a screen holding last week's ladder.
+    */
+    const paid = input.cost === undefined || input.cost === null || step <= 0
+      ? null
+      : Math.round((input.cost * MILLI) / step);
+    return received(line, step, paid);
+  }
+  if (move === "taken") return taken(line, Math.abs(step));
+  /*
+    ⚠️ THE ARRIVING HALF OF A TRANSFER IS A RECEIVE AT THE SOURCE'S RATE, and it
+    is told that rate rather than deriving one. `moved` in `costing.ts` is the
+    two halves together; the chokepoint only ever sees one, so the caller that
+    has both shelves passes the rate across on `cost` — see the transfer handler,
+    which is the only thing in this product that may.
+  */
+  if (move === "moved" && step > 0) return received(line, step, input.rate ?? null);
+  /* ⚠️ EVERYTHING LEFT MOVES VALUE AT THE STANDING RATE AND REPRICES NOTHING —
+     a correction, an undo, and the leaving half of a transfer. `step` carries
+     its own sign, so this is one expression rather than three. */
+  void ctx;
+  return adjusted(line, step);
 }
 
 /**
@@ -1488,7 +1644,7 @@ const receive = operation<MoveInput, Moved>({
      the ledger; who moved it is the platform's record of the request, and both
      name the same product so a suspicious line can be read from either side. */
   audit: (input) => ({ subject: input.product, verb: "received" }),
-  handler: (ctx, input) => stockMove(ctx as Ctx, "received", input),
+  handler: async (ctx, input) => answered(await stockMove(ctx as Ctx, "received", input)),
 });
 
 const take = operation<MoveInput, Moved>({
@@ -1510,7 +1666,7 @@ const take = operation<MoveInput, Moved>({
   },
   fails: ["inventory.short", "inventory.moved", "platform.not_found"],
   audit: (input) => ({ subject: input.product, verb: "took" }),
-  handler: (ctx, input) => stockMove(ctx as Ctx, "taken", input),
+  handler: async (ctx, input) => answered(await stockMove(ctx as Ctx, "taken", input)),
 });
 
 /**
@@ -1538,12 +1694,12 @@ const adjust = operation<MoveInput, Moved>({
   outcome: { message: "Corrected.", tone: "warning", invalidates: ["stock.list", "ledger.list"] },
   fails: ["inventory.short", "inventory.moved", "platform.invalid", "platform.not_found"],
   audit: (input) => ({ subject: input.product, verb: "corrected" }),
-  handler: (ctx, input) => {
+  handler: async (ctx, input) => {
     const c = ctx as Ctx;
     if (!input.reason?.trim()) {
       c.fail("platform.invalid", {}, { fields: { reason: "Say what was wrong" } });
     }
-    return stockMove(c, "adjusted", input);
+    return answered(await stockMove(c, "adjusted", input));
   },
 });
 
@@ -1775,10 +1931,17 @@ const shift = operation<ShiftInput, Moved & { arrived: number }>({
       ...common, location: input.from, quantity: -many,
     });
 
-    let arrived: Moved;
+    let arrived: Landed;
     try {
       arrived = await stockMove(c, "moved", {
-        ...common, location: input.to, quantity: many,
+        /* ⚠️ THE SOURCE'S RATE TRAVELS WITH THE STOCK, WHICH IS WHAT CONSERVES
+           THE TOTAL. The shelf it leaves loses `quantity × its own rate` and the
+           shelf it reaches gains the same money, blended into whatever was there
+           — so the two halves cancel however differently the two were priced. A
+           destination pricing the arrival at its OWN standing rate would create
+           or destroy value on every transfer between two shelves holding the
+           same thing at different prices, which is most of them. */
+        ...common, location: input.to, quantity: many, rate: left.rate,
       });
     } catch (why) {
       /*
@@ -1800,7 +1963,7 @@ const shift = operation<ShiftInput, Moved & { arrived: number }>({
 
     /* ⚠️ THE OUTBOUND MOVEMENT IS WHAT IS ANSWERED, so an undo reaches the pair
        through the half that names the shelf somebody was standing at. */
-    return { ...left, arrived: arrived.quantity };
+    return { ...answered(left), arrived: arrived.quantity };
   },
 });
 
@@ -5299,7 +5462,7 @@ const placeOrder = operation<
 const receiveLine = operation<
   {
     buying: string; product: string; location: string; quantity: number;
-    day: string; capture: string; batch?: string;
+    day: string; capture: string; batch?: string; cost?: number;
   },
   { state: string; had: number; left: number }
 >({
@@ -5314,6 +5477,11 @@ const receiveLine = operation<
     day: field.day({ label: "On", required: true, holds: "none" }),
     capture: field.text({ label: "Recorded by", required: true, holds: "none" }),
     batch: field.text({ label: "Batch", holds: "none" }),
+    /* ⚠️ WHAT THE LINE COST, FROM THE DELIVERY NOTE THAT IS IN SOMEBODY'S HAND —
+       see `moveInput.cost`. This is the lane most stock arrives through, so a
+       receipt that could not carry a price would leave the value of a warehouse
+       resting on whatever was typed on the ad-hoc receive screen. */
+    cost: field.money({ label: "What it cost", holds: "none" }),
   },
   output: {
     state: field.text({ label: "Standing", holds: "none" }),
@@ -5359,6 +5527,10 @@ const receiveLine = operation<
       capture: input.capture,
       against: of.id,
       ...(input.batch ? { batch: input.batch } : {}),
+      /* ⚠️ PASSED THROUGH, NEVER RE-DERIVED. The rate is worked out in exactly
+         one place — see `valueOf` — so a second division here would be a second
+         answer to what a delivery cost per unit. */
+      ...(input.cost === undefined ? {} : { cost: input.cost }),
     });
 
     await db.prepare(

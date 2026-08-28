@@ -391,6 +391,52 @@ than most of it. `refuseMove` is what makes a take that is short a **refusal**
 rather than a landing on zero: a shelf that quietly agrees with whoever took the
 last of it has destroyed the discrepancy that would have found the problem.
 
+### What the shelf is worth
+
+A receive may carry **what the line cost** — the total on the delivery note, not
+a per-unit price, because the person holding the note should not have to divide
+by three hundred. The server does, against the base quantity the packing ladder
+resolved, and holds the result as a **rate per unit** on the line.
+
+**One method, and the other three are refused.** ERPNext offers FIFO, LIFO,
+moving average and standard cost. FIFO and LIFO need a queue of `[qty, rate]`
+bins per key, replayed from the beginning whenever anything lands out of order —
+and that queue is the whole reason a mature stock ledger grows a reposting
+subsystem, a job runner, concurrency gates and six reports whose only job is to
+find ledgers that have gone wrong. A moving average holds one number and needs
+none of it. The price is that it cannot tell you which delivery a unit came from;
+where that matters the product already has **batches**, and the rate is per
+batch, which is FIFO's answer to the only question FIFO is better at.
+
+**The rate is per (product × place × batch)** — the same key the balance uses.
+Per product alone would make "what is this shelf worth" unanswerable, which is a
+question somebody standing in a doorway actually asks. Per place means a transfer
+has to **carry the rate across**, or moving a pallet would change what a
+warehouse is worth without anything being bought or sold.
+
+**The rate is in thousandths of a minor unit.** A rate in whole pence cannot hold
+£0.023: a thousand screws would value at £20 against a real £23 — wrong by 13%,
+in the direction that flatters. The **value** is in minor units, because that is
+what a person reads and what a money field holds.
+
+**Only a receive may reprice.** Taking leaves the rate where it was; a correction
+moves value at the standing rate, because finding two more on a shelf is not
+buying two more; an undo reprices nothing; a transfer carries the source's rate.
+
+**A line's value is derived, never accumulated.** What a shelf is worth is
+`quantity × rate`, computed fresh. What the ledger carries is a different fact —
+what each movement cost at the moment it happened, which is what a cost-of-goods
+question needs and what a repricing must never rewrite. The two are not required
+to reconcile, and not requiring them to is why there is no invariant here to
+drift.
+
+**`null` is "nobody has said", never nought,** on both the rate and the value. A
+workspace that has never entered a price has an unknown value; "£0" over a full
+warehouse is the confident empty with a currency symbol on it.
+
+The currency those minor units are in is the **workspace's**, set from its
+country at founding and changeable in its own money screen (D117).
+
 ### The count session
 
 A count is a job somebody spends an afternoon on, so it is a destination rather

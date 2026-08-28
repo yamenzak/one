@@ -60,6 +60,18 @@ describe("stock arriving", () => {
     expect(after.moved).toBe(2500);
   });
 
+  /*
+    ⚠️ AND A DELIVERY ONTO AN UNPRICED SHELF WITH NO PRICE MOVES AN UNKNOWN, not
+    a nought. This was a `?? 0` in three places: every movement on a shelf
+    nobody had priced recorded a confident zero, so a year of consumption came
+    out of the usage report costing nothing, with nothing anywhere saying the
+    figure was missing rather than small.
+  */
+  it("moves an unknown, not a nought, onto a shelf nobody has priced", () => {
+    expect(received(held(10, null), 5, null).moved).toBeNull();
+    expect(taken(held(10, null), 5).moved).toBeNull();
+  });
+
   it("takes the price as the rate when the shelf had none", () => {
     expect(received(held(0, null), 10, 400 * MILLI).rate).toBe(400 * MILLI);
   });
@@ -105,7 +117,13 @@ describe("stock moving between places", () => {
   */
   it("conserves the total across two differently priced shelves", () => {
     const both = moved(held(100, 300 * MILLI), held(50, 100 * MILLI), 20);
-    expect(both.out.moved + both.in.moved).toBe(0);
+    /* ⚠️ `?? 0` HERE AND NOWHERE IN THE SOURCE. Both shelves are priced in this
+       case, so neither is unknown — the coalesce is what satisfies the type,
+       and a null arriving would make this read as balanced when it is not, so
+       the two halves are asserted known first. */
+    expect(both.out.moved).not.toBeNull();
+    expect(both.in.moved).not.toBeNull();
+    expect((both.out.moved ?? 0) + (both.in.moved ?? 0)).toBe(0);
   });
 
   /* ⚠️ THE SOURCE'S RATE TRAVELS. A destination pricing the arrival at its OWN
@@ -140,8 +158,11 @@ describe("a correction", () => {
     expect(adjusted(held(100, 250 * MILLI), -2).moved).toBe(-500);
   });
 
+  /* ⚠️ AND UNKNOWN STAYS UNKNOWN RATHER THAN BECOMING NOUGHT. A confident zero
+     on a correction says the count was wrong and it cost nothing — which is a
+     sentence about money, on a line where no money has ever been named. */
   it("says nothing about a line nobody has priced", () => {
-    expect(adjusted(held(100, null), 2).moved).toBe(0);
+    expect(adjusted(held(100, null), 2).moved).toBeNull();
   });
 });
 

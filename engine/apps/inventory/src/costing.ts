@@ -69,8 +69,15 @@ export interface Costed {
    * goods went, from the rate that was standing then. Computing it afterwards
    * means computing it against a rate that has since moved, which is the one
    * arithmetic error in this whole area that nobody notices.
+   *
+   * ⚠️ AND `null` IS "NOBODY HAS SAID", NEVER NOUGHT — the same distinction
+   * `Held.rate` keeps, one step further on. It was a plain number with a `?? 0`
+   * behind it, which meant every movement on an unpriced shelf recorded a
+   * confident zero: a usage report over that history says a year's consumption
+   * cost nothing, and nothing anywhere says the figure is missing rather than
+   * small. A value is knowable exactly when a rate is.
    */
-  readonly moved: number;
+  readonly moved: number | null;
 }
 
 /**
@@ -103,7 +110,7 @@ export const worth = (quantity: number, rate: number | null): number | null =>
  */
 export function received(held: Held, quantity: number, paid: number | null): Costed {
   if (paid === null) {
-    return { rate: held.rate, moved: worth(quantity, held.rate) ?? 0 };
+    return { rate: held.rate, moved: worth(quantity, held.rate) };
   }
   /*
     ⚠️ A FIRST PRICE REPRICES WHAT WAS ALREADY THERE, and that is deliberate. A
@@ -114,12 +121,12 @@ export function received(held: Held, quantity: number, paid: number | null): Cos
     history of movements. That separation is what the header means by derived.
   */
   if (held.rate === null || held.quantity <= 0) {
-    return { rate: paid, moved: worth(quantity, paid) ?? 0 };
+    return { rate: paid, moved: worth(quantity, paid) };
   }
   const before = milliOf(held.quantity, held.rate);
   const coming = milliOf(quantity, paid);
   const rate = Math.round((before + coming) / (held.quantity + quantity));
-  return { rate, moved: worth(quantity, paid) ?? 0 };
+  return { rate, moved: worth(quantity, paid) };
 }
 
 /**
@@ -130,8 +137,13 @@ export function received(held: Held, quantity: number, paid: number | null): Cos
  * that moved the rate on the way out would make the value of a warehouse depend
  * on how often somebody visited it.
  */
-export const taken = (held: Held, quantity: number): Costed =>
-  ({ rate: held.rate, moved: -(worth(quantity, held.rate) ?? 0) });
+export const taken = (held: Held, quantity: number): Costed => {
+  const out = worth(quantity, held.rate);
+  /* ⚠️ NEGATING AN UNKNOWN LEAVES IT UNKNOWN. `-(x ?? 0)` reads as arithmetic
+     and is a zero wearing a minus sign — which on a cost-of-goods line says the
+     stock that left cost nothing. */
+  return { rate: held.rate, moved: out === null ? null : -out };
+};
 
 /**
  * A TRANSFER CARRIES THE RATE ACROSS, AND THAT IS WHAT CONSERVES THE TOTAL.
@@ -165,7 +177,7 @@ export const moved = (from: Held, to: Held, quantity: number):
  * should see rather than a rounding the ledger absorbs.
  */
 export const adjusted = (held: Held, delta: number): Costed =>
-  ({ rate: held.rate, moved: worth(delta, held.rate) ?? 0 });
+  ({ rate: held.rate, moved: worth(delta, held.rate) });
 
 /**
  * ⚠️ WHAT A DELIVERY COST ONCE THE CARRIAGE IS ON IT — see `buying`. Freight,
