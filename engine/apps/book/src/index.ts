@@ -987,6 +987,34 @@ const manifest = (): AppSpec => defineApp({
         shape: "list",
         layout: { as: "stack" },
         blocks: [
+          /*
+            ⚠️ OPENING THE BOOKS WAS UNREACHABLE, AND THIS IS THE CONTROL THAT
+            FIXES IT. `start-the-book` is `nav: "none"` and nothing linked to it,
+            so a workspace that installed OneBook landed here, read "the books
+            are not open yet", and had no way to open them — the one control on
+            the screen being `book.extend`, which refuses with `book.not_open`.
+            The empty state carries copy and cannot carry an action (see
+            `Region.nothing`), so the action is a row of its own above the list.
+
+            ⚠️ AND IT IS SHOWN ONLY WHILE THERE IS NOTHING, because a chart that
+            exists must never offer to be seeded again — `book.start` refuses
+            with `book.already_open` precisely to protect two years of postings,
+            and a button that exists to be refused is a button somebody presses.
+          */
+          {
+            group: null,
+            when: { empty: { of: "view", view: "chart" } },
+            of: [{
+              block: "ActionRow",
+              goes: "start-the-book",
+              bind: {
+                icon: { from: { of: "words", says: "add" } },
+                label: { from: { of: "words", says: "Open the books" } },
+                under: { from: { of: "words",
+                  says: "Start from a chart of accounts — you can rename all of it" } },
+              },
+            }],
+          },
           {
             group: null,
             of: [{
@@ -1030,6 +1058,11 @@ const manifest = (): AppSpec => defineApp({
           */
           {
             group: "Keeping up with the template",
+            /* ⚠️ AND NOT BEFORE THERE IS A TEMPLATE TO KEEP UP WITH. `book.extend`
+               refuses with `book.not_open`, so on a workspace whose books have
+               never been opened this was the only control on the screen and its
+               whole job was to fail. */
+            when: { not: { empty: { of: "view", view: "chart" } } },
             of: [{
               block: "ActionRow",
               does: [{ op: "book.extend", fills: {} }],
