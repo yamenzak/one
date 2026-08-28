@@ -297,6 +297,32 @@ export const namesIn = (spec: CollectionSpec): string | null =>
   ?? null;
 
 /**
+ * THE FIELDS THAT MAKE THIS COLLECTION A TREE.
+ *
+ * ⚠️ A `ref` POINTING AT ITS OWN COLLECTION IS A PARENT, AND NOTHING ELSE IS. A
+ * tree needs no second table — a root is the row whose parent is empty — which
+ * is how every tree in this deployment is already built: OneInventory's places
+ * nest inside each other, OneBook's accounts and its centres do the same.
+ *
+ * ⚠️ AND IT IS DERIVED RATHER THAN DECLARED, so an app that adds a parent to a
+ * flat collection gets the protection with nothing else edited. A flag somebody
+ * has to remember to set is a flag the fifth app will not set.
+ */
+export const treeFieldsOf = (spec: CollectionSpec): readonly string[] =>
+  Object.entries(spec.fields)
+    .filter(([, f]) => f.kind === "ref" && f.to === spec.id)
+    .map(([name]) => name);
+
+/**
+ * ⚠️ TWELVE, WHICH IS DEEPER THAN ANY REAL STRUCTURE. Company → division →
+ * region → site → building → room → aisle → rack → shelf → bin is ten, and it is
+ * the deepest thing this deployment has ever drawn. The bound is not really
+ * about depth: it stops a walk over rows that are ALREADY bent from running for
+ * ever, and a request that never answers is the worst way to find out.
+ */
+export const DEEPEST_TREE = 12;
+
+/**
  * ONE GENERATED VERB'S ID, FROM A COLLECTION'S ID ALONE.
  *
  * ⚠️ THE BROWSER NEEDS IT AND HAS NO `CollectionSpec` — which is the whole

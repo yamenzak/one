@@ -228,7 +228,7 @@ describe("the trial balance", () => {
   it("asks an operation rather than matching rows", () => {
     const asked = app.views?.filter((one) => one.asked) ?? [];
     expect(asked.map((one) => one.id).sort())
-      .toEqual(["standing-here", "trial-lines", "trial-total"]);
+      .toEqual(["centre-totals", "standing-here", "trial-lines", "trial-total"]);
   });
 
   /* ⚠️ ONE SUM, ASKED TWO WAYS — never a second answer computed in a browser.

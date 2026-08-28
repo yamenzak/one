@@ -309,6 +309,18 @@ function refuse(
     ctx.fail("platform.invalid", {},
       { fields: Object.fromEntries(done.names.map((f) => [f, done.detail])) });
   }
+  /* ⚠️ NOT `invalid`, AND THE SENTENCE IS THE POINT. Nothing the caller typed is
+     wrong — the record has been committed to — so "check the highlighted fields"
+     would send them back over a form that is correct. */
+  if (done.why === "not_a_draft") {
+    ctx.fail("platform.not_a_draft", { standing: done.standing, detail: done.detail });
+  }
+  /* ⚠️ AND A RING NAMES THE FIELD THAT WOULD CLOSE IT, because the caller picked
+     a real record and the fault is the relationship rather than the value. */
+  if (done.why === "cycles") {
+    ctx.fail("platform.cycles", { detail: done.detail },
+      { fields: { [done.field]: done.detail } });
+  }
   const named = done.why === "vault_only"
     ? Object.keys(spec.fields).filter((f) => spec.fields[f]?.vault)
     : [];

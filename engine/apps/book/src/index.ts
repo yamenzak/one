@@ -38,6 +38,7 @@ import {
   closingLines, monthsIn, refusePeriod, refusePostingOn, refuseYear,
   type Period, type PostRefusal, type Standing as AccountStanding, type Year,
 } from "./periods.js";
+import { refusePlacing, rollUp, within, type Centre } from "./dimensions.js";
 
 /* ------------------------------------------------------------------ shapes --- */
 
@@ -203,6 +204,51 @@ const period = collection({
 });
 
 /**
+ * WHICH PART OF THE BUSINESS A FIGURE BELONGS TO.
+ *
+ * ⚠️ THE CHART ANSWERS "WHAT" AND NOTHING IN IT ANSWERS "WHERE" — see
+ * `dimensions.ts`. Rent is rent whether it was the shop's or the workshop's, so
+ * a business with two branches needs both figures out of one ledger. An account
+ * per branch is the answer that looks obvious and multiplies the chart by the
+ * branches.
+ *
+ * ⚠️ AND THIS IS WHY A BRANCH IS NOT A SECOND WORKSPACE (D127). One workspace is
+ * one company: one chart, one year end, one return. Branches of that company are
+ * a column on the posting, and giving each one its own workspace would give one
+ * legal entity several ledgers that can never be added up.
+ *
+ * ⚠️ IT IS ALSO A DEPARTMENT, A PROJECT OR A VAN, and the label says "Cost
+ * centre" because that is what an accountant will look for. What a workspace
+ * actually puts in it is theirs.
+ */
+const centre = collection({
+  id: "centre",
+  label: { one: "Cost centre", many: "Cost centres" },
+  scope: { of: "tenant" },
+  /* ⚠️ THE CHART'S OWN GRANT, BECAUSE THIS IS THE SAME KIND OF DECISION. Which
+     centres exist is how the business is measured, like which accounts do —
+     and somebody entering the week's invoices names one all day without ever
+     being able to invent one. */
+  permission: "account",
+  retention: null,
+  onClose: { then: "purge" },
+  searchable: ["name", "code"],
+  names: "name",
+  fields: {
+    name: field.text({ label: "Name", required: true, holds: "none", max: 120 }),
+    code: field.text({ label: "Code", holds: "none", max: 24 }),
+    /* ⚠️ A NODE POINTS AT ITS PARENT AND A ROOT IS THE ROW WITH NONE. The engine
+       refuses a ring here (`treeFieldsOf`), so nothing in this app has to. */
+    parent: field.ref({ label: "Under", holds: "none", to: "centre" }),
+    /* ⚠️ CLOSED RATHER THAN DELETED, for the account's reason one axis over: a
+       branch that shut is still in last year's figures, and what "we do not use
+       this any more" means is that nothing new may land here. */
+    closed: field.bool({ label: "Closed to new postings", holds: "none" }),
+    note: field.long({ label: "Note", holds: "none", max: 1_000 }),
+  },
+});
+
+/**
  * ONE ENTRY IN THE JOURNAL — the header, and its lines are below.
  *
  * ⚠️ THE JOURNAL IS THE PRIMITIVE, NOT A BALANCE (B2). A wallet holds a figure;
@@ -259,6 +305,20 @@ const posting = collection({
   fields: {
     journal: field.ref({ label: "Entry", required: true, holds: "none", to: "journal" }),
     account: field.ref({ label: "Account", required: true, holds: "none", to: "account" }),
+    /*
+      ⚠️ ONE AXIS, ON THE LINE RATHER THAN ON THE ENTRY. A purchase covering two
+      departments is one entry with two lines, and putting the centre on the
+      header would make that impossible to record without splitting the invoice.
+
+      ⚠️ AND IT IS A COLUMN RATHER THAN A JOIN TABLE, WHICH IS THE DECISION
+      (D127). `posting` is the largest table this product holds; a second axis
+      means a row per posting per dimension, and every report would pay for it
+      whether or not anybody had ever used a second one.
+    */
+    centre: field.ref({
+      label: "Cost centre", holds: "none", to: "centre",
+      help: "Optional. Which branch, department or project this belongs to.",
+    }),
     amount: field.money({
       label: "Amount", required: true, holds: "none",
       help: "Positive is a debit, negative is a credit.",
@@ -463,7 +523,12 @@ const extend = operation<Record<string, never>, Extended>({
 
 interface Posting { readonly day: string; readonly memo: string; readonly lines: unknown }
 interface Posted { readonly journal: string; readonly lines: number }
-interface AccountRow { readonly id: string; readonly role: string | null; readonly closed: number }
+interface AccountRow {
+  readonly id: string;
+  readonly type?: string;
+  readonly role: string | null;
+  readonly closed: number;
+}
 
 /** ⚠️ Only what the writer below needs — see `writeEntry`. */
 interface Written {
@@ -554,13 +619,27 @@ async function writeEntry(
 
   for (const line of of.lines) {
     await db.prepare(
-      `INSERT INTO posting (id, tenant_id, journal, account, amount, memo, at, by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-      .bind(newId("pst"), c.tenantId, id, line.account, line.amount,
+      `INSERT INTO posting (id, tenant_id, journal, account, centre, amount, memo, at, by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .bind(newId("pst"), c.tenantId, id, line.account, line.centre ?? null, line.amount,
         line.memo ?? of.memo, c.now, c.accountId ?? null)
       .run();
   }
   return { journal: id, lines: of.lines.length };
+}
+
+/**
+ * ⚠️ EVERY CENTRE IN ONE READ, AND IT IS BOUNDED BY THE SHAPE OF THE BUSINESS
+ * rather than by how much it has done. A workspace has a handful of branches and
+ * departments; this does not grow with the ledger, which is the property that
+ * makes asking on every entry affordable.
+ */
+async function centresOf(db: Db, tenantId: string): Promise<readonly Centre[]> {
+  const got = await db.prepare(
+    `SELECT id, name, parent, closed FROM centre WHERE tenant_id = ?`)
+    .bind(tenantId)
+    .all<{ id: string; name: string; parent: string | null; closed: number | null }>();
+  return got.results.map((r) => ({ ...r, closed: !!r.closed }));
 }
 
 /** ⚠️ Every role-tagged account in one read, rather than one query per side. */
@@ -606,7 +685,10 @@ const post = operation<Posting, Posted>({
   idempotency: { mode: "key" },
   emits: ["journal.posted"],
   outcome: { message: "Posted.", tone: "success", invalidates: ["journal.list"] },
-  fails: ["platform.invalid", "book.unbalanced", "book.no_account"],
+  fails: [
+    "platform.invalid", "book.unbalanced", "book.no_account",
+    "book.centre_needed", "book.no_centre",
+  ],
   audit: (input) => ({ subject: input.memo, verb: "posted" }),
   async handler(ctx, input) {
     const c = ctx as Ctx;
@@ -619,6 +701,7 @@ const post = operation<Posting, Posted>({
         account: String(row.account ?? ""),
         amount: Number(row.amount ?? 0),
         ...(row.memo ? { memo: String(row.memo) } : {}),
+        ...(row.centre ? { centre: String(row.centre) } : {}),
       };
     });
 
@@ -639,15 +722,42 @@ const post = operation<Posting, Posted>({
        worse than none: it balances to nothing and can never be found by the
        report that would have shown it. */
     const held = await db.prepare(
-      "SELECT id, role, closed FROM account WHERE tenant_id = ?")
+      "SELECT id, type, role, closed FROM account WHERE tenant_id = ?")
       .bind(c.tenantId).all<AccountRow>();
-    const open = new Map(held.results.map((row) => [row.id, !row.closed] as const));
+    const open = new Map(held.results.map((row) => [row.id, row] as const));
     for (const line of lines) {
-      if (!open.has(line.account)) {
+      const account = open.get(line.account);
+      if (!account) {
         return c.fail("book.no_account", {}, { fields: { lines: "One line names no account" } });
       }
-      if (!open.get(line.account)) {
+      if (account.closed) {
         return c.fail("book.no_account", {}, { fields: { lines: "One account is closed" } });
+      }
+    }
+
+    /*
+      ⚠️ AND EVERY CENTRE, IN THE SAME PASS, BEFORE ANYTHING IS WRITTEN — see
+      `refusePlacing`. The requirement bites on the profit and loss only, which
+      is the industry's rule rather than a convenience: cash is the company's and
+      not the shop's, so a workspace that switched it on would otherwise be
+      unable to record a payment.
+    */
+    const centres = await centresOf(db, c.tenantId);
+    const wanted = String(await c.setting("book.centre_required")) === "true";
+    for (const line of lines) {
+      const root = (open.get(line.account)?.type ?? "asset") as AccountStanding["root"];
+      const said = refusePlacing({ centre: line.centre ?? null, root }, centres, wanted);
+      if (said === "centre_missing") {
+        return c.fail("book.centre_needed", {},
+          { fields: { lines: "Every income and expense line names a cost centre" } });
+      }
+      if (said === "centre_unknown") {
+        return c.fail("book.no_centre", {},
+          { fields: { lines: "One line names no cost centre" } });
+      }
+      if (said === "centre_closed") {
+        return c.fail("book.no_centre", {},
+          { fields: { lines: "One cost centre is closed" } });
       }
     }
 
@@ -687,13 +797,21 @@ interface Standing { readonly id: string; readonly name: string; readonly code: 
  * entry and every other figure is suspect.
  */
 const trial = operation<
-  Record<string, never>,
+  { centre?: string },
   { items: Standing[]; whole: { total: number }[] }
 >({
   id: "book.trial",
   kind: "read",
   summary: "What every account comes to",
-  input: {},
+  /*
+    ⚠️ NARROWED TO A CENTRE AND EVERYTHING UNDER IT — see `within`. Narrowing to
+    the one row called Retail would answer with whatever was posted directly to
+    it, which in a business that posts to its shops is nothing at all: a report
+    that is empty, correct, and reads as broken.
+  */
+  input: {
+    centre: field.ref({ label: "Cost centre", holds: "none", to: "centre" }),
+  },
   output: {
     items: field.json({ label: "Accounts", holds: "none" }),
     whole: field.json({ label: "The whole ledger", holds: "none" }),
@@ -701,17 +819,26 @@ const trial = operation<
   permission: "journal:read",
   idempotency: { mode: "none" },
   fails: [],
-  async handler(ctx) {
+  async handler(ctx, input) {
     const c = ctx as Ctx;
+    const under = input.centre
+      ? within(await centresOf(c.db as Db, c.tenantId), String(input.centre))
+      : null;
+    /* ⚠️ A NARROWED TRIAL BALANCE DOES NOT HAVE TO COME TO ZERO, and nothing
+       here pretends it does — see the screen. One department's half of an entry
+       whose other half was the bank is a real figure and a real imbalance. */
+    const narrow = under
+      ? ` AND p.centre IN (${under.map(() => "?").join(", ")})`
+      : "";
     const rows = await (c.db as Db).prepare(
       `SELECT a.id AS id, a.name AS name, a.code AS code,
               COALESCE(SUM(p.amount), 0) AS balance
          FROM account a LEFT JOIN posting p
-           ON p.account = a.id AND p.tenant_id = a.tenant_id
+           ON p.account = a.id AND p.tenant_id = a.tenant_id${narrow}
         WHERE a.tenant_id = ?
         GROUP BY a.id
         ORDER BY a.code IS NULL, a.code ASC, a.name ASC`)
-      .bind(c.tenantId)
+      .bind(...(under ?? []), c.tenantId)
       .all<Standing>();
 
     /* ⚠️ ONLY THE ACCOUNTS THAT HOLD SOMETHING. A trial balance listing thirty
@@ -727,6 +854,71 @@ const trial = operation<
       read as the good answer without anything having to say so.
     */
     return { items, whole: [{ total }] };
+  },
+});
+
+/**
+ * WHAT EACH PART OF THE BUSINESS COST, OR EARNED.
+ *
+ * ⚠️ IT ROLLS UP, AND THAT IS THE WHOLE REPORT. Nothing is posted to Retail —
+ * everything is posted to the two shops under it — so a figure that did not add
+ * the children in would show a zero beside the one row somebody opened this to
+ * read. `rollUp` in `dimensions.ts` is that arithmetic and it is pure.
+ *
+ * ⚠️ AND IT IS THE PROFIT AND LOSS ONLY. The balance sheet has no department: the
+ * company holds the cash and owes the debts, so putting an asset in a centre's
+ * column would answer a question nobody asked with a figure nobody can act on.
+ */
+const centres = operation<
+  Record<string, never>,
+  { items: { id: string; name: string; code: string | null; own: number; whole: number }[] }
+>({
+  id: "book.centres",
+  kind: "read",
+  summary: "What each part of the business came to",
+  input: {},
+  output: { items: field.json({ label: "Centres", holds: "none" }) },
+  permission: "journal:read",
+  idempotency: { mode: "none" },
+  fails: [],
+  async handler(ctx) {
+    const c = ctx as Ctx;
+    const db = c.db as Db;
+    const held = await centresOf(db, c.tenantId);
+
+    /* ⚠️ SUMMED IN ONE STATEMENT OVER THE LEDGER. Reading every posting into the
+       worker to add it up is the shape that works in a demo and times out in a
+       business. */
+    const sums = await db.prepare(
+      `SELECT p.centre AS centre, COALESCE(SUM(p.amount), 0) AS amount
+         FROM posting p JOIN account a ON a.id = p.account
+        WHERE p.tenant_id = ? AND p.centre IS NOT NULL
+          AND a.type IN ('income', 'expense')
+        GROUP BY p.centre`)
+      .bind(c.tenantId).all<{ centre: string; amount: number }>();
+
+    const own = new Map(sums.results.map((r) => [r.centre, r.amount] as const));
+    const whole = rollUp(own, held);
+    const codes = await db.prepare(
+      `SELECT id, code FROM centre WHERE tenant_id = ?`)
+      .bind(c.tenantId).all<{ id: string; code: string | null }>();
+    const code = new Map(codes.results.map((r) => [r.id, r.code] as const));
+
+    return {
+      items: held.map((one) => ({
+        id: one.id,
+        name: one.name,
+        code: code.get(one.id) ?? null,
+        /*
+          ⚠️ SIGNED THE WAY A POSTING IS AND THEN TURNED OVER, because what a
+          person reads on this screen is "what did this cost" — and an expense is
+          a debit, which is positive. A department that spent a thousand and
+          earned nothing reads as a thousand rather than as minus one.
+        */
+        own: own.get(one.id) ?? 0,
+        whole: whole.get(one.id) ?? 0,
+      })),
+    };
   },
 });
 
@@ -1222,9 +1414,9 @@ const manifest = (): AppSpec => defineApp({
   */
   entitlements: {},
 
-  collections: [account, journal, posting, rule, year, period],
+  collections: [account, centre, journal, posting, rule, year, period],
 
-  operations: [start, extend, post, trial, standing,
+  operations: [start, extend, post, trial, standing, centres,
     openYear, closeYear, reopenYear, shutPeriod],
 
   /*
@@ -1372,6 +1564,23 @@ const manifest = (): AppSpec => defineApp({
       fallback: "universal", needs: "tenant:manage",
       help: "Only decides what a top-up would add. Your accounts are yours.",
     }),
+    /*
+      ⚠️ OFF BY DEFAULT, AND THAT IS NOT TIMIDITY. Most businesses have one place
+      and no departments; requiring a cost centre on a workspace with one centre
+      is a compulsory field with one answer in front of every entry. It is on for
+      the workspace that has branches and wants none of them missed, which is a
+      decision somebody makes once and means.
+
+      ⚠️ AND IT ONLY BITES ON THE PROFIT AND LOSS — see `refusePlacing`. Asking
+      which department a bank balance belongs to is a question with no answer, so
+      a rule that covered the balance sheet would make a payment unrecordable.
+    */
+    "book.centre_required": setting({
+      id: "book.centre_required", level: "tenant", area: "books",
+      field: field.bool({ label: "Ask for one on every line", holds: "none" }),
+      fallback: false, needs: "tenant:manage",
+      help: "For a business with branches, where a figure with no home is a figure lost.",
+    }),
   },
 
   problems: {
@@ -1448,6 +1657,21 @@ const manifest = (): AppSpec => defineApp({
       title: "That year is already open",
       detail: "Nothing to reopen.",
     },
+    /*
+      ⚠️ THE SENTENCE SAYS WHERE THE RULE COMES FROM, because somebody meeting it
+      for the first time did not switch it on and has no idea why an entry that
+      balances is refused.
+    */
+    "book.centre_needed": {
+      status: 409, retryable: false, tone: "warning",
+      title: "Every income and expense line needs a cost centre",
+      detail: "This workspace asks for one. Change it in the books settings.",
+    },
+    "book.no_centre": {
+      status: 409, retryable: false, tone: "warning",
+      title: "One line names a closed cost centre",
+      detail: "Every centre a line names is open. Check the lines.",
+    },
     "book.no_reserves": {
       status: 409, retryable: false, tone: "warning",
       title: "There is nowhere to put the profit",
@@ -1466,6 +1690,15 @@ const manifest = (): AppSpec => defineApp({
        and is never stored (B2) — see `balanceOf` in `posting.ts`. */
     { id: "landed-here", of: "posting", where: [{ field: "account", is: { here: "record" } }] },
     { id: "rules", of: "posting-rule", limit: 50 },
+    /* ⚠️ NARROWED TO THE RECORD THE SCREEN IS ABOUT — the tree, one level. */
+    { id: "inside-this", of: "centre", where: [{ field: "parent", is: { here: "record" } }] },
+    /* ⚠️ EVERY POSTING THAT NAMED THIS CENTRE, which is what somebody opens one
+       to read — and the FIGURE beside it is a roll-up, which a `Match` cannot
+       do, so it is asked rather than narrowed. */
+    { id: "landed-in-this", of: "posting",
+      where: [{ field: "centre", is: { here: "record" } }] },
+    { id: "centre-totals", of: "centre",
+      asked: { operation: "book.centres", take: "items" } },
     /* ⚠️ NEWEST FIRST IS WRONG FOR A YEAR. The books are read forwards — 2025,
        then 2026 — because "which year am I in" is answered by the last row, and
        a reversed list makes somebody read up the screen to find it. */
@@ -1843,6 +2076,117 @@ const manifest = (): AppSpec => defineApp({
             says: { as: "with its months" } },
         ],
       } },
+    /*
+      COST CENTRES — what each part of the business cost, and the tree it is
+      shaped as.
+
+      ⚠️ THE FIGURE LEADS AND IT IS THE ROLLED-UP ONE. Nothing is posted to
+      Retail; everything is posted to the two shops under it. A column of the
+      rows' own figures would show a zero beside the one line somebody opened
+      this screen to read.
+    */
+    { id: "centres", route: "/centres", label: "Cost centres", nav: "primary", icon: "tag",
+      permission: "account:read", tone: "neutral",
+      body: {
+        shape: "list",
+        layout: { as: "stack" },
+        blocks: [
+          { group: null, of: [{
+            block: "Listing",
+            shows: [
+              { field: "name", label: "Centre" },
+              { field: "code", label: "Code" },
+              /* ⚠️ BOTH FIGURES, BECAUSE THE DIFFERENCE IS THE ANSWER. A parent
+                 with a large total and nothing of its own is working correctly;
+                 one with a figure of its own is a centre somebody has been
+                 posting to directly, which is usually a mistake. */
+              { field: "own", label: "Its own", as: "money" },
+              { field: "whole", label: "With everything under it", as: "money" },
+            ],
+            goes: { to: "centre", by: "id" },
+            nothing: {
+              says: "No cost centres yet",
+              under: "Add one for each branch, department or project you measure",
+            },
+            bind: {
+              label: { from: { of: "words", says: "Cost centres" } },
+              of: { from: { of: "view", view: "centre-totals" } },
+            },
+          }] },
+        ],
+      } },
+
+    /* ⚠️ ONE CENTRE — what it is, what is under it, and every line that named
+       it. The last is the answer to the only question anybody opens one to ask. */
+    { id: "centre", route: "/centre", label: "Cost centre", nav: "none", icon: "tag",
+      permission: "account:read", of: "centre",
+      body: {
+        shape: "detail",
+        layout: { as: "stack" },
+        blocks: [
+          {
+            group: "What it is",
+            of: [
+              { block: "FieldRow",
+                when: { has: { of: "field", field: "code" } },
+                bind: {
+                  label: { from: { of: "words", says: "Code" } },
+                  value: { from: { of: "field", field: "code" } },
+                } },
+              { block: "FieldRow",
+                when: { has: { of: "field", field: "closed" } },
+                bind: {
+                  label: { from: { of: "words", says: "Closed to new postings" } },
+                  value: { from: { of: "field", field: "closed" } },
+                } },
+              { block: "FieldRow",
+                when: { has: { of: "field", field: "note" } },
+                bind: {
+                  label: { from: { of: "words", says: "Note" } },
+                  value: { from: { of: "field", field: "note" } },
+                } },
+            ],
+          },
+          {
+            group: "Inside it",
+            of: [{
+              block: "Listing",
+              shows: [
+                { field: "name", label: "Centre" },
+                { field: "code", label: "Code" },
+              ],
+              goes: "centre",
+              nothing: {
+                says: "Nothing under it",
+                under: "A centre that stands alone is the ordinary case",
+              },
+              bind: {
+                label: { from: { of: "words", says: "Inside it" } },
+                of: { from: { of: "view", view: "inside-this" } },
+              },
+            }],
+          },
+          {
+            group: "What landed here",
+            of: [{
+              block: "Listing",
+              shows: [
+                { field: "memo", label: "What it was" },
+                { field: "amount", label: "Amount", as: "money" },
+              ],
+              nothing: {
+                says: "Nothing posted here yet",
+                under: "Lines that name this centre appear here",
+              },
+              bind: {
+                label: { from: { of: "words", says: "What landed here" } },
+                of: { from: { of: "view", view: "landed-in-this" } },
+              },
+            }],
+          },
+        ],
+      } },
+
     { id: "journal", route: "/journal", label: "Journal", nav: "primary", icon: "note",
       permission: "journal:read", tone: "neutral",
       body: {

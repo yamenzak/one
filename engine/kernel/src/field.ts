@@ -270,6 +270,26 @@ export function checkAll(fields: Fields, values: unknown): Checked {
  * means a caller who misspells a name gets a 200 and no change, which is the
  * hardest kind of bug to see from the outside.
  */
+/**
+ * ⚠️ ONE WAY TO SAY "THERE IS NO LONGER A VALUE", AND IT IS `null`. A caller may
+ * send `""` or `null` and means the same thing by both; storing whichever
+ * arrived would give a column two kinds of empty, so every reader would have to
+ * test for both and the first one that tested only for `IS NULL` would quietly
+ * miss half the rows. `text` and `long` keep `""`, because there an empty string
+ * is a value somebody typed nothing into rather than a field they cleared.
+ */
+const emptied = (
+  values: Record<string, unknown>, fields: Fields,
+): Record<string, unknown> => {
+  const out: Record<string, unknown> = {};
+  for (const [name, value] of Object.entries(values)) {
+    const kind = fields[name]?.kind;
+    const wordy = kind === "text" || kind === "long";
+    out[name] = !wordy && (value === "" || value === null) ? null : value;
+  }
+  return out;
+};
+
 export function checkSome(fields: Fields, values: unknown): Checked {
   if (values === null || typeof values !== "object" || Array.isArray(values)) {
     return { ok: false, why: "expected an object", fields: {} };
@@ -284,14 +304,46 @@ export function checkSome(fields: Fields, values: unknown): Checked {
     };
   }
 
+  /*
+    ⚠️ A REQUIRED FIELD CANNOT BE EMPTIED, AND SAYING SO TAKES ITS OWN LINE. Most
+    required text carries a `max` and no `min`, so `""` is a perfectly valid
+    string and the shape check has nothing to object to — which meant a patch
+    could take a record's name away and answer 200. `required` was read by the
+    create path alone; the edit path is where somebody deletes something.
+  */
+  const emptiedRequired = Object.keys(given).filter((name) =>
+    fields[name]?.required && (given[name] === "" || given[name] === null));
+  if (emptiedRequired.length) {
+    return {
+      ok: false,
+      why: `${emptiedRequired.join(", ")} cannot be left empty`,
+      fields: Object.fromEntries(emptiedRequired.map((n) => [n, "This cannot be empty"])),
+    };
+  }
+
   const shape: Record<string, v.GenericSchema> = {};
   for (const name of Object.keys(given)) {
     const spec = fields[name];
-    if (spec) shape[name] = checkerFor(spec);
+    if (!spec) continue;
+    /*
+      ⚠️ AN OPTIONAL FIELD CAN BE CLEARED, AND UNTIL THIS IT COULD NOT BE. Every
+      checker describes what a VALUE looks like — a ref is a non-empty id, a
+      colour is six hex digits, a day is a date — so emptying one was refused as
+      a malformed value, and a record moved into a tree could never be pulled
+      back out of it. What is being said here is not a value at all: it is that
+      there is no longer one.
+
+      ⚠️ AND ONLY ON THE PATCH PATH. A create sends the fields it has and omits
+      the rest; "" as an ANSWER to a required question is a different thing and
+      is still refused.
+    */
+    shape[name] = spec.required
+      ? checkerFor(spec)
+      : v.union([checkerFor(spec), v.literal(""), v.null()]);
   }
   const out = v.safeParse(v.object(shape as never), given);
   return out.success
-    ? { ok: true, values: out.output as Record<string, unknown> }
+    ? { ok: true, values: emptied(out.output as Record<string, unknown>, fields) }
     : {
       ok: false,
       why: out.issues.map((i: { message: string }) => i.message).join("; "),

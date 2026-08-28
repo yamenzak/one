@@ -120,6 +120,20 @@
       "retryable": false
     },
     {
+      "code": "platform.not_a_draft",
+      "status": 409,
+      "title": "This has been {standing}",
+      "tone": "warning",
+      "retryable": false
+    },
+    {
+      "code": "platform.cycles",
+      "status": 409,
+      "title": "That would put this inside itself",
+      "tone": "warning",
+      "retryable": false
+    },
+    {
       "code": "platform.proof_required",
       "status": 401,
       "title": "Confirm it is you",

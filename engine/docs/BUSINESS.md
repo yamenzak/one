@@ -332,13 +332,23 @@ Four traps to design against now, each of which ERPNext hit:
 
 ### B8. Extension is a declared dimension, not an ALTER
 
-A journal entry line carries a small open map of **dimensions** —
-`{project, department, branch, …}` — declared by the workspace and stored in one
-JSON column, with an index on the ones it filters by.
+A journal entry line carries a dimension the workspace shapes, not a column
+somebody generates. No `create_custom_field` across forty tables in a background
+job.
 
-No `create_custom_field` across forty tables in a background job. The reporting
-cost is real and should be stated: a dimension is filterable, and aggregating by
-one is the reports' business, not a generated view's.
+**What shipped is one axis rather than a map, and the decision is D127.** A
+posting has an optional `centre` — a tree the workspace names, which is a branch
+to one business, a department to another and a project to a third. A JSON map of
+N axes was the plan and was deferred with its shape written down: `posting` is
+the largest table this product holds, so a second axis is a row per posting per
+dimension and every report pays the join whether or not anybody ever declares
+one.
+
+**And it is what makes one company per workspace enough.** ERPNext supports many
+companies in one installation; a workspace here IS a company — one chart, one
+year end, one return — and its branches are centres inside it. A branch per
+workspace would give one legal entity several ledgers that can never be added
+up, while the return it files is about all of them.
 
 ---
 

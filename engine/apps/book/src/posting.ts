@@ -29,6 +29,13 @@ export interface Line {
   /** ⚠️ Minor units. Positive is a debit, negative is a credit. */
   readonly amount: number;
   readonly memo?: string;
+  /**
+   * ⚠️ WHICH PART OF THE BUSINESS, ON THE LINE RATHER THAN ON THE ENTRY — see
+   * `dimensions.ts`. A purchase covering two departments is one entry with two
+   * lines, and a centre on the header would make that impossible to record
+   * without splitting the invoice.
+   */
+  readonly centre?: string | null;
 }
 
 export const debits = (lines: readonly Line[]): number =>

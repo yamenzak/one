@@ -5250,3 +5250,94 @@ Closing a year is not posting to it and is not shaping the chart. It moves a
 year's profit and stops anybody adding to what was filed — the one act in this
 product that reaches backwards over everything already recorded. Whoever enters
 the week's invoices should not be able to do it by accident.
+
+## D127
+
+**One workspace is one company, and a branch is a column rather than a second
+workspace.** OneBook gains a `centre` tree, every posting line may name one, a
+workspace can require one on the profit and loss, and the engine refuses a tree
+bent into a ring for every app at once.
+
+### The chart answers "what" and nothing in it answers "where"
+
+Rent is rent whether it was the shop's or the workshop's; wages are wages
+whichever department earned them. A business with two branches, three departments
+or a dozen projects needs both figures out of one ledger — what it spent, and
+which part of itself spent it. An account per branch is the answer that looks
+obvious and is wrong: it multiplies the chart by the branches, so a new branch is
+thirty new accounts and every report has to be re-summed by hand.
+
+### Which settles the branch question
+
+ERPNext supports many companies in one installation. We do not, and this is why
+we do not have to: **a workspace is a company** — one chart, one year end, one
+return — and its branches are cost centres inside it. Giving each branch its own
+workspace would give one legal entity several ledgers that can never be added up,
+while the return it files is about all of them. A group of separate legal
+entities is a different question, and the answer to that one is a consolidator
+reading several workspaces, which is not built and is not needed until somebody
+has two companies rather than two shops.
+
+### One axis, and the second one is deferred with its shape written down
+
+A posting carries one optional `centre`. A second dimension is a join table on
+`posting` — the largest table this product holds — so a row per posting per
+dimension, and every report would pay the join whether or not anybody had ever
+used a second axis. The shape it would take when something needs it: a
+`dimension` collection naming the axes a workspace declares, a `posting_tag`
+table of `(posting, dimension, value)`, and every report gaining an optional
+`GROUP BY` over it. Nothing about the column below is in the way of that; the
+column becomes the first row of it.
+
+### And it goes on the line, not on the entry
+
+A purchase covering two departments is one entry with two lines. A centre on the
+header would make that impossible to record without splitting the invoice, which
+is the workaround every system that made this mistake documents as a feature.
+
+### The requirement only bites on the profit and loss
+
+That is the industry's rule rather than a convenience. Cash is not the shop's
+cash — it is the company's, sitting in one account — and neither is a debt owed
+to a supplier. Asking which department a bank balance belongs to is a question
+with no answer, so a workspace that switched the requirement on would otherwise
+be unable to record a payment. It is **off by default**: most businesses have one
+place and no departments, and a compulsory field with one answer in front of
+every entry is ceremony.
+
+### Narrowing to a parent means the parent and everything under it
+
+Filtering the ledger to the one row called Retail answers with whatever was
+posted directly to it, which in a business that posts to its shops is nothing at
+all — a report that is empty, correct, and reads as broken. `within` is that
+walk and `rollUp` is the same idea for the totals: nothing is posted to Retail,
+and Retail's figure is the only one anybody wanted.
+
+### A tree bent into a ring is the engine's problem, not the app's
+
+`refuseParent` was written in OneBook and then deleted, because the rule is not
+about accounting. **A `ref` pointing at its own collection is a tree**
+(`treeFieldsOf`), and moving a record under one of its own descendants is refused
+by nothing a database can express: both ids are real, both rows are the caller's,
+and the update lands. What it produces is a shape with no root, so every walk
+over it runs until something times out, and the person who did it saw a save that
+worked. `patch` now climbs the tree in one recursive statement — `UNION` rather
+than `UNION ALL`, which is what makes it terminate over rows that are already
+bent — and refuses both the ring and a chain past `DEEPEST_TREE`. OneInventory's
+places had the same hole and are closed by the same diff, which is the argument
+for putting it there.
+
+### And an optional field can finally be cleared
+
+Every checker describes what a VALUE looks like — a ref is a non-empty id, a
+colour is six hex digits, a day is a date — so emptying one was refused as a
+malformed value. A record moved into a tree could never be pulled back out of it,
+a supplier could never be un-assigned, an accent could never be taken off, and
+the refusal arrived at the form as "Expected >=1 but received 0" under a control
+somebody had deliberately emptied. `checkSome` now takes `""` or `null` on an
+optional field and stores `null` for both — one kind of empty in the column,
+because two would make every reader test for both and the first one testing only
+for `IS NULL` would quietly miss half the rows. `text` and `long` keep `""`,
+where an empty string is a value somebody typed nothing into. **And the same
+change closes the opposite hole**: `required` was read by the create path alone,
+so a patch could take a record's name away and answer 200.

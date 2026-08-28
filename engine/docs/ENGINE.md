@@ -312,6 +312,8 @@ it. A caller's job is to show it, never to invent one from a status code.
 | `platform.payment_required` | 402 | This needs a plan that includes it | — |
 | `platform.commercial_required` | 402 | This is for business workspaces | — |
 | `platform.out_of_reach` | 403 | That is not one of your {places} | — |
+| `platform.not_a_draft` | 409 | This has been {standing} | — |
+| `platform.cycles` | 409 | That would put this inside itself | — |
 | `platform.proof_required` | 401 | Confirm it is you | yes |
 | `platform.must_accept` | 451 | There is something to agree to first | — |
 | `platform.read_only` | 402 | This workspace is read-only | — |
@@ -423,7 +425,7 @@ and a manifest that does not compose refuses to boot.
 | `present` | how a date, a number, a price and a measurement are written for one reader | 18 | — |
 | `infra` | what a product needs underneath it, and what each kind can promise | 11 | — |
 | `field` | what a value is: its kind, its bounds, what it holds, whether it is the app's to keep | 9 | — |
-| `collection` | what a thing an app keeps is — and the six operations it gets for free | 26 | — |
+| `collection` | what a thing an app keeps is — and the six operations it gets for free | 28 | — |
 | `document` | what a thing somebody COMMITS to is: the ladder, the series, the reversal | 11 | — |
 | `operation` | one declaration carrying every cross-cutting concern (D12) | 12 | — |
 | `access` | permissions, roles, and what an app may never claim | 15 | — |
@@ -453,7 +455,7 @@ and a manifest that does not compose refuses to boot.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**350 of them**, 349 reached by something today.
+**352 of them**, 351 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 

@@ -148,6 +148,30 @@ export const PLATFORM_PROBLEMS: ProblemCatalog = {
     plain: "That is not one of yours",
     detail: "Ask somebody who runs this workspace to add it.",
   },
+  /*
+    ⚠️ A RECORD SOMEBODY COMMITTED TO — see `DocumentSpec`. Not `invalid`: the
+    caller is not wrong about anything they typed, and telling them to check the
+    highlighted fields sends them back over a form that is correct. What is wrong
+    is the moment — a number has been issued and a ledger has moved, so this is
+    evidence now, and the way to change it is to cancel and amend.
+  */
+  "platform.not_a_draft": {
+    status: 409, retryable: false, tone: "warning",
+    title: "This has been {standing}",
+    plain: "This is no longer a draft",
+    detail: "{detail}",
+  },
+  /*
+    ⚠️ A TREE BENT INTO A RING — see `treeFieldsOf`. Its own sentence because
+    "that does not look right" is exactly wrong here: what the caller picked is a
+    real record, they may edit both of them, and the reason it is refused is a
+    relationship between the two that no single field is at fault for.
+  */
+  "platform.cycles": {
+    status: 409, retryable: false, tone: "warning",
+    title: "That would put this inside itself",
+    detail: "{detail}",
+  },
   "platform.proof_required": {
     status: 401, retryable: true, tone: "info",
     title: "Confirm it is you",

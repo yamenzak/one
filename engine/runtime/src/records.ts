@@ -15,7 +15,9 @@
  */
 
 import type { Aside, CollectionSpec, Match, Sort, Value } from "@engine/kernel";
-import { checkAll, checkSome, eraseBy, newId, vaultKeyFor } from "@engine/kernel";
+import {
+  DEEPEST_TREE, checkAll, checkSome, eraseBy, newId, treeFieldsOf, vaultKeyFor,
+} from "@engine/kernel";
 import { noteScopeGone } from "./search.js";
 import { column, table, type Db } from "./sql.js";
 import type { Reaching } from "./reach.js";
@@ -58,7 +60,16 @@ export type WriteRefusal =
    * moment — a number has been issued and a ledger has moved, so this is
    * evidence now, and the way to change it is to cancel and amend.
    */
-  | { readonly why: "not_a_draft"; readonly detail: string; readonly standing: string };
+  | { readonly why: "not_a_draft"; readonly detail: string; readonly standing: string }
+  /**
+   * ⚠️ A TREE BENT INTO A RING — see `treeFieldsOf`. It is its own refusal
+   * because nothing else can catch it: the value is a real record's id, the
+   * caller may edit both rows, and the write is refused by no rule a database
+   * can express. What it produces is a shape with no root, so every walk over it
+   * — a picker drawing the tree, a report rolling figures up it — runs until
+   * something times out. The person who typed it sees a save that worked.
+   */
+  | { readonly why: "cycles"; readonly detail: string; readonly field: string };
 
 /**
  * ⚠️ A VAULT-BACKED VALUE NEVER REACHES A PRODUCT COLUMN, AND THIS IS THE ONLY
@@ -220,6 +231,12 @@ export async function patch(
   const away = outOfReach(reaching, checked.values);
   if (away) return away;
 
+  /* ⚠️ AND MOVING A RECORD UNDER ONE OF ITS OWN IS REFUSED — see `wouldCycle`.
+     Only an update can bend a tree into a ring, so the check is here and not on
+     the create path. */
+  const bent = await wouldCycle(db, spec, scope, id, checked.values);
+  if (bent) return bent;
+
   const held = vaultBacked(spec, checked.values);
   if (held.length && !vault) {
     return { why: "vault_only",
@@ -340,6 +357,74 @@ const outOfReach = (
   if (to === undefined || to === null) return null;
   if (reaching.values.includes(String(to))) return null;
   return { why: "out_of_reach", detail: String(to) };
+};
+
+/**
+ * WHETHER MOVING THIS RECORD UNDER THAT ONE WOULD BEND THE TREE INTO A RING.
+ *
+ * ⚠️ ONLY AN UPDATE CAN DO IT, WHICH IS WHY THIS IS NOT ON THE CREATE PATH. A
+ * new record's id does not exist yet, so no chain above it can already contain
+ * it; the shape only closes when a row that already has descendants is moved
+ * under one of them.
+ *
+ * ⚠️ ONE STATEMENT RATHER THAN A WALK OF READS. A loop climbing the tree a row
+ * at a time is twelve round trips on every edit of every place in the building —
+ * paid by an app whose tree is three deep, for a mistake nobody is making today.
+ * The recursive query climbs it inside the database and answers with one row or
+ * none.
+ *
+ * ⚠️ THE DEPTH PREDICATE IS WHAT MAKES IT TERMINATE, AND A DEDUPE WOULD NOT.
+ * Rows bent before this check existed are exactly what it will meet, and the
+ * obvious `UNION` does not stop them: each pass carries a different `deep`, so
+ * every row is new and nothing is ever deduplicated. The walk would go round for
+ * ever — the failure this exists to prevent, moved into the thing preventing it.
+ * `up.deep < DEEPEST_TREE` is the whole of the termination.
+ *
+ * ⚠️ AND THE SAME CLIMB ANSWERS THE OTHER QUESTION FOR NOTHING: how far above the
+ * proposed parent the chain already goes. A tree allowed to grow without bound is
+ * a tree every ancestor walk in the deployment pays for, so `DEEPEST_TREE` is
+ * refused rather than merely assumed everywhere else — and a subtree that is
+ * already bent hits the same ceiling, which is the right answer for it too.
+ */
+const wouldCycle = async (
+  db: Db, spec: CollectionSpec, scope: string, id: string, values: Record<string, unknown>,
+): Promise<WriteRefusal | null> => {
+  const erase = eraseBy(spec);
+  for (const name of treeFieldsOf(spec)) {
+    const to = values[name];
+    if (to === undefined || to === null || to === "") continue;
+    /* ⚠️ ITS OWN PARENT IS THE CASE THE QUERY BELOW CANNOT SEE, because the walk
+       starts AT the proposed parent and asks what is above it. */
+    if (String(to) === id) {
+      return { why: "cycles", field: name, detail: "A record cannot sit inside itself" };
+    }
+    const mine = erase ? ` AND ${column(erase.column)} = ?` : "";
+    const bound = erase ? [String(to), scope, scope, id] : [String(to), id];
+    const climbed = await db.prepare(
+      `WITH RECURSIVE up(node, over, deep) AS (
+         SELECT id, ${column(name)}, 1 FROM ${table(spec.id)} WHERE id = ?${mine}
+         UNION ALL
+         SELECT t.id, t.${column(name)}, up.deep + 1 FROM ${table(spec.id)} t
+           JOIN up ON t.id = up.over${erase ? ` AND t.${column(erase.column)} = ?` : ""}
+          WHERE up.deep < ${DEEPEST_TREE}
+       )
+       SELECT MAX(deep) AS deep, MAX(node = ?) AS loops FROM up`)
+      .bind(...bound).first<{ deep: number | null; loops: number | null }>();
+
+    if (climbed?.loops) {
+      return {
+        why: "cycles", field: name,
+        detail: "That is inside this one, so this cannot go inside it",
+      };
+    }
+    if ((climbed?.deep ?? 0) >= DEEPEST_TREE) {
+      return {
+        why: "cycles", field: name,
+        detail: `Nothing nests more than ${DEEPEST_TREE} deep`,
+      };
+    }
+  }
+  return null;
 };
 
 const within = (
