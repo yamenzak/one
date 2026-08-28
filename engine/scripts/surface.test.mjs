@@ -117,6 +117,21 @@ const SURFACES = {
   borrows: { owed: "99" },
 
   /*
+    ⚠️ WHAT THIS PRODUCT DOES WITH ANOTHER'S EVENTS — owed to the same screen,
+    and it is the half a person is more likely to ask about. `borrows` is a
+    dependency somebody chose; `hears` is a consequence they did not, and the
+    question it has to answer is "why did adding OneBook change what a goods
+    receipt does". A workspace that installs the two together gets journal
+    entries it never asked any screen for, and nothing today would say where
+    they came from.
+
+    ⚠️ IT IS OWED RATHER THAN BUILT because there is no second app to hear
+    anything yet, and a screen listing an empty union is a screen that looks
+    finished and proves nothing. Stage 99 is where the first hearer arrives.
+  */
+  hears: { owed: "99" },
+
+  /*
     ⚠️ A VIEW HAS NO SCREEN OF ITS OWN, AND THAT IS THE POINT OF IT. It reaches a
     person through the block that reads it — a `Listing`, a `Stat`'s count — so
     what is named here is the renderer that binds one, not a page called Views.

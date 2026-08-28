@@ -10,7 +10,8 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  beneath, defineApp, isUnder, refuseApp, refuseBorrows, screenFor, upFrom, type AppSpec,
+  beneath, defineApp, hearersOf, isUnder, refuseApp, refuseBorrows, refuseHears, screenFor,
+  upFrom, type AppSpec,
 } from "../src/manifest.js";
 import { operationsFor } from "../src/collection.js";
 import { collection } from "../src/collection.js";
@@ -1224,5 +1225,139 @@ describe("what the deployment can see that no app can", () => {
     const shut = owner({ collections: [collection({ ...note, id: "party", names: "title" })] });
     const why = refuseBorrows([shut, borrower]).map((r) => r.why).join(" ");
     expect(why).toContain("declares and does not share");
+  });
+});
+
+/**
+ * WHAT ONE APP DOES WHEN ANOTHER'S EVENT HAPPENS.
+ *
+ * ⚠️ THE ABSENCE OF THIS IS WHY ERPNEXT IS ONE PROGRAM. There a document reaches
+ * the ledger by INHERITING it, so a sales order is an accounting document
+ * whether or not the business wanted accounting. The lesson from reading their
+ * source is not that they lacked a bus — Frappe has `doc_events` with a wildcard
+ * — it is that they used it for validation and let inheritance carry the
+ * accounting. Having the bus is not enough.
+ */
+describe("what one app hears from another", () => {
+  const hearing = (over: Record<string, unknown> = {}) => app({
+    hears: {
+      "buying.received": {
+        why: "posts the goods received against the chart of accounts",
+        handler: async () => undefined,
+      },
+      ...over,
+    },
+  } as Partial<AppSpec>);
+
+  it("accepts a handler for an event another app raises", () => {
+    expect(whyOf(hearing())).not.toContain("hears");
+  });
+
+  /* ⚠️ AN APP HEARING ITSELF IS AN OPERATION CALLING A FUNCTION, written the long
+     way round — the bus exists to cross a boundary, and inside one app there is
+     none. */
+  it("refuses an app hearing its own event", () => {
+    const loops = app({
+      hears: { "note.created": { why: "x", handler: async () => undefined } },
+    } as Partial<AppSpec>);
+    expect(whyOf(loops)).toContain("this app's own event");
+  });
+
+  /* ⚠️ A SUBSCRIPTION IS A COUPLING BETWEEN TWO PRODUCTS. Unexplained, it is the
+     line somebody deletes in a year because nothing says what breaks. */
+  it("refuses a subscription that does not say why this app cares", () => {
+    const mute = app({
+      hears: { "buying.received": { why: "  ", handler: async () => undefined } },
+    } as Partial<AppSpec>);
+    expect(whyOf(mute)).toContain("says nothing about why this app cares");
+  });
+
+  const raiser = app({
+    id: "inventory",
+    operations: [operation({
+      id: "buying.receive", kind: "write", summary: "Receive.",
+      input: { id: field.text({ label: "Id", required: true, holds: "none" }) },
+      output: { id: field.text({ label: "Id", holds: "none" }) },
+      permission: "note:write", idempotency: { mode: "none" },
+      emits: ["buying.received"],
+      outcome: { message: "Received.", tone: "success" },
+      async handler() { return { id: "b1" }; },
+    }) as unknown as AnyOperation],
+  });
+
+  it("accepts a subscription whose event some installed app raises", () => {
+    expect(refuseHears([raiser, hearing({ })])).toEqual([]);
+  });
+
+  /*
+    ⚠️ AND THE ASYMMETRY IS THE DESIGN. An event nothing hears is quiet — a
+    workspace without OneBook is ordinary, not broken. A handler waiting for an
+    event nobody sends is dead code that looks live.
+  */
+  it("refuses a subscription no installed app raises", () => {
+    const why = refuseHears([hearing()]).map((r) => r.why).join(" ");
+    expect(why).toContain("nothing in this deployment raises it");
+  });
+
+  it("says nothing about an event that is raised and nobody hears", () => {
+    expect(refuseHears([raiser])).toEqual([]);
+  });
+});
+
+/**
+ * WHO ACTUALLY HEARS IT.
+ *
+ * ⚠️ THE DECISION IS TESTED HERE AND THE DELIVERY IS A LOOP WITH A `try` ROUND
+ * IT — which is the whole reason the two are separate functions. Everything that
+ * can be wrong is in the choosing: hearing yourself, missing a second listener,
+ * or firing once per app instead of once per (app × event).
+ */
+describe("who hears an event", () => {
+  const books = app({
+    id: "book",
+    hears: { "buying.received": { why: "posts it", handler: async () => undefined } },
+  } as Partial<AppSpec>);
+  const stock = app({ id: "inventory" });
+
+  it("finds the app that said it cares", () => {
+    const who = hearersOf([stock, books], "inventory", ["buying.received"]);
+    expect(who.map((h) => h.app.id)).toEqual(["book"]);
+  });
+
+  /* ⚠️ THE SAME RULE `refuseApp` ENFORCES, AT THE OTHER END — a manifest that
+     somehow got past composition still cannot loop through delivery. */
+  it("never hands an event back to the app that raised it", () => {
+    const selfish = app({
+      id: "inventory",
+      hears: { "buying.received": { why: "x", handler: async () => undefined } },
+    } as Partial<AppSpec>);
+    expect(hearersOf([selfish], "inventory", ["buying.received"])).toEqual([]);
+  });
+
+  it("says nothing when no app is listening", () => {
+    expect(hearersOf([stock], "inventory", ["buying.received"])).toEqual([]);
+  });
+
+  /* ⚠️ ONE RESULT PER (APP × EVENT). An operation may emit several, and a
+     listener for two of them is two pieces of work rather than one. */
+  it("answers once per app and event, not once per app", () => {
+    const both = app({
+      id: "book",
+      hears: {
+        "buying.received": { why: "x", handler: async () => undefined },
+        "buying.closed": { why: "y", handler: async () => undefined },
+      },
+    } as Partial<AppSpec>);
+    const who = hearersOf([both], "inventory", ["buying.received", "buying.closed"]);
+    expect(who.map((h) => h.event)).toEqual(["buying.received", "buying.closed"]);
+  });
+
+  it("finds every listener, not the first", () => {
+    const second = app({
+      id: "reports",
+      hears: { "buying.received": { why: "z", handler: async () => undefined } },
+    } as Partial<AppSpec>);
+    const who = hearersOf([books, second], "inventory", ["buying.received"]);
+    expect(who.map((h) => h.app.id)).toEqual(["book", "reports"]);
   });
 });

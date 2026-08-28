@@ -25,7 +25,7 @@
 import type { AppSpec, DeploymentLegal, PackDef, PlanSpec } from "@engine/kernel";
 import {
   PLATFORM_HOLDINGS, entitlementKeys, holdingsOf, missingDocuments, refuseBorrows, refuseCatalog,
-  refuseLegal, refusePacks,
+  refuseHears, refuseLegal, refusePacks,
 } from "@engine/kernel";
 import { incoherent, unledgered } from "./dossier.js";
 import { unbound, type Env } from "./handles.js";
@@ -112,6 +112,15 @@ export function deploymentFaults(of: Deployment): readonly string[] {
     because each composes alone and that is the whole point. See `refuseBorrows`.
   */
   for (const p of refuseBorrows(of.apps)) out.push(`${p.of}: ${p.why}`);
+
+  /*
+    ⚠️ AND WHAT ONE APP LISTENS FOR AND NO APP RAISES. The other direction is
+    deliberately NOT a fault: an event nothing hears is quiet, which is what a
+    workspace without OneBook looks like and is the ordinary case. A handler
+    waiting for an event nobody sends is the opposite — dead code that looks
+    live, and the product it was written for is missing.
+  */
+  for (const p of refuseHears(of.apps)) out.push(`${p.of}: ${p.why}`);
 
   /*
     ⚠️ TWO APPS DECLARING ONE COLLECTION ID IS NOT A STYLE QUESTION, IT IS A

@@ -686,6 +686,37 @@ export interface AppSpec {
   readonly problems?: ProblemCatalog;
 
   readonly notifications?: NotificationBook;
+  /**
+   * WHAT THIS APP DOES WHEN ANOTHER APP'S EVENT HAPPENS.
+   *
+   * ⚠️ THIS IS THE SEAM A SUITE POSTS THROUGH, AND ITS ABSENCE IS WHY ERPNEXT IS
+   * ONE PROGRAM. There, a document reaches the general ledger by INHERITING it —
+   * `SellingController extends StockController extends AccountsController` — so
+   * a sales order IS an accounting document whether or not the business wanted
+   * accounting, and `stock/` imports `accounts/` forty-two times. The striking
+   * part is that their framework HAS an event bus and they use it for validation
+   * and denormalisation upkeep. Having the bus is not enough; the accounting
+   * seam has to be the thing it carries, or inheritance fills the gap.
+   *
+   * ⚠️ SO OneInventory EMITS `buying.received` AND KNOWS NOTHING MORE. OneBook
+   * hears it and posts a journal entry from a rule the WORKSPACE owns. Neither
+   * app imports the other, a workspace without OneBook simply leaves the event
+   * unheard, and OneHR added in a year posts payroll through the same door with
+   * no edit anywhere else.
+   *
+   * ⚠️ A HANDLER MAY NOT REFUSE THE THING IT HEARD ABOUT. It runs AFTER the
+   * write has landed and been recorded, so a throw here is a problem to record
+   * and never a rollback: an accounting entry is a CONSEQUENCE of a goods
+   * receipt, and refusing the receipt because the chart of accounts is
+   * misconfigured would make one product's setup another product's outage.
+   *
+   * ⚠️ AND IT ACTS WITH THIS APP'S OWN AUTHORITY, NOT THE CALLER'S. The person
+   * who received the goods holds `stock:move` and has never heard of a journal;
+   * asking them for `book:write` would mean every storeman needs an accounting
+   * grant. `HeardCtx` carries `by` for the audit trail and nothing that could be
+   * mistaken for permission.
+   */
+  readonly hears?: HearsBook;
   readonly settings?: SettingBook;
   /**
    * ⚠️ THE PAGES ITS SETTINGS LIVE ON. Every declared setting names one, and an
@@ -894,6 +925,107 @@ export const upFrom = <T extends {
  * it: the collection is right there, and pointing at another app's private
  * record would be reaching through a wall the owner did not open.
  */
+/**
+ * WHAT A HEARD HANDLER IS TOLD — the event, who raised it, and what it carried.
+ *
+ * ⚠️ THE INPUT AND THE ANSWER BOTH, because between them they are the whole
+ * fact. `buying.received`'s input says which product and how many; its answer
+ * says what the delivery was actually VALUED at once the carriage landed on it,
+ * which is the number a journal entry needs and which no caller supplied.
+ */
+export interface Heard {
+  readonly event: string;
+  /** ⚠️ The app that raised it, so a handler can refuse to guess. */
+  readonly by: string;
+  readonly input: Readonly<Record<string, unknown>>;
+  readonly answer: Readonly<Record<string, unknown>>;
+}
+
+/**
+ * ⚠️ DELIBERATELY NARROWER THAN AN OPERATION'S CONTEXT. A handler hearing
+ * another app's event has no caller, no reach, no entitlements and no way to
+ * refuse — it has a workspace, a clock and a database. Everything else on `Ctx`
+ * belongs to somebody who asked for something, and nobody asked for this.
+ */
+export interface HeardCtx {
+  readonly db: unknown;
+  readonly tenantId: string;
+  /** ⚠️ The instant as a string, which is the only shape a handler can write. */
+  readonly now: string;
+  /**
+   * ⚠️ WHO CAUSED IT, FOR THE AUDIT TRAIL AND NEVER FOR AUTHORITY. A journal
+   * entry should say whose receipt produced it; it must not consult them about
+   * whether they may post.
+   */
+  readonly by: string | null;
+}
+
+export interface HearsSpec {
+  /**
+   * ⚠️ WHY THIS APP CARES, IN A SENTENCE, AND IT IS REQUIRED. A subscription is
+   * a coupling between two products; unexplained, it is the line somebody
+   * deletes in a year because nothing says what breaks. It is also what the
+   * console shows a workspace asking why an account moved.
+   */
+  readonly why: string;
+  readonly handler: (ctx: HeardCtx, raised: Heard) => Promise<void>;
+}
+
+export type HearsBook = Readonly<Record<string, HearsSpec>>;
+
+/**
+ * WHAT ONE APP LISTENS FOR AND NO APP RAISES.
+ *
+ * ⚠️ THE OTHER DIRECTION IS NOT A FAULT, AND THAT ASYMMETRY IS THE DESIGN. An
+ * event nothing hears is simply quiet — a workspace without OneBook is the
+ * ordinary case, not a broken one. A handler waiting for an event nobody sends
+ * is the opposite: dead code that looks live, and the product it was written for
+ * is missing.
+ */
+/**
+ * WHO HEARS THIS, out of everything the deployment serves.
+ *
+ * ⚠️ THE DECISION IS HERE AND THE DELIVERY IS THE RUNTIME'S, which is the split
+ * that makes it testable at all. What is interesting is entirely in the choosing
+ * — skip the app that raised it, find every subscription across every other app,
+ * one result per (app × event) — and what is left is a loop with a `try` round
+ * it.
+ *
+ * ⚠️ THE RAISER IS SKIPPED HERE AS WELL AS REFUSED AT COMPOSITION. `refuseApp`
+ * refuses an app hearing its own event, so this is the same rule at the other
+ * end: a manifest that somehow got past the first cannot loop through the
+ * second.
+ *
+ * ⚠️ AND EVERY APP THE DEPLOYMENT SERVES IS ASKED, NOT EVERY APP THE WORKSPACE
+ * HOLDS. A workspace without OneBook has no chart of accounts for the handler to
+ * find, so it does nothing — which is cheaper and more honest than threading
+ * which products a workspace switched on into a path that runs on every write.
+ * The handler is the only thing that knows what it needs.
+ */
+export const hearersOf = (
+  apps: readonly AppSpec[], raisedBy: string, events: readonly string[],
+): readonly { readonly app: AppSpec; readonly event: string; readonly def: HearsSpec }[] =>
+  apps.flatMap((app) => (app.id === raisedBy ? [] : events.flatMap((event) => {
+    const def = app.hears?.[event];
+    return def ? [{ app, event, def }] : [];
+  })));
+
+export function refuseHears(apps: readonly AppSpec[]): readonly Refusal[] {
+  const raised = new Set(apps.flatMap((a) => eventsOf(a)));
+  const out: Refusal[] = [];
+  for (const app of apps) {
+    for (const event of Object.keys(app.hears ?? {})) {
+      if (raised.has(event)) continue;
+      out.push({
+        of: `app ${app.id}`,
+        why: `hears "${event}" and nothing in this deployment raises it — a handler`
+          + ` waiting for an event nobody sends, which looks live and is not`,
+      });
+    }
+  }
+  return out;
+}
+
 export function refuseBorrows(apps: readonly AppSpec[]): readonly Refusal[] {
   const out: Refusal[] = [];
   const owner = new Map<string, AppSpec>();
@@ -1067,6 +1199,24 @@ export function refuseApp(spec: AppSpec): readonly Refusal[] {
   ];
   const owned = new Set([...spec.collections.map((c) => c.id), ...(spec.borrows ?? [])]);
   for (const bad of danglingRefs(holds, owned)) at("reference", `${bad} points at no collection`);
+  /*
+    ⚠️ AN APP HEARING ITS OWN EVENT IS AN OPERATION CALLING A FUNCTION, written
+    the long way round. The subscription exists to cross a boundary that must not
+    be crossed by an import; inside one app there is no boundary, and routing a
+    call through the bus hides the caller from everyone reading the handler.
+  */
+  for (const event of Object.keys(spec.hears ?? {})) {
+    if (!events.includes(event)) continue;
+    at("hears", `"${event}" is this app's own event — an app hearing itself is an`
+      + ` operation calling a function, and the bus is for crossing a boundary`
+      + ` that has one`);
+  }
+  for (const [event, def] of Object.entries(spec.hears ?? {})) {
+    if (def.why?.trim()) continue;
+    at("hears", `"${event}" says nothing about why this app cares — a subscription`
+      + ` is a coupling between two products, and unexplained it is the line`
+      + ` somebody deletes in a year because nothing says what breaks`);
+  }
   for (const id of idleBorrows(holds, spec.borrows ?? [])) {
     at("reference",
       `borrows "${id}" and points at it nowhere — a dependency that makes this app`

@@ -26,7 +26,7 @@ import type {
 } from "@engine/kernel";
 import {
   IN_GOOD_STANDING, LEGAL_INDEX, LEGAL_PATH, PLATFORM_PROBLEMS, PROOF_WINDOW_MS, blockedBy, check,
-  checkAll, doorFor, isDrawn, newId, passagesOf, problem, resolveFlags,
+  checkAll, doorFor, hearersOf, isDrawn, newId, passagesOf, problem, resolveFlags,
 } from "@engine/kernel";
 import { compose, type Composed, type Resolved as ResolvedOp } from "./compose.js";
 import { switchesFor } from "./flags.js";
@@ -1361,6 +1361,10 @@ export async function performOperation(
     */
     await happened(located, composed.app, who, op, now);
     await told(wiring, located, composed.app, who, op, input, answer, now, at);
+    /* ⚠️ AND EVERY OTHER APP THAT SAID IT CARES — see `heard`. Last of the three
+       consequences, because a journal entry is the one a person is least likely
+       to be waiting on. */
+    await heard(wiring, located, composed.app, who, op, input, answer, now);
     return { kind: "ok", answer };
   } catch (thrown) {
     if (thrown instanceof Refused) {
@@ -1535,6 +1539,62 @@ const happened = async (
     ]);
   } catch (why) {
     console.error(`[progress] ${op.id} raised ${events.join(", ")} and nothing counted it`, why);
+  }
+};
+
+/**
+ * AND THEN EVERY OTHER APP THAT SAID IT CARES.
+ *
+ * ⚠️ THIS IS THE THIRD CONSEQUENCE, AND IT OBEYS THE OTHER TWO'S RULE. `happened`
+ * counts, `told` notifies, `heard` posts — all three run after the write and
+ * after the record, only on success, and none of them may fail the request. A
+ * handler that threw here would tell somebody their goods receipt failed after
+ * the stock was on the shelf.
+ *
+ * ⚠️ AND THAT IS THE WHOLE ARGUMENT FOR IT BEING A CONSEQUENCE RATHER THAN A
+ * STEP. An accounting entry follows from a receipt; refusing the receipt because
+ * the chart of accounts is misconfigured would make one product's setup another
+ * product's outage — which is exactly what inheriting the ledger does to
+ * ERPNext, where a Sales Order cannot be saved if the GL rejects it.
+ *
+ * ⚠️ EVERY APP THE DEPLOYMENT SERVES IS ASKED, NOT EVERY APP THE WORKSPACE HOLDS.
+ * A workspace without OneBook has no `book_entry` table to write to, so its
+ * handler finds nothing and does nothing — which is cheaper and more honest than
+ * threading which products this workspace switched on into a path that runs on
+ * every write. The handler is the only thing that knows what it needs.
+ *
+ * ⚠️ AND THE APP THAT RAISED IT IS SKIPPED, because `refuseApp` refuses an app
+ * hearing its own event — this is the same rule at the other end, so a manifest
+ * that somehow got past it still cannot loop.
+ */
+const heard = async (
+  wiring: Wiring, located: Located, app: AppSpec, who: Who, op: _Op,
+  input: Record<string, unknown>, answer: unknown, now: Date,
+): Promise<void> => {
+  const events = op.spec.emits ?? [];
+  if (!events.length) return;
+  /* ⚠️ THE CHOOSING IS `hearersOf`'S — see there. What is left here is the
+     delivery and the refusal to let it fail the request. */
+  const all = Object.values(wiring.apps).map((make) => make());
+  for (const { app: other, event, def } of hearersOf(all, app.id, events)) {
+    try {
+      await def.handler({
+        db: located.db,
+        tenantId: located.tenantId,
+        now: now.toISOString(),
+        by: who.accountId ?? null,
+      }, {
+        event, by: app.id, input,
+        answer: (answer ?? {}) as Record<string, unknown>,
+      });
+    } catch (why) {
+      /* ⚠️ NAMED IN FULL, because the symptom of a swallowed failure here is a
+         ledger that is quietly short by one entry — which nobody notices until a
+         period is closed and the two sides do not meet. */
+      console.error(
+        `[hears] ${other.id} heard ${event} from ${app.id} and threw; the write stands`,
+        why);
+    }
   }
 };
 
