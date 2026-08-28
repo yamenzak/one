@@ -1042,6 +1042,20 @@ component and no container, and a row naming one would send a reader to code the
 product does not run.
 
 
+## What a mature warehouse system has that this does not
+
+**[ERPNEXT.md](ERPNEXT.md) is the survey** — ERPNext's Stock module read from its
+own source: 80 tables, 51 reports, every setting, and a comparison against this
+product. It exists so that "does a real warehouse system do X" has a citable
+answer while this one is being designed, and so that what we leave out is left
+out on purpose.
+
+⚠️ **IT IS A CATALOGUE, NOT A ROADMAP.** ERPNext's stock module exists to feed a
+general ledger, and about a third of it is accounting machinery that only makes
+sense if you are also the accounting system. Its own last section names the three
+gaps that are load-bearing — **stock value**, **a warehouse tree that rolls up**,
+and **reservation** — and the two that are traps.
+
 ## What is not built
 
 - **The GHS pictograms are named, not drawn.** The decant label prints a named
