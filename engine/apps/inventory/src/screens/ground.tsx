@@ -276,7 +276,34 @@ const SHELF = LINES.map((one) => ({
   "location.name": one.whereName,
   quantity: one.quantity,
   seen: one.seen,
+  /* ⚠️ ABSENT ON THE LINES NOBODY PRICED, RATHER THAN ZERO — see `Line.worth`.
+     A fixture that filled every row would photograph a value column with no
+     blank in it, and the blank is the state the design is about. */
+  ...(one.worth === undefined ? {} : { worth: one.worth }),
 }));
+
+/**
+ * ⚠️ WHAT A SET OF LINES IS WORTH — the same arithmetic `stock.lines` answers,
+ * over the same rows the list beside it draws. A board answering a figure from
+ * its own constant would photograph a total that agrees with nothing, which is
+ * the one fault this shape exists to prevent.
+ */
+const worthOf = (of: readonly { quantity: number; worth?: number }[]) => {
+  const priced = of.filter((one) => one.worth !== undefined);
+  const unpriced = of.length - priced.length;
+  return rows([{
+    quantity: of.reduce((sum, one) => sum + one.quantity, 0),
+    lines: of.length,
+    worth: priced.length ? priced.reduce((sum, one) => sum + (one.worth ?? 0), 0) : null,
+    priced: priced.length,
+    unpriced,
+    says: !priced.length && !unpriced ? "Nothing on a shelf yet"
+      : !priced.length ? "None of it is priced yet"
+        : !unpriced ? (priced.length === 1 ? "Across one line" : `Across ${priced.length} lines`)
+          : unpriced === 1 ? "One more line is not priced"
+            : `${unpriced} more lines are not priced`,
+  }]);
+};
 
 const CATALOGUE = THINGS.map((one) => ({
   id: one.id,
@@ -476,6 +503,19 @@ const SEEN: Has = {
     silently removed, which looks exactly like a screen never given them.
   */
   onGo: () => undefined,
+  /*
+    ⚠️ THE WORKSPACE'S OWN CURRENCY, AND ITS ABSENCE WAS VISIBLE IN A PHOTOGRAPH
+    BEFORE IT WAS ANYWHERE ELSE. `DRAWN.money` refuses to guess which currency's
+    minor units a figure is — correctly, and every test went on passing — so the
+    first pictures of the value surfaces had a heading, a mark, a sentence and
+    NO NUMBER, on both the figure and the column. That is the deployment's fault
+    exactly, reproduced by a board that had not been told (D117).
+
+    ⚠️ AND IT IS A REAL CURRENCY RATHER THAN A PLACEHOLDER, because the whole
+    reason these images are worth taking is that the separator, the symbol and
+    the side it sits on are decisions somebody has to be able to look at.
+  */
+  currency: "GBP",
   views: {
     "shelf-lines": rows(SHELF),
     "run-out": rows(SHELF.filter((one) => one.quantity === 0)),
@@ -484,11 +524,16 @@ const SEEN: Has = {
        `Value.here`. A board answering this with every line would draw a product
        page reporting shelves the thing is not on, which is the one fault a
        narrowed view exists to prevent and the hardest to notice in a picture. */
-    "lines-of-this": rows(SHELF.filter((one) => one.product === FIRST.id)),
+    "shelves-of-this": rows(SHELF.filter((one) => one.product === FIRST.id)),
+    /* ⚠️ AND THE FIGURE OVER THE SAME ROWS THE LIST DRAWS — see `worthOf`. The
+       two are filtered by one expression rather than two, because a total and
+       the lines under it answering differently narrowed questions is exactly the
+       disagreement a picture cannot show. */
+    "worth-of-this": worthOf(LINES.filter((one) => one.product === FIRST.id)),
     /* ⚠️ THE SAME `stock` READ FROM THE OTHER END, NARROWED THE SAME WAY. A
        board answering this with every line would draw a shelf holding things
-       that are somewhere else — `lines-of-this`' fault mirrored, and just as
-       invisible in a picture. */
+       that are somewhere else — the mirror fault, and just as invisible in a
+       picture. */
     "on-this-shelf": rows(LINES
       .filter((one) => one.where === SHELF_FIRST.id)
       .map((one) => ({
@@ -497,7 +542,13 @@ const SEEN: Has = {
         "product.name": one.name,
         quantity: one.quantity,
         seen: one.seen,
+        ...(one.worth === undefined ? {} : { worth: one.worth }),
       }))),
+    "worth-here": worthOf(LINES.filter((one) => one.where === SHELF_FIRST.id)),
+    /* ⚠️ THE WHOLE WORKSPACE, WHICH IS THE FIGURE THE REPORT LEADS ITS VALUE
+       SECTION WITH — and the one where the unpriced lines actually show up,
+       because the sample deliberately leaves two of them uncosted. */
+    "worth-of-it-all": worthOf(LINES),
     "codes-of-this": rows(CODES
       .filter((one) => one.product === FIRST.id)
       .map((one) => ({ id: one.id, value: one.value, kind: one.kind, pack: one.pack }))),

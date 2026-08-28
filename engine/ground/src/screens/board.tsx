@@ -114,6 +114,15 @@ const SEEN: Has = {
     them. The hero card drew as a plain panel for one sweep for that reason.
   */
   onGo: () => undefined,
+  /*
+    ⚠️ THE WORKSPACE'S OWN CURRENCY — see D117. `DRAWN.money` refuses to guess
+    which currency's minor units a figure is, so a board that has not been told
+    photographs every price as an empty cell: a heading, a mark and no number,
+    with every test green. The ground declares no money field today, and that is
+    exactly why it is set — the day it declares one, the picture is right rather
+    than a blank somebody has to notice.
+  */
+  currency: "GBP",
   views: {
     "every-note": rows(NOTES),
     "every-person": rows(PEOPLE),

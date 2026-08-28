@@ -437,6 +437,23 @@ warehouse is the confident empty with a currency symbol on it.
 The currency those minor units are in is the **workspace's**, set from its
 country at founding and changeable in its own money screen (D117).
 
+**Where it appears.** The product page says what a product is worth across its
+shelves; the place page says what is on one shelf; the report says what the whole
+building is holding. All three read one operation — `stock.lines` — because a
+total and the lines under it must be answers to the same narrowed question, and
+two operations could be given two.
+
+**The figure never stands alone.** A total is the sum of the lines that HAVE a
+rate, so it is answered with how many do not, and with the sentence saying so.
+Over a catalogue nobody has finished costing, a lone figure is a confident number
+wrong by however much is missing — on the one screen somebody would take to an
+accountant.
+
+**And the value column is the fourth,** which means a phone does not draw it at
+all: `Listing` folds to three. A stockroom sees where, when and how many; a desk
+sees those and what it is worth. Nobody standing at a shelf is auditing a
+valuation, and nobody auditing one is doing it on a handset.
+
 ### The count session
 
 A count is a job somebody spends an afternoon on, so it is a destination rather

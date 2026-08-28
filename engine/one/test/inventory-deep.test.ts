@@ -1315,3 +1315,127 @@ describe("what a movement does to a line's worth", () => {
     expect(await rateOf(product)).toBe(2000 * 1000);
   });
 });
+
+/**
+ * AND THE VALUE REACHES A SCREEN.
+ *
+ * ⚠️ THE ROW HELD IT AND NOTHING DREW IT, which is the whole shape of the fault
+ * this round is against — a fact correctly recorded, correctly derived, and
+ * reaching no surface. These drive `stock.lines`, which is what the product
+ * page, the place page and the report all read through.
+ */
+describe("what the shelf is worth, on the screens", () => {
+  const lines = async (input: Record<string, string> = {}) => {
+    const said = await read("stock.lines", input);
+    expect(said.status, JSON.stringify(said.body)).toBe(200);
+    return said.body as {
+      items: { product: string; quantity: number; worth: number | null }[];
+      total: number;
+      worth: {
+        quantity: number; lines: number; worth: number | null;
+        priced: number; unpriced: number; says: string;
+      }[];
+    };
+  };
+
+  /* ⚠️ THE RATE IS MILLI AND MUST NEVER LEAVE — a thousandth of what `money`
+     renders, so a rate on a screen is a figure off by a factor of a thousand.
+     What crosses the wire is the arithmetic already done. */
+  it("sends what a line is worth and never the rate it came from", async () => {
+    const place = idOf(await write("location.create", { name: "Rope locker", kind: "room" }));
+    const product = idOf(await write("product.create", {
+      name: "Mooring line", unit: "coil", tracking: "counted" }));
+    await write("stock.receive", {
+      product, location: place, quantity: 4, day: TODAY, capture: "typed", cost: 8000 });
+
+    const said = await lines({ product });
+    expect(said.items[0]?.worth).toBe(8000);
+    expect(said.items[0]).not.toHaveProperty("rate");
+  });
+
+  /*
+    ⚠️ THE TOTAL IS THE SUM OF WHAT IS KNOWN, AND HOW MUCH IS NOT KNOWN TRAVELS
+    WITH IT. Drawn alone over a catalogue nobody has finished costing, a total is
+    a confident number wrong by however much is missing — and nothing on the
+    screen would say so. That is why the count and the sentence are answered
+    beside the figure rather than left to a screen to work out.
+  */
+  it("says what the figure leaves out", async () => {
+    const place = idOf(await write("location.create", { name: "Sail bin", kind: "room" }));
+    const priced = idOf(await write("product.create", {
+      name: "Jib sheet", unit: "coil", tracking: "counted" }));
+    const not = idOf(await write("product.create", {
+      name: "Whipping twine", unit: "reel", tracking: "counted" }));
+
+    await write("stock.receive", {
+      product: priced, location: place, quantity: 2, day: TODAY, capture: "typed", cost: 3000 });
+    await write("stock.receive", {
+      product: not, location: place, quantity: 5, day: TODAY, capture: "typed" });
+
+    const said = await lines({ where: place });
+    expect(said.worth[0]?.worth).toBe(3000);
+    expect(said.worth[0]?.priced).toBe(1);
+    expect(said.worth[0]?.unpriced).toBe(1);
+    expect(said.worth[0]?.says).toMatch(/1 more line is not priced|One more line is not priced/);
+  });
+
+  /*
+    ⚠️ AND A WORKSPACE THAT HAS PRICED NOTHING IS WORTH AN UNKNOWN, NOT NOUGHT.
+    "£0.00" over a full warehouse is the confident empty with a currency symbol
+    on it — the one reading a valuation must never produce.
+  */
+  it("says nothing rather than nought where nothing is priced", async () => {
+    const place = idOf(await write("location.create", { name: "Chain locker", kind: "room" }));
+    const product = idOf(await write("product.create", {
+      name: "Anchor chain", unit: "metre", tracking: "counted" }));
+    await write("stock.receive", {
+      product, location: place, quantity: 30, day: TODAY, capture: "typed" });
+
+    const said = await lines({ where: place });
+    expect(said.worth[0]?.worth).toBeNull();
+    expect(said.worth[0]?.quantity).toBe(30);
+    expect(said.worth[0]?.says).toMatch(/not priced/i);
+  });
+
+  /*
+    ⚠️ THE BALANCE THE PRODUCT PAGE COULD NOT SAY. Its hero counted SHELVES and
+    its own comment named why: a view answers how many rows it has and will never
+    sum a column. This is that sum, and it is what the hero reads now.
+  */
+  it("sums the quantity across a product's shelves", async () => {
+    const one = idOf(await write("location.create", { name: "Fore peak", kind: "room" }));
+    const two = idOf(await write("location.create", { name: "Aft peak", kind: "room" }));
+    const product = idOf(await write("product.create", {
+      name: "Shackle pin", unit: "item", tracking: "counted" }));
+
+    await write("stock.receive", {
+      product, location: one, quantity: 12, day: TODAY, capture: "typed", cost: 2400 });
+    await write("stock.receive", {
+      product, location: two, quantity: 8, day: TODAY, capture: "typed", cost: 1600 });
+
+    const said = await lines({ product });
+    expect(said.worth[0]?.quantity).toBe(20);
+    expect(said.worth[0]?.lines).toBe(2);
+    expect(said.worth[0]?.worth).toBe(4000);
+  });
+
+  /* ⚠️ AND NARROWING TO ONE PRODUCT NARROWS THE TOTAL TOO. A figure summed over
+     every line while the list under it showed one product's would be two answers
+     to differently narrowed questions, side by side, with nothing saying so. */
+  it("narrows the figure by the same question as the lines", async () => {
+    const place = idOf(await write("location.create", { name: "Lazarette", kind: "room" }));
+    const mine = idOf(await write("product.create", {
+      name: "Fairlead", unit: "item", tracking: "counted" }));
+    const other = idOf(await write("product.create", {
+      name: "Stanchion", unit: "item", tracking: "counted" }));
+
+    await write("stock.receive", {
+      product: mine, location: place, quantity: 3, day: TODAY, capture: "typed", cost: 900 });
+    await write("stock.receive", {
+      product: other, location: place, quantity: 3, day: TODAY, capture: "typed", cost: 9000 });
+
+    const said = await lines({ product: mine });
+    expect(said.items).toHaveLength(1);
+    expect(said.worth[0]?.worth).toBe(900);
+  });
+});

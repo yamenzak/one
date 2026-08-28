@@ -4654,6 +4654,18 @@ sends it, the view declares it, every mount passes it — with no edit to the
 guard. A hand-kept list of "things that must be threaded" is exactly the artefact
 that was already missing an entry.
 
+**AND A BOARD BUILDS A `Has` TOO, WHICH A PHOTOGRAPH FOUND AND THE GUARD DID
+NOT.** The three questions above follow the DEPLOYMENT's path — server, view,
+mount. A screenshot board is a fourth constructor of the same object: it hands
+the renderer a `Has` assembled by hand. The first pictures of the value surfaces
+had a heading, a mark, a sentence and no number, on both the figure and the
+column, with every test green — the deployment's exact bug, reproduced in an
+image. That matters more than an ordinary miss, because a screenshot is
+evidence: a blank figure filed under the screen's own name reads as the design
+somebody chose. The guard now walks every `: Has = {` and asks the same question
+of each, so a board added tomorrow is covered; widening it found a second one
+(the proving ground's) that had the same hole.
+
 **AND `present.ts`'S FILE EXEMPTION BECAME A RULE ABOUT THE CALL.**
 `countries.ts` was waived wholesale so it could build an `Intl.DisplayNames`;
 `currencies.ts` wanted the same waiver, which is how a list that can only shrink

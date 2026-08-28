@@ -36,7 +36,7 @@ import {
    methods and the reason argued in its own header. The chokepoint decides WHICH
    verb gets which; every number comes from there. */
 import {
-  MILLI, adjusted, received, taken, type Costed, type Held,
+  MILLI, adjusted, received, taken, worth, type Costed, type Held,
 } from "./costing.js";
 import { PROFILES, wordsFor, type Words } from "./words.js";
 import { columnsFor, planIn, readSheet, tallyIn, type Planned } from "./sheet.js";
@@ -6196,7 +6196,75 @@ interface Shelved {
   id: string; product: string; name: string;
   quantity: number; unit: string; amount: string;
   where: string; says: string;
+  /**
+   * ⚠️ WHAT THIS LINE IS WORTH, IN MINOR UNITS, DERIVED ON READ — see
+   * `costing.ts`. It is `quantity × rate` computed here rather than a column,
+   * for the same reason a `tally` is: a stored value implies a writer and a
+   * drift, and the first time one write path forgets it, a warehouse's worth is
+   * a number that agrees with nothing.
+   *
+   * ⚠️ AND `null` IS "NOBODY HAS PRICED THIS", NEVER NOUGHT. In a column of
+   * figures a blank cell is the truthful answer — the value is genuinely not
+   * known — and it is the TOTAL that must never quietly leave those lines out;
+   * see `Worth.unpriced`.
+   */
+  worth: number | null;
 }
+
+/**
+ * WHAT A WHOLE SHELF, PRODUCT OR WORKSPACE IS WORTH — one row, so a figure can
+ * read it off a view (`Read`'s `first`).
+ *
+ * ⚠️ THE COUNT OF UNPRICED LINES TRAVELS WITH THE FIGURE, AND THAT IS THE WHOLE
+ * POINT OF THIS SHAPE. A total is the sum of what is KNOWN; drawn alone over a
+ * warehouse where half the lines have never been costed it is a confident number
+ * that is wrong by however much nobody has entered — and nothing on the screen
+ * says so. The two are answered together so a screen cannot draw one without the
+ * other being right there.
+ *
+ * ⚠️ AND WHERE NOTHING AT ALL IS PRICED THE FIGURE IS `null`, not zero. "£0.00"
+ * over a full warehouse is the confident empty with a currency symbol on it.
+ */
+interface Worth {
+  /**
+   * HOW MANY THERE ARE, SUMMED ACROSS THE LINES.
+   *
+   * ⚠️ THE PRODUCT PAGE'S HERO ASKED FOR THIS AND COULD NOT HAVE IT — its own
+   * comment says so: "a view answers how many ROWS it has and will never sum a
+   * column, so a screen claiming a total here would be a number nothing
+   * computed", and it settled for counting shelves. Summing a column is
+   * arithmetic, which is what an asked view is for.
+   */
+  quantity: number;
+  /** ⚠️ The sum of the lines that HAVE a rate. `null` when none of them do. */
+  worth: number | null;
+  /**
+   * ⚠️ HOW MANY LINES THERE ARE, so a figure counting them need not run a second
+   * view over the same rows. Two views is two requests, and — worse — two
+   * narrowings that could be given different answers, so a screen would show one
+   * shelf's count over another's lines with nothing saying they disagreed.
+   */
+  lines: number;
+  /** How many lines are in that sum. */
+  priced: number;
+  /** ⚠️ How many are not, which is what stops the figure being read as whole. */
+  unpriced: number;
+  /** ⚠️ The sentence, decided here — a screen must not re-derive this rule. */
+  says: string;
+}
+
+/**
+ * ⚠️ WHAT THE FIGURE SAYS BESIDE ITSELF, AND IT IS THE SERVER'S SENTENCE. The
+ * rule — "a total is the sum of what is known, and how much is not known is part
+ * of the answer" — is one rule, and a screen re-deriving it is a second copy
+ * that disagrees the day somebody edits one of them.
+ */
+const saysWorthOf = (priced: number, unpriced: number): string => {
+  if (!priced && !unpriced) return "Nothing on a shelf yet";
+  if (!priced) return unpriced === 1 ? "The one line here is not priced" : "None of it is priced yet";
+  if (!unpriced) return priced === 1 ? "Across one line" : `Across ${priced} lines`;
+  return unpriced === 1 ? "One more line is not priced" : `${unpriced} more lines are not priced`;
+};
 
 /**
  * ⚠️ "LAST SEEN" IS THE APP ADMITTING A NUMBER MAY BE FICTION, and it is only
@@ -6217,21 +6285,35 @@ const STALE_MS = 60 * 86_400_000;
 const SHELF_MOST = 200;
 
 const shelf = operation<
-  { where?: string }, { items: readonly Shelved[]; total: number }
+  { where?: string; product?: string },
+  { items: readonly Shelved[]; total: number; worth: readonly Worth[] }
 >({
   id: "stock.lines",
   kind: "read",
-  summary: "What is on the shelves, and how many",
+  summary: "What is on the shelves, how many, and what it is worth",
   input: {
     /* ⚠️ OPTIONAL, BECAUSE THE WHOLE WORKSPACE IS THE ANSWER SOMEBODY OPENS ON.
        A required place would make the first thing this screen asks "which one of
        your four hundred shelves", which is a question nobody has an answer to
        before they have seen the list. */
     where: field.ref({ label: "Where", holds: "none", to: "location" }),
+    /*
+      ⚠️ AND ONE PRODUCT, FOR THE PAGE THAT IS ABOUT ONE. The product screen used
+      the generated view, which can filter but cannot do ARITHMETIC — so it could
+      list the shelves and never say what the stock on them was worth. That is
+      the escape valve `AskedSpec` exists for, and this is what it opens onto.
+    */
+    product: field.ref({ label: "Product", holds: "none", to: "product" }),
   },
   output: {
     items: field.json({ label: "The lines", holds: "none" }),
     total: field.number({ label: "How many there are", holds: "none" }),
+    /* ⚠️ ONE ROW, SO A FIGURE CAN READ IT — see `Worth` and `Read`'s `first`. It
+       travels with the lines rather than in a second operation because it is the
+       same rows summed: asked separately the two could be given different
+       narrowings, and a screen would show one shelf's total over another's
+       lines with nothing saying they disagreed. */
+    worth: field.json({ label: "What it is worth", holds: "none" }),
   },
   permission: "stock:read",
   idempotency: { mode: "none" },
@@ -6261,13 +6343,16 @@ const shelf = operation<
       }
     }
 
+    /* ⚠️ THE RATE COMES BACK AND IS NEVER SENT ON. It is milli — a thousandth of
+       what `money` renders — so what leaves here is `worth`, which is the
+       arithmetic done once, on the server, where the rounding rule lives. */
     const rows = await db.prepare(
-      `SELECT id, product, location, quantity, seen, at FROM stock
-        WHERE tenant_id = ?${only(c).sql}`)
-      .bind(c.tenantId, ...only(c).bound)
+      `SELECT id, product, location, quantity, rate, seen, at FROM stock
+        WHERE tenant_id = ?${input.product ? " AND product = ?" : ""}${only(c).sql}`)
+      .bind(c.tenantId, ...(input.product ? [input.product] : []), ...only(c).bound)
       .all<{
         id: string; product: string; location: string;
-        quantity: number; seen: string | null; at: string;
+        quantity: number; rate: number | null; seen: string | null; at: string;
       }>();
 
     const kinds = await db.prepare(
@@ -6302,11 +6387,31 @@ const shelf = operation<
               ? "not seen in a while"
               : null,
           ].filter(Boolean).join(" · "),
+          /* ⚠️ DERIVED HERE AND NOWHERE ELSE — `worth` rounds once, at the end,
+             which is why the rate is carried in thousandths at all. */
+          worth: worth(Number(row.quantity), row.rate === null ? null : Number(row.rate)),
         };
       })
       .sort((a, b) => a.name.localeCompare(b.name));
 
-    return { items: items.slice(0, SHELF_MOST), total: items.length };
+    /*
+      ⚠️ THE TOTAL IS OVER EVERY LINE, NOT OVER THE PAGE. `items` is capped at
+      `SHELF_MOST`; summing what is sent would make a workspace's worth a
+      function of how many rows fit on a phone — a number that falls when the
+      catalogue grows, which is the one direction nobody would question.
+    */
+    const known = items.filter((one) => one.worth !== null);
+    const summed: Worth = {
+      quantity: items.reduce((sum, one) => sum + one.quantity, 0),
+      lines: items.length,
+      /* ⚠️ `null` RATHER THAN NOUGHT WHERE NOTHING IS PRICED — see `Worth`. */
+      worth: known.length ? known.reduce((sum, one) => sum + (one.worth ?? 0), 0) : null,
+      priced: known.length,
+      unpriced: items.length - known.length,
+      says: saysWorthOf(known.length, items.length - known.length),
+    };
+
+    return { items: items.slice(0, SHELF_MOST), total: items.length, worth: [summed] };
   },
 });
 
@@ -7266,7 +7371,29 @@ const manifest = (): AppSpec => defineApp({
       line and a screen filtering it in the browser would be the same query twice
       with the phone doing the half the database is for.
     */
-    { id: "lines-of-this", of: "stock", where: [{ field: "product", is: { here: "record" } }] },
+    /*
+      ⚠️ ASKED FOR RATHER THAN FILTERED, BECAUSE THE ANSWER CARRIES ARITHMETIC.
+      This was `lines-of-this`, a generated view narrowing `stock` to the record
+      — which could list the shelves and would never say what the stock on them
+      was WORTH, because a `Match` is equality and presence and will never be
+      more. That is the valve `AskedSpec` exists for.
+
+      ⚠️ AND THE GENERATED ONE IS GONE RATHER THAN KEPT BESIDE IT. The first
+      attempt left both, on the theory that a `count` still wanted the old one —
+      and the manifest refused to compose, because nothing read it any more. Two
+      views over one question is two answers waiting to disagree; the composer
+      not letting the dead one linger is the whole point of that refusal.
+    */
+    { id: "shelves-of-this", of: "stock",
+      asked: {
+        operation: "stock.lines", take: "items", total: "total",
+        fills: { product: "record" },
+      } },
+    /* ⚠️ ONE ROW, READ BY A FIGURE — see `Worth`. It is a second view over the
+       same operation rather than a second operation, so the total and the lines
+       under it can never be answers to differently narrowed questions. */
+    { id: "worth-of-this", of: "stock",
+      asked: { operation: "stock.lines", take: "worth", fills: { product: "record" } } },
     { id: "every-place", of: "location", limit: 50 },
     /*
       ⚠️ EVERY CODE THAT RESOLVES TO THIS PRODUCT, WHICH IS THE ONE TABLE THE
@@ -7277,10 +7404,22 @@ const manifest = (): AppSpec => defineApp({
       catalogue where "unknown code" is unanswerable.
     */
     { id: "codes-of-this", of: "code", where: [{ field: "product", is: { here: "record" } }] },
-    /* ⚠️ THE MIRROR OF `lines-of-this` — the same `stock` read from the other
+    /* ⚠️ THE MIRROR OF `shelves-of-this` — the same `stock` read from the other
        end. A product page asks where the thing is; a place page asks what is on
-       the shelf, and they are one table with the term swapped. */
-    { id: "on-this-shelf", of: "stock", where: [{ field: "location", is: { here: "record" } }] },
+       the shelf, and they are one table with the term swapped — including the
+       arithmetic, which is why both go through the same asked operation. */
+    { id: "on-this-shelf", of: "stock",
+      asked: {
+        operation: "stock.lines", take: "items", total: "total",
+        fills: { where: "record" },
+      } },
+    { id: "worth-here", of: "stock",
+      asked: { operation: "stock.lines", take: "worth", fills: { where: "record" } } },
+    /* ⚠️ THE WHOLE WORKSPACE, WHICH IS THE SAME OPERATION WITH NOTHING FILLED
+       IN. "What is all of it worth" is the question an owner asks and the one a
+       report is for; it is the same sum as a shelf's, over every line. */
+    { id: "worth-of-it-all", of: "stock",
+      asked: { operation: "stock.lines", take: "worth" } },
     /*
       ⚠️ EVERY RUN, NEWEST FIRST, AND NOT JUST THE ONES STILL OPEN. `counting`
       asks for the absence because a closed count is history and history is a
@@ -8033,6 +8172,46 @@ const manifest = (): AppSpec => defineApp({
             things to buy. A row that goes somewhere and a row that is a fact
             about stock are two kinds of row, and a card is what separates them.
           */
+          /*
+            ⚠️ WHAT ALL OF IT IS WORTH, WHICH IS THE FIGURE A REPORT EXISTS FOR
+            AND THE ONE THIS SCREEN COULD NOT SAY. Everything else here is about
+            MOVEMENT — what was used, what was lost, what to buy — and none of it
+            answers what the building is holding.
+
+            ⚠️ AND THE SENTENCE UNDER IT IS NOT DECORATION. A total is the sum of
+            the lines that have a rate; over a catalogue nobody has finished
+            costing, drawn alone, it is a confident number that is wrong by
+            however much is missing. This is the one screen somebody would take
+            to an accountant, which is exactly where that must not happen.
+          */
+          {
+            group: "What it is all worth",
+            of: [
+              {
+                block: "Stat",
+                bind: {
+                  value: {
+                    from: { of: "first", view: "worth-of-it-all", field: "worth" },
+                    as: "money",
+                  },
+                  /* ⚠️ "AT COST", WHICH IS THE ONE THING A VALUATION HAS TO SAY
+                     ABOUT ITSELF. It read "On the shelves" — the eyebrow of the
+                     figure above it, word for word — so the screen said the
+                     phrase twice and never said what KIND of value this is.
+                     Stock at cost and stock at what it would sell for are
+                     different numbers, and only one of them is this one. */
+                  label: { from: { of: "words", says: "At cost" } },
+                  mark: { from: { of: "words", says: "money" } },
+                },
+              },
+              {
+                block: "NoteRow",
+                bind: {
+                  children: { from: { of: "first", view: "worth-of-it-all", field: "says" } },
+                },
+              },
+            ],
+          },
           {
             group: null,
             of: [{
@@ -8238,22 +8417,23 @@ const manifest = (): AppSpec => defineApp({
           as: "figure",
           nothing: { says: "Not on any shelf", under: "Receive some and it will be here" },
           bind: {
-            value: { from: { of: "count", view: "lines-of-this" } },
             /*
-              ⚠️ WHERE rather than HOW MANY, and the difference is stated because
-              it is the one thing this figure could be misread as. How many there
-              are is a sum across the lines below; a view answers how many ROWS
-              it has and will never sum a column, so a screen claiming a total
-              here would be a number nothing computed. The finding that comes
-              with it: this product has no operation that answers a product's
-              balance, and it wants one.
+              ⚠️ HOW MANY THERE ARE, WHICH THIS SCREEN COULD NOT SAY UNTIL NOW. It
+              counted SHELVES, and the note here named the gap: "a view answers
+              how many ROWS it has and will never sum a column, so a screen
+              claiming a total here would be a number nothing computed. The
+              finding that comes with it: this product has no operation that
+              answers a product's balance, and it wants one." `stock.lines` is
+              that operation, and summing a column is what an asked view is the
+              valve for.
 
               ⚠️ AND NO `unit`, BECAUSE A STATIC ONE CANNOT AGREE WITH THE NUMBER.
               It read "1 places" the first time it was photographed — a
               declaration holds a constant and English does not, so the noun goes
               in the eyebrow where it is a heading rather than a plural.
             */
-            of: { from: { of: "words", says: "Shelves it is on" } },
+            value: { from: { of: "first", view: "worth-of-this", field: "quantity" } },
+            of: { from: { of: "words", says: "On the shelves" } },
             mark: { from: { of: "words", says: "box" } },
           },
         },
@@ -8264,7 +8444,13 @@ const manifest = (): AppSpec => defineApp({
              A block's `label` is the table's accessible name and is drawn
              nowhere; a heading is a `group`. */
           {
-            group: "On the shelves",
+            /* ⚠️ "WHERE IT IS", BECAUSE THE HERO DIRECTLY ABOVE ALREADY SAYS "ON
+               THE SHELVES". Photographed, the screen read that phrase three
+               times in four inches — the eyebrow over the count, this heading,
+               and the label under the value. A heading that repeats the line
+               above it is a heading somebody's eye skips, and the list genuinely
+               answers a different question: not how many, but where. */
+            group: "Where it is",
             of: [{
               block: "Listing",
               /* ⚠️ THE PRODUCT'S OWN COLUMN IS GONE, because the screen is about
@@ -8279,10 +8465,25 @@ const manifest = (): AppSpec => defineApp({
                 Same order reads correctly as columns on a desk: what, when, how
                 many.
               */
+              /*
+                ⚠️ THE VALUE IS THE FOURTH COLUMN, AND `Listing` FOLDS TO THREE
+                BY ITS OWN MEASURED BOX — so wherever the list is a row rather
+                than a table, this is not drawn. That is why the FIGURE carries
+                the answer and the column only elaborates it: a screen whose only
+                statement of worth was a column would say nothing at all in a
+                narrow frame, and a picture of that is indistinguishable from a
+                screen where the value was never built.
+
+                ⚠️ A BLANK CELL HERE IS THE TRUTHFUL ANSWER, not a failure. A line
+                nobody has priced HAS no value, and `money` over a `null`
+                correctly draws nothing. What must never be quiet about it is the
+                TOTAL — which is why the figure below carries a sentence.
+              */
               shows: [
                 { field: "location.name", label: "Where" },
                 { field: "seen", label: "Last seen", as: "when" },
                 { field: "quantity", label: "How many" },
+                { field: "worth", label: "Worth", as: "money" },
               ],
               nothing: {
                 says: "Not on any shelf",
@@ -8290,9 +8491,47 @@ const manifest = (): AppSpec => defineApp({
               },
               bind: {
                 label: { from: { of: "words", says: "On the shelves" } },
-                of: { from: { of: "view", view: "lines-of-this" } },
+                /* ⚠️ THE ASKED ONE, because the rows now carry arithmetic — see
+                   `shelves-of-this`. */
+                of: { from: { of: "view", view: "shelves-of-this" } },
               },
             }],
+          },
+          /*
+            ⚠️ WHAT IT IS WORTH, AND WHAT THAT FIGURE LEAVES OUT, TOGETHER. A
+            total is the sum of the lines that HAVE a rate; drawn alone over a
+            catalogue nobody has finished costing it is a confident number wrong
+            by however much is missing, with nothing on the screen saying so. The
+            sentence under it is the server's — see `saysWorthOf` — because a
+            screen re-deriving that rule is a second copy of it.
+          */
+          {
+            group: "What it is worth",
+            of: [
+              {
+                block: "Stat",
+                bind: {
+                  value: {
+                    from: { of: "first", view: "worth-of-this", field: "worth" },
+                    as: "money",
+                  },
+                  /* ⚠️ "AT COST", WHICH IS THE ONE THING A VALUATION HAS TO SAY
+                     ABOUT ITSELF. It read "On the shelves" — the eyebrow of the
+                     figure above it, word for word — so the screen said the
+                     phrase twice and never said what KIND of value this is.
+                     Stock at cost and stock at what it would sell for are
+                     different numbers, and only one of them is this one. */
+                  label: { from: { of: "words", says: "At cost" } },
+                  mark: { from: { of: "words", says: "money" } },
+                },
+              },
+              {
+                block: "NoteRow",
+                bind: {
+                  children: { from: { of: "first", view: "worth-of-this", field: "says" } },
+                },
+              },
+            ],
           },
           /*
             ⚠️ THE HERO ABOVE SAYS "RECEIVE SOME AND IT WILL BE HERE", AND THIS IS
@@ -8643,7 +8882,9 @@ const manifest = (): AppSpec => defineApp({
           as: "figure",
           nothing: { says: "Nothing on it", under: "Put something here and it will be here" },
           bind: {
-            value: { from: { of: "count", view: "on-this-shelf" } },
+            /* ⚠️ READ OFF THE SAME ANSWER THE LIST BELOW IS, rather than counted
+               by a second view over the same rows — see `Worth.lines`. */
+            value: { from: { of: "first", view: "worth-here", field: "lines" } },
             of: { from: { of: "words", says: "Products on it" } },
             mark: { from: { of: "words", says: "workspace" } },
           },
@@ -8651,10 +8892,14 @@ const manifest = (): AppSpec => defineApp({
         blocks: [
           {
             block: "Listing",
+            /* ⚠️ THE VALUE IS THE FOURTH COLUMN AND SO IS NOT ON A PHONE AT ALL —
+               see the product page, which draws the same split from the other
+               end of the same table. */
             shows: [
               { field: "product.name", label: "What" },
               { field: "seen", label: "Last seen", as: "when" },
               { field: "quantity", label: "How many" },
+              { field: "worth", label: "Worth", as: "money" },
             ],
             /* ⚠️ A LINE IS A PRODUCT ON A SHELF, AND THE SHELF IS THIS SCREEN —
                so the row opens the other half. */
@@ -8667,6 +8912,32 @@ const manifest = (): AppSpec => defineApp({
               label: { from: { of: "words", says: "What is on it" } },
               of: { from: { of: "view", view: "on-this-shelf" } },
             },
+          },
+          /* ⚠️ WHAT THIS SHELF IS WORTH, AND WHAT THE FIGURE LEAVES OUT — the
+             same pair the product page draws, because it is the same question
+             asked of the same rows from the other end. */
+          {
+            group: "What it is worth",
+            of: [
+              {
+                block: "Stat",
+                bind: {
+                  value: {
+                    from: { of: "first", view: "worth-here", field: "worth" },
+                    as: "money",
+                  },
+                  /* ⚠️ "AT COST" — see the product page. */
+                  label: { from: { of: "words", says: "At cost" } },
+                  mark: { from: { of: "words", says: "money" } },
+                },
+              },
+              {
+                block: "NoteRow",
+                bind: {
+                  children: { from: { of: "first", view: "worth-here", field: "says" } },
+                },
+              },
+            ],
           },
           {
             group: "Its label",

@@ -3849,7 +3849,7 @@
       "status": "live",
       "impl": "scripts/currency.test.mjs",
       "proves": "sent, declared and passed",
-      "fails": "every price on every app screen drawn as an empty cell — a prop declared, typed, documented and never passed, which no compiler and no test can see because its absence is a legitimate state",
+      "fails": "every price on every app screen drawn as an empty cell — a prop declared, typed, documented and never passed, which no compiler and no test can see because its absence is a legitimate state; and the same blank photographed by a screenshot board, filed under the screen own name, where it reads as the design somebody chose",
       "becomes": "elsewhere: the browser, where a workspace fact reaches the renderer that cannot work it out"
     },
     {

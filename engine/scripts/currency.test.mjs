@@ -26,7 +26,7 @@
  * the field; checking only the first would pass on today's bug exactly.
  */
 
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -47,6 +47,18 @@ const read = (rel) => {
 const strip = (src) => src
   .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "))
   .replace(/^(\s*)\/\/.*$/gm, "$1");
+
+/** ⚠️ Every source file under a tree, so a board added tomorrow is walked. */
+const walk = (at) => {
+  if (!existsSync(at)) return [];
+  const out = [];
+  for (const e of readdirSync(at, { withFileTypes: true })) {
+    const full = join(at, e.name);
+    if (e.isDirectory()) out.push(...walk(full));
+    else if (/\.tsx?$/.test(e.name) && !/\.test\.tsx?$/.test(e.name)) out.push(full);
+  }
+  return out;
+};
 
 const BODY = "design/src/rendered/body.tsx";
 const DECLARED = "one-space/src/centre/Declared.tsx";
@@ -160,6 +172,55 @@ for (const fact of FACTS) {
       + `       legitimate state — so the renderer correctly draws NOTHING and the\n`
       + `       compiler correctly says nothing. On the screen that is a blank cell\n`
       + `       where a figure belongs, which reads as a value that failed to load.`);
+  }
+}
+
+/* ------------------------------------------------- and every other `Has` --- */
+
+/**
+ * A BOARD BUILDS A `Has` TOO, AND IT WAS MISSING ONE.
+ *
+ * ⚠️ THIS CHECK EXISTS BECAUSE A PHOTOGRAPH FOUND WHAT THE GUARD ABOVE DID NOT.
+ * The three questions follow the DEPLOYMENT's path — server, view, mount — and a
+ * screenshot board is a fourth constructor of the same object: it hands the
+ * renderer a `Has` assembled by hand, so a fact nobody threaded there produces
+ * exactly the deployment's bug in an image. The first pictures of the value
+ * surfaces had a heading, a mark, a sentence and no number, and every test was
+ * green.
+ *
+ * ⚠️ AND A PICTURE OF A BLANK IS WORSE THAN NO PICTURE, which is what makes this
+ * worth a check rather than a habit. A screenshot is evidence: an empty figure
+ * filed under the screen's own name reads as the design somebody chose.
+ *
+ * ⚠️ FOUND BY TYPE ANNOTATION, so a board added tomorrow is asked the same
+ * question. `: Has = {` is how one is written and the only way one is written —
+ * the renderer's own prop type is what forces it.
+ */
+{
+  const boards = [];
+  for (const where of ["ground/src/screens", "apps"]) {
+    for (const file of walk(join(ENGINE, where))) {
+      const src = read(file.slice(ENGINE.length + 1));
+      if (src === null) continue;
+      const clean = strip(src);
+      if (!/:\s*Has\s*=\s*\{/.test(clean)) continue;
+      boards.push(file.slice(ENGINE.length + 1));
+      const block = blockAfter(clean, ": Has =");
+      for (const fact of FACTS) {
+        if (block !== null && new RegExp(`\\b${fact}\\s*:`).test(block)) continue;
+        fail(`${file.slice(ENGINE.length + 1)}: a \`Has\` built here carries no \`${fact}\`.\n`
+          + `       A board hands the renderer the same object the deployment does, so a\n`
+          + `       fact missing here draws the deployment's blank INTO A PHOTOGRAPH —\n`
+          + `       filed under the screen's own name, where it reads as the design.`);
+      }
+    }
+  }
+  if (!bad && boards.length) {
+    ok(`boards: ${boards.length} hand-built \`Has\`, each carrying every fact`);
+  }
+  if (!boards.length) {
+    fail("no hand-built `Has` found. Either every board is gone — delete this check"
+      + " deliberately — or they are written some other way now and it stopped looking.");
   }
 }
 

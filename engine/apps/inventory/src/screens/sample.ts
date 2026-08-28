@@ -48,6 +48,18 @@ export interface Line {
   /** ⚠️ When this line last moved — see `stock.seen`. */
   readonly seen: string;
   /**
+   * ⚠️ WHAT THE LINE IS WORTH, IN MINOR UNITS — the derivation `stock.lines`
+   * does, written here rather than a rate, because a fixture that carried a
+   * milli rate would be a second copy of the arithmetic and could disagree with
+   * the one that ships.
+   *
+   * ⚠️ AND TWO LINES DELIBERATELY HAVE NONE. A world where everything is priced
+   * photographs a total that is always whole, and the one reading this shape
+   * exists to prevent — a confident figure over a catalogue nobody has finished
+   * costing — would never appear in a picture.
+   */
+  readonly worth?: number;
+  /**
    * ⚠️ AN ADDRESS, NOT A MEDIA ID. What the product was photographed as, already
    * resolved to something an `<img>` can take — `linesOf` does that once with the
    * door's `file`, so a screen never learns the shape of a route and the sample
@@ -73,16 +85,16 @@ export const PLACES: readonly Place[] = [
 export const LINES: readonly Line[] = [
   { id: "s1", product: "t-glove", name: "Nitrile gloves, blue", brand: "Ansell",
     where: "p-a1", whereName: "A1", quantity: 1_200, unit: "glove", par: 400,
-    tracking: "batched", seen: "2026-08-20T09:12:00.000Z" },
+    tracking: "batched", seen: "2026-08-20T09:12:00.000Z", worth: 8_400 },
   { id: "s2", product: "t-resin", name: "Casting resin, clear", brand: "Smooth-On",
     where: "p-a3", whereName: "A3 — flammables", quantity: 4, unit: "tin", par: 6,
-    tracking: "batched", seen: "2026-08-19T16:40:00.000Z" },
+    tracking: "batched", seen: "2026-08-19T16:40:00.000Z", worth: 9_560 },
   { id: "s3", product: "t-screw", name: "Screws, M4 × 20", brand: "",
     where: "p-b1", whereName: "B1", quantity: 137, unit: "box", par: 20,
-    tracking: "counted", seen: "2026-08-18T11:02:00.000Z" },
+    tracking: "counted", seen: "2026-08-18T11:02:00.000Z", worth: 4_795 },
   { id: "s4", product: "t-wrench", name: "Torque wrench", brand: "Norbar",
     where: "p-bench", whereName: "Bench", quantity: 1, unit: "item",
-    tracking: "itemised", seen: "2026-04-14T08:30:00.000Z" },
+    tracking: "itemised", seen: "2026-04-14T08:30:00.000Z", worth: 21_900 },
   { id: "s5", product: "t-paper", name: "A4 paper", brand: "",
     where: "p-b2", whereName: "B2", quantity: 0, unit: "ream", par: 5,
     tracking: "counted", seen: "2026-08-11T14:55:00.000Z" },
