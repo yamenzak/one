@@ -399,6 +399,7 @@ before an app is resolved draws on them.
 | `person_event` | Which of the first steps in each product you have taken yourself | `account_id: delete` | `tenant_id: delete` |
 | `media` | The files you uploaded | `subject_id: delete` | `tenant_id: delete` |
 | `search_item` | — *which records are in the index, and never what they say* | — | kept |
+| `numbering` | — *how far a workspace's own document series has counted* | — | `tenant_id: delete` |
 
 Both walks read one ledger (`HOLDINGS` in `runtime/src/dossier.ts`), and a table
 declared by a schema module with no row in it fails `pnpm engine:gate` — which is
@@ -421,7 +422,8 @@ and a manifest that does not compose refuses to boot.
 | `present` | how a date, a number, a price and a measurement are written for one reader | 18 | — |
 | `infra` | what a product needs underneath it, and what each kind can promise | 11 | — |
 | `field` | what a value is: its kind, its bounds, what it holds, whether it is the app's to keep | 9 | — |
-| `collection` | what a thing an app keeps is — and the six operations it gets for free | 22 | — |
+| `collection` | what a thing an app keeps is — and the six operations it gets for free | 26 | — |
+| `document` | what a thing somebody COMMITS to is: the ladder, the series, the reversal | 11 | — |
 | `operation` | one declaration carrying every cross-cutting concern (D12) | 12 | — |
 | `access` | permissions, roles, and what an app may never claim | 15 | — |
 | `reach` | how far one person works inside a workspace — where, as against what (D45) | 4 | — |
@@ -450,7 +452,7 @@ and a manifest that does not compose refuses to boot.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**335 of them**, 334 reached by something today.
+**350 of them**, 349 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -475,7 +477,8 @@ env or a binding.
 | `membership` | the roster and what each member may do | 16 | — |
 | `compose` | a manifest becomes a live surface of operations | 2 | — |
 | `serve` | the one path every request ends in — both doors | 6 | — |
-| `records` | the generated reads and writes behind a collection | 10 | — |
+| `records` | the generated reads and writes behind a collection | 11 | — |
+| `documents` | the three moves a document makes, and the counter its number comes from | 4 | — |
 | `settings` | reading and writing a workspace's own switches | 5 | — |
 | `billing` | plans, subscriptions, the bill, the ladder | 17 | — |
 | `wallet` | OneWallet: the allowance, what was bought, and reserve → settle → release | 22 | — |
@@ -533,7 +536,7 @@ env or a binding.
 | `bin-ops` | the trash: what is in it, putting a record back, and freezing one — one set of routes across every collection | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 9 | — |
 
-**475 of them**, 474 reached by something today.
+**480 of them**, 479 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 
@@ -572,6 +575,7 @@ its own header, cited by other files, and doing nothing.
 | `refuseCollection` | `collection` | composition |
 | `refusePacks` | `credit` | runtime |
 | `unbounded` | `credit` | composition |
+| `refuseDocument` | `document` | composition |
 | `refuseLadder` | `dunning` | composition |
 | `refuseCatalog` | `entitlement` | runtime |
 | `unenforced` | `entitlement` | composition |

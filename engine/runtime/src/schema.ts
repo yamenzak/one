@@ -23,7 +23,7 @@
  */
 
 import type { AppSpec, CollectionSpec } from "@engine/kernel";
-import { eraseBy } from "@engine/kernel";
+import { DOCUMENT_COLUMNS, eraseBy } from "@engine/kernel";
 import { asTable, column, liveTable, storeFor, table, type Db } from "./sql.js";
 
 /* ---------------------------------------------------------------- modules --- */
@@ -96,14 +96,37 @@ export function statementsFor(spec: CollectionSpec): readonly string[] {
     */
     `aside TEXT`,
     `aside_at TEXT`,
+    /*
+      ⚠️ AND WHERE IT STANDS, IF IT IS SOMETHING SOMEBODY COMMITS TO — see
+      `DocumentSpec`. Four columns, added by the engine, declared by no app: the
+      standing, when it was committed to, the number it took from its series,
+      and the cancelled document it corrects.
+
+      ⚠️ NULL IS `draft`, WHICH IS THE SAME TRICK `aside` USES AND FOR THE SAME
+      REASON. Every row written before these columns existed reads as the draft
+      it was, so a live database gains a document rail on its next boot with
+      nothing migrated and no row rewritten.
+    */
+    ...(spec.document ? DOCUMENT_COLUMNS.map((c) => `${c} TEXT`) : []),
   ];
 
   const out = [`CREATE TABLE IF NOT EXISTS ${name} (${cols.join(", ")});`];
   if (scope) {
     out.push(`CREATE INDEX IF NOT EXISTS ix_${name}_scope ON ${name} (${column(scope.column)}, at);`);
   }
+  /*
+    ⚠️ A NUMBER IS LOOKED UP BY THE NUMBER, WHICH IS THE ONE READ NOBODY
+    DECLARES AND EVERYBODY MAKES. "Which invoice is INV-2026-0412" is the
+    question an accountant asks, a customer asks and a bank statement asks, and
+    without this it is a table scan on the biggest table the workspace has.
+  */
+  if (spec.document && scope) {
+    out.push(`CREATE INDEX IF NOT EXISTS ix_${name}_number `
+      + `ON ${name} (${column(scope.column)}, number);`);
+  }
   return out;
 }
+
 
 /** Every column a collection declares, as the reconciler expects them. */
 export const columnsFor = (spec: CollectionSpec): Readonly<Record<string, string>> => {
@@ -114,6 +137,11 @@ export const columnsFor = (spec: CollectionSpec): Readonly<Record<string, string
   const out: Record<string, string> = {
     id: "TEXT", at: "TEXT", by: "TEXT", edited_at: "TEXT", edited_by: "TEXT",
     aside: "TEXT", aside_at: "TEXT",
+    /* ⚠️ So a table that predates the rail gains it by ALTER on the next boot,
+       the same way `aside` reached databases written before the trash existed. */
+    ...(spec.document
+      ? Object.fromEntries(DOCUMENT_COLUMNS.map((c) => [c, "TEXT"]))
+      : {}),
   };
   if (scope) out[column(scope.column)] = "TEXT";
   for (const [field, f] of Object.entries(spec.fields)) out[column(field)] = storeFor(f.kind);

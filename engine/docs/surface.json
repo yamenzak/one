@@ -1472,6 +1472,13 @@
         "why": "which records are in the index, and never what they say",
         "onForget": [],
         "onClose": null
+      },
+      {
+        "table": "numbering",
+        "export": null,
+        "why": "how far a workspace's own document series has counted",
+        "onForget": [],
+        "onClose": "tenant_id: delete"
       }
     ]
   }

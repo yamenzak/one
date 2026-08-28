@@ -148,6 +148,55 @@ const checkIn = collection({
   },
 });
 
+/**
+ * ⚠️ THE THIRD KIND OF RECORD, AND A REFERENCE APP HAS TO CARRY IT. `note` and
+ * `check-in` are both things a workspace KEEPS: the current value is the truth
+ * and the previous one is nobody's evidence. A minute is something somebody
+ * COMMITS TO — it is agreed, it takes a number, and from that moment it is the
+ * record of what was decided rather than a draft of it.
+ *
+ * ⚠️ WITHOUT ONE HERE THE WHOLE DOCUMENT RAIL WOULD BE DECLARED AND UNEXERCISED.
+ * The ladder, the series, the counter, the amendment copy and the refusal to
+ * edit a committed record are all engine machinery, and machinery no app
+ * instantiates is machinery whose first real caller finds the bugs.
+ *
+ * ⚠️ A MINUTE RATHER THAN AN INVOICE, DELIBERATELY. The ground has no product
+ * vocabulary — what it proves is that ANY app declaring a document gets the
+ * rail, and picking a noun out of one product's world would make the mechanism
+ * look like a feature of that product.
+ */
+const minute = collection({
+  id: "minute",
+  label: { one: "Minute", many: "Minutes" },
+  scope: { of: "tenant" },
+  permission: "minute",
+  /* ⚠️ A COMMITTED RECORD OUTLIVES THE WORKSPACE, which is the case `keep` was
+     built for — somebody agreed something, and a closed account does not make
+     that not have happened. */
+  retention: null,
+  onClose: { then: "keep", why: "The record of what was agreed, which outlives the workspace" },
+  names: "about",
+  searchable: ["about", "agreed"],
+  /*
+    ⚠️ NEVER OFFLINE, AND THE MOVES ENFORCE IT ANYWAY (see `moveOp`). A queued
+    submit takes its number when the signal comes back rather than when somebody
+    pressed the button, so two people working apart would number their documents
+    in an order neither chose.
+  */
+  offline: "none",
+  document: {
+    series: "MIN-{YYYY}-{####}",
+    /* ⚠️ Nothing to reverse — the ground keeps no ledger. What is exercised here
+       is the ladder, the numbering and the amendment, which is every part of the
+       rail an app without a ledger still gets. */
+  },
+  fields: {
+    about: field.text({ label: "What it was about", required: true, holds: "none", max: 200 }),
+    met: field.day({ label: "Met on", required: true, holds: "none" }),
+    agreed: field.long({ label: "What was agreed", holds: "none", max: 20_000 }),
+  },
+});
+
 /* ------------------------------------------------------------- operations --- */
 
 interface Publish { readonly id: string }
@@ -430,6 +479,11 @@ export const GROUND: AppSpec = defineApp({
          it into `check-in:read` would mean the key somebody needs to write their
          own week is the key that opens everybody's. */
       "check-in:review",
+      /* ⚠️ AND THE DOCUMENT'S TWO. A move is a write — see `moveOp` — so
+         `minute:write` is what agreeing, withdrawing and correcting all need,
+         rather than a third key per verb that a workspace would have to grant
+         three times to let one person finish a job. */
+      "minute:read", "minute:write",
     ],
     /*
       ⚠️ APP ROLES ONLY (D15). Workspace authority — the roster, the settings,
@@ -437,10 +491,15 @@ export const GROUND: AppSpec = defineApp({
       in a bundle is refused at composition.
     */
     roles: {
-      writer: ["note:read", "note:write", "check-in:read", "check-in:write", "check-in:review"],
+      writer: [
+        "note:read", "note:write", "check-in:read", "check-in:write", "check-in:review",
+        "minute:read", "minute:write",
+      ],
       /* ⚠️ A reader writes their OWN check-in and cannot read the team's, which
          is the shape every product with customers in it has. */
-      reader: ["note:read", "check-in:read", "check-in:write"],
+      /* ⚠️ A reader SEES what was agreed and cannot agree anything — which is
+         the whole of what a document rail is for on a shared record. */
+      reader: ["note:read", "check-in:read", "check-in:write", "minute:read"],
     },
     founding: "writer",
     /* ⚠️ Seats count PLATFORM staff — a person is on the team or they are not,
@@ -460,7 +519,7 @@ export const GROUND: AppSpec = defineApp({
     publishing: { label: "Publishing", withheld: "gate" },
   },
 
-  collections: [note, checkIn],
+  collections: [note, checkIn, minute],
 
   /*
     ⚠️ A VIEW IS A DECLARED READ OVER ONE COLLECTION, and `unreadViews` refuses
@@ -478,6 +537,10 @@ export const GROUND: AppSpec = defineApp({
       anyway. What somebody wrote last is what they came back for.
     */
     { id: "every-note", of: "note", limit: 50 },
+    /* ⚠️ THE DOCUMENT RAIL'S ONE VIEW HERE. What a list of documents is asked
+       is not "which are drafts" — it is "what have we got", in the order they
+       were raised, because a number is how anybody refers to one afterwards. */
+    { id: "every-minute", of: "minute", limit: 50 },
     /*
       ⚠️ THREE VIEWS THAT EXIST TO BE COUNTED, NOT TO BE LISTED, and that is a
       shape worth having in the reference. A supporting figure is `count` over a
@@ -858,6 +921,78 @@ export const GROUND: AppSpec = defineApp({
        rather than a second screen borrowing a neighbour's. */
     { id: "shared", route: "/shared", label: "Shared", nav: "none", icon: "share",
       permission: "note:read", commercial: true },
+    /*
+      ⚠️ THE DOCUMENT RAIL'S SURFACE, AND IT IS HERE BECAUSE MACHINERY WITH NO
+      SCREEN IS MACHINERY NOBODY HAS PRESSED. `minute.submit`, `minute.cancel`
+      and `minute.amend` are generated from one `document:` line — nothing in
+      this app writes a handler for any of them — and until a control called
+      one, the whole ladder was a set of routes that had never answered.
+    */
+    { id: "minutes", route: "/minutes", label: "Minutes", nav: "none", icon: "check",
+      permission: "minute:read", tone: "neutral", of: "minute",
+      body: {
+        shape: "detail",
+        layout: { as: "stack" },
+        blocks: [
+          /* ⚠️ THE THREE MOVES, EACH SHOWN ONLY WHERE IT CAN WORK. A Cancel
+             offered on a draft is a control refused every time it is pressed —
+             the ladder already refuses it, and a screen drawing it anyway makes
+             the refusal look like a fault rather than a rule. */
+          {
+            block: "ActionRow",
+            does: ["minute.submit"],
+            when: { is: { of: "field", field: "stands" }, one: ["draft"] },
+            bind: {
+              icon: { from: { of: "words", says: "check" } },
+              label: { from: { of: "words", says: "Agree it" } },
+              under: { from: { of: "words",
+                says: "It takes its number and stops being editable" } },
+            },
+          },
+          {
+            block: "ActionRow",
+            does: ["minute.cancel"],
+            when: { is: { of: "field", field: "stands" }, one: ["submitted"] },
+            bind: {
+              icon: { from: { of: "words", says: "close" } },
+              label: { from: { of: "words", says: "Withdraw it" } },
+              under: { from: { of: "words",
+                says: "It stays on the record, marked withdrawn" } },
+            },
+          },
+          {
+            block: "ActionRow",
+            does: ["minute.amend"],
+            when: { is: { of: "field", field: "stands" }, one: ["cancelled"] },
+            bind: {
+              icon: { from: { of: "words", says: "edit" } },
+              label: { from: { of: "words", says: "Correct it" } },
+              under: { from: { of: "words",
+                says: "Copies it into a new draft you can edit" } },
+            },
+          },
+          /* ⚠️ THE NUMBER IS A COLUMN, AND IT IS THE FIRST ONE. It is how
+             anybody refers to a document once it has one — in an email, on a
+             statement, on the phone — so a list that showed only what each was
+             about would be a list nobody could quote from. */
+          {
+            block: "Listing",
+            shows: [
+              { field: "number", label: "Number" },
+              { field: "about", label: "What it was about" },
+              { field: "stands", label: "Standing" },
+            ],
+            nothing: {
+              says: "Nothing agreed yet",
+              under: "A minute is the record of what was decided",
+            },
+            bind: {
+              label: { from: { of: "words", says: "Minutes" } },
+              of: { from: { of: "view", view: "every-minute" } },
+            },
+          },
+        ],
+      } },
     /* ⚠️ Behind one of our switches, which is what makes the flag mean anything:
        a flag no screen and no operation is behind changes nothing when pressed. */
     /* ⚠️ THE CROWN'S MIDDLE, NOT A DESTINATION — see `ScreenSpec.chrome`.

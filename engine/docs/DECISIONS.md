@@ -5035,3 +5035,95 @@ the name. It is `settled`, and one operation writes both.
   there — passing. That is pre-existing and is not what this stage changed; it is
   recorded here because it is the reason a whole suite could be green over
   references to nothing.
+
+## D124
+
+**A record somebody commits to is a DOCUMENT, and the ladder is the engine's.**
+`document: { series, amendable, cancel, posts }` on a collection, and everything
+follows: three standings, three operations, four columns, a numbered series and
+a table to count it in. No app writes a submit.
+
+### Why the engine rather than each app
+
+Every product in a business suite has documents, they all need the same three
+transitions and the same numbering, and an app that implements its own gets one
+of them subtly wrong. The framework this round was read against — Frappe, under
+ERPNext — settles it the same way: `docstatus` and `naming_series` are the
+FRAMEWORK's, and every module inherits them. Reaching feature parity with an ERP
+means owning this seam; re-deriving it per product means "cancel" coming to mean
+four different things inside one deployment.
+
+### Three standings, not four
+
+`draft → submitted → cancelled`. "Amended" is not a state a document is in — it
+is a fact about a CANCELLED document that another one points at, through
+`amends`. A fourth standing would be a second place the same truth lived, and
+the two would disagree the first time an amendment was itself cancelled.
+
+### What is deliberately not copied
+
+- **Per-field "allow on submit".** A hole with a checkbox on it: every field so
+  marked changes after the number was issued and after the ledger moved, with the
+  document still reading as evidence. A submitted document is closed, whole, and
+  the way to change one is to cancel and amend.
+- **Nine naming strategies.** Set-by-user, autoincrement, by-fieldname, series,
+  expression, a deprecated second expression, random, UUID and a scripting hook.
+  Each is a way for two documents to end up differently named. One grammar:
+  literal text and braced placeholders — `{YYYY}` `{YY}` `{MM}` `{DD}`,
+  `{#####}` for the counter, `{field:x}` for one of the document's own.
+- **A dot-delimited placeholder.** `.YEAR.` is a token nobody implements and a
+  dot-delimited grammar cannot tell it from literal text — so a typo prints
+  itself on every invoice for the life of the deployment and is found by a
+  customer. Braces make an unknown token a refusal at composition.
+- **Amending under a suffixed number.** Their amendment takes `…-1` and the
+  cancelled document keeps the clean number. Most jurisdictions want a gapless
+  sequential run, and several forbid withdrawing a tax invoice at all. That is
+  what `cancel: { by: "refusing", instead, why }` is for: the lawful correction
+  is a different document, and naming it lets a screen offer the right thing
+  rather than nothing.
+
+### What is new rather than copied
+
+**A document declares what it POSTS, so the reversal is derived.** ERPNext
+hand-writes `on_submit` and `on_cancel` per module, and cancel is where its bugs
+live — read it off their own settings screen, which carries
+`unlink_payment_on_cancellation_of_invoice`, `delete_linked_ledger_entries` and
+`enable_immutable_ledger`. Those are switches that exist because nobody could
+settle what cancel means. Here the engine knows what submitting wrote, so it can
+work out what cancelling must write. Same move `purge` made for erasure.
+
+### The three that would have been silent
+
+- **The number is taken in the statement that advances the counter.** One
+  `INSERT … ON CONFLICT … RETURNING`. Read-then-write is the shape every
+  numbering bug has: two requests read 41, both write 42, and one workspace has
+  two invoices with one number — invisible until an auditor sorts by it, and
+  unrepairable because both have been sent.
+- **The counter's key carries the period.** A series with `{YYYY}` restarts each
+  year because that is what a business means by it; keyed on the collection
+  alone, `INV-2026-0412` is followed on the first of January by `INV-2027-0413`
+  and the year in the number is decoration.
+- **The draft clause is in the `WHERE`.** Checking the standing and then updating
+  leaves a window a concurrent submit fits between, so the edit lands on evidence
+  having passed a check that was true when it was asked. One statement cannot be
+  raced.
+
+### What it cost elsewhere, and what that says
+
+`movesFor` is separate from `operationsFor` because two callers of that one cast
+the tail of an id back to a `CrudVerb` — folding three non-CRUD ids in would not
+fail to compile, it would produce a `CrudVerb` holding "submit". And a screen
+must be able to read a standing, so `readableFields` is what a surface binds
+against: a collection's own fields plus the rail's, which is strictly wider on a
+document and identical on everything else. Both were found by the composer
+refusing the ground's first document, which is the whole argument for declaring
+one there.
+
+### The floor
+
+`stands` is NULL for a draft, which is the same trick `aside` uses: every row
+written before the columns existed reads as the draft it was, so a live database
+gains the rail on its next boot with nothing migrated. A global-scoped document
+is refused — its counter would be one every tenant increments, so one business's
+numbers would skip wherever another raised a document, leaking how busy the
+neighbours are and handing an auditor a gapped run.

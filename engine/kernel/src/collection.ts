@@ -15,8 +15,10 @@
  * Layer 2. Imports primitives and field.
  */
 
+import type { DocumentMove, DocumentSpec } from "./document.js";
+import { DOCUMENT_MOVES, DOCUMENT_STANDINGS, refuseDocument } from "./document.js";
 import type { Fields } from "./field.js";
-import { holdingsIn, refuseFields } from "./field.js";
+import { field, holdingsIn, refuseFields } from "./field.js";
 
 /* ---------------------------------------------------------------- the shape --- */
 
@@ -132,6 +134,21 @@ export interface CollectionSpec {
    * without it is refused rather than rendered.
    */
   readonly shared?: true;
+  /**
+   * THIS IS SOMETHING SOMEBODY COMMITS TO, NOT SOMETHING THEY KEEP.
+   *
+   * ⚠️ THE DIFFERENCE IS THAT A DOCUMENT STOPS BEING EDITABLE, and everything
+   * else follows from that one moment: it takes a number from a series, other
+   * records may depend on it, a ledger moves, and correcting it is a cancel and
+   * an amendment rather than a `PATCH`. See `document.ts` for the ladder and
+   * why the reversal is derived rather than written.
+   *
+   * ⚠️ ABSENT IS THE COMMON ANSWER. A product, a place, a contact: records a
+   * workspace maintains, where the current value is the truth and the previous
+   * one is nobody's evidence. Declaring those as documents would put a number
+   * and a cancel button on a shelf label.
+   */
+  readonly document?: DocumentSpec;
   /** ⚠️ Which operations the collection does NOT get. See `operationsFor`. */
   readonly without?: readonly CrudVerb[];
 }
@@ -207,6 +224,54 @@ export const operationsFor = (spec: CollectionSpec): readonly string[] =>
   CRUD.filter((verb) => !(spec.without ?? []).includes(verb)).map((verb) => verbId(spec.id, verb));
 
 /**
+ * THE THREE A DOCUMENT GETS ON TOP OF ITS CRUD.
+ *
+ * ⚠️ SEPARATE FROM `operationsFor` BECAUSE THE CALLERS OF THAT ONE READ A VERB
+ * BACK OUT OF THE ID. Two of them do `id.slice(collection.length + 1) as
+ * CrudVerb`, which is a cast — so folding three non-CRUD ids into that list
+ * would not fail to compile, it would produce a `CrudVerb` holding the string
+ * "submit" and a switch with no branch for it, silently, at composition.
+ *
+ * ⚠️ AND `without` DOES NOT REACH THEM. A document that opts out of `update`
+ * has done so precisely BECAUSE it is a document — the way to change one is to
+ * cancel and amend — so reading the same list to withhold `cancel` would leave
+ * it with no way to be corrected at all.
+ */
+export const movesFor = (spec: CollectionSpec): readonly string[] =>
+  spec.document ? DOCUMENT_MOVES.map((move) => `${spec.id}.${move}`) : [];
+
+/**
+ * ⚠️ THE FOUR THE ENGINE ADDS, AS FIELDS A SCREEN MAY READ. They are real
+ * columns on a document's table and no app declares them — so without this a
+ * screen asking "is this still a draft" binds a field the composer has never
+ * heard of, and the only way to draw a standing would be for every app to
+ * declare its own shadow copy of the rail.
+ *
+ * ⚠️ AND THEY ARE READ-ONLY BY CONSTRUCTION, WHICH `settled` SAYS. The moves are
+ * the only thing that writes them; an update naming one would be a person
+ * setting their own invoice number.
+ */
+const DOCUMENT_FIELDS: Fields = {
+  stands: field.enum({
+    label: "Standing", holds: "none", settled: true,
+    values: [...DOCUMENT_STANDINGS],
+  }),
+  number: field.text({ label: "Number", holds: "none", settled: true, max: 120 }),
+  amends: field.text({ label: "Corrects", holds: "none", settled: true, max: 120 }),
+};
+
+/**
+ * WHAT A SCREEN MAY BIND OF THIS COLLECTION — its own fields, plus the rail's.
+ *
+ * ⚠️ ONE READING, SO A SCREEN AND A WRITE CANNOT DISAGREE ABOUT WHAT A FIELD IS.
+ * `spec.fields` is what an app declared and is what a write checks against;
+ * this is what can be READ, which is strictly wider on a document and identical
+ * on everything else.
+ */
+export const readableFields = (spec: CollectionSpec): Fields =>
+  spec.document ? { ...spec.fields, ...DOCUMENT_FIELDS } : spec.fields;
+
+/**
  * WHICH FIELD SAYS WHAT ONE RECORD IS CALLED — the declaration, or a guess.
  *
  * ⚠️ `names` IS THE ANSWER AND THE GUESS IS THE FALLBACK, in that order, in one
@@ -253,10 +318,25 @@ export const verbId = (collection: string, verb: CrudVerb): string =>
  */
 export const eventFor = (spec: CollectionSpec, verb: CrudVerb): string => `${spec.id}.${verb}d`;
 
-/** Every event a collection's generated operations raise. */
-export const eventsFor = (spec: CollectionSpec): readonly string[] =>
-  CRUD.filter((v) => v !== "list" && v !== "read" && !(spec.without ?? []).includes(v))
-    .map((v) => eventFor(spec, v));
+/**
+ * ⚠️ THE PAST TENSE OF A MOVE, WRITTEN OUT RATHER THAN BUILT. `eventFor` appends
+ * a `d` to a CRUD verb, which is right for four of them and produces `submitd`
+ * for the fifth — a plausible-looking event id nothing raises, that a
+ * notification could then wait for forever.
+ */
+export const MOVE_EVENTS: Readonly<Record<DocumentMove, string>> = {
+  submit: "submitted", cancel: "cancelled", amend: "amended",
+};
+
+export const moveEventFor = (spec: CollectionSpec, move: DocumentMove): string =>
+  `${spec.id}.${MOVE_EVENTS[move]}`;
+
+/** Every event a collection's generated operations raise, moves included. */
+export const eventsFor = (spec: CollectionSpec): readonly string[] => [
+  ...CRUD.filter((v) => v !== "list" && v !== "read" && !(spec.without ?? []).includes(v))
+    .map((v) => eventFor(spec, v)),
+  ...(spec.document ? DOCUMENT_MOVES.map((m) => moveEventFor(spec, m)) : []),
+];
 
 /** ⚠️ Reads need the read key; anything that changes a record needs write. */
 export const permissionFor = (spec: CollectionSpec, verb: CrudVerb): string =>
@@ -335,7 +415,8 @@ export type CollectionRefusal =
   | "not_a_name" | "vault_without_a_subject"
   | "searchable_unknown" | "searchable_not_text" | "searchable_vault"
   | "names_unknown" | "names_not_words" | "names_vault"
-  | "shared_without_a_name" | "shared_names_elsewhere" | "shared_beyond_a_tenant";
+  | "shared_without_a_name" | "shared_names_elsewhere" | "shared_beyond_a_tenant"
+  | "document_invalid" | "document_beyond_a_tenant";
 
 /**
  * ⚠️ AN ID AND A FIELD NAME BECOME A TABLE AND A COLUMN, AND AN IDENTIFIER
@@ -461,6 +542,27 @@ export function refuseCollection(spec: CollectionSpec): readonly CollectionProbl
     at("shared_beyond_a_tenant",
       `is shared and scoped by ${spec.scope.of} — a borrowing app joins to it without this `
       + `declaration, so the only scope it can apply is the workspace it is already in`);
+  }
+
+  if (spec.document) {
+    /* ⚠️ THE SAME SHAPE `field_invalid` USES. A document's own rules are its
+       file's to state; what belongs here is that the collection carries them. */
+    for (const bad of refuseDocument(spec.id, spec.document)) {
+      at("document_invalid", `${bad.why}: ${bad.detail}`);
+    }
+    /*
+      ⚠️ A DOCUMENT IS A COMMITMENT ONE WORKSPACE MAKES, SO IT IS THE WORKSPACE'S.
+      A global one would draw its number from a counter every tenant increments —
+      so one business's invoice numbers would skip wherever another business
+      raised one, which leaks how busy the neighbours are and gives an auditor a
+      sequence with holes in it. A subject-scoped one is a commitment made by a
+      person to nobody, which is not what any of this is for.
+    */
+    if (spec.scope.of !== "tenant") {
+      at("document_beyond_a_tenant",
+        `is a document scoped by ${spec.scope.of} — a series counts within one workspace, `
+        + `and any wider counter is shared with businesses that cannot see each other`);
+    }
   }
 
   if (spec.scope.of !== "subject") {

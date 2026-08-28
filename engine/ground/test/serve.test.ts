@@ -218,6 +218,19 @@ describe("what the manifest produced", () => {
       "POST /api/member.reach",
       "POST /api/member.remove",
       "POST /api/member.role",
+      /* ⚠️ THE FIVE CRUD VERBS AND THE THREE MOVES, FROM ONE `document:` LINE.
+         Nothing in the ground writes a submit, a cancel or an amendment — the
+         rail derives all three from the declaration, which is the claim, and
+         this list is where it is either true or it is not. */
+      "POST /api/minute.amend",
+      "POST /api/minute.cancel",
+      "POST /api/minute.create",
+      "POST /api/minute.delete",
+      "GET /api/minute.list",
+      "GET /api/minute.read",
+      "GET /api/minute.search",
+      "POST /api/minute.submit",
+      "POST /api/minute.update",
       "POST /api/money.auto",
       "POST /api/money.checkout",
       "POST /api/money.topup",

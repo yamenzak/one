@@ -287,6 +287,12 @@ export const HOLDINGS: readonly HeldBy[] = [
       why: "it is the workspace's own record that something happened, kept without a name in it" }] },
   { table: "replay", person: [], why: "an idempotency key, not a record about anybody",
     workspace: its() },
+  /* ⚠️ A COUNT, AND THE ONE THING IT MUST NOT DO IS GO BACKWARDS. Erased with
+     the workspace like everything else here — but note what that means: closing
+     a workspace and founding it again starts its invoice numbers at one, which
+     is correct, because it is a different business. */
+  { table: "numbering", person: [], workspace: its(),
+    why: "how far a workspace's own document series has counted" },
   { table: "notify_policy", person: [], why: "a workspace's own routing", workspace: its() },
   { table: "notify_letter", person: [], why: "a workspace's own words for its own messages", workspace: its() },
   { table: "custom_role", person: [], why: "a workspace's own roles", workspace: its() },

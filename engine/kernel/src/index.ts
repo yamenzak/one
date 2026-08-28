@@ -15,6 +15,7 @@ export * from "./present.js";
 export * from "./problem.js";
 export * from "./door.js";
 export * from "./field.js";
+export * from "./document.js";
 export * from "./collection.js";
 export * from "./operation.js";
 export * from "./access.js";

@@ -39,7 +39,8 @@
 import type { FieldKind, Fields } from "./field.js";
 import type { CollectionSpec } from "./collection.js";
 import type { Permission } from "./operation.js";
-import { FIELD_NAME, NAME } from "./collection.js";
+import {
+  readableFields, FIELD_NAME, NAME } from "./collection.js";
 
 /* ------------------------------------------------------------------ shape --- */
 
@@ -1603,6 +1604,20 @@ export const talliedIn = (spec: ViewSpec): readonly string[] =>
   (spec.tally ?? []).map((t) => t.as);
 
 /**
+ * ⚠️ WHAT A VIEW'S ROWS CARRY, AND IT IS `readableFields` FOR THE SAME REASON THE
+ * SUBJECT IS. A list of documents that could not show a number or a standing
+ * would be a list of what each document is ABOUT, with the one thing anybody
+ * quotes it by missing — and the engine's columns are on every row of the table
+ * the view reads, so refusing to name them is refusing a column that is there.
+ */
+const fieldsOfView = (
+  collections: readonly CollectionSpec[], of: string,
+): Fields | undefined => {
+  const found = collections.find((c) => c.id === of);
+  return found ? readableFields(found) : undefined;
+};
+
+/**
  * What one screen's body can get wrong.
  *
  * ⚠️ EVERY CHECK IN HERE IS ONE THAT WOULD OTHERWISE PRODUCE A SCREEN THAT
@@ -1773,7 +1788,13 @@ export function refuseSurface(
     looks unfinished rather than broken, which is how it survives review.
   */
   const subject: Fields | null = screen.of
-    ? (collections.find((c) => c.id === screen.of)?.fields ?? null)
+    /* ⚠️ `readableFields`, NOT `.fields` — a document's standing and number are
+       the engine's columns, and a screen that could not name them would have no
+       way to draw the ladder it is standing on. */
+    ? (() => {
+      const of = collections.find((c) => c.id === screen.of);
+      return of ? readableFields(of) : null;
+    })()
     : null;
   if (screen.of && !subject) {
     at("view_collection_unknown", `is about "${screen.of}", which this app does not declare`);
@@ -1926,7 +1947,7 @@ export function refuseSurface(
     if (r.of !== "first") continue;
     const view = byId.get(r.view);
     if (!view || view.asked) continue;
-    const held = collections.find((c) => c.id === view.of)?.fields;
+    const held = fieldsOfView(collections, view.of);
     if (!held || r.field in held || talliedIn(view).includes(r.field)) continue;
     at("view_field_unknown",
       `takes "${r.field}" off the first row of "${r.view}", which ${view.of} does not have`);
@@ -2099,7 +2120,7 @@ export function refuseSurface(
         /* ⚠️ AN ASKED VIEW IS EXEMPT, for the reason its columns are — the row
            shape is a handler's and nothing writes it down. */
         const held = view
-          ? (view.asked ? null : collections.find((c) => c.id === view.of)?.fields)
+          ? (view.asked ? null : fieldsOfView(collections, view.of))
           : subject;
         if (held && !(go.by in held)) {
           at("shows_field_unknown",
@@ -2164,7 +2185,7 @@ export function refuseSurface(
            thing anybody could check them against is a shape nothing writes
            down, and refusing every column would make the escape valve unusable
            for the exact screens it exists for. */
-        const held = collections.find((c) => c.id === view.of)?.fields;
+        const held = fieldsOfView(collections, view.of);
         /* ⚠️ A TALLY IS A COLUMN TOO, AND IT IS NOT A FIELD. `talliedIn` is what
            the view promises to put on each row beyond the collection's own — so
            a `shows` naming one is correct, and checking against the fields alone
@@ -2235,7 +2256,7 @@ export function refuseSurface(
       /* ⚠️ AN ASKED VIEW IS EXEMPT, exactly as its columns are — the row shape is
          a handler's answer and nothing writes it down. */
       const held = view && !view.asked
-        ? collections.find((c) => c.id === view.of)?.fields
+        ? fieldsOfView(collections, view.of)
         : undefined;
       for (const name of [b.plots.of, b.plots.along].filter((n): n is string => Boolean(n))) {
         if (held && !(name in held) && !(view && talliedIn(view).includes(name))) {

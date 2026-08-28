@@ -37,6 +37,7 @@ import { CONFIG_SCHEMA } from "./config.js";
 import { STRIPE_SCHEMA } from "./stripe.js";
 import { PACKAGE_SCHEMA } from "./packages.js";
 import { PUSH_SCHEMA } from "./push.js";
+import { NUMBERING_SCHEMA } from "./documents.js";
 import { MOVE_SCHEMA } from "./move.js";
 import { RESOURCE_SCHEMA } from "./resources.js";
 import type { SchemaModule } from "./schema.js";
@@ -115,5 +116,10 @@ export const SHARD_MODULES: readonly SchemaModule[] = [
      copy in the directory would be a pair a move has to keep in step and a
      deletion that has to reach across two databases to be complete. */
   SEARCH_SCHEMA,
+  /* ⚠️ AND THE SERIES COUNTERS, ON THE SHARD BECAUSE THE DOCUMENTS ARE. A
+     counter in the directory would be a second database in the write that
+     issues an invoice number — so the one statement that must not be raced
+     would become two, across a boundary, with no way to make them one. */
+  NUMBERING_SCHEMA,
 ];
 

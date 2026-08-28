@@ -19,17 +19,19 @@
  */
 
 import type {
-  AnyOperation, AppSpec, CollectionSpec, CrudVerb, Gate, Permission, ProblemCatalog,
+  AnyOperation, AppSpec, CollectionSpec, CrudVerb, DocumentMove, Gate, Permission,
+  ProblemCatalog,
 } from "@engine/kernel";
 import {
-  PLATFORM_PROBLEMS, eraseBy, eventFor, field, offlineFor, operationsFor, permissionFor,
-  routeFor,
+  PLATFORM_PROBLEMS, eraseBy, eventFor, field, moveEventFor, movesFor, offlineFor,
+  operationsFor, permissionFor, routeFor,
 } from "@engine/kernel";
 import { tableFor } from "@engine/kernel";
 import type { Db } from "./sql.js";
 import {
   MOST_ROWS, list, patch, put, readOne, setAside, type VaultSeam, type WriteRefusal,
 } from "./records.js";
+import { move } from "./documents.js";
 import { reachingBy } from "./reach.js";
 import { memberOps } from "./member-ops.js";
 import { packageOps } from "./packages.js";
@@ -437,6 +439,97 @@ const verbSummary = (spec: CollectionSpec, verb: CrudVerb): string => {
  * declaration per call would miss this memo every time — see `once` in the
  * worker, where a product's manifest is built at most once per isolate.
  */
+/**
+ * THE THREE A DOCUMENT GETS: commit to it, withdraw it, correct it.
+ *
+ * ⚠️ GENERATED FROM THE DECLARATION LIKE THE CRUD IS, AND THAT IS THE WHOLE
+ * ARGUMENT FOR THE RAIL. An app writing its own submit is an app deciding for
+ * itself whether a cancelled document can be submitted again, whether an
+ * amendment needs a cancellation first, and whether a number is taken before or
+ * after the row moves. Three apps writing it are three answers, and the one that
+ * is wrong is wrong quietly.
+ *
+ * ⚠️ AND IT IS `write`, NEVER ITS OWN PERMISSION. Somebody who may edit a draft
+ * is somebody the workspace trusts with the record; a fourth permission would be
+ * one more thing to grant and one more way to end up with a person who can fill
+ * an invoice in and not issue it. Where a business wants that split it is a role
+ * question, and roles are the app's.
+ */
+function moveOp(
+  spec: CollectionSpec, what: DocumentMove, places: string,
+): Resolved {
+  const one = spec.label.one.toLowerCase();
+  const operation: AnyOperation = {
+    id: `${spec.id}.${what}`,
+    kind: "write",
+    summary: what === "submit"
+      ? `Commit to a ${one}. It takes its number and stops being editable.`
+      : what === "cancel"
+        ? `Withdraw a ${one} that was committed to.`
+        : `Copy a cancelled ${one} into a new draft.`,
+    input: {},
+    output: {},
+    permission: permissionFor(spec, "update"),
+    /*
+      ⚠️ NEVER QUEUED, WHATEVER THE COLLECTION SAYS ABOUT BEING OFFLINE. A queued
+      submit is a number taken when the signal comes back rather than when the
+      person pressed the button — so two people working offline in one warehouse
+      would issue documents in an order neither of them chose, and the one whose
+      phone reconnected first would take the earlier number. Committing to
+      something is the moment the network has to be there for.
+    */
+    idempotency: { mode: "none" },
+    emits: [moveEventFor(spec, what)],
+    async handler() { return {} as never; },
+  } as AnyOperation;
+
+  const run = async (ctx: Ctx, input: Record<string, unknown>): Promise<unknown> => {
+    const done = await move(
+      ctx.db, spec, scopeOf(spec, ctx), String(input.id ?? ""), what,
+      { now: ctx.now, by: ctx.accountId ?? null, tenantId: ctx.tenantId });
+
+    if ("why" in done) {
+      if (done.why === "not_found") ctx.fail("platform.not_found");
+      /*
+        ⚠️ THE LADDER'S REFUSAL REACHES THE PERSON AS A SENTENCE ABOUT WHERE THE
+        DOCUMENT IS, not as a code. Somebody pressing Submit on something a
+        colleague submitted a moment ago needs to be told it is already done —
+        "that did not work" would send them looking for a fault that is not
+        there.
+      */
+      if (done.why === "unnumbered") {
+        ctx.fail("platform.invalid", {},
+          { fields: { series: "This workspace's numbering cannot be read. Check it in settings." } });
+      }
+      ctx.fail("platform.conflict", { was: SAYS[done.because] ?? done.standing });
+    }
+    return done;
+  };
+  void places;
+  /* ⚠️ `generated: true` LIKE THE CRUD, WHICH IS WHAT KEEPS THE DOOR'S OWN INPUT
+     CHECK OFF IT. A move takes an id and nothing else; the operation that
+     validates a body against declared fields would find none and refuse. */
+  return {
+    id: operation.id, kind: "write", ...routeFor(operation),
+    permission: operation.permission, spec: operation, run, generated: true,
+  };
+}
+
+/**
+ * ⚠️ THE REFUSAL IN THE WORDS OF WHAT HAPPENED. `mayMoveDocument` answers with a
+ * reason a programmer reads; this is the half a person does, and it lives beside
+ * the operation rather than on a screen so that every surface — the app, an
+ * agent, the API — is told the same thing.
+ */
+const SAYS: Readonly<Record<string, string>> = {
+  already_submitted: "already submitted",
+  not_submitted: "still a draft",
+  already_cancelled: "already cancelled",
+  amend_before_cancel: "still standing — cancel it first",
+  not_amendable: "not something that can be amended",
+  never_cancellable: "not something that can be withdrawn",
+};
+
 const MEMO = new WeakMap<AppSpec, Composed>();
 
 export function compose(app: AppSpec): Composed {
@@ -451,6 +544,12 @@ export function compose(app: AppSpec): Composed {
          one of your sites" rather than naming a concept nobody outside this
          codebase has heard of. */
       byId.set(opId, crudFor(spec, verb, app.id, app.reach?.label.many.toLowerCase() ?? "places"));
+    }
+    /* ⚠️ AND THE THREE A DOCUMENT GETS ON TOP — see `moveOp`. Empty for every
+       collection that is not one, which is most of them. */
+    for (const opId of movesFor(spec)) {
+      const what = opId.slice(spec.id.length + 1) as DocumentMove;
+      byId.set(opId, moveOp(spec, what, app.reach?.label.many.toLowerCase() ?? "places"));
     }
   }
   /*

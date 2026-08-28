@@ -50,7 +50,15 @@ export type WriteRefusal =
    * and the way to do it deliberately is an operation that knows what else has to
    * be true first.
    */
-  | { readonly why: "settled"; readonly detail: string; readonly names: readonly string[] };
+  | { readonly why: "settled"; readonly detail: string; readonly names: readonly string[] }
+  /**
+   * ⚠️ A DOCUMENT SOMEBODY COMMITTED TO — see `DocumentSpec`. It is its own
+   * refusal because the caller is not wrong about anything they typed: the
+   * record is theirs, the field is real, the value is fine. What is wrong is the
+   * moment — a number has been issued and a ledger has moved, so this is
+   * evidence now, and the way to change it is to cancel and amend.
+   */
+  | { readonly why: "not_a_draft"; readonly detail: string; readonly standing: string };
 
 /**
  * ⚠️ A VAULT-BACKED VALUE NEVER REACHES A PRODUCT COLUMN, AND THIS IS THE ONLY
@@ -242,16 +250,65 @@ export async function patch(
     now.toISOString(), by, id, ...(erase ? [scope] : []), ...near.bound,
   ];
 
+  /*
+    ⚠️ THE DRAFT CLAUSE IS IN THE `WHERE`, NOT IN A READ BEFORE IT. Checking the
+    standing first and then updating leaves a window in which a second request
+    submits the document between the two — so the edit lands on evidence, having
+    passed a check that was true when it was asked. One statement cannot be
+    raced. `stands IS NULL` is a row written before the rail existed, which is a
+    draft (see `DocumentSpec`).
+  */
+  const draftOnly = spec.document ? ` AND (stands IS NULL OR stands = 'draft')` : "";
+
   const done = await db.prepare(
     `UPDATE ${table(spec.id)} SET ${sets.join(", ")}
-     WHERE id = ?${erase ? ` AND ${column(erase.column)} = ?` : ""}${near.sql}`)
+     WHERE id = ?${erase ? ` AND ${column(erase.column)} = ?` : ""}${near.sql}${draftOnly}`)
     .bind(...bound).run();
 
   /* ⚠️ Reported, not assumed. A statement that matched no row is a record that
      is not the caller's, and answering 200 to it says an edit landed on
      somebody else's data. */
-  if (!done.meta?.changes) return { why: "not_found" };
+  if (!done.meta?.changes) {
+    /*
+      ⚠️ AND ONLY NOW IS IT WORTH ASKING WHY. This is already the refusal path,
+      so the extra read costs nothing anybody is waiting on — and the difference
+      between "no such record" and "you may not edit this one any more" is the
+      difference between somebody thinking they lost their work and somebody
+      pressing Amend.
+    */
+    if (spec.document) {
+      const standing = await standingOf(db, spec, scope, id);
+      if (standing && standing !== "draft") {
+        return {
+          why: "not_a_draft",
+          standing,
+          detail: standing === "submitted"
+            ? "This has been submitted. Cancel it to make changes."
+            : "This has been cancelled. Amend it to make changes.",
+        };
+      }
+    }
+    return { why: "not_found" };
+  }
   return { id };
+}
+
+/**
+ * ⚠️ READ STRAIGHT OFF THE TABLE RATHER THAN THROUGH `readOne`, because the
+ * caller is a refusal path and every column of a record it is about to refuse is
+ * work nobody asked for — and because `readOne` shapes a row for a screen, which
+ * is not what a one-word question wants back.
+ */
+export async function standingOf(
+  db: Db, spec: CollectionSpec, scope: string, id: string,
+): Promise<string | null> {
+  const erase = eraseBy(spec);
+  const row = await db.prepare(
+    `SELECT stands FROM ${table(spec.id)} `
+    + `WHERE id = ?${erase ? ` AND ${column(erase.column)} = ?` : ""}`)
+    .bind(...(erase ? [id, scope] : [id])).first<{ stands: string | null }>();
+  if (!row) return null;
+  return row.stands ?? "draft";
 }
 
 /**

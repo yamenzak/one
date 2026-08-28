@@ -29,7 +29,7 @@ import type { Lane } from "./ai.js";
 import type { WhitelabelDef } from "./brand.js";
 import type { CollectionSpec } from "./collection.js";
 import {
-  danglingRefs, eventsFor, idleBorrows, operationsFor, quotasWithoutCeiling, refuseCollection,
+  danglingRefs, eventsFor, idleBorrows, movesFor, operationsFor, quotasWithoutCeiling, refuseCollection,
 } from "./collection.js";
 import type { MeterBook } from "./credit.js";
 import { unbounded } from "./credit.js";
@@ -1698,6 +1698,11 @@ export function refuseApp(spec: AppSpec): readonly Refusal[] {
   const ops = [
     ...spec.operations.map((o) => o.id),
     ...spec.collections.flatMap(operationsFor),
+    /* ⚠️ AND THE THREE A DOCUMENT GETS — `movesFor` is separate from
+       `operationsFor` because its callers cast the tail back to a `CrudVerb`
+       (see there), so a screen offering `invoice.submit` would read as an
+       operation the app does not declare and be refused at composition. */
+    ...spec.collections.flatMap(movesFor),
   ];
   const screenIds = spec.screens.map((s) => s.id);
   for (const s of spec.screens) {

@@ -130,7 +130,11 @@ describe("totals.read", () => {
     expect((await post("westgate", "/api/check-in.create",
       { week: "2026-08-17", went: "fine" }, owner)).status).toBe(200);
 
-    expect(await totals(owner)).toEqual({ note: 3, "check-in": 1 });
+    /* ⚠️ EVERY COLLECTION, INCLUDING THE ONES NOBODY HAS USED. A workspace with
+       no minutes in it answers zero rather than omitting the key — a missing
+       entry and a count of none are the same thing to a screen reading a map,
+       and only one of them is true. */
+    expect(await totals(owner)).toEqual({ note: 3, "check-in": 1, minute: 0 });
   });
 
   /*
