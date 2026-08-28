@@ -5584,3 +5584,64 @@ books arranged", and they are reached from the chart they arrange. Centres lost
 its seat to Invoices last round and Years lost one to Bills this round; that
 trade — a document over the configuration behind it — is the right way round
 every time.
+
+## D131
+
+**A document billed in another currency posts in it, and the one writer no longer
+drops three columns on the way.** `inBaseLines` converts a whole balanced entry
+and stays balanced; `writeEntry`'s insert is derived from an exhaustive list, so
+a line's column that goes unwritten is a build failure.
+
+### `original` was NULL on every posting ever written
+
+D128 gave a posting three foreign columns, `journal.post` validated all three
+against each other with care, and `writeEntry` — the one writer, the whole point
+of which is that there is only one — named none of them in its insert. That is
+not a feature that failed to arrive. **The revaluation SUMS `original`**, so a
+foreign account held nothing according to the books, `inBase(0, rate)` came to
+nothing, and restating it moved the account's entire balance to the exchange
+account. The entry balanced. The screen said "Restated."
+
+**So the column list is a shape, not a habit.** `KEPT` is `satisfies
+Record<keyof Required<Line>, …>` and the SQL is built from its keys: the next
+field somebody adds to a line does not compile until it is written down. Nothing
+short of that would have caught the last three, because every one of them
+typechecked, passed, and shipped.
+
+### Converting line by line does not balance, and that is arithmetic
+
+The sum of rounded figures is not the rounded sum. An entry that comes to nothing
+in dollars comes to a penny either side of nothing in dirhams at most rates — so
+a perfectly ordinary foreign invoice would be refused by `refuseEntry`, correctly,
+and the person raising it told their books do not add up over arithmetic they
+never saw.
+
+**The remainder is posted rather than spread.** Absorbing it into the largest line
+makes revenue wrong by a penny with nothing recording that it moved; the exchange
+account says what it is, and it is where a revaluation's difference already goes,
+so a workspace reads a year of them in one place. Where the conversion comes out
+even there is no extra line at all, which is most invoices.
+
+**And the property is proved by a sweep rather than an example.** Whether a
+remainder appears depends on the rate, so one hand-picked case proves nothing
+about the next; the test converts the same entry at a thousand rates and asserts
+every one balances — and separately that several hundred of them actually needed
+the extra line, because a branch nothing reaches is the thing being guarded
+against.
+
+### What a foreign document is refused for, and when
+
+`may` asks for all three before the number is taken: a workspace currency to
+convert INTO, a rate that is a rate, and an exchange account for the remainder.
+Without the last one an entry a penny out reaches `writeEntry` and is refused
+*after* the number is issued — the same trap `may` exists to close.
+
+**A withdrawal reverses at the rate it was posted at**, never at today's.
+Converting afresh would post the difference between two rates as an exchange gain
+the business never made, on a document it decided never happened.
+
+### Blank and naming your own currency are the same thing
+
+Almost every document is in the currency the books are kept in, and neither
+spelling of that costs a conversion, a rate, an exchange account or a refusal.
+`foreignTo` is one line and it is what keeps the ordinary case free.

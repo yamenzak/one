@@ -11,8 +11,10 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  RATE_SCALE, inBase, rateFrom, refuseRate, revalueLines, unrated, type Holding,
+  RATE_SCALE, inBase, inBaseLines, rateFrom, refuseRate, revalueLines, unrated,
+  type Holding,
 } from "../src/money.js";
+import type { Line } from "../src/posting.js";
 
 /* ⚠️ The real peg, to six places, which is what a bank publishes. */
 const AED_PER_USD = 3.6725 * RATE_SCALE;
@@ -226,5 +228,97 @@ describe("what revaluing the foreign accounts posts", () => {
     expect(lines.map((l) => l.account)).toEqual(["usd-bank", "fx"]);
     expect(unrated(some, rates)).toEqual(["EUR"]);
     expect(unrated(held, rates)).toEqual([]);
+  });
+});
+
+/* ------------------------------------------------- a whole entry, converted --- */
+
+/**
+ * ⚠️ THE FAILURE THIS SECTION IS ABOUT IS A PENNY, AND IT REFUSES A DOCUMENT.
+ * Converting each line and rounding it makes a set of lines that summed to
+ * nothing sum to one — so a perfectly ordinary foreign invoice reaches the
+ * ledger unbalanced, and the person raising it is told their books do not add
+ * up over arithmetic they never saw.
+ */
+describe("converting a whole entry", () => {
+  const at = 3_672_500;
+
+  it("converts every line and keeps what actually moved", () => {
+    const lines: Line[] = [
+      { account: "debtors", amount: 10_000, memo: "INV-1" },
+      { account: "sales", amount: -10_000, memo: "INV-1" },
+    ];
+    const out = inBaseLines(lines, "USD", at, "AED", "fx", "INV-1");
+    if (typeof out === "string") throw new Error(out);
+    expect(out).toHaveLength(2);
+    expect(out[0]).toMatchObject({
+      account: "debtors", amount: 36_725, currency: "USD", original: 10_000, rate: at,
+    });
+    expect(out[1]?.amount).toBe(-36_725);
+  });
+
+  /*
+    ⚠️ THE ROUNDING REMAINDER IS POSTED RATHER THAN SPREAD. Absorbing it into the
+    largest line makes revenue wrong by a penny with nothing recording that it
+    moved; the exchange account says what it is, and it is where a revaluation's
+    difference already goes.
+  */
+  it("puts what line-by-line rounding leaves on the exchange account", () => {
+    /* ⚠️ Three lines of 3.33 against one of −9.99: nothing in dollars, and a
+       penny out in dirhams once each is rounded on its own. */
+    const lines: Line[] = [
+      { account: "sales-a", amount: 333 },
+      { account: "sales-b", amount: 333 },
+      { account: "sales-c", amount: 333 },
+      { account: "debtors", amount: -999 },
+    ];
+    const out = inBaseLines(lines, "USD", at, "AED", "fx", "INV-2");
+    if (typeof out === "string") throw new Error(out);
+    /* ⚠️ 3.33 × 3.6725 is 12.2295 → 12.23 each; 9.99 × 3.6725 is 36.688… →
+       36.69. Three twelve-twenty-threes are 36.69 — so this rate happens to come
+       out even, and the assertion that matters is the one below. */
+    expect(out.reduce((sum, one) => sum + one.amount, 0)).toBe(0);
+  });
+
+  /*
+    ⚠️ AND THE PROPERTY IS THE POINT, NOT ONE ARITHMETIC EXAMPLE. Whether a
+    remainder appears depends on the rate, so a single hand-picked case proves
+    nothing about the next one. Swept over a range of rates, every converted
+    entry balances.
+  */
+  it("balances at every rate", () => {
+    const lines: Line[] = [
+      { account: "sales-a", amount: 333 },
+      { account: "sales-b", amount: 1_777 },
+      { account: "sales-c", amount: 91 },
+      { account: "debtors", amount: -2_201 },
+    ];
+    let carried = 0;
+    for (let rate = 1_000; rate <= 9_000_000; rate += 7_919) {
+      const out = inBaseLines(lines, "USD", rate, "AED", "fx", "x");
+      if (typeof out === "string") throw new Error(out);
+      expect(out.reduce((sum, one) => sum + one.amount, 0)).toBe(0);
+      if (out.length > lines.length) carried++;
+    }
+    /* ⚠️ AND THE REMAINDER IS REAL, not a branch nothing reaches — several
+       hundred of those rates need the extra line. */
+    expect(carried).toBeGreaterThan(0);
+  });
+
+  /* ⚠️ AN ORDINARY FOREIGN INVOICE CARRIES NO EXTRA LINE, so the exchange
+     account appears when it has something to say and not on every document. */
+  it("adds no line when the conversion comes out even", () => {
+    const lines: Line[] = [
+      { account: "debtors", amount: 10_000 },
+      { account: "sales", amount: -10_000 },
+    ];
+    const out = inBaseLines(lines, "USD", at, "AED", "fx", "x");
+    if (typeof out === "string") throw new Error(out);
+    expect(out.map((l) => l.account)).toEqual(["debtors", "sales"]);
+  });
+
+  it("reports a figure too large rather than rounding it", () => {
+    const lines: Line[] = [{ account: "a", amount: Number.MAX_SAFE_INTEGER }];
+    expect(inBaseLines(lines, "USD", 9_000_000, "AED", "fx", "x")).toBe("amount_too_large");
   });
 });

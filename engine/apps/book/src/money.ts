@@ -135,6 +135,50 @@ export function rateFrom(
   return Number(out);
 }
 
+/* ------------------------------------------------------- a whole entry, over --- */
+
+/**
+ * A BALANCED ENTRY, CONVERTED, STILL BALANCED.
+ *
+ * ⚠️ CONVERTING LINE BY LINE DOES NOT BALANCE, AND THAT IS ARITHMETIC RATHER
+ * THAN A BUG. The sum of rounded figures is not the rounded sum: three lines of
+ * 33.33 and one of −99.99 add to nothing in dollars and, at almost any rate,
+ * come to a penny either side of nothing in dirhams. The entry would be refused
+ * by `refuseEntry` — correctly — and the person raising a perfectly ordinary
+ * foreign invoice would be told their books do not balance.
+ *
+ * ⚠️ SO THE REMAINDER IS POSTED RATHER THAN SPREAD. Absorbing it into the
+ * largest line makes revenue wrong by a penny with nothing recording that it was
+ * moved; putting it on the exchange account says what it is — a difference that
+ * arose on conversion — and it is the same account, and the same argument, as a
+ * revaluation's. A workspace can read a year's worth of them in one place.
+ *
+ * ⚠️ AND EVERY LINE KEEPS WHAT IT ACTUALLY WAS. `original` and `rate` travel with
+ * each converted line, so a foreign receivable can be shown to the customer in
+ * their own money, reconciled against their statement, and revalued later.
+ */
+export function inBaseLines(
+  lines: readonly Line[],
+  from: string,
+  rate: number,
+  to: string,
+  exchange: string,
+  said: string,
+): readonly Line[] | ConvertRefusal {
+  const out: Line[] = [];
+  let over = 0;
+  for (const one of lines) {
+    const base = inBase(one.amount, rate, from, to);
+    if (typeof base !== "number") return base;
+    over += base;
+    out.push({ ...one, amount: base, currency: from, original: one.amount, rate });
+  }
+  /* ⚠️ AND USUALLY THERE IS NONE, so an ordinary foreign invoice carries no
+     extra line at all — the account appears when it has something to say. */
+  if (over) out.push({ account: exchange, amount: -over, memo: said });
+  return out;
+}
+
 /* ------------------------------------------------------------- revaluation --- */
 
 /**

@@ -40,7 +40,7 @@ import {
 } from "./periods.js";
 import { refusePlacing, rollUp, within, type Centre } from "./dimensions.js";
 import {
-  RATE_SCALE, inBase, refuseRate, revalueLines, unrated, type Holding,
+  RATE_SCALE, inBase, inBaseLines, refuseRate, revalueLines, unrated, type Holding,
 } from "./money.js";
 import {
   RATE_BASIS, chargeOf, entryFor, refuseItems, type Item, type Way,
@@ -887,6 +887,35 @@ function refuseCalendar(c: Pick<Ctx, "fail">, said: PostRefusal): never {
 }
 
 /**
+ * EVERY COLUMN A POSTING LINE CARRIES, AND ADDING ONE IS A BUILD FAILURE.
+ *
+ * ⚠️ THREE OF THESE WERE VALIDATED AT THE DOOR AND DROPPED HERE. `journal.post`
+ * checks a foreign line's currency, figure and rate against each other with some
+ * care, and the insert below named neither `currency`, `original` nor `rate` —
+ * so `original` was NULL on every posting ever written, and the revaluation SUMS
+ * that column. A foreign account therefore held nothing according to the books,
+ * and restating it moved its entire balance to the exchange account, on an entry
+ * that balanced and a screen that said "Restated."
+ *
+ * ⚠️ SO THE LIST IS A SHAPE RATHER THAN A HABIT. `satisfies` makes it exhaustive
+ * over `Line`: the next field somebody adds does not compile until it is written
+ * down here, which is the only mechanism that would have caught the last three.
+ */
+const KEPT = {
+  account: (line: Line) => line.account,
+  amount: (line: Line) => line.amount,
+  centre: (line: Line) => line.centre ?? null,
+  currency: (line: Line) => line.currency ?? null,
+  original: (line: Line) => line.original ?? null,
+  rate: (line: Line) => line.rate ?? null,
+  /* ⚠️ THE ENTRY'S OWN WORDS WHERE THE LINE HAS NONE, so a posting is never
+     nameless on a ledger somebody is reading down. */
+  memo: (line: Line, said: string) => line.memo ?? said,
+} satisfies Record<keyof Required<Line>, (line: Line, said: string) => unknown>;
+
+const OF_A_LINE = Object.keys(KEPT) as (keyof typeof KEPT)[];
+
+/**
  * ⚠️ IT ANSWERS WITH THE REFUSAL RATHER THAN THROWING, because its two callers
  * want different things from one. A person typing an entry is told which month
  * is shut and can reopen it; an EVENT arriving from another product has nobody
@@ -919,10 +948,12 @@ async function writeEntry(
 
   for (const line of of.lines) {
     await db.prepare(
-      `INSERT INTO posting (id, tenant_id, journal, account, centre, amount, memo, at, by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .bind(newId("pst"), c.tenantId, id, line.account, line.centre ?? null, line.amount,
-        line.memo ?? of.memo, c.now, c.accountId ?? null)
+      `INSERT INTO posting
+        (id, tenant_id, journal, ${OF_A_LINE.join(", ")}, at, by)
+        VALUES (?, ?, ?, ${OF_A_LINE.map(() => "?").join(", ")}, ?, ?)`)
+      .bind(newId("pst"), c.tenantId, id,
+        ...OF_A_LINE.map((name) => KEPT[name](line, of.memo)),
+        c.now, c.accountId ?? null)
       .run();
   }
   return { journal: id, lines: of.lines.length };
@@ -1383,7 +1414,9 @@ const itemsOf = (rows: readonly ItemRow[]): readonly Item[] =>
  */
 async function homesFor(
   c: Ctx, db: Db, way: Way,
-): Promise<{ party: string; taxTo: (code: string) => string } | null> {
+): Promise<
+  { party: string; taxTo: (code: string) => string; exchange: string | undefined } | null
+> {
   const roles = await rolesOf(db, c.tenantId);
   const party = roles.get(way === "out" ? "receivable" : "payable");
   const taxes = roles.get(way === "out" ? "tax_output" : "tax_input");
@@ -1392,8 +1425,21 @@ async function homesFor(
      filing several taxes separately wants an account each, and that is a column
      on the code — deliberately not built until a workspace has two, because the
      role already answers it for everyone who has one. */
-  return { party, taxTo: () => taxes };
+  /* ⚠️ AND THE EXCHANGE ACCOUNT IS OPTIONAL HERE ON PURPOSE, because a workspace
+     billing in its own money never needs one. It is refused where a foreign
+     document actually asks for it, not at the door of every invoice. */
+  return { party, taxTo: () => taxes, exchange: roles.get("exchange") };
 }
+
+/**
+ * WHAT CURRENCY A DOCUMENT IS IN, AND WHETHER THAT NEEDS CONVERTING.
+ *
+ * ⚠️ BLANK MEANS THE WORKSPACE'S OWN, AND SO DOES NAMING IT. Almost every
+ * document is in the currency the books are kept in, and neither spelling of
+ * that should cost a conversion, a rate, an exchange account or a refusal.
+ */
+const foreignTo = (said: string | null, base: string): string | null =>
+  said && said !== base ? said : null;
 
 /**
  * ⚠️ EVERY REFUSAL AN INVOICE HAS, ASKED BEFORE ITS NUMBER IS ISSUED. That order
@@ -1429,6 +1475,24 @@ function mayBill(way: Way) {
         : "No account is marked for what this business owes" } });
     }
 
+    /*
+      ⚠️ A FOREIGN DOCUMENT NEEDS THREE THINGS AND EVERY ONE OF THEM IS ASKED FOR
+      HERE. Without a workspace currency there is nothing to convert INTO; without
+      a rate the conversion is a guess; and without an exchange account the
+      remainder that line-by-line rounding leaves has nowhere to go, so an entry
+      that is a penny out reaches `writeEntry` and is refused there — after the
+      number is issued.
+    */
+    const foreign = foreignTo(held.sale.currency, c.currency);
+    if (foreign) {
+      if (!c.currency) return c.fail("book.no_currency");
+      if (refuseRate(held.sale.rate ?? 0)) {
+        return c.fail("book.bad_rate", {},
+          { fields: { rate: `What one ${foreign} is worth, in millionths` } });
+      }
+      if (!homes.exchange) return c.fail("book.no_exchange");
+    }
+
     /* ⚠️ THE CALENDAR, ASKED HERE RATHER THAN BY THE WRITE. `writeEntry` would
        refuse it too — and by then the number is issued, or the document is
        already withdrawn. */
@@ -1453,7 +1517,24 @@ function postBill(way: Way) {
     if (!homes) return;
 
     const items = itemsOf(held.items);
-    const lines = entryFor(items, chargeOf(items, held.rates), homes, way, at.number);
+    const charged = entryFor(items, chargeOf(items, held.rates), homes, way, at.number);
+
+    /*
+      ⚠️ THE DOCUMENT'S FIGURES ARE IN THE CURRENCY IT WAS BILLED IN, AND THE
+      LEDGER'S ARE NOT. Everything above is the customer's copy — their prices,
+      their tax, their total — and the entry is that converted at the rate the
+      document carries, with what actually moved kept on every line. `mayBill`
+      asked for the rate and the exchange account, so neither is missing here.
+    */
+    const foreign = foreignTo(held.sale.currency, c.currency);
+    const lines = foreign
+      ? inBaseLines(charged, foreign, held.sale.rate ?? 0, c.currency,
+        homes.exchange ?? "", at.number)
+      : charged;
+    if (typeof lines === "string") {
+      throw new Error(`${at.number} could not be converted: ${lines}`);
+    }
+
     /* ⚠️ THE PARTY BY NAME, because a journal entry reading `pty_0m7…` is a
        figure nobody can check against the document it came from. */
     const called = (await namesOf(db, c.tenantId)).get(held.sale.party) ?? "";
@@ -1491,12 +1572,21 @@ function unpostBill(way: Way) {
   return async (ctx: unknown, at: { id: string; number: string }): Promise<void> => {
     const c = ctx as Ctx;
     const db = c.db as Db;
+    /* ⚠️ THE FOREIGN THREE COME BACK WITH IT, because what a withdrawal has to
+       undo is the HOLDING as well as the figure: leaving `original` behind would
+       reverse the base amount and leave the account still holding somebody
+       else's money, which the next revaluation would then restate. */
     const was = await db.prepare(
-      `SELECT p.account AS account, p.centre AS centre, p.amount AS amount, j.day AS day
+      `SELECT p.account AS account, p.centre AS centre, p.amount AS amount,
+              p.currency AS currency, p.original AS original, p.rate AS rate,
+              j.day AS day
          FROM posting p JOIN journal j ON j.id = p.journal
         WHERE p.tenant_id = ? AND j.ref = ? AND j.source = ?`)
       .bind(c.tenantId, at.id, way === "out" ? "sale.posted" : "bill.posted")
-      .all<{ account: string; centre: string | null; amount: number; day: string }>();
+      .all<{
+        account: string; centre: string | null; amount: number;
+        currency: string | null; original: number | null; rate: number | null; day: string;
+      }>();
 
     const rows = was.results ?? [];
     /* ⚠️ NOTHING POSTED IS NOT A FAULT. A document cancelled before it was ever
@@ -1514,6 +1604,12 @@ function unpostBill(way: Way) {
         amount: -r.amount,
         memo: `${at.number} withdrawn`,
         ...(r.centre ? { centre: r.centre } : {}),
+        /* ⚠️ AT THE RATE IT WAS POSTED AT, NEVER AT TODAY'S. A withdrawal undoes
+           what happened; converting it afresh would post the difference between
+           two rates as an exchange gain the business never made. */
+        ...(r.currency
+          ? { currency: r.currency, original: -(r.original ?? 0), rate: r.rate }
+          : {}),
       })),
     });
     if ("why" in posted) throw new Error(`${at.number} could not be withdrawn: ${posted.why}`);
