@@ -93,6 +93,22 @@ const RESOLVERS = new Set([
   "apps/inventory/src/packing.ts",
 ]);
 
+/**
+ * ⚠️ A QUANTITY TIMES A RATE IS MONEY, NOT BASE UNITS, and that is a fact about
+ * the OPERAND rather than about the file. `quantity * rate` values a shelf;
+ * `quantity * pack` decides how many things are on it. Only the second is what
+ * this guard is about, and reading the first as a loose packing factor would
+ * make every valuation look like the bug this exists to catch.
+ *
+ * ⚠️ AN OPERAND LIST RATHER THAN A FILE EXEMPTION, WHICH IS THE NARROWER OF THE
+ * TWO. `costing.ts` is where value arithmetic lives, and waiving the whole file
+ * would waive a real `quantity * pack` written there tomorrow — which is a case
+ * that was tried, and which still fires. Naming the operands keeps the question
+ * live everywhere: a pack factor called `rate` would slip through, and it would
+ * also be wrong about what it was called.
+ */
+const PRICES = new Set(["rate", "paid", "cost", "carriage"]);
+
 /** ⚠️ Names this file binds from the resolver — those are resolved factors. */
 const resolvedIn = (src) => {
   const out = new Set();
@@ -115,6 +131,8 @@ const resolvedIn = (src) => {
         const name = hit[1];
         /* ⚠️ A literal or an inline `Math.…` is not a packing factor at all. */
         if (!name || /^\d/.test(name)) continue;
+        /* ⚠️ NOR IS A PRICE — see `PRICES`. The result is money, not units. */
+        if (PRICES.has(name)) continue;
         applied++;
         if (resolved.has(name)) continue;
         loose++;
