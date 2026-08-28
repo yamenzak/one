@@ -697,7 +697,7 @@
       "status": "live",
       "impl": "scripts/space.test.mjs",
       "proves": "founding: a new workspace starts with every product",
-      "fails": "a workspace founded holding a subset of what one membership already bought \u2014 a destination missing from its bar, on a plan whose own copy says \"everything we make\", and no screen anywhere saying why"
+      "fails": "a workspace founded holding a subset of what one membership already bought — a destination missing from its bar, on a plan whose own copy says \"everything we make\", and no screen anywhere saying why"
     },
     {
       "id": "a-destination-nobody-can-reach-is-never-drawn",
@@ -3368,7 +3368,7 @@
       "status": "live",
       "impl": "scripts/shadow.test.mjs",
       "proves": "collection id(s) across the apps, each declared by one",
-      "fails": "two products declaring `party` on the one shard every app applies its schema to \u2014 `CREATE TABLE IF NOT EXISTS` is won by whichever runs first, the loser's columns silently never exist, its inserts fail on a field it declared, and every manifest is correct when asked on its own"
+      "fails": "two products declaring `party` on the one shard every app applies its schema to — `CREATE TABLE IF NOT EXISTS` is won by whichever runs first, the loser's columns silently never exist, its inserts fail on a field it declared, and every manifest is correct when asked on its own"
     },
     {
       "id": "a-reserved-concept-belongs-to-the-app-that-owns-it",
@@ -3377,7 +3377,17 @@
       "status": "live",
       "impl": "scripts/shadow.test.mjs",
       "proves": "reserved concept(s),",
-      "fails": "a fourth product keeping its own `customer` table, so a company's suppliers are half-known in four places that disagree about which is current \u2014 and the duplicate check cannot see it until the second app exists, which is a year after the name stopped being free to change"
+      "fails": "a fourth product keeping its own `customer` table, so a company's suppliers are half-known in four places that disagree about which is current — and the duplicate check cannot see it until the second app exists, which is a year after the name stopped being free to change"
+    },
+    {
+      "id": "a-borrowed-record-yields-its-name-and-nothing-else",
+      "protects": "D122",
+      "stage": "99",
+      "status": "live",
+      "impl": "scripts/borrowed.test.mjs",
+      "proves": "statement(s) against a table another product owns",
+      "fails": "`SELECT * FROM party` inside a handler — the kernel refuses `supplier.taxId` at composition and a handwritten statement never goes near it, so another product's tax numbers, payment terms and contact rows arrive in this one's memory with nothing in any manifest to say so",
+      "becomes": "elsewhere: one statement per borrowed table, in the open, in the shape a guard can read — a parsed SELECT list is a parser, and a parser is a thing that quietly fails to understand an alias"
     },
     {
       "id": "an-app-never-imports-another-app",
@@ -3386,7 +3396,7 @@
       "status": "live",
       "impl": "scripts/apps.test.mjs",
       "proves": "import(s) of ours, all kernel or design",
-      "fails": "one product reaching another's source instead of borrowing its records \u2014 a workspace that installed OneInventory would carry OneBook whole, and one product's deploy would be the other's; the relative path out of a tree does it with nothing in the module graph to say so"
+      "fails": "one product reaching another's source instead of borrowing its records — a workspace that installed OneInventory would carry OneBook whole, and one product's deploy would be the other's; the relative path out of a tree does it with nothing in the module graph to say so"
     },
     {
       "id": "the-chrome-slot-and-the-bar-seat-are-exclusive",

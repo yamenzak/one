@@ -1337,6 +1337,30 @@ function mine(c: Ctx, location: string | null | undefined): void {
 /* ------------------------------------------------------------- a supplier --- */
 
 /**
+ * WHAT EVERY PARTY IN THIS WORKSPACE IS CALLED — the ONE place this app reads a
+ * table it does not own.
+ *
+ * ⚠️ A BORROWED RECORD GIVES ITS NAME AND NOTHING ELSE (D122), AND THIS IS WHERE
+ * THAT STOPS BEING A PROMISE. The kernel enforces it for a declared PATH, and a
+ * handwritten statement goes nowhere near the kernel: `SELECT * FROM party` in
+ * any handler would put another product's tax numbers, terms and contact rows in
+ * this one's memory, and nothing in the manifest would have a word to say. So
+ * the statement lives once, in the open, in the shape a guard can read —
+ * `borrowed.test.mjs` fails on any other mention of a borrowed table in this
+ * app's source, which is a check about a SHAPE rather than about intent.
+ *
+ * ⚠️ AND IT IS A MAP RATHER THAN A JOIN, WHICH IS WHY THE REPORT DOES NOT BUILD
+ * ITS OWN. A `LEFT JOIN party` reaching for one more column is a two-word edit
+ * nobody would question in review; two statements merged in memory cannot grow
+ * that way, and both are bounded by the workspace either way.
+ */
+async function namesOf(db: Db, c: Ctx): Promise<Map<string, string>> {
+  const said = await db.prepare(`SELECT id, name FROM party WHERE tenant_id = ?`)
+    .bind(c.tenantId).all<{ id: string; name: string }>();
+  return new Map(said.results.map((row) => [String(row.id), String(row.name)]));
+}
+
+/**
  * THIS PARTY IS SOMEBODY WE BUY FROM — recorded once, and only once.
  *
  * ⚠️ THE ROW'S ID IS THE PARTY'S, SO `OR IGNORE` IS THE WHOLE OF THE RACE. Two
@@ -6261,13 +6285,11 @@ const doImport = operation<
        row put on it is stock in a place that does not exist — while an
        unrecognised supplier costs the product nothing but a blank field.
 
-       ⚠️ TWO COLUMNS OF ANOTHER PRODUCT'S TABLE, WHICH IS THE WHOLE OF WHAT A
-       BORROWED RECORD GIVES (D122). The id to point at and the name to match on;
-       nothing here reads what a party is, what it is taxed as, or where it is. */
-    const parties = await db.prepare(`SELECT id, name FROM party WHERE tenant_id = ?`)
-      .bind(c.tenantId).all<{ id: string; name: string }>();
+       ⚠️ THROUGH `namesOf`, WHICH IS THE ONE PLACE THIS APP READS A TABLE IT
+       DOES NOT OWN (D122). The name to match on and the id to point at; nothing
+       here reads what a party is, what it is taxed as, or where it is. */
     const partyOf = new Map(
-      parties.results.map((r) => [String(r.name).toLowerCase(), String(r.id)]));
+      [...(await namesOf(db, c))].map(([id, name]) => [name.toLowerCase(), id]));
 
     let made = 0;
     let changed = 0;
@@ -6779,16 +6801,22 @@ const report = operation<{ today: string; span?: string }, Reported>({
        line of a report drawn on every visit.
 
        ⚠️ AND THEY COME FROM TWO TABLES NOW, WHICH IS THE SEAM RATHER THAN A COST
-       (D122). The name is OneParty's — two columns of it, the id and the name,
-       which is the whole of what a borrowed record gives — and how long they take
-       is ours, in `supplying`. A `LEFT JOIN` because a party this workspace has
-       never recorded a lead time for still has to be ringable. */
-    const from = await db.prepare(
-      `SELECT p.id AS id, p.name AS name, s.leadDays AS leadDays
-         FROM party p LEFT JOIN supplying s ON s.id = p.id AND s.tenant_id = p.tenant_id
-        WHERE p.tenant_id = ?`)
-      .bind(c.tenantId).all<{ id: string; name: string; leadDays: number | null }>();
-    const supplied = new Map(from.results.map((row) => [String(row.id), row]));
+       (D122). The name is OneParty's and arrives through `namesOf`; how long they
+       take is ours, in `supplying`. Merged in memory rather than joined, and that
+       is deliberate — see `namesOf`: a `LEFT JOIN party` reaching for one more
+       column is a two-word edit nobody would question in review.
+
+       ⚠️ AND A PARTY WITH NO LEAD TIME RECORDED IS STILL RINGABLE. `null` rather
+       than absent, because a supplier nobody has been asked how long they take is
+       not a supplier who delivers today. */
+    const [parties, ours] = await Promise.all([
+      namesOf(db, c),
+      db.prepare(`SELECT id, leadDays FROM supplying WHERE tenant_id = ?`)
+        .bind(c.tenantId).all<{ id: string; leadDays: number | null }>(),
+    ]);
+    const takes = new Map(ours.results.map((row) => [String(row.id), row.leadDays]));
+    const supplied = new Map([...parties].map(([id, name]) =>
+      [id, { id, name, leadDays: takes.get(id) ?? null }]));
 
     const balances = await db.prepare(
       /* ⚠️ THE SAME NARROWING AS THE MOVEMENTS ABOVE, and the pair has to agree:

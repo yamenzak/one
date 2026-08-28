@@ -987,6 +987,7 @@ its own header, cited by other files, and doing nothing.
 | `an-apps-table-never-shadows-the-platforms` | D114 | two schema modules creating one table name — `CREATE TABLE IF NOT EXISTS` is won by whichever runs first, the loser's indexes then name columns that are not there, `ensureSchema` throws, and every route that touches D1 answers 500 including `/health` |
 | `no-two-apps-declare-one-collection` | D120 | two products declaring `party` on the one shard every app applies its schema to — `CREATE TABLE IF NOT EXISTS` is won by whichever runs first, the loser's columns silently never exist, its inserts fail on a field it declared, and every manifest is correct when asked on its own |
 | `a-reserved-concept-belongs-to-the-app-that-owns-it` | D120 | a fourth product keeping its own `customer` table, so a company's suppliers are half-known in four places that disagree about which is current — and the duplicate check cannot see it until the second app exists, which is a year after the name stopped being free to change |
+| `a-borrowed-record-yields-its-name-and-nothing-else` | D122 | `SELECT * FROM party` inside a handler — the kernel refuses `supplier.taxId` at composition and a handwritten statement never goes near it, so another product's tax numbers, payment terms and contact rows arrive in this one's memory with nothing in any manifest to say so |
 | `an-app-never-imports-another-app` | D120 | one product reaching another's source instead of borrowing its records — a workspace that installed OneInventory would carry OneBook whole, and one product's deploy would be the other's; the relative path out of a tree does it with nothing in the module graph to say so |
 | `the-chrome-slot-and-the-bar-seat-are-exclusive` | D53 | one screen offered twice in one row of chrome, and a scarce bar slot spent on a door the crown is already holding open |
 | `the-first-destination-is-the-app-s-own-root` | D53 | a product whose bar opens on its second screen — two answers to where it starts, and the one somebody lands on is unmarked |
@@ -1215,7 +1216,7 @@ its own header, cited by other files, and doing nothing.
 | D119 | One valuation method, and back-dating is refused in writing | 0 |
 | D120 | One record, one owner: apps share rather than each keep a copy | 3 |
 | D121 | One membership buys every product, and a workspace starts with all of them | 1 |
-| D122 | A borrowed record gives its name and nothing else | 0 |
+| D122 | A borrowed record gives its name and nothing else | 1 |
 | D123 | One address book, and OneInventory reads it rather than keeping a second | 0 |
 <!-- /generated -->
 

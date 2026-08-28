@@ -4956,6 +4956,28 @@ A rule about what may cross an app boundary has to refuse at composition.
 Every rule here is mutation-tested — the two refusals in `kernel/test/manifest.test.ts`,
 the name-only reach and both halves of the statement in `runtime/test/joined.test.ts`.
 
+### And the half no declaration can reach: `borrowed.test.mjs`
+
+Everything above is about a DECLARED path. A `SELECT * FROM party` inside a
+handler never goes near the kernel, appears in no manifest, and would put another
+product's tax numbers, terms and contact rows in this one's memory with nothing
+anywhere saying a word. So an app may name a borrowed table **exactly once** in
+its source, in **exactly** `SELECT id, name FROM <table> WHERE tenant_id = ?`,
+and everything else in the app reads that one answer.
+
+⚠️ **ONE STATEMENT RATHER THAN A PARSED SELECT LIST, AND THAT IS THE WHOLE
+DESIGN.** Reading the columns out of arbitrary SQL is a parser, and a parser is a
+thing that quietly fails to understand an alias — `SELECT p.taxId FROM party p`
+is two characters from the shape a naive matcher waves through. A count and a
+literal cannot be talked past. It is `storage-chokepoint.test.mjs` one boundary
+over, for the same reason: a write behind the ledger is invisible for ever, and
+nothing else would notice.
+
+Five mutations, all firing: a `*`, an alias reaching for a private column, the
+scope clause dropped, a second statement beside the canonical one, and the seam
+removed entirely — the last because a guard that asks nothing prints exactly like
+a guard that passed.
+
 ---
 
 ## D123 — One address book, and OneInventory reads it rather than keeping a second
