@@ -5341,3 +5341,93 @@ for `IS NULL` would quietly miss half the rows. `text` and `long` keep `""`,
 where an empty string is a value somebody typed nothing into. **And the same
 change closes the opposite hole**: `required` was read by the create path alone,
 so a patch could take a record's name away and answer 200.
+
+## D128
+
+**The books are kept in one currency and a posting may record another.** A
+workspace's own currency reaches an app through `Ctx.currency`; an account may
+name a currency of its own; a posting line carries what actually moved, at what
+rate, beside the base figure the ledger adds up; and `book.revalue` restates the
+foreign accounts at a date's rates.
+
+### `amount` is still the only figure that balances
+
+Every balance, report and check adds up the base column, so an entry balances
+however many currencies it touches. The other two columns are not decoration:
+without them a business cannot say how many dollars are in the dollar account —
+the base figure has moved with every rate since — cannot reconcile against a
+foreign bank statement, and cannot show a supplier what it owes in their money.
+
+### A rate is an integer of millionths, never a float
+
+`0.1 + 0.2` is famously not `0.3`, and a rate multiplied into every line of every
+entry is the worst place for it: the error is small, different per line, and
+surfaces as a trial balance out by pennies with nothing to point at. Six places
+is what banks and central banks publish.
+
+**The bounds on a rate are for typos, not economics.** Real rates span from a
+millionth of a bitcoin to fourteen hundred won, so the floor and ceiling are wide
+enough that no real quote meets them. What they catch is a rate typed into the
+amount box.
+
+### The conversion is minor-unit aware, and that is the trap
+
+A hundred yen and a hundred cents are the same integer and a hundredfold apart.
+A conversion assuming two decimal places is right for most of the world and wrong
+by 100 for Japan, Korea and Iceland — in a figure that looks entirely plausible.
+`minorDigitsOf` is exported from the kernel (it was already there, private,
+behind `sayMoney`) and asked about **both** currencies. A second copy of that
+fact anywhere is a second place to be wrong about the yen.
+
+### And the arithmetic is `BigInt`, for a reason worth stating precisely
+
+A billion in cents times a rate in millionths is 1e17, past what a double holds
+exactly — and the error is usually absorbed by the division that follows, so most
+large figures come out right with floats and a few do not. Finding a case that
+actually differs took several attempts, and that is the argument: reasoning about
+where the boundary sits is something somebody has to re-check on every edit, over
+an arithmetic whose failure is money. Exact is cheaper than
+correct-if-you-think-about-it. The result is then checked to fit inside an exact
+integer before it leaves, because `field.money` is a JavaScript number.
+
+### The base figure is recomputed, never trusted
+
+A caller sending a foreign amount, a rate and a base figure is a caller who can
+send two numbers that do not agree — and a ledger that adds up one of them while
+a bank statement reconciles against the other is a set of books that balances and
+cannot be reconciled. `journal.post` recomputes and refuses a mismatch, which is
+the same shape as `planRun` returning its prompt and its reserve from one call.
+
+### Rates are typed, not fetched
+
+A rate a business files a return on is one it can point at a source for — a
+central bank's published figure, or the rate its own bank actually gave it — and
+those two differ. Pulling a third number off an API and posting it would be
+inventing a figure the business cannot defend. `rate` is dated, and the lookup
+takes the latest on or before the day, which is what an accountant does.
+
+### Revaluation posts an entry, and names what it could not do
+
+A balance sheet is as at a date, and a foreign balance has to be shown at that
+date's rate; a dollar account filled at 3.60 and still reported at 3.60 a year
+later states a figure that was true once. **It posts rather than displaying** —
+`year.close`'s argument — because a revaluation nobody posted is a number the
+next report disagrees with. **An account whose currency has no rate is left out
+and the currency is named**: guessing a rate is inventing a figure and posting
+it, and skipping silently would be a report that ran, claimed success, and left
+the one account somebody was asking about exactly as wrong as it was.
+
+### What is deferred, and why it could not be built yet
+
+**Exchange gain or loss on settlement** — a receivable booked at one rate and
+paid at another — needs a payment allocated against an invoice, and neither
+exists yet. Building the arithmetic now would be an export nothing imports, which
+this repository's capability guard refuses on purpose. Revaluation is the half
+that needs no allocation, and it is complete.
+
+### One reserved word, found by the composer
+
+`foreign` is a word SQL means something by, and the kernel refuses a field named
+one — so the column is `original`, which is the standard phrase anyway ("the
+amount in the original currency"). The refusal arrived at composition rather than
+as a `CREATE TABLE` that would not parse on a deployment.

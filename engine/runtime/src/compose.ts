@@ -77,6 +77,21 @@ export interface Ctx {
    * at every place that does not.
    */
   readonly now: string;
+  /**
+   * WHAT THIS WORKSPACE'S MONEY IS IN.
+   *
+   * ⚠️ `field.money` IS MINOR UNITS OF SOMETHING (D117), AND THIS IS THE
+   * SOMETHING. A product holding two amounts in different currencies cannot add
+   * them without knowing which one the books are kept in, and until this the
+   * only place that knew was the surface — so an app doing the arithmetic would
+   * have had to read the platform's own `tenant` table, which is the seam this
+   * exists to keep closed.
+   *
+   * ⚠️ AND `""` IS A DEPLOYMENT THAT NEVER SET ONE, which every consumer already
+   * reads as unconfigured. A handler that needs it refuses rather than guessing:
+   * a guessed currency is a figure that is wrong by a factor nobody can see.
+   */
+  readonly currency: string;
   /** ⚠️ Refuse from inside a handler with a catalogue code, never a bare throw. */
   /**
    * ⚠️ `values` FILLS THE SENTENCE'S TOKENS; `fields` SAYS WHICH INPUT IS WRONG.

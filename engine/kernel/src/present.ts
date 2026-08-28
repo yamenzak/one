@@ -614,23 +614,37 @@ export function sayMoney(shown: Shown, minor: number, currency: string): string 
 }
 
 /**
+ * HOW MANY DIGITS THIS CURRENCY KEEPS AFTER THE POINT.
+ *
  * ⚠️ ASKED OF `Intl` RATHER THAN LISTED, for the same reason as the date order:
  * a table of zero-decimal currencies is a table that goes stale, and the runtime
  * already ships the answer.
+ *
+ * ⚠️ AND IT IS EXPORTED BECAUSE CONVERTING BETWEEN TWO CURRENCIES NEEDS BOTH.
+ * A hundred yen and a hundred cents are the same integer and a hundredfold apart
+ * — so a conversion that assumed two digits is right for most of the world and
+ * wrong by 100 for Japan, Korea and Iceland, in a figure that looks entirely
+ * plausible. This is the one fact that makes the arithmetic possible, and a
+ * second copy of it somewhere else is a second place to be wrong about the yen.
+ *
+ * ⚠️ AN UNKNOWN CODE ANSWERS 2, which is what `Intl` does for one it recognises
+ * and cannot detail, and what nearly every currency uses. Throwing would make an
+ * unrecognised code an outage rather than a rounding a person can check.
  */
-const minorPer = (currency: string): number => {
-  const key = `m:${currency}`;
-  const had = KEPT.get(key) as unknown as { readonly per?: number } | undefined;
-  if (had?.per) return had.per;
-  let per = 100;
+export const minorDigitsOf = (currency: string): number => {
+  const key = `d:${currency}`;
+  const had = KEPT.get(key) as unknown as { readonly digits?: number } | undefined;
+  if (had?.digits !== undefined) return had.digits;
+  let digits = 2;
   try {
-    const digits = new Intl.NumberFormat("en", { style: "currency", currency })
+    digits = new Intl.NumberFormat("en", { style: "currency", currency })
       .resolvedOptions().maximumFractionDigits ?? 2;
-    per = 10 ** digits;
-  } catch { per = 100; }
-  KEPT.set(key, { per } as never);
-  return per;
+  } catch { digits = 2; }
+  KEPT.set(key, { digits } as never);
+  return digits;
 };
+
+const minorPer = (currency: string): number => 10 ** minorDigitsOf(currency);
 
 /**
  * MONEY, TAKEN APART, SO THE FRACTION CAN BE SET SMALLER THAN THE WHOLE.

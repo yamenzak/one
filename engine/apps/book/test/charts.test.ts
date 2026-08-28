@@ -27,7 +27,7 @@ describe("every chart this deployment ships", () => {
 
       /* ⚠️ ASKED SEPARATELY FROM `refuseChart` SO A FAILURE NAMES THE ROLE. The
          rule above reports a list; this says which country is missing what. */
-      it("covers all sixteen roles", () => {
+      it("covers every role a posting rule can name", () => {
         const held = rowsOf(chart).map((row) => row.node.role).filter(Boolean);
         expect([...held].sort()).toEqual([...ROLES].sort());
       });

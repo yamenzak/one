@@ -2,7 +2,7 @@
  * ONEBOOK — THE BOOKS, IN ANY COUNTRY.
  *
  * ⚠️ A POSTING RULE NAMES A ROLE, NEVER AN ACCOUNT, AND THAT IS THE WHOLE
- * INTERNATIONAL DESIGN. `roles.ts` holds the sixteen; `charts.ts` holds the
+ * INTERNATIONAL DESIGN. `roles.ts` holds them; `charts.ts` holds the
  * templates that tag them. A German workspace tags `1400 Forderungen aus L+L`
  * `receivable`, a British one tags `Trade debtors`, and a workspace that threw
  * the template away tags whatever it built — and the posting code is identical.
@@ -39,6 +39,9 @@ import {
   type Period, type PostRefusal, type Standing as AccountStanding, type Year,
 } from "./periods.js";
 import { refusePlacing, rollUp, within, type Centre } from "./dimensions.js";
+import {
+  RATE_SCALE, inBase, refuseRate, revalueLines, unrated, type Holding,
+} from "./money.js";
 
 /* ------------------------------------------------------------------ shapes --- */
 
@@ -55,6 +58,8 @@ interface Db {
 interface Ctx {
   readonly db: unknown;
   readonly tenantId: string;
+  /** ⚠️ What this workspace's money is in — see `Ctx.currency` in the runtime. */
+  readonly currency: string;
   readonly accountId?: string;
   readonly now: string;
   fail(
@@ -126,6 +131,22 @@ const account = collection({
       label: "Used for", holds: "none",
       values: [...ROLES],
       help: "What the books post here automatically. One account per job.",
+    }),
+    /*
+      ⚠️ WHOSE MONEY THIS ACCOUNT HOLDS, AND EMPTY IS THE WORKSPACE'S OWN. A
+      dollar bank account in a dirham business is one row with `USD` here — and
+      what makes that meaningful is `posting.original`, which keeps what is
+      actually IN it beside what the books say it was worth.
+
+      ⚠️ `settled`, FOR `type`'s REASON ONE STEP OVER. Changing the currency of an
+      account that has anything in it reinterprets every posting already against
+      it: the same integers now mean dollars instead of dirhams, every balance is
+      out by the rate, and nothing was written anywhere near a figure. An account
+      in the wrong currency is closed and a new one opened.
+    */
+    currency: field.text({
+      label: "Currency", holds: "none", max: 3, settled: true,
+      help: "Three letters. Leave empty for the workspace's own.",
     }),
     parent: field.ref({ label: "Under", holds: "none", to: "account" }),
     /*
@@ -323,7 +344,69 @@ const posting = collection({
       label: "Amount", required: true, holds: "none",
       help: "Positive is a debit, negative is a credit.",
     }),
+    /*
+      ⚠️ THE THREE COLUMNS THAT MAKE A FOREIGN POSTING READABLE, AND `amount` IS
+      STILL THE ONE THAT BALANCES. What was actually paid, in what, and at what
+      rate — see `money.ts`. Without them the base figure has moved with every
+      rate since, so nobody can say how many dollars are in the dollar account,
+      reconcile against a foreign statement, or revalue anything.
+
+      ⚠️ AND THEY ARE ALL EMPTY FOR AN ORDINARY POSTING, which is almost every
+      posting. A business with one currency never fills one in and pays nothing
+      for them but three nulls.
+    */
+    currency: field.text({ label: "Paid in", holds: "none", max: 3 }),
+    original: field.money({
+      label: "In that currency", holds: "none",
+      help: "What actually moved. The amount beside it is what the books say.",
+    }),
+    /* ⚠️ MILLIONTHS, NOT A FLOAT — see `RATE_SCALE`. A rate held as a float is
+       out by a fraction of a cent per line, differently each time, and surfaces
+       as a trial balance that will not close. */
+    rate: field.number({ label: "Rate", holds: "none", min: 0 }),
     memo: field.text({ label: "What it was", required: true, holds: "none", max: 200 }),
+  },
+});
+
+/**
+ * WHAT A CURRENCY WAS WORTH ON A DAY.
+ *
+ * ⚠️ TYPED, NOT FETCHED, AND THAT IS DELIBERATE FOR NOW. A rate a business
+ * files a return on is one they can point at a source for — a central bank's
+ * published figure, or the rate their own bank actually gave them — and those
+ * two differ. Pulling a third number off an API and posting it would be
+ * inventing a figure the business cannot defend.
+ *
+ * ⚠️ AND IT IS DATED, BECAUSE A RATE IS ONLY EVER TRUE ON A DAY. `rateOn` reads
+ * the latest one on or before the day being asked about, which is what an
+ * accountant does: yesterday's rate is the answer for a day nobody quoted.
+ */
+const rate = collection({
+  id: "rate",
+  label: { one: "Rate", many: "Rates" },
+  scope: { of: "tenant" },
+  /* ⚠️ THE JOURNAL'S GRANT. A rate is what a posting is converted at, so whoever
+     may post may record the rate they posted at — and a separate key would put
+     a bookkeeper's ordinary Tuesday behind somebody else's permission. */
+  permission: "journal",
+  retention: null,
+  onClose: { then: "keep", why: "what a figure was converted at, which outlives the business" },
+  searchable: ["currency"],
+  names: "currency",
+  fields: {
+    currency: field.text({
+      label: "Currency", required: true, holds: "none", max: 3, settled: true,
+      help: "Three letters, against this workspace's own.",
+    }),
+    day: field.day({ label: "On", required: true, holds: "none", settled: true }),
+    /* ⚠️ MILLIONTHS. One unit of that currency, in this workspace's own — so
+       3.6725 dirhams to the dollar is 3672500. */
+    rate: field.number({
+      label: "Millionths", required: true, holds: "none", min: 1,
+      help: "One unit, in your currency, times a million.",
+    }),
+    said: field.text({ label: "From", holds: "none", max: 120,
+      help: "Where it came from. A central bank, or your own bank's advice." }),
   },
 });
 
@@ -642,6 +725,33 @@ async function centresOf(db: Db, tenantId: string): Promise<readonly Centre[]> {
   return got.results.map((r) => ({ ...r, closed: !!r.closed }));
 }
 
+/**
+ * WHAT EVERY CURRENCY WAS WORTH ON A DAY, IN ONE READ.
+ *
+ * ⚠️ THE LATEST ROW ON OR BEFORE THE DAY, WHICH IS WHAT AN ACCOUNTANT DOES.
+ * Nobody quotes a rate for every day, and yesterday's is the answer for a day
+ * nobody quoted — so a lookup demanding an exact match would refuse most days of
+ * the year for a workspace keeping perfectly good records.
+ *
+ * ⚠️ AND IT IS ONE STATEMENT, NOT ONE PER CURRENCY. A business holds a handful
+ * of currencies and years of rates; asking per currency would be a fan-out
+ * growing with how long it has been trading.
+ */
+async function ratesOn(
+  db: Db, tenantId: string, day: string,
+): Promise<ReadonlyMap<string, number>> {
+  const got = await db.prepare(
+    `SELECT currency, rate FROM rate
+      WHERE tenant_id = ? AND day <= ?
+      ORDER BY currency ASC, day ASC`)
+    .bind(tenantId, day).all<{ currency: string; rate: number }>();
+  /* ⚠️ OLDEST FIRST AND OVERWRITTEN, so the last row for a currency wins — the
+     newest on or before the day, which is the one that is true. */
+  const out = new Map<string, number>();
+  for (const row of got.results) out.set(row.currency, row.rate);
+  return out;
+}
+
 /** ⚠️ Every role-tagged account in one read, rather than one query per side. */
 async function rolesOf(db: Db, tenantId: string): Promise<Map<string, string>> {
   const rows = await db.prepare(
@@ -688,6 +798,7 @@ const post = operation<Posting, Posted>({
   fails: [
     "platform.invalid", "book.unbalanced", "book.no_account",
     "book.centre_needed", "book.no_centre",
+    "book.no_currency", "book.bad_rate", "book.rate_disagrees",
   ],
   audit: (input) => ({ subject: input.memo, verb: "posted" }),
   async handler(ctx, input) {
@@ -702,6 +813,9 @@ const post = operation<Posting, Posted>({
         amount: Number(row.amount ?? 0),
         ...(row.memo ? { memo: String(row.memo) } : {}),
         ...(row.centre ? { centre: String(row.centre) } : {}),
+        ...(row.currency ? { currency: String(row.currency) } : {}),
+        ...(row.original ? { original: Number(row.original) } : {}),
+        ...(row.rate ? { rate: Number(row.rate) } : {}),
       };
     });
 
@@ -758,6 +872,36 @@ const post = operation<Posting, Posted>({
       if (said === "centre_closed") {
         return c.fail("book.no_centre", {},
           { fields: { lines: "One cost centre is closed" } });
+      }
+    }
+
+    /*
+      ⚠️ A FOREIGN LINE CARRIES ITS OWN RATE AND ITS OWN FIGURE, AND `amount` IS
+      STILL WHAT BALANCES. What is checked here is that the three agree: a rate
+      that is not a rate, or a base figure that is not what the rate produces,
+      would make the ledger and the foreign column disagree — and the foreign
+      column is the one a bank statement is reconciled against.
+
+      ⚠️ AND THE BASE FIGURE IS RECOMPUTED RATHER THAN TRUSTED. A caller sending
+      both is a caller who can send two numbers that do not match; recomputing
+      makes the pair impossible to disagree, which is the same shape as `planRun`
+      returning its prompt and its reserve from one call.
+    */
+    for (const line of lines) {
+      if (!line.currency) continue;
+      if (!c.currency) return c.fail("book.no_currency");
+      const wrong = refuseRate(line.rate ?? 0);
+      if (wrong) {
+        return c.fail("book.bad_rate", {},
+          { fields: { lines: wrong === "rate_absurd" ? "That rate is not a rate" : "Every foreign line needs a rate" } });
+      }
+      const should = inBase(line.original ?? 0, line.rate ?? 0, line.currency, c.currency);
+      if (typeof should !== "number") {
+        return c.fail("platform.invalid", {}, { fields: { lines: "That figure is too large" } });
+      }
+      if (should !== line.amount) {
+        return c.fail("book.rate_disagrees", {},
+          { fields: { lines: "The amount is not what that rate gives" } });
       }
     }
 
@@ -918,6 +1062,93 @@ const centres = operation<
         own: own.get(one.id) ?? 0,
         whole: whole.get(one.id) ?? 0,
       })),
+    };
+  },
+});
+
+/**
+ * RESTATING WHAT THE FOREIGN ACCOUNTS ARE WORTH TODAY.
+ *
+ * ⚠️ A BALANCE SHEET IS AS AT A DATE, AND A FOREIGN BALANCE HAS TO BE SHOWN AT
+ * THAT DATE'S RATE. A dollar account filled when a dollar was 3.60 and still
+ * reported at 3.60 a year later states a figure that was true once — every
+ * jurisdiction requires it restated, and the difference is a gain or a loss the
+ * business has already made whether or not anybody writes it down.
+ *
+ * ⚠️ IT POSTS AN ENTRY RATHER THAN SHOWING A NUMBER, which is the same argument
+ * `year.close` makes. A revaluation nobody posted is a figure on a screen that
+ * the next report disagrees with; posted, it is in the ledger and every report
+ * derives from it.
+ *
+ * ⚠️ AND AN ACCOUNT IT HAS NO RATE FOR IS LEFT OUT AND NAMED. Guessing a rate is
+ * inventing a figure and posting it; skipping silently would be a report that
+ * ran, said it succeeded, and left the one account somebody was asking about
+ * exactly as wrong as it was.
+ */
+const revalue = operation<{ day: string }, { journal: string; moved: number; missing: string }>({
+  id: "book.revalue",
+  kind: "write",
+  summary: "Restate the foreign accounts at today's rates",
+  input: { day: field.day({ label: "As at", required: true, holds: "none" }) },
+  output: {
+    journal: field.text({ label: "Entry", holds: "none" }),
+    moved: field.money({ label: "Gain or loss", holds: "none" }),
+    missing: field.text({ label: "No rate for", holds: "none" }),
+  },
+  permission: "journal:write",
+  idempotency: { mode: "key" },
+  emits: ["book.revalued"],
+  outcome: { message: "Restated.", tone: "success", invalidates: ["journal.list"] },
+  fails: ["book.no_currency", "book.no_exchange"],
+  audit: (input) => ({ subject: String(input.day), verb: "revalued the foreign accounts" }),
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const db = c.db as Db;
+    if (!c.currency) return c.fail("book.no_currency");
+
+    const home = await db.prepare(
+      `SELECT id FROM account WHERE tenant_id = ? AND role = 'exchange' AND closed = 0 LIMIT 1`)
+      .bind(c.tenantId).first<Row>();
+    if (!home) return c.fail("book.no_exchange");
+
+    /*
+      ⚠️ SUMMED IN ONE STATEMENT, AND THE ACCOUNT'S OWN CURRENCY DECIDES. What is
+      IN the account is the sum of `original`; what the books say it was worth is
+      the sum of `amount`, converted on the day each posting landed. The gap
+      between them is the whole report.
+    */
+    const sums = await db.prepare(
+      `SELECT p.account AS account, a.currency AS currency,
+              COALESCE(SUM(p.original), 0) AS original, COALESCE(SUM(p.amount), 0) AS base
+         FROM posting p JOIN journal j ON j.id = p.journal
+         JOIN account a ON a.id = p.account
+        WHERE p.tenant_id = ? AND j.day <= ?
+          AND a.currency IS NOT NULL AND a.currency <> '' AND a.currency <> ?
+        GROUP BY p.account, a.currency`)
+      .bind(c.tenantId, String(input.day), c.currency)
+      .all<Holding>();
+
+    const held = sums.results ?? [];
+    const rates = await ratesOn(db, c.tenantId, String(input.day));
+    const lines = revalueLines(held, rates, c.currency, String(home.id),
+      `Revalued ${String(input.day)}`);
+    const missing = unrated(held, rates).join(", ");
+
+    /* ⚠️ NOTHING TO POST IS A SUCCESS, not a refusal. A workspace whose rates
+       have not moved is a workspace whose books are already right. */
+    if (!lines.length) return { journal: "", moved: 0, missing };
+
+    const posted = await writeEntry(c, db, {
+      day: String(input.day),
+      memo: `Revalued ${String(input.day)}`,
+      source: "book.revalue",
+      lines,
+    });
+    if ("why" in posted) refuseCalendar(c, posted);
+    return {
+      journal: posted.journal,
+      moved: -(lines[lines.length - 1]?.amount ?? 0),
+      missing,
     };
   },
 });
@@ -1414,9 +1645,9 @@ const manifest = (): AppSpec => defineApp({
   */
   entitlements: {},
 
-  collections: [account, centre, journal, posting, rule, year, period],
+  collections: [account, centre, journal, posting, rate, rule, year, period],
 
-  operations: [start, extend, post, trial, standing, centres,
+  operations: [start, extend, post, trial, standing, centres, revalue,
     openYear, closeYear, reopenYear, shutPeriod],
 
   /*
@@ -1672,6 +1903,37 @@ const manifest = (): AppSpec => defineApp({
       title: "One line names a closed cost centre",
       detail: "Every centre a line names is open. Check the lines.",
     },
+    /*
+      ⚠️ A DEPLOYMENT THAT NEVER SET A CURRENCY CANNOT CONVERT ANYTHING, and a
+      guessed one is a figure wrong by a factor nobody can see. It is a real
+      configuration gap rather than a mistake this person made, so the sentence
+      says where to fix it.
+    */
+    "book.no_currency": {
+      status: 409, retryable: false, tone: "warning",
+      title: "This workspace has no currency",
+      detail: "Set one before recording anything in another.",
+    },
+    "book.bad_rate": {
+      status: 409, retryable: false, tone: "warning",
+      title: "That rate is not a rate",
+      detail: "A rate is a whole number of millionths. Check the line.",
+    },
+    /*
+      ⚠️ THE FIGURE AND THE RATE HAVE TO AGREE, because the ledger adds up one of
+      them and a bank statement reconciles against the other. Two numbers that
+      disagree is a set of books that balances and cannot be reconciled.
+    */
+    "book.rate_disagrees": {
+      status: 409, retryable: false, tone: "warning",
+      title: "The amount and the rate do not agree",
+      detail: "The amount is what the rate gives. Check the line.",
+    },
+    "book.no_exchange": {
+      status: 409, retryable: false, tone: "warning",
+      title: "There is nowhere to put the difference",
+      detail: "One account has to be marked for exchange gain or loss.",
+    },
     "book.no_reserves": {
       status: 409, retryable: false, tone: "warning",
       title: "There is nowhere to put the profit",
@@ -1699,6 +1961,9 @@ const manifest = (): AppSpec => defineApp({
       where: [{ field: "centre", is: { here: "record" } }] },
     { id: "centre-totals", of: "centre",
       asked: { operation: "book.centres", take: "items" } },
+    /* ⚠️ NEWEST FIRST, because "what is it worth today" is the question, and the
+       history under it is what somebody checks afterwards. */
+    { id: "rates", of: "rate", limit: 100 },
     /* ⚠️ NEWEST FIRST IS WRONG FOR A YEAR. The books are read forwards — 2025,
        then 2026 — because "which year am I in" is answered by the last row, and
        a reversed list makes somebody read up the screen to find it. */
@@ -1732,6 +1997,14 @@ const manifest = (): AppSpec => defineApp({
         shape: "list",
         layout: { as: "stack" },
         blocks: [
+          /* ⚠️ RATES SIT BESIDE THE CHART BECAUSE AN ACCOUNT NAMES A CURRENCY.
+             It is not a sixth destination — the bar holds five (D10) — and what
+             a currency is worth is a question somebody asks while looking at the
+             account that holds it. */
+          {
+            group: null,
+            of: [{ block: "QuickActions", leads: ["rates"] }],
+          },
           /*
             ⚠️ OPENING THE BOOKS WAS UNREACHABLE, AND THIS IS THE CONTROL THAT
             FIXES IT. `start-the-book` is `nav: "none"` and nothing linked to it,
@@ -2184,6 +2457,53 @@ const manifest = (): AppSpec => defineApp({
               },
             }],
           },
+        ],
+      } },
+
+    /*
+      RATES — what a currency was worth on a day, and the button that restates
+      the books at today's.
+
+      ⚠️ IT IS ITS OWN DESTINATION RATHER THAN A SETTING, for `year.close`'s
+      reason: revaluing posts an entry. A switch buried in settings would make an
+      act that moves money look like a preference.
+    */
+    { id: "rates", route: "/rates", label: "Rates", nav: "none", icon: "money",
+      permission: "journal:read", tone: "neutral",
+      body: {
+        shape: "list",
+        layout: { as: "stack" },
+        blocks: [
+          {
+            group: null,
+            of: [{
+              block: "ActionRow",
+              does: ["book.revalue"],
+              bind: {
+                icon: { from: { of: "words", says: "chart" } },
+                label: { from: { of: "words", says: "Restate at today's rates" } },
+                under: { from: { of: "words",
+                  says: "A original balance is shown at the date's rate" } },
+              },
+            }],
+          },
+          { group: "Rates", of: [{
+            block: "Listing",
+            shows: [
+              { field: "currency", label: "Currency" },
+              { field: "day", label: "On", as: "when" },
+              { field: "rate", label: "Millionths" },
+              { field: "said", label: "From" },
+            ],
+            nothing: {
+              says: "No rates yet",
+              under: "Add one for each currency you hold or are owed in",
+            },
+            bind: {
+              label: { from: { of: "words", says: "Rates" } },
+              of: { from: { of: "view", view: "rates" } },
+            },
+          }] },
         ],
       } },
 

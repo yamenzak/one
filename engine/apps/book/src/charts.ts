@@ -13,7 +13,7 @@
  * correct books, which is an afternoon of renaming rather than a migration.
  * Presenting them as authoritative would be the part that is not right.
  *
- * ⚠️ AND EVERY ONE OF THEM COVERS ALL SIXTEEN ROLES, checked by
+ * ⚠️ AND EVERY ONE OF THEM COVERS EVERY ROLE, checked by
  * `refuseChart` in this package's own suite. A template missing one is a
  * workspace whose first goods receipt has nowhere to post — found by a customer,
  * six months later, in whichever country nobody thought to check.
@@ -75,6 +75,7 @@ const universal: Chart = {
       { name: "Other costs", type: "expense", role: "expense" },
       { name: "Discounts given", type: "expense", role: "discount" },
       { name: "Rounding", type: "expense", role: "rounding" },
+      { name: "Exchange gain or loss", type: "expense", role: "exchange" },
       { name: "Wages", type: "expense" },
       { name: "Rent", type: "expense" },
       { name: "Bank charges", type: "expense" },
@@ -127,6 +128,7 @@ const ae: Chart = {
       { name: "General expenses", type: "expense", role: "expense" },
       { name: "Discounts allowed", type: "expense", role: "discount" },
       { name: "Rounding differences", type: "expense", role: "rounding" },
+      { name: "Exchange gain or loss", type: "expense", role: "exchange" },
       { name: "Salaries and wages", type: "expense" },
       { name: "Rent", type: "expense" },
       { name: "Bank charges", type: "expense" },
@@ -170,6 +172,7 @@ const sa: Chart = {
       { name: "General expenses", type: "expense", role: "expense" },
       { name: "Discounts allowed", type: "expense", role: "discount" },
       { name: "Rounding differences", type: "expense", role: "rounding" },
+      { name: "Exchange gain or loss", type: "expense", role: "exchange" },
       { name: "Salaries and wages", type: "expense" },
       { name: "Rent", type: "expense" },
     ] },
@@ -219,6 +222,7 @@ const gb: Chart = {
       { name: "Administrative expenses", type: "expense", role: "expense" },
       { name: "Discounts allowed", type: "expense", role: "discount" },
       { name: "Rounding", type: "expense", role: "rounding" },
+      { name: "Exchange gain or loss", type: "expense", role: "exchange" },
       { name: "Wages and salaries", type: "expense" },
       { name: "Rent and rates", type: "expense" },
     ] },
@@ -270,6 +274,7 @@ const us: Chart = {
       { name: "Operating expenses", type: "expense", role: "expense" },
       { name: "Discounts given", type: "expense", role: "discount" },
       { name: "Rounding", type: "expense", role: "rounding" },
+      { name: "Foreign exchange gain or loss", type: "expense", role: "exchange" },
       { name: "Payroll", type: "expense" },
       { name: "Rent", type: "expense" },
     ] },
@@ -320,6 +325,7 @@ const de: Chart = {
       { code: "4900", name: "Sonstige betriebliche Aufwendungen", type: "expense", role: "expense" },
       { code: "8700", name: "Erlösschmälerungen", type: "expense", role: "discount" },
       { code: "4970", name: "Rundungsdifferenzen", type: "expense", role: "rounding" },
+      { code: "4840", name: "Währungsdifferenzen", type: "expense", role: "exchange" },
       { code: "4100", name: "Löhne und Gehälter", type: "expense" },
       { code: "4210", name: "Miete", type: "expense" },
     ] },
@@ -368,6 +374,7 @@ const fr: Chart = {
       { code: "628", name: "Charges diverses", type: "expense", role: "expense" },
       { code: "709", name: "Rabais, remises et ristournes accordés", type: "expense", role: "discount" },
       { code: "658", name: "Différences d'arrondis", type: "expense", role: "rounding" },
+      { code: "666", name: "Pertes de change", type: "expense", role: "exchange" },
       { code: "641", name: "Rémunérations du personnel", type: "expense" },
       { code: "613", name: "Locations", type: "expense" },
     ] },
@@ -429,6 +436,7 @@ const inChart: Chart = {
       { name: "Indirect expenses", type: "expense", role: "expense" },
       { name: "Discount allowed", type: "expense", role: "discount" },
       { name: "Rounding off", type: "expense", role: "rounding" },
+      { name: "Exchange gain or loss", type: "expense", role: "exchange" },
       { name: "Salaries", type: "expense" },
       { name: "Rent", type: "expense" },
     ] },
@@ -471,6 +479,7 @@ const au: Chart = {
       { name: "Operating expenses", type: "expense", role: "expense" },
       { name: "Discounts given", type: "expense", role: "discount" },
       { name: "Rounding", type: "expense", role: "rounding" },
+      { name: "Exchange gain or loss", type: "expense", role: "exchange" },
       { name: "Wages and salaries", type: "expense" },
       { name: "Rent", type: "expense" },
     ] },
@@ -512,6 +521,7 @@ const sg: Chart = {
       { name: "Administrative expenses", type: "expense", role: "expense" },
       { name: "Discounts allowed", type: "expense", role: "discount" },
       { name: "Rounding", type: "expense", role: "rounding" },
+      { name: "Exchange gain or loss", type: "expense", role: "exchange" },
       { name: "Staff costs", type: "expense" },
       { name: "Rent", type: "expense" },
     ] },
@@ -524,7 +534,7 @@ const sg: Chart = {
  * ⚠️ `universal` IS FIRST AND IS THE FALLBACK, so a country with no template of
  * its own gets something usable rather than an empty book. Adding a country is a
  * literal in this file and nothing else — no registration, no code path, and the
- * suite refuses it if it does not cover all sixteen roles.
+ * suite refuses it if it does not cover every role.
  */
 export const CHARTS: readonly Chart[] = [
   universal, ae, sa, gb, us, de, fr, inChart, au, sg,

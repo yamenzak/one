@@ -36,6 +36,18 @@ export interface Line {
    * without splitting the invoice.
    */
   readonly centre?: string | null;
+  /**
+   * ⚠️ WHAT ACTUALLY MOVED, IF IT WAS NOT THE WORKSPACE'S OWN MONEY — see
+   * `money.ts`. `amount` above is still the only figure the ledger adds up,
+   * which is why an entry balances however many currencies it touches; these
+   * three are what make it reconcilable against a foreign bank statement, and
+   * what a revaluation is computed from.
+   */
+  readonly currency?: string | null;
+  /** ⚠️ Minor units of `currency`, signed the way `amount` is. */
+  readonly original?: number | null;
+  /** ⚠️ Millionths — see `RATE_SCALE`. Never a float. */
+  readonly rate?: number | null;
 }
 
 export const debits = (lines: readonly Line[]): number =>

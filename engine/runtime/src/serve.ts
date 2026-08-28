@@ -513,6 +513,15 @@ export interface Located {
   readonly kind?: Kind;
   /** ⚠️ Its name, because the commercial refusal is a sentence with it in. */
   readonly name?: string;
+  /**
+   * ⚠️ WHAT ITS MONEY IS IN, AND EVERY PRODUCT THAT HOLDS AN AMOUNT NEEDS IT.
+   * `field.money` is minor units of SOMETHING (D117), and until this the
+   * something was a fact only the surface knew — so an app doing arithmetic
+   * across two currencies had to read the platform's own `tenant` table, which
+   * is the seam this carries it across instead. Absent reads as the empty
+   * string, which every consumer already treats as "not configured".
+   */
+  readonly currency?: string;
   readonly standing?: Standing;
   /**
    * ⚠️ WHICH JURISDICTION THIS WORKSPACE WAS PROMISED, carried so the file
@@ -1166,6 +1175,9 @@ export async function performOperation(
        `now` is a `Date` in here because the bookkeeping below does arithmetic
        with it; what crosses into an app is the ISO text, the same as a job's. */
     now: now.toISOString(),
+    /* ⚠️ WHAT ITS MONEY IS IN — see `Ctx.currency`. Carried on the read that
+       already resolved the workspace, so an app never asks a second time. */
+    currency: located.currency ?? "",
     directory: wiring.directory,
     permissions: caller.permissions,
     permissionsIn: who.permissionsIn,

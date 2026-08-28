@@ -199,6 +199,10 @@ async function everything(
          to fail in. */
       kind: tenant.kind,
       name: tenant.name,
+      /* ⚠️ WHAT ITS MONEY IS IN — see `Located.currency`. Resolved on the read
+         every request already makes, because an app asking separately would be
+         a second round trip before any amount could be added up. */
+      currency: tenant.currency,
       /* ⚠️ CARRIED SO THE FILE LOOKUP CAN RESOLVE THE BUCKET IN THE RIGHT
          JURISDICTION. Residency is in the addressing rather than in a check —
          see `bucketOf`. */

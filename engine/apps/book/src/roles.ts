@@ -49,6 +49,7 @@ export const ROLES = [
   "tax_input", "tax_output",
   "rounding", "discount",
   "opening", "suspense", "retained",
+  "exchange",
 ] as const;
 export type Role = (typeof ROLES)[number];
 
@@ -98,6 +99,15 @@ export const ROOT_OF: Readonly<Record<Role, Root>> = {
      account is a figure nobody can trace. */
   suspense: "asset",
   retained: "equity",
+  /*
+    ⚠️ ONE ACCOUNT FOR A GAIN AND A LOSS, AND IT IS AN EXPENSE. A rate moving
+    against a business costs it money and a rate moving with it makes money, and
+    the two are the same event in opposite directions — so separating them buys
+    two figures somebody has to net off. Filed as an expense because that is
+    where a negative reads correctly on a profit-and-loss: a credit balance here
+    is a gain, and every accountant reads it that way.
+  */
+  exchange: "expense",
 };
 
 /* ----------------------------------------------------------------- a chart --- */
