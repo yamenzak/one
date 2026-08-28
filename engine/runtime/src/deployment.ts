@@ -24,8 +24,8 @@
 
 import type { AppSpec, DeploymentLegal, PackDef, PlanSpec } from "@engine/kernel";
 import {
-  PLATFORM_HOLDINGS, entitlementKeys, holdingsOf, missingDocuments, refuseCatalog, refuseLegal,
-  refusePacks,
+  PLATFORM_HOLDINGS, entitlementKeys, holdingsOf, missingDocuments, refuseBorrows, refuseCatalog,
+  refuseLegal, refusePacks,
 } from "@engine/kernel";
 import { incoherent, unledgered } from "./dossier.js";
 import { unbound, type Env } from "./handles.js";
@@ -105,6 +105,33 @@ export function deploymentFaults(of: Deployment): readonly string[] {
      mistake that anybody can spend without limit. */
   for (const p of refusePacks(of.packs ?? [])) {
     out.push(`packs: ${p.why} — ${p.detail}`);
+  }
+
+  /*
+    ⚠️ WHAT ONE APP BORROWS AND NO APP SHARES — the half no manifest can check,
+    because each composes alone and that is the whole point. See `refuseBorrows`.
+  */
+  for (const p of refuseBorrows(of.apps)) out.push(`${p.of}: ${p.why}`);
+
+  /*
+    ⚠️ TWO APPS DECLARING ONE COLLECTION ID IS NOT A STYLE QUESTION, IT IS A
+    SILENT DATA FAULT. Every app in a deployment applies its schema to the SAME
+    shard database, and a `CREATE TABLE IF NOT EXISTS` is won by whichever module
+    runs first — so the second app's columns never exist, its inserts fail on a
+    column it declared, and nothing at composition says a word. This is the
+    Scena billing incident one layer up, waiting for the second app that
+    declares a `party` of its own instead of borrowing one.
+  */
+  const seen = new Map<string, string>();
+  for (const app of of.apps) {
+    for (const c of app.collections) {
+      const first = seen.get(c.id);
+      if (first) {
+        out.push(`${app.id} and ${first} both declare collection "${c.id}" — they share one `
+          + `database, so whichever schema runs first wins and the other's columns never `
+          + `exist; one of them should share it and the other borrow it`);
+      } else seen.set(c.id, app.id);
+    }
   }
 
   for (const app of of.apps) {

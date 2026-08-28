@@ -100,6 +100,31 @@ export interface CollectionSpec {
    * has no name rather than a guess assembled out of its columns.
    */
   readonly names?: string;
+  /**
+   * ANOTHER APP MAY POINT AT THIS ONE.
+   *
+   * ⚠️ THIS IS THE WHOLE OF HOW A SUITE SHARES A RECORD, AND IT IS DELIBERATELY
+   * THE SMALLEST THING THAT WORKS. A workspace holding OneInventory and OneParty
+   * has one `party` table and one supplier list, not two — but OneInventory must
+   * reach it WITHOUT importing OneParty, or the two apps are one app with a
+   * directory between them.
+   *
+   * ⚠️ WHAT SHARING BUYS IS THE ROW'S IDENTITY: its id, and the field `names`
+   * points at. That is exactly what a picker and a label need — "this order is
+   * for Harbour Supplies" — and it is not a boundary worth defending inside one
+   * workspace, where everybody with a seat can already see the order.
+   *
+   * ⚠️ WHAT IT DOES NOT BUY IS THE RECORD. The party's tax identifier, its
+   * payment terms, its addresses: those are OneParty's screens behind OneParty's
+   * permission, and an app that wants them installs OneParty and asks for the
+   * grant. A shared collection is a NOUN other apps may name, never a table they
+   * may read.
+   *
+   * ⚠️ AND IT OBLIGES `names`. A ref that cannot be labelled draws a picker of
+   * identifiers, which is the one thing `names` exists to prevent — so sharing
+   * without it is refused rather than rendered.
+   */
+  readonly shared?: true;
   /** ⚠️ Which operations the collection does NOT get. See `operationsFor`. */
   readonly without?: readonly CrudVerb[];
 }
@@ -302,7 +327,8 @@ export type CollectionRefusal =
   | "subject_column_missing" | "quota_without_ceiling" | "no_operations_at_all"
   | "not_a_name" | "vault_without_a_subject"
   | "searchable_unknown" | "searchable_not_text" | "searchable_vault"
-  | "names_unknown" | "names_not_words" | "names_vault";
+  | "names_unknown" | "names_not_words" | "names_vault"
+  | "shared_without_a_name";
 
 /**
  * ⚠️ AN ID AND A FIELD NAME BECOME A TABLE AND A COLUMN, AND AN IDENTIFIER
@@ -385,6 +411,18 @@ export function refuseCollection(spec: CollectionSpec): readonly CollectionProbl
     the honest handling is a guess. This is the declaration being wrong, and the
     fix is either a subject scope or an ordinary column.
   */
+  /*
+    ⚠️ SHARING A COLLECTION NOBODY CAN NAME IS SHARING A LIST OF IDENTIFIERS.
+    What another app gets from `shared` is the row's identity — see the field's
+    own header — and identity that reads `pty_01J9X…` on a picker is not identity
+    to the person choosing. The owning app is the only one that can say which
+    field names a row, so it has to have said it before anybody else may point.
+  */
+  if (spec.shared && !spec.names) {
+    at("shared_without_a_name",
+      `is shared and declares no \`names\` — another app may point at it, and every picker and label would draw the identifier`);
+  }
+
   if (spec.scope.of !== "subject") {
     for (const [name, f] of Object.entries(spec.fields)) {
       if (f.vault) {
@@ -522,18 +560,55 @@ export const quotasWithoutCeiling = (
     .map((c) => `${c.id} counts against "${c.quota}", which nothing declares`);
 
 /**
+ * ANYTHING THAT CAN HOLD A `ref` — a collection's columns, or an operation's
+ * input.
+ *
+ * ⚠️ BOTH, BECAUSE ONLY ONE OF THEM WAS EVER CHECKED. A dangling ref on a COLUMN
+ * is a join that returns nothing; a dangling ref on an operation's INPUT is a
+ * picker with no list behind it, which is worse — it is a control somebody is
+ * asked to choose from, and it is empty. `choosesIn` reads exactly these to
+ * build that picker, and nothing asked whether the target existed.
+ */
+export interface HoldsRefs {
+  /** What to call the holder in a refusal — `note`, or `note.create`. */
+  readonly of: string;
+  readonly fields: Fields;
+}
+
+/**
  * ⚠️ A `ref` POINTING NOWHERE IS A JOIN THAT RETURNS NOTHING, for ever, and it
  * reads on the screen as a record that simply has no parent.
+ *
+ * ⚠️ `known` IS THE APP'S OWN COLLECTIONS PLUS WHAT IT DECLARES IT `borrows` — see
+ * `AppSpec.borrows`. An app in a suite points at records it does not own, and the
+ * alternative to declaring that is either importing the other app (which is the
+ * one thing a suite must never do) or dropping the check entirely, which would
+ * let a typo through on every ref in every app to buy one cross-app reference.
  */
-export const danglingRefs = (collections: readonly CollectionSpec[]): readonly string[] => {
-  const known = new Set(collections.map((c) => c.id));
+export const danglingRefs = (
+  holders: readonly HoldsRefs[], known: ReadonlySet<string>,
+): readonly string[] => {
   const out: string[] = [];
-  for (const c of collections) {
-    for (const [name, f] of Object.entries(c.fields)) {
-      if (f.kind === "ref" && f.to && !known.has(f.to)) out.push(`${c.id}.${name} → ${f.to}`);
+  for (const holder of holders) {
+    for (const [name, f] of Object.entries(holder.fields)) {
+      if (f.kind === "ref" && f.to && !known.has(f.to)) out.push(`${holder.of}.${name} → ${f.to}`);
     }
   }
   return out;
+};
+
+/**
+ * ⚠️ A BORROWED COLLECTION NOTHING POINTS AT is a dependency an app does not
+ * have. It makes the deployment refuse to install without another product, buys
+ * nothing, and is exactly the kind of entry that is copied into the next app's
+ * manifest because it was there in the last one's.
+ */
+export const idleBorrows = (
+  holders: readonly HoldsRefs[], needs: readonly string[],
+): readonly string[] => {
+  const wanted = new Set(holders.flatMap((h) => Object.values(h.fields)
+    .filter((f) => f.kind === "ref" && f.to).map((f) => f.to!)));
+  return needs.filter((id) => !wanted.has(id));
 };
 
 export const collection = (spec: CollectionSpec): CollectionSpec => spec;

@@ -103,6 +103,20 @@ const SURFACES = {
   needs: { file: "design/src/rendered/legal.tsx", renders: "export function WhereItLives" },
 
   /*
+    ⚠️ WHAT THIS PRODUCT USES OF ANOTHER'S — and it OWES a surface rather than
+    having one. A workspace deciding whether to add OneInventory should be told
+    it will also want OneParty, and a workspace looking at what it holds should
+    see that its suppliers are Parties rather than a second list. That screen is
+    the products screen, and it is stage 99's.
+
+    ⚠️ THE ENTRY IS HERE ON THE DAY THE FIELD IS, WHICH IS THE POINT OF `owed`.
+    A declaration nothing renders is the failure this guard exists to catch
+    (D12), and scheduled looks identical to forgotten unless somebody writes
+    down which it is.
+  */
+  borrows: { owed: "99" },
+
+  /*
     ⚠️ A VIEW HAS NO SCREEN OF ITS OWN, AND THAT IS THE POINT OF IT. It reaches a
     person through the block that reads it — a `Listing`, a `Stat`'s count — so
     what is named here is the renderer that binds one, not a page called Views.

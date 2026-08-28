@@ -559,6 +559,12 @@
       "status": "shipped",
       "title": "The door closes: no private UI in an app",
       "ends": "`NOT_YET` in `private-ui.test.mjs` is empty, so an app drawing its own screen where the engine has a body is a failure rather than an entry on a list. The arc that made that possible is the declared surface: a screen is a body, a story or a session, and the first two are drawn from the manifest by `Placed` rather than by the app. What was left at the end was the vocabulary itself — thirty-one registry entries of which fifteen were placed by no declaration anywhere. Seven of those turned out to be unfillable rather than unused: the renderer projects a view into a component's shape in exactly two places (`shows` and `plots`) and hands everything else through as a prop, so a body naming `Tree` or `Face` composed, passed every check, and drew nothing. They are out. `drawn.test.mjs` is what stops the registry growing another: an entry is placed by a manifest — the proving ground counts — or it is named with the shape of data that is missing, and an entry that becomes placed fails there until its excuse is deleted."
+    },
+    {
+      "n": 99,
+      "status": "planned",
+      "title": "The business suite: apps share a record without importing each other",
+      "ends": "OneParty and OneBook are two apps a workspace installs on their own; OneInventory names a party without importing OneParty, and OneBook posts from OneInventory's events without OneInventory knowing a chart of accounts exists. The seam is `shared` on the owner, `borrows` on the borrower and `hears` for the event. What proves it is a check no single manifest can do: every app in a deployment applies its schema to the SAME shard, so two apps declaring one collection id means whichever runs first wins and the other's columns silently never exist. BUSINESS.md is the plan, and per BUILDING.md §5.5 it is deleted when this ships."
     }
   ]
 }

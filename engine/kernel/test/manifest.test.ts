@@ -10,7 +10,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  beneath, defineApp, isUnder, refuseApp, screenFor, upFrom, type AppSpec,
+  beneath, defineApp, isUnder, refuseApp, refuseBorrows, screenFor, upFrom, type AppSpec,
 } from "../src/manifest.js";
 import { operationsFor } from "../src/collection.js";
 import { collection } from "../src/collection.js";
@@ -1111,5 +1111,118 @@ describe("a write that can be taken back", () => {
   it("refuses a way back with no words on it", () => {
     expect(whyOf(withBack({ ...sound, says: "  " })))
       .toContain("a way back with no words on it");
+  });
+});
+
+/**
+ * WHAT ONE APP MAY POINT AT IN ANOTHER.
+ *
+ * ⚠️ THIS IS THE SEAM A SUITE STANDS ON, AND ITS WHOLE JOB IS TO BE NARROWER
+ * THAN AN IMPORT. A workspace holding OneInventory and OneParty has one supplier
+ * list; getting there by importing the other app makes two products one product
+ * with a directory between them, which is what ERPNext's Selling module is.
+ *
+ * ⚠️ AND THE CHECK IS SPLIT BECAUSE THE QUESTION IS. What an app can be asked
+ * ALONE is whether every ref is either its own or declared — so a typo is still
+ * caught and the app still typechecks without the other one in the room. What
+ * only the DEPLOYMENT can answer is whether the owner is actually installed and
+ * actually shared it.
+ */
+describe("what one app borrows from another", () => {
+  const pointsAtParty = collection({
+    ...note, id: "order", names: "title",
+    fields: {
+      title: field.text({ label: "Title", required: true, holds: "none", max: 200 }),
+      party: field.ref({ label: "Party", holds: "none", to: "party" }),
+    },
+  });
+
+  it("refuses a ref at a collection this app neither owns nor borrows", () => {
+    expect(whyOf(app({ collections: [pointsAtParty] }))).toContain("order.party → party");
+  });
+
+  it("accepts the same ref once the app says it borrows it", () => {
+    const why = whyOf(app({ collections: [pointsAtParty], borrows: ["party"] }));
+    expect(why).not.toContain("order.party");
+  });
+
+  /*
+    ⚠️ AN OPERATION'S INPUT IS THE HALF THAT WAS NEVER CHECKED, and it is the one
+    that draws a control. `choosesIn` turns a `ref` on an input into a PICKER, so
+    a dangling one is an empty list somebody is being asked to choose from.
+  */
+  it("refuses a dangling ref on an operation's input, which draws a picker", () => {
+    const picks = operation({
+      id: "note.assign",
+      kind: "write",
+      summary: "Assign one.",
+      input: { who: field.ref({ label: "Who", required: true, holds: "none", to: "party" }) },
+      output: { id: field.text({ label: "Id", holds: "none" }) },
+      permission: "note:write",
+      idempotency: { mode: "none" },
+      outcome: { message: "Assigned.", tone: "success" },
+      async handler() { return { id: "n1" }; },
+    }) as unknown as AnyOperation;
+    expect(whyOf(app({ operations: [picks] }))).toContain("note.assign.who → party");
+  });
+
+  /* ⚠️ A DEPENDENCY THAT BUYS NOTHING still makes the deployment refuse to
+     install this app without another product. */
+  it("refuses a borrow nothing points at", () => {
+    expect(whyOf(app({ borrows: ["party"] }))).toContain('borrows "party" and points at it nowhere');
+  });
+
+  /* ⚠️ SHARING SOMETHING NOBODY CAN NAME shares a list of identifiers — every
+     picker and every label in the borrowing app draws `pty_01J9X…`. */
+  it("refuses a shared collection that declares no name field", () => {
+    const nameless = collection({ ...note, id: "party", shared: true });
+    expect(whyOf(app({ collections: [nameless] }))).toContain("shared_without_a_name");
+  });
+});
+
+/**
+ * AND THE HALF ONLY THE DEPLOYMENT CAN ANSWER.
+ *
+ * ⚠️ EACH APP COMPOSES ALONE, WHICH IS THE POINT AND ALSO THE HOLE. `refuseApp`
+ * takes a `borrows` entry on trust, because the alternative is that OneInventory
+ * cannot be typechecked without OneParty in the room. So the question "is the
+ * owner actually installed, and did it actually share" has exactly one place it
+ * can be asked, and it is here.
+ */
+describe("what the deployment can see that no app can", () => {
+  const owner = (over: Partial<AppSpec> = {}): AppSpec => app({
+    id: "party", collections: [collection({
+      ...note, id: "party", names: "title", shared: true,
+    })], ...over,
+  });
+  const borrower = app({
+    id: "inventory", borrows: ["party"],
+    collections: [collection({
+      ...note, id: "order",
+      fields: {
+        title: field.text({ label: "Title", required: true, holds: "none", max: 200 }),
+        party: field.ref({ label: "Party", holds: "none", to: "party" }),
+      },
+    })],
+  });
+
+  it("accepts a borrow whose owner is installed and shares it", () => {
+    expect(refuseBorrows([owner(), borrower])).toEqual([]);
+  });
+
+  /* ⚠️ THE PRODUCT WAS INSTALLED WITHOUT ITS DEPENDENCY, and every picker
+     pointed at the missing collection is empty with nothing saying why. */
+  it("refuses a borrow nothing in the deployment declares", () => {
+    const why = refuseBorrows([borrower]).map((r) => r.why).join(" ");
+    expect(why).toContain("nothing in this deployment declares it");
+  });
+
+  /* ⚠️ THE COLLECTION IS RIGHT THERE AND ITS OWNER DID NOT OPEN IT. Physically
+     trivial — they share one database — which is exactly why the declaration
+     has to be the thing that refuses. */
+  it("refuses a borrow of a collection its owner declares and does not share", () => {
+    const shut = owner({ collections: [collection({ ...note, id: "party", names: "title" })] });
+    const why = refuseBorrows([shut, borrower]).map((r) => r.why).join(" ");
+    expect(why).toContain("declares and does not share");
   });
 });

@@ -28,7 +28,9 @@ import {
 import type { Lane } from "./ai.js";
 import type { WhitelabelDef } from "./brand.js";
 import type { CollectionSpec } from "./collection.js";
-import { danglingRefs, eventsFor, operationsFor, quotasWithoutCeiling, refuseCollection } from "./collection.js";
+import {
+  danglingRefs, eventsFor, idleBorrows, operationsFor, quotasWithoutCeiling, refuseCollection,
+} from "./collection.js";
 import type { MeterBook } from "./credit.js";
 import { unbounded } from "./credit.js";
 import { unknownInPrompt } from "./ai.js";
@@ -646,6 +648,32 @@ export interface AppSpec {
    */
   readonly entitlements: Readonly<Record<string, EntitlementDef>>;
   readonly collections: readonly CollectionSpec[];
+  /**
+   * COLLECTIONS THIS APP POINTS AT AND DOES NOT OWN.
+   *
+   * ⚠️ THIS IS A DEPENDENCY, DECLARED, AND IT IS THE ONLY ONE AN APP MAY HAVE.
+   * OneInventory names a supplier on an order; the supplier is a `party` and
+   * OneParty owns it. Without this the choice is importing OneParty — which
+   * makes two apps one app — or dropping the dangling-ref check, which would let
+   * a typo through on every ref in every app to buy one cross-app reference.
+   *
+   * ⚠️ AND IT IS CHECKED TWICE, IN THE TWO PLACES THAT CAN ANSWER. In isolation,
+   * `refuseApp` accepts a ref whose target is here and refuses one that is
+   * neither local nor declared — so an app still composes alone and a typo is
+   * still caught. Across the deployment, `refuseNeeds` asks whether some
+   * installed app actually declares it `shared`, which is the half no single
+   * manifest can know.
+   *
+   * ⚠️ WHAT IT DOES NOT DO IS GRANT ANYTHING. Naming `party` here lets this app
+   * point at one and draw its name. Reading the record is OneParty's permission,
+   * on OneParty's screens.
+   *
+   * ⚠️ AND IT IS `borrows` RATHER THAN `needs` BECAUSE `needs` IS THE
+   * INFRASTRUCTURE BOOK — a queue, a bucket, a model lane. The pairing that
+   * matters is the other one: one app SHARES a collection and another BORROWS
+   * it, which says in two words who owns the table and who may point at it.
+   */
+  readonly borrows?: readonly string[];
   readonly operations: readonly AnyOperation[];
   readonly screens: readonly ScreenSpec[];
   /**
@@ -850,6 +878,49 @@ export const upFrom = <T extends {
  * make the manifest refuse a notification about a note being created — the most
  * ordinary thing an app could possibly want to be told about.
  */
+/**
+ * WHAT ONE APP BORROWS AND NO APP SHARES — asked of the deployment, because no
+ * single manifest can answer it.
+ *
+ * ⚠️ THIS IS THE HALF `refuseApp` CANNOT DO. An app composes alone, so a
+ * `borrows` entry is taken on trust there — the alternative is that OneInventory
+ * cannot be typechecked without OneParty in the room, which is the coupling this
+ * whole mechanism exists to avoid. What can only be asked HERE is whether the
+ * deployment that is about to serve them both actually contains the owner.
+ *
+ * ⚠️ AND THE TWO ANSWERS ARE DIFFERENT FAULTS, so they are different sentences.
+ * Nobody declares it: the product was installed without its dependency, and
+ * every picker pointed at it is empty. Somebody declares it and did not SHARE
+ * it: the collection is right there, and pointing at another app's private
+ * record would be reaching through a wall the owner did not open.
+ */
+export function refuseBorrows(apps: readonly AppSpec[]): readonly Refusal[] {
+  const out: Refusal[] = [];
+  const owner = new Map<string, AppSpec>();
+  for (const app of apps) for (const c of app.collections) owner.set(c.id, app);
+
+  for (const app of apps) {
+    for (const id of app.borrows ?? []) {
+      const has = owner.get(id);
+      if (!has) {
+        out.push({
+          of: `app ${app.id}`,
+          why: `borrows "${id}" and nothing in this deployment declares it — every`
+            + ` picker and label pointing at it is empty, and no test can see it`
+            + ` because each app composes on its own`,
+        });
+      } else if (!has.collections.find((c) => c.id === id)?.shared) {
+        out.push({
+          of: `app ${app.id}`,
+          why: `borrows "${id}", which ${has.id} declares and does not share —`
+            + ` pointing at it would reach through a wall its owner did not open`,
+        });
+      }
+    }
+  }
+  return out;
+}
+
 export const eventsOf = (spec: AppSpec): readonly string[] => [...new Set([
   ...spec.operations.flatMap((o) => o.emits ?? []),
   ...spec.collections.flatMap(eventsFor),
@@ -984,7 +1055,23 @@ export function refuseApp(spec: AppSpec): readonly Refusal[] {
   for (const o of spec.operations) {
     for (const p of refuseOperation(o)) at(`operation ${p.operation}`, `${p.why}: ${p.detail}`);
   }
-  for (const bad of danglingRefs(spec.collections)) at("reference", `${bad} points at no collection`);
+  /*
+    ⚠️ COLLECTIONS AND OPERATION INPUTS, AGAINST WHAT THIS APP OWNS PLUS WHAT IT
+    SAYS IT NEEDS. The operation half was never asked, and it is the half that
+    draws a control: a `ref` on an input is a PICKER, so a dangling one is an
+    empty list somebody is being asked to choose from.
+  */
+  const holds = [
+    ...spec.collections.map((c) => ({ of: c.id, fields: c.fields })),
+    ...spec.operations.map((o) => ({ of: o.id, fields: o.input ?? {} })),
+  ];
+  const owned = new Set([...spec.collections.map((c) => c.id), ...(spec.borrows ?? [])]);
+  for (const bad of danglingRefs(holds, owned)) at("reference", `${bad} points at no collection`);
+  for (const id of idleBorrows(holds, spec.borrows ?? [])) {
+    at("reference",
+      `borrows "${id}" and points at it nowhere — a dependency that makes this app`
+      + ` refuse to install without another product and buys nothing`);
+  }
   for (const p of refuseSettings(spec.settings ?? {}, spec.settingAreas ?? {})) at(`setting ${p.setting}`, `${p.why}: ${p.detail}`);
   for (const p of refuseFlags(spec.flags ?? {})) at(`flag ${p.flag}`, `${p.why}: ${p.detail}`);
   for (const p of refuseVault(spec.vault ?? {}, spec.purposes ?? {})) {

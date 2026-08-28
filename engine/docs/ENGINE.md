@@ -421,14 +421,14 @@ and a manifest that does not compose refuses to boot.
 | `present` | how a date, a number, a price and a measurement are written for one reader | 18 | — |
 | `infra` | what a product needs underneath it, and what each kind can promise | 11 | — |
 | `field` | what a value is: its kind, its bounds, what it holds, whether it is the app's to keep | 9 | — |
-| `collection` | what a thing an app keeps is — and the six operations it gets for free | 21 | — |
+| `collection` | what a thing an app keeps is — and the six operations it gets for free | 22 | — |
 | `operation` | one declaration carrying every cross-cutting concern (D12) | 12 | — |
 | `access` | permissions, roles, and what an app may never claim | 15 | — |
 | `reach` | how far one person works inside a workspace — where, as against what (D45) | 4 | — |
 | `gate` | the eight gates, in the order that decides which sentence somebody reads first | 3 | — |
 | `surface` | a screen declared — its shape, its blocks, and the closed vocabulary they bind through | 28 | — |
 | `blocks` | which blocks a screen may name at all | 3 | — |
-| `manifest` | the whole app, and the composition that refuses a broken one | 16 | — |
+| `manifest` | the whole app, and the composition that refuses a broken one | 17 | — |
 | `entitlement` | what a plan includes, and the allowance algebra over it | 17 | — |
 | `credit` | metered work: the reserve, the rate, the ceiling | 15 | — |
 | `dunning` | the ladder from past due to erased | 5 | — |
@@ -450,7 +450,7 @@ and a manifest that does not compose refuses to boot.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**330 of them**, 329 reached by something today.
+**332 of them**, 331 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -589,6 +589,7 @@ its own header, cited by other files, and doing nothing.
 | `missingDocuments` | `legal` | runtime |
 | `refuseLegal` | `legal` | composition |
 | `refuseApp` | `manifest` | composition |
+| `refuseBorrows` | `manifest` | runtime |
 | `refuseLetter` | `notify` | runtime |
 | `refusePolicy` | `notify` | runtime |
 | `unaddressable` | `notify` | composition |
@@ -1357,8 +1358,9 @@ a later decision superseded, so neither list can rot into a promise nobody owes.
 | 96 | The renderer: a screen is drawn from what it declares | shipped |
 | 97 | OneInventory, ported — everything the vocabulary covers, and what it does not | shipped |
 | 98 | The door closes: no private UI in an app | shipped |
+| 99 | The business suite: apps share a record without importing each other | **planned** |
 
-**86 shipped, 11 planned, 1 superseded.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it, and nothing may defer to a superseded one — `scripts/docs.test.mjs` fails the build on either, which is the only reason this table can be read instead of the code.
+**86 shipped, 12 planned, 1 superseded.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it, and nothing may defer to a superseded one — `scripts/docs.test.mjs` fails the build on either, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---
