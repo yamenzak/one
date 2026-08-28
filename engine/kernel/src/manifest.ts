@@ -1701,7 +1701,9 @@ export function refuseApp(spec: AppSpec): readonly Refusal[] {
   ];
   const screenIds = spec.screens.map((s) => s.id);
   for (const s of spec.screens) {
-    for (const p of refuseSurface(s, BLOCKS, views, spec.collections, ops, screenIds, HEROES)) {
+    for (const p of refuseSurface(
+      s, BLOCKS, views, spec.collections, ops, screenIds, HEROES, spec.borrows ?? [],
+    )) {
       at(p.of, `${p.why}: ${p.detail}`);
     }
     /*

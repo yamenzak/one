@@ -109,10 +109,17 @@ export interface CollectionSpec {
    * reach it WITHOUT importing OneParty, or the two apps are one app with a
    * directory between them.
    *
-   * ⚠️ WHAT SHARING BUYS IS THE ROW'S IDENTITY: its id, and the field `names`
-   * points at. That is exactly what a picker and a label need — "this order is
-   * for Harbour Supplies" — and it is not a boundary worth defending inside one
-   * workspace, where everybody with a seat can already see the order.
+   * ⚠️ WHAT SHARING BUYS IS THE ROW'S IDENTITY: its id and its `name`. That is
+   * exactly what a picker and a label need — "this order is for Harbour
+   * Supplies" — and it is not a boundary worth defending inside one workspace,
+   * where everybody with a seat can already see the order.
+   *
+   * ⚠️ AND IT IS THE FIELD LITERALLY CALLED `name`, ENFORCED BELOW. A borrower
+   * composes without this declaration in the room, so it cannot look up which
+   * field carries the label — it writes `supplier.name` and that has to be
+   * right. `reachFor` lets exactly that one field across a borrowed hop and
+   * refuses every other, which is what makes the boundary a rule rather than a
+   * convention nobody can check.
    *
    * ⚠️ WHAT IT DOES NOT BUY IS THE RECORD. The party's tax identifier, its
    * payment terms, its addresses: those are OneParty's screens behind OneParty's
@@ -328,7 +335,7 @@ export type CollectionRefusal =
   | "not_a_name" | "vault_without_a_subject"
   | "searchable_unknown" | "searchable_not_text" | "searchable_vault"
   | "names_unknown" | "names_not_words" | "names_vault"
-  | "shared_without_a_name";
+  | "shared_without_a_name" | "shared_names_elsewhere" | "shared_beyond_a_tenant";
 
 /**
  * ⚠️ AN ID AND A FIELD NAME BECOME A TABLE AND A COLUMN, AND AN IDENTIFIER
@@ -421,6 +428,39 @@ export function refuseCollection(spec: CollectionSpec): readonly CollectionProbl
   if (spec.shared && !spec.names) {
     at("shared_without_a_name",
       `is shared and declares no \`names\` — another app may point at it, and every picker and label would draw the identifier`);
+  }
+
+  /*
+    ⚠️ THE FIELD THAT CROSSES IS CALLED `name`, AND THE BORROWER IS WHY. An app
+    that borrows this one composes ALONE — that is the whole point of the seam —
+    so nothing in the room can tell it which field carries the label. It has to
+    be able to write `supplier.name` and be right, which means the answer cannot
+    vary by owner. One literal field name is the smallest rule that gives a
+    borrower something to write, and it is the ONLY field `reachFor` lets across.
+
+    ⚠️ A COLLECTION MAY STILL NAME ITSELF BY `label` OR `title` — it just may not
+    also be shared. Sharing is a promise about a field's name to code that cannot
+    see the declaration; keeping a private one is not.
+  */
+  if (spec.shared && spec.names && spec.names !== "name") {
+    at("shared_names_elsewhere",
+      `is shared and names itself by "${spec.names}" — a borrowing app composes without this `
+      + `declaration in the room, so the one field that crosses has to be called \`name\``);
+  }
+
+  /*
+    ⚠️ AND SHARING IS WITHIN ONE WORKSPACE, WHICH IS WHY THE SCOPE IS PINNED. A
+    borrower's join is built without the owner's spec, so the clause that keeps
+    it inside the caller's workspace has to be knowable from the id alone —
+    `tenant_id`, the same clause every other query gets. A subject-scoped shared
+    row would be one person's record read across a product boundary; a global one
+    has no clause at all, which is a cross-workspace read waiting for the first
+    borrowed picker.
+  */
+  if (spec.shared && spec.scope.of !== "tenant") {
+    at("shared_beyond_a_tenant",
+      `is shared and scoped by ${spec.scope.of} — a borrowing app joins to it without this `
+      + `declaration, so the only scope it can apply is the workspace it is already in`);
   }
 
   if (spec.scope.of !== "subject") {

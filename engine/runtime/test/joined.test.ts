@@ -175,6 +175,96 @@ describe("what it does when the other end is not there", () => {
   });
 });
 
+/* ------------------------------------------------------- another app's row --- */
+
+/**
+ * A HOP INTO A COLLECTION THIS APP BORROWS AND DOES NOT OWN.
+ *
+ * ⚠️ `party` IS DELIBERATELY ABSENT FROM `COLLECTIONS`, which is the whole point:
+ * OneInventory composes with OneParty nowhere in the room, so the join has to
+ * work from the hop's id and the `borrowed` flag alone. A test that put the spec
+ * in the list would be testing the ordinary join with a different name.
+ */
+describe("a field on a record another product owns", () => {
+  const party = made("party", {
+    name: field.text({ label: "Name", required: true, holds: "identity", max: 200 }),
+    tax: field.text({ label: "Tax number", holds: "identity", max: 40 }),
+  });
+  /* ⚠️ The line's ref points at it; the app's collection list does not hold it. */
+  const buy = made("purchase", {
+    supplier: field.ref({ label: "Supplier", holds: "none", to: "party" }),
+  });
+  const MINE = [buy];
+
+  let harbour = "";
+  let orders: Record<string, unknown>[] = [];
+
+  beforeEach(async () => {
+    await applySchema(shard(), [party, buy]
+      .map((c) => schemaFor({ id: "wh", collections: [c] } as never)));
+    for (const t of ["purchase", "party"]) await shard().prepare(`DELETE FROM ${t}`).run();
+    harbour = await add(party, { name: "Harbour Supplies", tax: "GB123456789" });
+    await add(buy, { supplier: harbour });
+    orders = (await shard().prepare("SELECT * FROM purchase ORDER BY id").all())
+      .results as Record<string, unknown>[];
+  });
+
+  const hop = (field_: string) => {
+    const got = reachFor(`supplier.${field_}`, buy.fields, MINE, ["party"]);
+    if (typeof got === "string") throw new Error(`supplier.${field_}: ${got}`);
+    return got;
+  };
+
+  it("draws the borrowed record's name", async () => {
+    const out = await joinRows(shard(), orders, [hop("name")], MINE, TENANT);
+    expect(out[0]?.["supplier.name"]).toBe("Harbour Supplies");
+  });
+
+  /*
+    ⚠️ THE KERNEL REFUSES THE PATH, WHICH IS WHY THE STATEMENT NEVER HAS TO. A
+    borrowed record gives its name and nothing else — `tax` here stands for every
+    field OneParty holds and OneInventory has no grant over.
+  */
+  it("cannot be pointed at any other field of it", () => {
+    expect(reachFor("supplier.tax", buy.fields, MINE, ["party"]))
+      .toBe("borrowed_beyond_the_name");
+    expect(() => hop("tax")).toThrow();
+  });
+
+  /* ⚠️ AND WITHOUT THE BORROW IT IS THE ORDINARY DANGLING REF, so an app that
+     forgot to declare the dependency is refused rather than quietly joined. */
+  it("resolves nothing at all when the app never said it borrows", () => {
+    expect(reachFor("supplier.name", buy.fields, MINE)).toBe("path_target_unknown");
+  });
+
+  /*
+    ⚠️ TWO COLUMNS LEAVE THE DATABASE, AND THIS IS THE ASSERTION THAT PROVES IT.
+    A `SELECT *` would put another product's whole record in this worker's memory
+    one key lookup from a screen — so the defence is the statement, not the loop
+    that picks a field out of the result.
+  */
+  it("reads two columns of it and no more", async () => {
+    let sql = "";
+    const db = { prepare: (q: string) => { sql = q; return shard().prepare(q); } } as unknown as Db;
+    await joinRows(db, orders, [hop("name")], MINE, TENANT);
+    expect(sql).toContain("SELECT id, name FROM party");
+    expect(sql).toContain("tenant_id = ?");
+    expect(sql).not.toContain("*");
+  });
+
+  /*
+    ⚠️ AND THE WORKSPACE CLAUSE IS APPLIED WITHOUT THE OWNER'S SPEC — which is
+    why `shared` is refused unless it is tenant-scoped. There is no `eraseBy` to
+    ask here, so a borrowed join with no clause would be a picker reading every
+    workspace's parties.
+  */
+  it("refuses to resolve a borrowed reference from another workspace", async () => {
+    const out = await joinRows(shard(), orders, [hop("name")], MINE, OTHER);
+    expect(out[0]?.["supplier.name"],
+      "a borrowed reference resolved past the caller's own workspace").toBeNull();
+  });
+});
+
 describe("how many rows point back at each of these", () => {
   const places = async () => (await shard().prepare("SELECT * FROM place ORDER BY id").all())
     .results as Record<string, unknown>[];

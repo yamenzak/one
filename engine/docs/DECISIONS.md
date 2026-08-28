@@ -4901,3 +4901,57 @@ membership, on by default, and switchable off by a workspace that does not want
 a chart of accounts. The worry that motivated the question (a workshop counting
 stock being handed accounting it never asked for) is answered by the switch, not
 by the price.
+
+---
+
+## D122 — A borrowed record gives its name and nothing else
+
+**Date:** 2026-08-28 · **Status:** shipped
+
+`AppSpec.borrows` has said since BS-1 that naming another app's collection "lets
+this app point at one and **draw its name**". Nothing enforced the second half,
+because until a borrowed hop resolved at all there was nothing to enforce: the
+ref composed and the PATH through it did not, so `supplier.name` was refused as
+`path_target_unknown` and no product could use the seam it was given.
+
+**`reachFor` now resolves a borrowed hop, for the field `name` and no other.**
+Everything else through a borrowed ref is `borrowed_beyond_the_name`.
+
+### Why the literal field name, rather than the owner's `names`
+
+The kernel cannot see the owner. An app composes ALONE — that is the point of the
+seam, and the alternative is that OneInventory cannot be typechecked without
+OneParty in the room — so `collections` holds this app's own and no other's, and
+there is no declaration to ask which field labels a borrowed row.
+
+So the owner's answer is made the literal name instead: `refuseCollection` refuses
+`shared` unless `names` is the field called `name`. Both ends then agree without
+either importing the other, and BS-1's decorative `shared_without_a_name` becomes
+load-bearing. A collection may still name itself by `label` or `title` — it may
+not also be shared.
+
+### And why not in `deploymentFaults`
+
+That is where cross-app knowledge legitimately lives, and it is the wrong place
+for this one: `deploymentFaults` REPORTS rather than throws, so a check that ran
+there would let one product read another's tax identifiers behind a line in a log.
+A rule about what may cross an app boundary has to refuse at composition.
+
+### The three consequences, each written where it bites
+
+- **`shared` must be tenant-scoped.** The borrower's join is built without the
+  owner's spec, so there is no `eraseBy` to ask and the workspace clause has to be
+  knowable from the id alone. A subject-scoped shared row would be one person's
+  record read across a product boundary; a global one has no clause at all, which
+  is a picker reading every workspace's parties.
+- **The join reads two columns and the STATEMENT says so.** `SELECT id, name`,
+  never `SELECT *` — a whole record in the worker's memory is one key lookup from
+  a screen, and the defence must not be the loop that happens to pick a field out
+  of it. A borrowed picker (`choicesOf`) is the same statement for the same reason.
+- **A borrowed hop demands no permission.** `collectionsFor` subtracts `borrows`
+  before the grant check. The opposite failure is the sharper one: a warehouse
+  worker with no OneParty grant refused a screen that shows a supplier's name and
+  nothing else, which would make the mechanism dead on arrival.
+
+Every rule here is mutation-tested — the two refusals in `kernel/test/manifest.test.ts`,
+the name-only reach and both halves of the statement in `runtime/test/joined.test.ts`.

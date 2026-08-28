@@ -1384,20 +1384,50 @@ export const fieldsIn = (body: SurfaceSpec): readonly string[] =>
  */
 export type Reach =
   | { readonly on: "self"; readonly field: string }
-  | { readonly on: "ref"; readonly through: string; readonly to: string; readonly field: string };
+  | {
+    readonly on: "ref";
+    readonly through: string;
+    readonly to: string;
+    readonly field: string;
+    /**
+     * ⚠️ THE TARGET BELONGS TO ANOTHER APP — see `AppSpec.borrows`. Marked rather
+     * than inferred from a missing spec, because "the collection is not here" is
+     * also what a manifest that never composed looks like, and the runner would
+     * have to guess which. It is `name` and nothing else; the join reads two
+     * columns for exactly that reason.
+     */
+    readonly borrowed?: true;
+  };
 
 export type ReachRefusal =
   | "path_too_deep" | "path_head_unknown" | "path_head_not_a_ref"
-  | "path_target_unknown" | "path_field_unknown" | "not_a_name";
+  | "path_target_unknown" | "path_field_unknown" | "not_a_name"
+  | "borrowed_beyond_the_name";
 
 /**
  * ⚠️ ONE RESOLVER, READ BY THE REFUSAL AND BY THE RUNNER. Two implementations of
  * "what does `product.name` mean" is how a path the kernel accepts becomes a
  * column the runner cannot find — a blank under a correct heading, which reads
  * as missing data rather than as a fault.
+ *
+ * ⚠️ AND A BORROWED HOP YIELDS THE NAME, NOTHING ELSE, WHICH IS THE WHOLE OF
+ * WHAT ONE APP MAY READ OF ANOTHER'S RECORD (D120). `borrows` said this in prose
+ * from the day it was written — "lets this app point at one and draw its name" —
+ * and nothing enforced it, because until a borrowed hop resolved at all there was
+ * nothing to enforce. The rule has to live HERE rather than in the deployment:
+ * `deploymentFaults` REPORTS, so a check that ran there would let a product read
+ * another product's tax identifiers behind a line in a log.
+ *
+ * ⚠️ IT IS THE LITERAL FIELD `name` BECAUSE THE KERNEL CANNOT SEE THE OWNER. An
+ * app composes alone — that is the point of the seam — so `collections` holds
+ * this app's own and no other's, and there is no declaration in the room to ask
+ * which field labels a borrowed row. `refuseCollection` makes the owner's answer
+ * that literal name, so both ends agree without either importing the other.
  */
 export function reachFor(
   path: string, held: Fields, collections: readonly CollectionSpec[],
+  /** ⚠️ `AppSpec.borrows` — the collections this app may point at and not read. */
+  borrowed: readonly string[] = [],
 ): Reach | ReachRefusal {
   const parts = path.split(".");
   if (parts.length > 2) return "path_too_deep";
@@ -1409,10 +1439,22 @@ export function reachFor(
   if (!through) return "path_head_unknown";
   if (through.kind !== "ref") return "path_head_not_a_ref";
   const to = collections.find((c) => c.id === through.to);
-  if (!to) return "path_target_unknown";
+  if (!to) {
+    if (!through.to || !borrowed.includes(through.to)) return "path_target_unknown";
+    return tail === BORROWED_FIELD
+      ? { on: "ref", through: head, to: through.to, field: tail, borrowed: true }
+      : "borrowed_beyond_the_name";
+  }
   if (!(tail in to.fields)) return "path_field_unknown";
   return { on: "ref", through: head, to: to.id, field: tail };
 }
+
+/**
+ * ⚠️ THE ONE FIELD THAT CROSSES AN APP BOUNDARY. Said once, read by the resolver
+ * above, by the refusal that makes an owner declare it, and by the join that
+ * fetches it — three places that would otherwise each spell a string.
+ */
+export const BORROWED_FIELD = "name";
 
 /**
  * ⚠️ ONE SENTENCE PER REFUSAL, SAID ONCE. The same six can be raised from a
@@ -1431,15 +1473,27 @@ export const sayReach = (
     case "path_head_not_a_ref": return `"${path}", and "${head}" is a `
       + `${(held[head] as { kind: string } | undefined)?.kind ?? "field"} rather than a reference`;
     case "path_target_unknown": return `"${path}", and "${head}" points at a collection `
-      + "this app does not declare";
+      + "this app neither declares nor borrows";
+    case "borrowed_beyond_the_name": return `"${path}", and "${head}" points at a borrowed `
+      + `collection — another product's record gives its \`${BORROWED_FIELD}\` and nothing `
+      + "else, so what a screen wants beyond that is a field of its own or that product's screen";
     case "path_field_unknown": return `"${path}", which is not there`;
   }
 };
 
 /** ⚠️ The hops a set of paths needs, deduplicated — one query each, never one per row. */
-export const hopsIn = (reaches: readonly Reach[]): readonly { through: string; to: string }[] => {
-  const out = new Map<string, { through: string; to: string }>();
-  for (const r of reaches) if (r.on === "ref") out.set(r.through, { through: r.through, to: r.to });
+export const hopsIn = (
+  reaches: readonly Reach[],
+): readonly { through: string; to: string; borrowed?: true }[] => {
+  const out = new Map<string, { through: string; to: string; borrowed?: true }>();
+  for (const r of reaches) {
+    if (r.on !== "ref") continue;
+    /* ⚠️ THE FLAG TRAVELS WITH THE HOP, because the join is what has to build a
+       narrower statement for a borrowed one — see `joinRows`. */
+    out.set(r.through, r.borrowed
+      ? { through: r.through, to: r.to, borrowed: true }
+      : { through: r.through, to: r.to });
+  }
   return [...out.values()];
 };
 
@@ -1576,6 +1630,13 @@ export function refuseSurface(
     whole file is built to refuse.
   */
   heroes: BlockIndex = {},
+  /**
+   * ⚠️ `AppSpec.borrows` — see `reachFor`. It defaults to empty, and empty is the
+   * SAFE default rather than a hole: a borrowed hop then refuses as
+   * `path_target_unknown` on the first compose, loudly, instead of resolving
+   * unchecked.
+   */
+  borrowed: readonly string[] = [],
 ): readonly SurfaceProblem[] {
   const body = screen.body;
   if (!body) return [];
@@ -1779,7 +1840,7 @@ export function refuseSurface(
     if (!subject) continue;
     /* ⚠️ ONE HOP IS A FIELD TOO — see `reachFor`. A screen about a stock line
        binding "product.name" is the ordinary case, not an exception. */
-    const reach = reachFor(name, subject, collections);
+    const reach = reachFor(name, subject, collections, borrowed);
     if (typeof reach !== "string") continue;
     /* ⚠️ A BARE NAME KEEPS ITS OWN REFUSAL. `field_unknown` says "this screen's
        subject has no such field", which is the whole story for a name with no
@@ -2111,7 +2172,7 @@ export function refuseSurface(
         const counted = talliedIn(view);
         for (const col of b.shows) {
           if (!held || counted.includes(col.field)) continue;
-          const reach = reachFor(col.field, held, collections);
+          const reach = reachFor(col.field, held, collections, borrowed);
           if (typeof reach === "string") {
             at(reach === "path_field_unknown" && !col.field.includes(".")
               ? "shows_field_unknown"

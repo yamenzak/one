@@ -24,8 +24,8 @@
 
 import type { AppSpec, FieldSpec, Fields, Fill, Reach, ScreenSpec } from "@engine/kernel";
 import {
-  SCREEN_PATH, actsIn, columnsIn, editsIn, eraseBy, fieldsIn, fillsIn, namesIn, operationsFor,
-  permissionFor, reachFor, verbId, viewsIn,
+  BORROWED_FIELD, SCREEN_PATH, actsIn, columnsIn, editsIn, eraseBy, fieldsIn, fillsIn, namesIn,
+  operationsFor, permissionFor, reachFor, verbId, viewsIn,
 } from "@engine/kernel";
 import { joinRows } from "./joined.js";
 import { readOne } from "./records.js";
@@ -199,7 +199,11 @@ type Hop = Extract<Reach, { readonly on: "ref" }>;
 const reachesFor = (app: AppSpec, screen: ScreenSpec) => {
   const collections = app.collections ?? [];
   const resolve = (held: Fields | undefined, paths: readonly string[]): readonly Hop[] => (held
-    ? paths.map((path) => reachFor(path, held, collections))
+    /* ⚠️ AND WHAT IT BORROWS — see `reachFor`. Without this the resolution here
+       and the one `refuseSurface` did disagree about a borrowed path: the kernel
+       accepts `supplier.name` and this would drop it, which draws a blank under a
+       correct heading. The two must read the same rule from the same function. */
+    ? paths.map((path) => reachFor(path, held, collections, app.borrows ?? []))
       .filter((r): r is Hop => typeof r !== "string" && r.on === "ref")
     : []);
 
@@ -303,6 +307,20 @@ export const collectionsFor = (app: AppSpec, screen: ScreenSpec): readonly strin
      control listing every location by name is a read of the location collection
      whether it is a filter or a form field. */
   for (const one of screen.body?.picks ?? []) if (one.of) ids.add(one.of);
+  /*
+    ⚠️ EXCEPT WHAT IT BORROWS, AND THAT IS THE SEAM RATHER THAN A HOLE IN IT —
+    see `AppSpec.borrows`. What crosses is a `name`, which is the identity of a
+    row already named on the order in front of the reader; the RECORD is the
+    owner's, behind the owner's permission, on the owner's screens. Demanding
+    `party:read` here would be the opposite failure — a warehouse worker with no
+    OneParty grant refused a screen that shows a supplier's name and nothing
+    else — so no app could borrow anything and the mechanism would be dead.
+
+    ⚠️ AND IT IS SUBTRACTED HERE RATHER THAN SKIPPED AT EACH SOURCE, because a
+    borrowed id arrives four ways — a hop, a picker, a narrowing, a tally — and
+    four copies of one rule is how the fifth arrival gets it wrong.
+  */
+  for (const id of app.borrows ?? []) ids.delete(id);
   return [...ids];
 };
 
@@ -499,7 +517,25 @@ const choicesOf = async (
   db: Db, app: AppSpec, id: string, scope: string,
 ): Promise<readonly Choice[]> => {
   const spec = (app.collections ?? []).find((c) => c.id === id);
-  if (!spec) return [];
+  /*
+    ⚠️ A PICKER OVER A BORROWED COLLECTION IS THE WHOLE POINT OF `borrows` — see
+    `reachFor`. "Which supplier is this order for" is a list of another product's
+    rows by name, and without this arm the form draws an empty dropdown, which
+    reads as a workspace with no suppliers rather than as a seam that does not
+    reach. Two columns, `name` and no other, scoped by the workspace the caller
+    is already in — the same statement the join builds, for the same reasons.
+  */
+  if (!spec) {
+    if (!(app.borrows ?? []).includes(id)) return [];
+    const borrowed = await db.prepare(
+      `SELECT id, ${column(BORROWED_FIELD)} AS said FROM ${table(id)} `
+      + `WHERE ${column("tenant_id")} = ? ORDER BY ${column(BORROWED_FIELD)} ASC, id ASC LIMIT ?`)
+      .bind(scope, CHOICES_MOST)
+      .all<{ id: string; said?: string | null }>();
+    return borrowed.results.map((row) => ({
+      id: String(row.id), label: String(row.said ?? row.id),
+    }));
+  }
   const erase = eraseBy(spec);
   /* ⚠️ THE DECLARATION ONLY, AND `namesIn`'s GUESS IS DELIBERATELY NOT TAKEN —
      see its header. These rows are a CHOICE BETWEEN similar things, so a guessed

@@ -587,6 +587,16 @@ have an obvious answer reads as a question nobody asked.
    business concepts are reserved to the product that owns them so the collision
    is caught on the FIRST app rather than the second.
 
+   **And D122 says what crosses: the row's `name`, and nothing else.** A borrowed
+   hop resolves for the field literally called `name` — which is what a picker and
+   a label need — and `borrowed_beyond_the_name` refuses every other path through
+   it. The rule is the literal field name because the borrower composes with the
+   owner nowhere in the room, so `refuseCollection` makes the owner's `names`
+   answer that same literal and the two ends agree without importing each other.
+   The join reads two columns and the statement says so; a borrowed hop demands
+   no permission, because a name already on the order in front of somebody is not
+   the record behind it.
+
 ---
 
 ## What this plan is not

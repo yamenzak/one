@@ -1179,6 +1179,39 @@ describe("what one app borrows from another", () => {
     const nameless = collection({ ...note, id: "party", shared: true });
     expect(whyOf(app({ collections: [nameless] }))).toContain("shared_without_a_name");
   });
+
+  /*
+    ⚠️ THE FIELD THAT CROSSES IS CALLED `name`, AND A BORROWER IS WHY. It composes
+    with the owner nowhere in the room, so nothing can tell it which field carries
+    the label — it writes `supplier.name` and that has to be right. A collection
+    may still name itself by `title`; it may not also be shared.
+  */
+  it("refuses a shared collection that names itself by any other field", () => {
+    const titled = collection({ ...note, id: "party", shared: true, names: "title" });
+    expect(whyOf(app({ collections: [titled] }))).toContain("shared_names_elsewhere");
+  });
+
+  it("accepts a shared collection whose name field is called name", () => {
+    const named = collection({
+      ...note, id: "party", shared: true, names: "name",
+      fields: { name: field.text({ label: "Name", required: true, holds: "none", max: 200 }) },
+    });
+    expect(whyOf(app({ collections: [named] }))).not.toContain("shared_");
+  });
+
+  /*
+    ⚠️ AND SHARING IS WITHIN ONE WORKSPACE. The borrower's join is built without
+    the owner's spec, so the clause keeping it inside the caller's workspace has
+    to be knowable from the id alone — a global one has no clause at all, which
+    is a picker reading every workspace's parties.
+  */
+  it("refuses a shared collection scoped by anything but the tenant", () => {
+    const global = collection({
+      ...note, id: "party", shared: true, names: "name", scope: { of: "global" },
+      fields: { name: field.text({ label: "Name", required: true, holds: "none", max: 200 }) },
+    });
+    expect(whyOf(app({ collections: [global] }))).toContain("shared_beyond_a_tenant");
+  });
 });
 
 /**
@@ -1192,8 +1225,12 @@ describe("what one app borrows from another", () => {
  */
 describe("what the deployment can see that no app can", () => {
   const owner = (over: Partial<AppSpec> = {}): AppSpec => app({
+    /* ⚠️ `names: "name"` BECAUSE A SHARED COLLECTION MAY NOT NAME ITSELF ANYTHING
+       ELSE — see `reachFor`. A fixture carrying the illegal shape is how the
+       shape gets copied into a product. */
     id: "party", collections: [collection({
-      ...note, id: "party", names: "title", shared: true,
+      ...note, id: "party", names: "name", shared: true,
+      fields: { name: field.text({ label: "Name", required: true, holds: "none", max: 200 }) },
     })], ...over,
   });
   const borrower = app({

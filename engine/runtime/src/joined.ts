@@ -26,7 +26,7 @@
  */
 
 import type { CollectionSpec, Reach, TallySpec } from "@engine/kernel";
-import { eraseBy, hopsIn } from "@engine/kernel";
+import { BORROWED_FIELD, eraseBy, hopsIn } from "@engine/kernel";
 import { column, table, type Db } from "./sql.js";
 
 /**
@@ -67,7 +67,33 @@ export async function joinRows(
   const found = await Promise.all(hops.map(async (hop) => {
     const spec = collections.find((c) => c.id === hop.to);
     const ids = idsOf(rows, hop.through);
-    if (!spec || !ids.length) return { hop, held: new Map<string, Record<string, unknown>>() };
+    if (!ids.length) return { hop, held: new Map<string, Record<string, unknown>>() };
+
+    /*
+      ⚠️ A BORROWED HOP READS TWO COLUMNS AND THE STATEMENT SAYS SO — see
+      `reachFor`. The owner's spec is not in this app's list and must not be:
+      selecting `*` would put another product's whole record in this worker's
+      memory, one key lookup away from a screen, and the only thing between a
+      party's tax identifier and a browser would be the loop below happening to
+      pick one field out of it.
+
+      ⚠️ AND THE SCOPE IS THE WORKSPACE, WHICH IS WHY `shared` IS REFUSED UNLESS
+      IT IS TENANT-SCOPED. There is no owner's spec here to ask `eraseBy`, so the
+      clause has to be knowable from the id alone — and a borrowed join with no
+      scope clause is a picker that reads every workspace's parties.
+    */
+    if (hop.borrowed) {
+      const holes = ids.map(() => "?").join(", ");
+      const got = await db.prepare(
+        `SELECT id, ${column(BORROWED_FIELD)} FROM ${table(hop.to)} `
+        + `WHERE id IN (${holes}) AND ${column("tenant_id")} = ?`,
+      ).bind(...ids, scope).all();
+      const held = new Map<string, Record<string, unknown>>();
+      for (const r of got.results as Record<string, unknown>[]) held.set(String(r["id"]), r);
+      return { hop, held };
+    }
+
+    if (!spec) return { hop, held: new Map<string, Record<string, unknown>>() };
 
     const erase = eraseBy(spec);
     const holes = ids.map(() => "?").join(", ");
