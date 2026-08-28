@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@engine/inventory": "workspace:*",
+    "@engine/party": "workspace:*",
     "@engine/kernel": "workspace:*",
     "@engine/runtime": "workspace:*"
   },

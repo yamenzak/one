@@ -50,6 +50,7 @@ import {
   type Searcher,
 } from "@engine/runtime";
 import { inventory } from "@engine/inventory";
+import { oneParty } from "@engine/party";
 
 /* ------------------------------------------------------------------ what --- */
 
@@ -74,6 +75,13 @@ const APPS: Readonly<Record<string, () => AppSpec>> = {
      recipient nobody disclosed is the disclosure failure that gets found from
      outside. See `under`. */
   inventory: once(() => under(LEGAL, inventory())),
+  /*
+    ⚠️ THE BOOK EVERY OTHER PRODUCT READS FROM. It is a product a workspace adds
+    on its own — a person counting the boxes in a basement has no suppliers to
+    keep — and the day OneInventory borrows its `party`, `deploymentFaults`
+    refuses a deployment that serves the one without the other.
+  */
+  party: once(() => under(LEGAL, oneParty())),
 };
 
 /**
@@ -89,7 +97,7 @@ const APPS: Readonly<Record<string, () => AppSpec>> = {
  * answering for the workspaces an operator put it in, and comes out of THIS list
  * — one line, in review, rather than an unmounting that breaks them.
  */
-const SELLS: readonly string[] = ["inventory"];
+const SELLS: readonly string[] = ["inventory", "party"];
 
 /**
  * ONE MEMBERSHIP — WHAT THIS DEPLOYMENT SELLS, IN ONE LIST.
@@ -131,7 +139,8 @@ const PLANS: readonly PlanSpec[] = [
     said: "Read and export what is here. Nothing new can be added.",
     price: 0, currency: "USD", credits: 0,
     includes: { seats: 1, storage: GB, domains: 0,
-      products: 0, locations: 0, processes: false, jobs: false, imports: false },
+      products: 0, locations: 0, processes: false, jobs: false, imports: false,
+      parties: 0 },
   },
   {
     id: "solo", name: "Solo", kind: "personal", order: 1, trialDays: 14,
@@ -152,28 +161,32 @@ const PLANS: readonly PlanSpec[] = [
       everything else is: that row adds nothing.
     */
     includes: { seats: 1, storage: 10 * GB, domains: 0,
-      products: 200, locations: 25, processes: false, jobs: true, imports: true },
+      products: 200, locations: 25, processes: false, jobs: true, imports: true,
+      parties: 500 },
   },
   {
     id: "plus", name: "Plus", kind: "personal", order: 2, trialDays: 14,
     said: "Room to work, and somebody beside you.",
     price: 2500, currency: "USD", credits: 4_000,
     includes: { seats: 2, storage: 50 * GB, domains: 0,
-      products: 1_000, locations: 100, processes: true, jobs: true, imports: true },
+      products: 1_000, locations: 100, processes: true, jobs: true, imports: true,
+      parties: 2_500 },
   },
   {
     id: "studio", name: "Studio", kind: "commercial", order: 3, trialDays: 14,
     said: "A business: your own name on it, your own address, your own database.",
     price: 4900, currency: "USD", credits: 7_500,
     includes: { seats: 5, storage: 250 * GB, domains: 1,
-      products: 10_000, locations: 1_000, processes: true, jobs: true, imports: true },
+      products: 10_000, locations: 1_000, processes: true, jobs: true, imports: true,
+      parties: 25_000 },
   },
   {
     id: "company", name: "Company", kind: "commercial", order: 4, trialDays: 14,
     said: "A team, and the room a team needs.",
     price: 19900, currency: "USD", credits: 40_000,
     includes: { seats: 25, storage: 2048 * GB, domains: 3,
-      products: -1, locations: -1, processes: true, jobs: true, imports: true },
+      products: -1, locations: -1, processes: true, jobs: true, imports: true,
+      parties: -1 },
   },
 ];
 

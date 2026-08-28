@@ -1,0 +1,31 @@
+{
+  "name": "@engine/party",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "OneParty — everybody a business deals with, once. One record with roles: the same company is a customer, a supplier and nobody's second address book.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit",
+    "clean": "rm -rf .turbo *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@engine/kernel": "workspace:*",
+    "@engine/design": "workspace:*",
+    "@heroui/react": "^3.0.5",
+    "react": "^19.2.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.0"
+  }
+}
