@@ -533,9 +533,9 @@ function moveOp(
       document that took one and then failed to post is evidence with no entry
       behind it and no way to undo either half.
     */
-    if (what === "submit") {
+    if (what !== "amend") {
       for (const p of spec.document?.posts ?? []) {
-        await app.postings?.[p.rule]?.may(ctx, String(input.id ?? ""));
+        await app.postings?.[p.rule]?.may(ctx, String(input.id ?? ""), what);
       }
     }
 
@@ -564,10 +564,18 @@ function moveOp(
 
     /* ⚠️ AND NOW THE DOCUMENT STANDS, SO THE ANSWER IS ALREADY YES. `may` above
        is where a refusal belongs; this half writes what was agreed. */
-    if (what === "submit") {
-      for (const p of spec.document?.posts ?? []) {
-        await app.postings?.[p.rule]?.post(ctx, { id: done.id, number: done.number ?? "" });
-      }
+    for (const p of spec.document?.posts ?? []) {
+      const rule = app.postings?.[p.rule];
+      const at = { id: done.id, number: done.number ?? "" };
+      if (what === "submit") await rule?.post(ctx, at);
+      /*
+        ⚠️ AND A CANCEL REVERSES IT — see `PostingSpec.undo`. A document withdrawn
+        without undoing what it posted leaves the ledger holding a sale that did
+        not happen, and every screen agrees: the document says cancelled and the
+        entry says nothing. The kernel refuses a cancellable posting document
+        that declares no way back, so `undo` is present wherever this runs.
+      */
+      if (what === "cancel") await rule?.undo?.(ctx, at);
     }
     return done;
   };

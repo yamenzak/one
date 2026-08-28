@@ -277,3 +277,64 @@ describe("the nightly sweep", () => {
     expect(app.screens.map((one) => one.route)).toContain(where);
   });
 });
+
+/**
+ * THE TWO DOCUMENTS, AND THE ONE DIFFERENCE BETWEEN THEM.
+ *
+ * ⚠️ EVERY ASSERTION HERE IS A DECLARATION THAT WOULD BE UNDONE SILENTLY. Giving
+ * an invoice a cancel makes a document a customer holds withdrawable; taking a
+ * bill's away makes a wrong record permanent; and dropping either `undo` leaves
+ * the ledger holding a purchase the workspace decided never happened. None of
+ * the three fails anything else — the app still composes, every screen draws,
+ * and the fault surfaces in a figure somebody cannot explain.
+ */
+describe("the invoice and the bill", () => {
+  const sale = of("sale");
+  const bill = of("bill");
+
+  /* ⚠️ THE CUSTOMER HOLDS IT AND THE NUMBER IS SPENT, so the way out is a credit
+     note and the kernel is told which. */
+  it("refuses to cancel an invoice, and names the way out", () => {
+    const cancel = sale?.document?.cancel;
+    if (cancel?.by !== "refusing") throw new Error("an invoice must refuse cancellation");
+    expect(cancel.instead).toContain("credit note");
+    /* ⚠️ AND AMENDING FOLLOWS, because an amendment is a cancellation and a
+       fresh draft — a document refusing the first cannot offer the second. */
+    expect(sale?.document?.amendable).toBe(false);
+  });
+
+  /* ⚠️ NOBODY OUTSIDE THIS WORKSPACE HAS SEEN A BILL, so getting it wrong is a
+     mistake to withdraw rather than a fact to correct with a second document. */
+  it("lets a bill be withdrawn", () => {
+    expect(bill?.document?.cancel?.by).toBeUndefined();
+  });
+
+  /* ⚠️ AND THE ASYMMETRY REACHES THE HANDLERS, which is the half that moves
+     money. An invoice needs no reversal and a bill cannot ship without one. */
+  it("gives the reversal to the document that can be withdrawn, and only that one", () => {
+    expect(app.postings?.["sale.posted"]?.undo).toBeUndefined();
+    expect(app.postings?.["bill.posted"]?.undo).toBeTypeOf("function");
+  });
+
+  it("posts both through a rule that is declared", () => {
+    for (const one of [sale, bill]) {
+      for (const p of one?.document?.posts ?? []) {
+        expect(app.postings?.[p.rule]?.post).toBeTypeOf("function");
+        expect(app.postings?.[p.rule]?.may).toBeTypeOf("function");
+      }
+    }
+  });
+
+  /* ⚠️ THEIR NUMBER IS SEARCHABLE, because that is what a supplier quotes on a
+     statement and in every chasing email. Ours orders our own records. */
+  it("finds a bill by the supplier's own number", () => {
+    expect(bill?.searchable).toContain("theirs");
+  });
+
+  /* ⚠️ AND NOT UNIQUE: two suppliers may both call something INV-1, and refusing
+     that would refuse a real bill over a coincidence in somebody else's
+     numbering. */
+  it("does not make the supplier's number required", () => {
+    expect(bill?.fields.theirs?.required).toBeUndefined();
+  });
+});

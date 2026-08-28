@@ -15,13 +15,15 @@
  * gets one of them subtly wrong. A hand-written state machine per document is
  * how "cancel" comes to mean four different things in one product.
  *
- * ⚠️ WHAT A CANCEL DOES IS DERIVED, NEVER HAND-WRITTEN. A document declares what
- * it POSTS; the reverse of a declared posting is computable, so cancelling
- * writes the mirror entries because the engine can work them out rather than
- * because a handler remembered to. That is the same move erasure made — derived
- * from declarations instead of a list somebody maintains — and it is worth
- * making here for the same reason: the hand-written half is the half that goes
- * stale, silently, in the direction of a ledger that no longer balances.
+ * ⚠️ CANCELLING REVERSES WHAT SUBMITTING POSTED, AND WHERE THAT IS DERIVED IS
+ * WORTH BEING EXACT ABOUT. The engine cannot compute the mirror of an entry: it
+ * has no idea what a ledger is, and an earlier draft of this comment claimed it
+ * did. What the engine DOES is refuse a cancellable document that posts and
+ * declares no way to reverse itself (`PostingSpec.undo`), and call that half at
+ * the one moment it is correct to. The derivation then happens where the
+ * knowledge is — in the app, over the entries its own posting tagged with the
+ * document's id, rather than from a list somebody maintains. That is still the
+ * shape erasure has; it is one layer further in than the aspiration said.
  *
  * ⚠️ THERE ARE THREE STANDINGS AND NOT FOUR. "Amended" is not a state a document
  * is in; it is a fact about a CANCELLED document that another one points at. A

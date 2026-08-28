@@ -26,7 +26,7 @@
 
 import {
   area, collection, defineApp, field, job as declareJob, newId, operation, setting,
-  type AppSpec,
+  type AppSpec, type DocumentMove,
 } from "@engine/kernel";
 
 import { CHARTS, chartById, chartFor } from "./charts.js";
@@ -544,6 +544,78 @@ const saleLine = collection({
     said: field.text({ label: "What it is", required: true, holds: "none", max: 200 }),
     /* ⚠️ THOUSANDTHS, because half an hour is a real invoice line — see
        `QUANTITY_SCALE`. */
+    quantity: field.number({
+      label: "How many (thousandths)", required: true, holds: "none",
+      help: "2.5 hours is 2500.",
+    }),
+    price: field.money({ label: "Each", required: true, holds: "none" }),
+    account: field.ref({ label: "Goes to", required: true, holds: "none", to: "account" }),
+    tax: field.ref({ label: "Tax", holds: "none", to: "tax" }),
+    centre: field.ref({ label: "Cost centre", holds: "none", to: "centre" }),
+  },
+});
+
+/**
+ * A BILL SOMEBODY SENT US.
+ *
+ * ⚠️ IT CAN BE CANCELLED AND AN INVOICE CANNOT, AND THE ASYMMETRY IS THE WHOLE
+ * DIFFERENCE BETWEEN THEM. A sales invoice is a document we ISSUED — a customer
+ * holds it, its number is spent, and the lawful correction is a credit note. A
+ * bill is our own RECORD of what a supplier sent; nobody outside this workspace
+ * has ever seen it, so getting it wrong is a mistake to withdraw rather than a
+ * fact to correct with a second document.
+ *
+ * ⚠️ AND WITHDRAWING IT REVERSES WHAT IT POSTED — see `unpostBill`. A bill
+ * cancelled without that leaves the books owing a supplier for something the
+ * workspace decided never happened, with the document saying cancelled and the
+ * ledger saying nothing.
+ *
+ * ⚠️ IT CARRIES THEIR NUMBER, NOT ONLY OURS. Ours orders our own records; theirs
+ * is what a supplier quotes on a statement and on every chasing email, and a
+ * payables ledger that cannot be searched by it is one somebody reconciles by
+ * hand.
+ */
+const bill = collection({
+  id: "bill",
+  label: { one: "Bill", many: "Bills" },
+  scope: { of: "tenant" },
+  permission: "journal",
+  retention: null,
+  onClose: { then: "keep", why: "what was billed to this business, and by whom" },
+  searchable: ["memo", "theirs"],
+  names: "memo",
+  document: {
+    series: "BILL-{YYYY}-{####}",
+    posts: [{ to: "book", rule: "bill.posted" }],
+  },
+  fields: {
+    party: field.ref({ label: "Supplier", required: true, holds: "none", to: "party" }),
+    memo: field.text({ label: "What it is for", required: true, holds: "none", max: 200 }),
+    /* ⚠️ THEIR NUMBER, WHICH IS WHAT A SUPPLIER QUOTES. Not unique here on
+       purpose: two suppliers may both call something "INV-1", and refusing that
+       would refuse a real bill over a coincidence in somebody else's numbering. */
+    theirs: field.text({ label: "Their number", holds: "none", max: 60 }),
+    day: field.day({ label: "Date", required: true, holds: "none" }),
+    due: field.day({ label: "Due", holds: "none",
+      help: "When it is payable. Blank means on receipt." }),
+    currency: field.text({ label: "Billed in", holds: "none", max: 3 }),
+    rate: field.number({ label: "Rate", holds: "none", min: 0 }),
+    note: field.long({ label: "Note", holds: "none", max: 2_000 }),
+  },
+});
+
+/** ⚠️ The same line as an invoice's, against expense rather than income. */
+const billLine = collection({
+  id: "bill-line",
+  label: { one: "Line", many: "Lines" },
+  scope: { of: "tenant" },
+  permission: "journal",
+  retention: null,
+  onClose: { then: "keep", why: "what a bill was made of" },
+  names: "said",
+  fields: {
+    bill: field.ref({ label: "Bill", required: true, holds: "none", to: "bill" }),
+    said: field.text({ label: "What it is", required: true, holds: "none", max: 200 }),
     quantity: field.number({
       label: "How many (thousandths)", required: true, holds: "none",
       help: "2.5 hours is 2500.",
@@ -1258,18 +1330,31 @@ async function namesOf(db: Db, tenantId: string): Promise<ReadonlyMap<string, st
  * cache that can be stale between them.
  */
 async function invoiceAt(
-  db: Db, tenantId: string, id: string,
+  db: Db, tenantId: string, id: string, way: Way,
 ): Promise<{ sale: SaleRow; items: readonly ItemRow[]; rates: ReadonlyMap<string, number> } | null> {
-  const sale = await db.prepare(
-    `SELECT id, day, memo, party, currency, rate FROM sale WHERE id = ? AND tenant_id = ?`)
-    .bind(id, tenantId).first<SaleRow>();
+  /*
+    ⚠️ THE TWO STATEMENTS ARE SPELLED OUT RATHER THAN BUILT FROM `way`, and that
+    is `sql.ts`'s rule rather than a preference: a table name interpolated from a
+    variable is the one thing the generated schema layer refuses outright. Two
+    literals cost four lines and cannot be anything but names.
+  */
+  const sale = way === "out"
+    ? await db.prepare(
+      `SELECT id, day, memo, party, currency, rate FROM sale WHERE id = ? AND tenant_id = ?`)
+      .bind(id, tenantId).first<SaleRow>()
+    : await db.prepare(
+      `SELECT id, day, memo, party, currency, rate FROM bill WHERE id = ? AND tenant_id = ?`)
+      .bind(id, tenantId).first<SaleRow>();
   if (!sale) return null;
 
   const [lines, codes] = await Promise.all([
-    db.prepare(
-      `SELECT account, said, quantity, price, tax, centre FROM sale_line
-        WHERE sale = ? AND tenant_id = ?`)
-      .bind(id, tenantId).all<ItemRow>(),
+    way === "out"
+      ? db.prepare(
+        `SELECT account, said, quantity, price, tax, centre FROM sale_line
+          WHERE sale = ? AND tenant_id = ?`).bind(id, tenantId).all<ItemRow>()
+      : db.prepare(
+        `SELECT account, said, quantity, price, tax, centre FROM bill_line
+          WHERE bill = ? AND tenant_id = ?`).bind(id, tenantId).all<ItemRow>(),
     db.prepare(`SELECT id, basis FROM tax WHERE tenant_id = ?`)
       .bind(tenantId).all<{ id: string; basis: number }>(),
   ]);
@@ -1316,26 +1401,41 @@ async function homesFor(
  * document that took one and then found the month shut is evidence with no entry
  * behind it and no way to undo either half.
  */
-async function maySell(ctx: unknown, id: string): Promise<void> {
-  const c = ctx as Ctx;
-  const db = c.db as Db;
-  const held = await invoiceAt(db, c.tenantId, id);
-  if (!held) return c.fail("platform.not_found");
+function mayBill(way: Way) {
+  return async (ctx: unknown, id: string, what: DocumentMove): Promise<void> => {
+    const c = ctx as Ctx;
+    const db = c.db as Db;
+    const held = await invoiceAt(db, c.tenantId, id, way);
+    if (!held) return c.fail("platform.not_found");
 
-  const wrong = refuseItems(itemsOf(held.items));
-  if (wrong === "no_items") return c.fail("book.empty_invoice");
-  if (wrong === "nothing_charged") return c.fail("book.nil_invoice");
-  if (wrong) return c.fail("platform.invalid", {}, { fields: { lines: "Check the lines" } });
+    /*
+      ⚠️ THE CALENDAR IS ASKED ON BOTH MOVES AND THE CONTENTS ON ONLY ONE. A
+      cancellation writes a reversing entry, so a shut month refuses it for
+      exactly the reason it refuses the original — but the lines are already what
+      they were, and re-checking them would refuse a withdrawal of a document
+      somebody is withdrawing BECAUSE it is wrong.
+    */
+    if (what === "submit") {
+      const wrong = refuseItems(itemsOf(held.items));
+      if (wrong === "no_items") return c.fail("book.empty_invoice");
+      if (wrong === "nothing_charged") return c.fail("book.nil_invoice");
+      if (wrong) return c.fail("platform.invalid", {}, { fields: { lines: "Check the lines" } });
+    }
 
-  const homes = await homesFor(c, db, "out");
-  if (!homes) return c.fail("book.no_account", {},
-    { fields: { party: "No account is marked for what customers owe" } });
+    const homes = await homesFor(c, db, way);
+    if (!homes) {
+      return c.fail("book.no_account", {}, { fields: { party: way === "out"
+        ? "No account is marked for what customers owe"
+        : "No account is marked for what this business owes" } });
+    }
 
-  /* ⚠️ THE CALENDAR, ASKED HERE RATHER THAN BY THE WRITE. `writeEntry` would
-     refuse it too — and by then the number is issued. */
-  const { years, periods } = await calendarOf(db, c.tenantId);
-  const shut = refusePostingOn(held.sale.day, years, periods);
-  if (shut) refuseCalendar(c, shut);
+    /* ⚠️ THE CALENDAR, ASKED HERE RATHER THAN BY THE WRITE. `writeEntry` would
+       refuse it too — and by then the number is issued, or the document is
+       already withdrawn. */
+    const { years, periods } = await calendarOf(db, c.tenantId);
+    const shut = refusePostingOn(held.sale.day, years, periods);
+    if (shut) refuseCalendar(c, shut);
+  };
 }
 
 /**
@@ -1343,33 +1443,81 @@ async function maySell(ctx: unknown, id: string): Promise<void> {
  * number the customer's copy carries, which is what makes a figure in the ledger
  * traceable to a piece of paper somebody holds.
  */
-async function postSale(ctx: unknown, at: { id: string; number: string }): Promise<void> {
-  const c = ctx as Ctx;
-  const db = c.db as Db;
-  const held = await invoiceAt(db, c.tenantId, at.id);
-  if (!held) return;
-  const homes = await homesFor(c, db, "out");
-  if (!homes) return;
+function postBill(way: Way) {
+  return async (ctx: unknown, at: { id: string; number: string }): Promise<void> => {
+    const c = ctx as Ctx;
+    const db = c.db as Db;
+    const held = await invoiceAt(db, c.tenantId, at.id, way);
+    if (!held) return;
+    const homes = await homesFor(c, db, way);
+    if (!homes) return;
 
-  const items = itemsOf(held.items);
-  const lines = entryFor(items, chargeOf(items, held.rates), homes, "out", at.number);
-  /* ⚠️ THE CUSTOMER BY NAME, because a journal entry reading `pty_0m7…` is a
-     figure nobody can check against the invoice it came from. */
-  const called = (await namesOf(db, c.tenantId)).get(held.sale.party) ?? "";
-  const posted = await writeEntry(c, db, {
-    day: held.sale.day,
-    memo: called ? `${at.number} · ${called}` : `${at.number} · ${held.sale.memo}`,
-    source: "sale.posted",
-    /* ⚠️ THE DOCUMENT'S OWN ID, so the journal entry and the invoice can be read
-       from each other — which is B2's "why is this account moving", answered by
-       a row rather than by reading source. */
-    ref: at.id,
-    lines,
-  });
-  /* ⚠️ IT CANNOT REFUSE HERE, because `maySell` asked. If it somehow does, the
-     throw is loud and the operation fails rather than answering success over an
-     invoice with no entry. */
-  if ("why" in posted) throw new Error(`invoice ${at.number} could not post: ${posted.why}`);
+    const items = itemsOf(held.items);
+    const lines = entryFor(items, chargeOf(items, held.rates), homes, way, at.number);
+    /* ⚠️ THE PARTY BY NAME, because a journal entry reading `pty_0m7…` is a
+       figure nobody can check against the document it came from. */
+    const called = (await namesOf(db, c.tenantId)).get(held.sale.party) ?? "";
+    const posted = await writeEntry(c, db, {
+      day: held.sale.day,
+      memo: called ? `${at.number} · ${called}` : `${at.number} · ${held.sale.memo}`,
+      source: way === "out" ? "sale.posted" : "bill.posted",
+      /* ⚠️ THE DOCUMENT'S OWN ID, so the entry and the document can be read from
+         each other — which is B2's "why is this account moving", answered by a
+         row rather than by reading source, AND what the reversal below finds. */
+      ref: at.id,
+      lines,
+    });
+    /* ⚠️ IT CANNOT REFUSE HERE, because `mayBill` asked. If it somehow does, the
+       throw is loud and the operation fails rather than answering success over a
+       document with no entry. */
+    if ("why" in posted) throw new Error(`${at.number} could not post: ${posted.why}`);
+  };
+}
+
+/**
+ * WITHDRAWING A BILL REVERSES WHAT IT POSTED.
+ *
+ * ⚠️ IT REVERSES WHAT IS THERE RATHER THAN RE-DERIVING IT, and that is the whole
+ * reason the entry carries the document's id. Recomputing the lines from the
+ * document would be the same arithmetic twice — and the second copy would be run
+ * against rows somebody may have edited while the bill was a draft again, so a
+ * withdrawal could reverse a figure that was never posted.
+ *
+ * ⚠️ AND IT IS A NEW ENTRY, NOT A DELETED ONE. What happened is that a bill was
+ * recorded and then withdrawn, and both are facts — the same rule `year.reopen`
+ * follows. A ledger that forgets is a ledger nobody can audit.
+ */
+function unpostBill(way: Way) {
+  return async (ctx: unknown, at: { id: string; number: string }): Promise<void> => {
+    const c = ctx as Ctx;
+    const db = c.db as Db;
+    const was = await db.prepare(
+      `SELECT p.account AS account, p.centre AS centre, p.amount AS amount, j.day AS day
+         FROM posting p JOIN journal j ON j.id = p.journal
+        WHERE p.tenant_id = ? AND j.ref = ? AND j.source = ?`)
+      .bind(c.tenantId, at.id, way === "out" ? "sale.posted" : "bill.posted")
+      .all<{ account: string; centre: string | null; amount: number; day: string }>();
+
+    const rows = was.results ?? [];
+    /* ⚠️ NOTHING POSTED IS NOT A FAULT. A document cancelled before it was ever
+       submitted never reached this half; one whose entry is missing is a
+       workspace that predates the rail, and refusing would trap it. */
+    if (!rows.length) return;
+
+    const posted = await writeEntry(c, db, {
+      day: rows[0]?.day ?? c.now.slice(0, 10),
+      memo: `${at.number} withdrawn`,
+      source: way === "out" ? "sale.unposted" : "bill.unposted",
+      ref: at.id,
+      lines: rows.map((r) => ({
+        account: r.account,
+        amount: -r.amount,
+        memo: `${at.number} withdrawn`,
+        ...(r.centre ? { centre: r.centre } : {}),
+      })),
+    });
+    if ("why" in posted) throw new Error(`${at.number} could not be withdrawn: ${posted.why}`);
+  };
 }
 
 /**
@@ -1965,9 +2113,17 @@ const manifest = (): AppSpec => defineApp({
     is FOR. `may` is asked before the number is taken and holds every refusal;
     `post` writes the entry once the document stands.
   */
-  postings: { "sale.posted": { may: maySell, post: postSale } },
+  postings: {
+    /* ⚠️ AN INVOICE HAS NO `undo` AND A BILL DOES, which is the asymmetry in one
+       line: a document a customer holds is corrected by a credit note, and one
+       nobody outside this workspace has seen is withdrawn. The kernel refuses
+       either half being wrong. */
+    "sale.posted": { may: mayBill("out"), post: postBill("out") },
+    "bill.posted": { may: mayBill("in"), post: postBill("in"), undo: unpostBill("in") },
+  },
 
-  collections: [account, centre, journal, posting, rate, rule, sale, saleLine, tax, year, period],
+  collections: [account, bill, billLine, centre, journal, posting, rate, rule,
+    sale, saleLine, tax, year, period],
 
   operations: [start, extend, post, trial, standing, centres, revalue,
     openYear, closeYear, reopenYear, shutPeriod],
@@ -2310,6 +2466,13 @@ const manifest = (): AppSpec => defineApp({
     { id: "entry-of-invoice", of: "journal",
       where: [{ field: "ref", is: { here: "record" } }] },
     { id: "taxes", of: "tax", limit: 50 },
+    { id: "bills", of: "bill", limit: 50 },
+    { id: "lines-of-bill", of: "bill-line",
+      where: [{ field: "bill", is: { here: "record" } }] },
+    /* ⚠️ THE SAME QUESTION AS AN INVOICE'S, asked of a bill — what withdrawing it
+       did is in here too, which is why it is not narrowed to one source. */
+    { id: "entry-of-bill", of: "journal",
+      where: [{ field: "ref", is: { here: "record" } }] },
     /* ⚠️ NEWEST FIRST IS WRONG FOR A YEAR. The books are read forwards — 2025,
        then 2026 — because "which year am I in" is answered by the last row, and
        a reversed list makes somebody read up the screen to find it. */
@@ -2344,16 +2507,17 @@ const manifest = (): AppSpec => defineApp({
         layout: { as: "stack" },
         blocks: [
           /*
-            ⚠️ THE THREE THAT SHAPE THE CHART, REACHED FROM IT. An account names a
-            cost centre, a tax code and a currency, so all three are questions
-            somebody asks while looking at the chart — and the bar holds five
-            (D10). Cost centres was a destination for one round and lost the seat
-            to Invoices, which is the right trade: a document a customer holds
-            outranks the configuration behind it.
+            ⚠️ THE FOUR THAT SHAPE THE BOOKS, REACHED FROM THE CHART. Years,
+            centres, tax codes and rates are all answers to "how are these books
+            arranged" rather than things somebody does — and the bar holds five
+            (D10), which it now spends on the five things somebody DOES: read the
+            chart, check it balances, keep the journal, send an invoice, record a
+            bill. Centres lost its seat last round and Years lost one this round,
+            both to a document; that trade is the right way round every time.
           */
           {
             group: null,
-            of: [{ block: "QuickActions", leads: ["centres", "taxes", "rates"] }],
+            of: [{ block: "QuickActions", leads: ["years", "centres", "taxes", "rates"] }],
           },
           /*
             ⚠️ OPENING THE BOOKS WAS UNREACHABLE, AND THIS IS THE CONTROL THAT
@@ -2619,7 +2783,7 @@ const manifest = (): AppSpec => defineApp({
       everything already recorded. A switch buried in settings would make it look
       like a preference.
     */
-    { id: "years", route: "/years", label: "Years", nav: "primary", icon: "calendar",
+    { id: "years", route: "/years", label: "Years", nav: "none", icon: "calendar",
       permission: "year:read", tone: "neutral",
       body: {
         shape: "list",
@@ -2984,6 +3148,155 @@ const manifest = (): AppSpec => defineApp({
               bind: {
                 label: { from: { of: "words", says: "Lines" } },
                 of: { from: { of: "view", view: "lines-of-invoice" } },
+              },
+            }],
+          },
+        ],
+      } },
+
+    /*
+      BILLS — what suppliers sent us, which is the mirror of Invoices and is a
+      destination of its own rather than a tab on it.
+
+      ⚠️ TWO LISTS ON ONE SCREEN WOULD BE THE WRONG ECONOMY. Money in and money
+      out are asked about at different moments by different people, and a screen
+      that answers both leads with neither.
+    */
+    { id: "bills", route: "/bills", label: "Bills", nav: "primary", icon: "inbox",
+      permission: "journal:read", tone: "neutral",
+      body: {
+        shape: "list",
+        layout: { as: "stack" },
+        blocks: [{
+          group: null,
+          of: [{
+            block: "Listing",
+            shows: [
+              /* ⚠️ THEIR NUMBER LEADS, because that is what a supplier quotes on
+                 a statement — ours orders our own records and theirs is what a
+                 chasing email is about. */
+              { field: "theirs", label: "Their number" },
+              { field: "memo", label: "What it is for" },
+              { field: "day", label: "Date", as: "when" },
+              { field: "stands", label: "Standing" },
+            ],
+            goes: "bill",
+            nothing: {
+              says: "No bills yet",
+              under: "Record one and it posts what you owe when you accept it",
+            },
+            bind: {
+              label: { from: { of: "words", says: "Bills" } },
+              of: { from: { of: "view", view: "bills" } },
+            },
+          }],
+        }],
+      } },
+
+    /* ⚠️ ONE BILL, AND IT OFFERS BOTH MOVES — which an invoice does not. Nobody
+       outside this workspace has seen it, so getting it wrong is a mistake to
+       withdraw rather than a fact to correct with a second document. */
+    { id: "bill", route: "/bill", label: "Bill", nav: "none", icon: "inbox",
+      permission: "journal:read", of: "bill",
+      body: {
+        shape: "detail",
+        layout: { as: "stack" },
+        blocks: [
+          {
+            group: null,
+            of: [
+              {
+                block: "ActionRow",
+                does: ["bill.submit"],
+                when: { is: { of: "field", field: "stands" }, one: ["draft"] },
+                bind: {
+                  icon: { from: { of: "words", says: "check" } },
+                  label: { from: { of: "words", says: "Accept it" } },
+                  under: { from: { of: "words",
+                    says: "It takes its number and posts what you owe" } },
+                },
+              },
+              {
+                block: "ActionRow",
+                does: ["bill.cancel"],
+                when: { is: { of: "field", field: "stands" }, one: ["submitted"] },
+                bind: {
+                  icon: { from: { of: "words", says: "leave" } },
+                  label: { from: { of: "words", says: "Withdraw it" } },
+                  under: { from: { of: "words",
+                    says: "The entry behind it is reversed" } },
+                },
+              },
+            ],
+          },
+          {
+            group: "What it says",
+            of: [
+              { block: "FieldRow",
+                when: { has: { of: "field", field: "number" } },
+                bind: {
+                  label: { from: { of: "words", says: "Our number" } },
+                  value: { from: { of: "field", field: "number" } },
+                } },
+              { block: "FieldRow",
+                when: { has: { of: "field", field: "theirs" } },
+                bind: {
+                  label: { from: { of: "words", says: "Their number" } },
+                  value: { from: { of: "field", field: "theirs" } },
+                } },
+              { block: "FieldRow",
+                bind: {
+                  label: { from: { of: "words", says: "Date" } },
+                  value: { from: { of: "field", field: "day" }, as: "when" },
+                } },
+              { block: "FieldRow",
+                when: { has: { of: "field", field: "due" } },
+                bind: {
+                  label: { from: { of: "words", says: "Due" } },
+                  value: { from: { of: "field", field: "due" }, as: "when" },
+                } },
+              { block: "FieldRow",
+                bind: {
+                  label: { from: { of: "words", says: "Standing" } },
+                  value: { from: { of: "field", field: "stands" } },
+                } },
+            ],
+          },
+          {
+            group: "What it did",
+            of: [{
+              block: "Listing",
+              shows: [
+                { field: "memo", label: "Entry" },
+                { field: "day", label: "Date", as: "when" },
+              ],
+              goes: "entry",
+              nothing: {
+                says: "Nothing posted yet",
+                under: "Accepting it writes the entry behind it",
+              },
+              bind: {
+                label: { from: { of: "words", says: "In the books" } },
+                of: { from: { of: "view", view: "entry-of-bill" } },
+              },
+            }],
+          },
+          {
+            group: "What it is made of",
+            of: [{
+              block: "Listing",
+              shows: [
+                { field: "said", label: "What it is" },
+                { field: "quantity", label: "How many" },
+                { field: "price", label: "Each", as: "money" },
+              ],
+              nothing: {
+                says: "Nothing on it yet",
+                under: "Add a line for each thing being charged for",
+              },
+              bind: {
+                label: { from: { of: "words", says: "Lines" } },
+                of: { from: { of: "view", view: "lines-of-bill" } },
               },
             }],
           },

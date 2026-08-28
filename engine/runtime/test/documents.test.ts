@@ -25,6 +25,7 @@ import {
   takeNumber,
 } from "../src/documents.js";
 import { patch, put } from "../src/records.js";
+import { compose, type Ctx } from "../src/compose.js";
 
 const db = () => env.SHARD_EU_1 as unknown as Db;
 
@@ -407,9 +408,12 @@ describe("the rule a submitted document posts through", () => {
   const said: string[] = [];
 
   const posting = {
-    async may(_ctx: unknown, _id: string) { said.push("may"); },
+    async may(_ctx: unknown, _id: string, what: string) { said.push(`may ${what}`); },
     async post(_ctx: unknown, at: { id: string; number: string }) {
       said.push(`post ${at.number}`);
+    },
+    async undo(_ctx: unknown, at: { id: string; number: string }) {
+      said.push(`undo ${at.number}`);
     },
   };
 
@@ -427,7 +431,8 @@ describe("the rule a submitted document posts through", () => {
     const id = await draft();
     const chosen = await seriesFor(db(), TENANT, posts.id);
     for (const p of posts.document?.posts ?? []) {
-      await (app as { postings: Record<string, typeof posting> }).postings[p.rule]?.may(null, id);
+      await (app as { postings: Record<string, typeof posting> })
+        .postings[p.rule]?.may(null, id, "submit");
     }
     const done = await move(db(), posts, TENANT, id, "submit",
       { ...at, ...(chosen ? { series: chosen } : {}) });
@@ -439,7 +444,39 @@ describe("the rule a submitted document posts through", () => {
 
     /* ⚠️ `may` FIRST AND `post` WITH THE NUMBER, which is the only order in which
        a refusal is recoverable and an entry is traceable to a document. */
-    expect(said).toEqual(["may", "post MIN-2026-0001"]);
+    expect(said).toEqual(["may submit", "post MIN-2026-0001"]);
+  });
+
+  /*
+    ⚠️ AND A CANCEL REVERSES RATHER THAN MERELY MARKING. A document withdrawn
+    without undoing what it posted leaves the ledger holding something that did
+    not happen — and every screen agrees, because the document says cancelled and
+    the entry says nothing. The number stays spent: it was issued.
+  */
+  it("undoes what it posted, with the number it was posted under", async () => {
+    said.length = 0;
+    const id = await draft("To withdraw");
+    const chosen = await seriesFor(db(), TENANT, posts.id);
+    const up = await move(db(), posts, TENANT, id, "submit",
+      { ...at, ...(chosen ? { series: chosen } : {}) });
+    if ("why" in up) throw new Error(up.why);
+    await posting.post(null, { id: up.id, number: up.number ?? "" });
+
+    await posting.may(null, id, "cancel");
+    const down = await move(db(), posts, TENANT, id, "cancel", at);
+    if ("why" in down) throw new Error(down.why);
+    await posting.undo(null, { id: down.id, number: down.number ?? "" });
+
+    /* ⚠️ `may` IS ASKED ON THE CANCEL TOO, because the reversing entry is a
+       write into a month that may be shut — the same question as the original,
+       and the same moment to ask it. */
+    expect(said).toEqual([
+      `post ${up.number}`, "may cancel", `undo ${up.number}`,
+    ]);
+    expect(down.stands).toBe("cancelled");
+    /* ⚠️ THE NUMBER SURVIVES THE CANCELLATION, because it was issued. A gap in a
+       series is a question an auditor asks; a reused number is a worse one. */
+    expect(down.number).toBe(up.number);
   });
 
   /* ⚠️ AND A REFUSAL IN `may` LEAVES THE DOCUMENT A DRAFT, with no number spent.
@@ -452,5 +489,108 @@ describe("the rule a submitted document posts through", () => {
        rail has run yet when it happens. */
     expect(await documentAt(db(), posts, TENANT, id)).toMatchObject({ stands: "draft" });
     expect((await numberingIn(db(), TENANT, [posts], NOW))[0]?.next).toBe(before);
+  });
+});
+
+/**
+ * ⚠️ AND THE COMPOSED OPERATION IS WHERE THE WIRING LIVES, WHICH IS A DIFFERENT
+ * CLAIM FROM THE ONE ABOVE. That suite proves the seam's contract by calling the
+ * halves itself; this one proves `moveOp` calls them — the gap between the two
+ * is exactly where a declaration comes to be reached by nothing, which is the
+ * failure this whole seam was added to close.
+ */
+describe("the composed submit and cancel", () => {
+  const said: string[] = [];
+
+  const posts: CollectionSpec = collection({
+    ...minute,
+    document: {
+      series: "MIN-{YYYY}-{####}",
+      posts: [{ to: "wired", rule: "minute.posted" }],
+    },
+  } as never);
+
+  const app = {
+    id: "wired",
+    collections: [posts],
+    operations: [],
+    /* ⚠️ Composition builds every app's member operations, which read the seat
+       declaration — so the smallest app that composes at all still has one. */
+    access: {
+      permissions: ["minute:read", "minute:write"],
+      roles: { keeper: ["minute:read", "minute:write"], user: [], viewer: [] },
+      presets: [], founding: "keeper",
+      seats: { counts: ["owner"], entitlement: "seats" },
+    },
+    postings: {
+      "minute.posted": {
+        async may(_c: unknown, _id: string, what: string) { said.push(`may ${what}`); },
+        async post(_c: unknown, at: { number: string }) { said.push(`post ${at.number}`); },
+        async undo(_c: unknown, at: { number: string }) { said.push(`undo ${at.number}`); },
+      },
+    },
+  } as never;
+
+  const run = async (op: string, id: string) => {
+    const found = compose(app).byId.get(op);
+    if (!found) throw new Error(`no ${op}`);
+    const ctx = {
+      db: db(), tenantId: TENANT, accountId: "acc_x", now: NOW, currency: "AED",
+      reach: null,
+      fail: (code: string) => { throw new Error(code); },
+    } as unknown as Ctx;
+    return found.run(ctx, { id });
+  };
+
+  it("runs the rule through the operation the door answers", async () => {
+    said.length = 0;
+    const id = await draft("Through the door");
+    await run("minute.submit", id);
+    await run("minute.cancel", id);
+
+    /* ⚠️ FOUR CALLS IN ONE ORDER, and the order is the claim: asked, posted,
+       asked again, undone. Anything else leaves a number issued over nothing or
+       a withdrawal that did not reach the ledger. */
+    expect(said).toEqual([
+      "may submit", "post MIN-2026-0001", "may cancel", "undo MIN-2026-0001",
+    ]);
+  });
+
+  /*
+    ⚠️ AND A REFUSAL LANDS BEFORE THE NUMBER IS TAKEN, which is the reason `may`
+    exists at all rather than `post` throwing. A number cannot be given back: a
+    document that took one and then failed to post is evidence with nothing
+    behind it, and the next document skips a number for a reason nobody can
+    reconstruct. Ordering alone does not show this — the counter does.
+  */
+  it("takes no number when the rule refuses", async () => {
+    const refusing = {
+      ...(app as Record<string, unknown>),
+      postings: {
+        "minute.posted": {
+          async may() { throw new Error("not this one"); },
+          async post() { throw new Error("reached the post"); },
+          async undo() { /* unreachable here */ },
+        },
+      },
+    } as never;
+
+    const id = await draft("Refused at the door");
+    const found = compose(refusing).byId.get("minute.submit");
+    const ctx = {
+      db: db(), tenantId: TENANT, accountId: "acc_x", now: NOW, currency: "AED",
+      reach: null, fail: (code: string) => { throw new Error(code); },
+    } as unknown as Ctx;
+    await expect(found?.run(ctx, { id })).rejects.toThrow("not this one");
+
+    /* ⚠️ THE COUNTER NEVER MOVED, so the next document is still the first. */
+    const counted = await db().prepare(`SELECT COUNT(*) AS n FROM numbering`)
+      .first<{ n: number }>();
+    expect(counted?.n).toBe(0);
+
+    /* ⚠️ AND THE DOCUMENT IS STILL A DRAFT — the refusal took nothing with it. */
+    const row = await documentAt(db(), posts, TENANT, id);
+    expect(row?.stands).toBe("draft");
+    expect(row?.number).toBeNull();
   });
 });

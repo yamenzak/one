@@ -5510,3 +5510,77 @@ Five findings on the first run, and none of them was noise:
   reported `item` — an object in no vocabulary it has. It captures the last
   segment of a path now, which is what makes its own `PRICES` list work at all,
   and it still fires on the fault it was written for.
+
+## D130
+
+**A bill can be withdrawn and an invoice cannot, and that asymmetry is what the
+`undo` half of the posting seam is for.** OneBook gains `bill` and `bill-line` on
+the document rail; cancelling one reverses the entry accepting it posted, and the
+kernel refuses any cancellable posting document that declares no way back.
+
+### The two documents are not the same document with the sign flipped
+
+A sales invoice is a piece of paper we ISSUED. A customer holds it, its number is
+spent, and the lawful correction is a credit note — which is why D129 gave it
+`cancel: { by: "refusing" }`. A bill is our own RECORD of what a supplier sent.
+Nobody outside this workspace has ever seen it, so getting it wrong is a mistake
+to withdraw rather than a fact to correct with a second document. One arithmetic
+serves both — `entryFor` takes a `Way` and mirrors every side — and the
+difference between them is one declaration each.
+
+**A bill carries their number as well as ours.** Ours orders our own records;
+theirs is what a supplier quotes on a statement and in every chasing email, and a
+payables ledger that cannot be searched by it is one somebody reconciles by hand.
+It is deliberately not unique: two suppliers may both call something `INV-1`, and
+refusing that would refuse a real bill over a coincidence in somebody else's
+numbering.
+
+### The engine cannot compute the mirror of an entry, and said it could
+
+`document.ts` claimed that what a cancel does is DERIVED — that the reverse of a
+declared posting is computable, so the engine could write the mirror entries
+itself. It cannot: the engine has no idea what a ledger is, and that paragraph
+was an aspiration written in the present tense, which is the worst form for a
+comment to take. What the engine actually does is **refuse a cancellable posting
+document that declares no `undo`**, and call that half at the one moment it is
+correct to. The derivation then happens where the knowledge is.
+
+### The reversal reads what was posted; it does not recompute it
+
+`post` tags its entry with the document's id, and `undo` reverses whatever
+carries that tag. Recomputing the lines from the document would be the same
+arithmetic twice — and the second copy would run against rows somebody may have
+edited while the bill sat as a draft again, so a withdrawal could reverse a
+figure that was never posted. **And it is a new entry, not a deleted one**: a
+bill was recorded and then withdrawn, and both are facts. `year.reopen` already
+works this way, for the same reason — a ledger that forgets is a ledger nobody
+can audit.
+
+**Nothing posted is not a fault.** A document cancelled before it was ever
+submitted never reached this half, and one whose entry is missing is a workspace
+that predates the rail. Refusing would trap it.
+
+### `may` is asked on both moves, and asks a different question on each
+
+The calendar is checked for a cancel exactly as it is for a submit, because a
+cancel writes an entry too and a shut month refuses it for the same reason. The
+CONTENTS are checked on submit only: the lines are already what they were, and
+re-checking them would refuse a withdrawal of a document somebody is withdrawing
+*because* it is wrong. `may` therefore takes the move as an argument rather than
+being two functions.
+
+**And the refusal still lands before the number is taken.** The composed
+operation asks every rule first, then moves the document, then posts or undoes —
+proved in the runtime by a rule that throws, over a counter that never advanced
+and a document still standing as a draft. Ordering alone does not show that; the
+counter does.
+
+### Bills took the fifth seat, and Years lost it
+
+The nav bar holds five (D10) and OneBook now spends all five on things somebody
+DOES: read the chart, check it balances, keep the journal, send an invoice,
+record a bill. Years, centres, tax codes and rates are answers to "how are these
+books arranged", and they are reached from the chart they arrange. Centres lost
+its seat to Invoices last round and Years lost one to Bills this round; that
+trade — a document over the configuration behind it — is the right way round
+every time.

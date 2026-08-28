@@ -28,6 +28,7 @@ import {
 import type { Lane } from "./ai.js";
 import type { WhitelabelDef } from "./brand.js";
 import type { CollectionSpec } from "./collection.js";
+import type { DocumentMove } from "./document.js";
 import {
   danglingRefs, eventsFor, idleBorrows, movesFor, operationsFor, quotasWithoutCeiling, refuseCollection,
 } from "./collection.js";
@@ -1009,18 +1010,32 @@ export interface PostingSpec {
    * knowable in advance, and all of them are unrecoverable afterwards, because
    * an issued number cannot be given back.
    */
-  readonly may: (ctx: unknown, id: string) => Promise<void>;
+  readonly may: (ctx: unknown, id: string, what: DocumentMove) => Promise<void>;
   /**
    * ⚠️ RUNS ONCE THE DOCUMENT STANDS, AND BY THEN THE ANSWER IS YES. Anything
    * that throws here leaves evidence with no entry behind it — which is why the
    * question is asked above, and why this half is a write rather than a decision.
    */
   readonly post: (ctx: unknown, at: PostingAt) => Promise<void>;
+  /**
+   * WHAT CANCELLING UNDOES.
+   *
+   * ⚠️ REQUIRED OF ANY POSTING DOCUMENT THAT CAN BE CANCELLED, and absent from
+   * one that cannot. A document withdrawn without reversing what it posted
+   * leaves the ledger holding a sale that did not happen — and every screen
+   * agrees, because the document says cancelled and the entry says nothing.
+   *
+   * ⚠️ AND IT IS THE APP'S DERIVATION, NOT A SECOND HAND-WRITTEN ENTRY. `post`
+   * tags what it wrote with the document's id; this reverses whatever carries
+   * that tag. Writing the mirror lines out again would be the same arithmetic
+   * twice, and the copy is the one that goes stale.
+   */
+  readonly undo?: (ctx: unknown, at: PostingAt) => Promise<void>;
 }
 
 export interface PostingAt {
   readonly id: string;
-  /** ⚠️ The number just issued — what the entry is filed under. */
+  /** ⚠️ The number the document carries — what its entry is filed under. */
   readonly number: string;
 }
 
@@ -1285,6 +1300,23 @@ export function refuseApp(spec: AppSpec): readonly Refusal[] {
       + ` declared — the engine would know the document had an effect and nothing`
       + ` would carry it out`);
   }
+  /*
+    ⚠️ AND A CANCELLABLE POSTING DOCUMENT HAS TO SAY HOW IT UNDOES ITSELF. One
+    withdrawn without reversing what it posted leaves the ledger holding a sale
+    that did not happen — and every screen agrees, because the document says
+    cancelled and the entry says nothing. `cancel: { by: "refusing" }` is the one
+    shape that needs none, which is why an invoice does not have one.
+  */
+  for (const one of spec.collections) {
+    if (one.document?.cancel?.by === "refusing") continue;
+    for (const p of one.document?.posts ?? []) {
+      if (spec.postings?.[p.rule]?.undo) continue;
+      at("postings", `"${one.id}" can be cancelled and posts through "${p.rule}", which`
+        + ` declares no way to reverse itself — a withdrawn document would leave its`
+        + ` entry standing, and every screen would agree`);
+    }
+  }
+
   for (const rule of Object.keys(spec.postings ?? {})) {
     if (posted.has(rule)) continue;
     at("postings", `"${rule}" is declared and no document posts through it — a rule`
