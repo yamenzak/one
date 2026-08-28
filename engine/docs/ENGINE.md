@@ -400,6 +400,7 @@ before an app is resolved draws on them.
 | `media` | The files you uploaded | `subject_id: delete` | `tenant_id: delete` |
 | `search_item` | — *which records are in the index, and never what they say* | — | kept |
 | `numbering` | — *how far a workspace's own document series has counted* | — | `tenant_id: delete` |
+| `series` | How your documents are numbered | `by: anonymise` | `tenant_id: delete` |
 
 Both walks read one ledger (`HOLDINGS` in `runtime/src/dossier.ts`), and a table
 declared by a schema module with no row in it fails `pnpm engine:gate` — which is
@@ -478,7 +479,8 @@ env or a binding.
 | `compose` | a manifest becomes a live surface of operations | 2 | — |
 | `serve` | the one path every request ends in — both doors | 6 | — |
 | `records` | the generated reads and writes behind a collection | 11 | — |
-| `documents` | the three moves a document makes, and the counter its number comes from | 4 | — |
+| `documents` | the three moves a document makes, and the counter its number comes from | 8 | — |
+| `series-ops` | reading and changing the format a workspace numbers its documents by | 1 | — |
 | `settings` | reading and writing a workspace's own switches | 5 | — |
 | `billing` | plans, subscriptions, the bill, the ladder | 17 | — |
 | `wallet` | OneWallet: the allowance, what was bought, and reserve → settle → release | 22 | — |
@@ -536,7 +538,7 @@ env or a binding.
 | `bin-ops` | the trash: what is in it, putting a record back, and freezing one — one set of routes across every collection | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 9 | — |
 
-**480 of them**, 479 reached by something today.
+**485 of them**, 484 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 

@@ -1479,6 +1479,15 @@
         "why": "how far a workspace's own document series has counted",
         "onForget": [],
         "onClose": "tenant_id: delete"
+      },
+      {
+        "table": "series",
+        "export": "How your documents are numbered",
+        "why": null,
+        "onForget": [
+          "by: anonymise"
+        ],
+        "onClose": "tenant_id: delete"
       }
     ]
   }

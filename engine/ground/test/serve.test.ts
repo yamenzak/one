@@ -269,6 +269,11 @@ describe("what the manifest produced", () => {
       "GET /api/role.list",
       "POST /api/role.remove",
       "POST /api/role.save",
+      /* ⚠️ TWO ROUTES ABOUT NUMBERING FOR THE WHOLE APP, mounted because ONE
+         collection declares a document — the same "only where there is
+         something to answer about" rule the bin and the guide already follow. */
+      "GET /api/series.list",
+      "POST /api/series.set",
       "GET /api/setting.read",
       "POST /api/setting.write",
       /* ⚠️ ASKING FOR A DATABASE OF ITS OWN, which is the half of isolation that

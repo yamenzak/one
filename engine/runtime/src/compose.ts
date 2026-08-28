@@ -31,7 +31,7 @@ import type { Db } from "./sql.js";
 import {
   MOST_ROWS, list, patch, put, readOne, setAside, type VaultSeam, type WriteRefusal,
 } from "./records.js";
-import { move } from "./documents.js";
+import { move, seriesFor } from "./documents.js";
 import { reachingBy } from "./reach.js";
 import { memberOps } from "./member-ops.js";
 import { packageOps } from "./packages.js";
@@ -45,6 +45,7 @@ import { totalsOps } from "./totals-ops.js";
 import { noteGone, noteWritten } from "./search.js";
 import { centreOps } from "./centre-ops.js";
 import { binOps } from "./bin-ops.js";
+import { seriesOps } from "./series-ops.js";
 import { progressOps } from "./progress.js";
 
 /* ------------------------------------------------------------------ shape --- */
@@ -484,9 +485,25 @@ function moveOp(
   } as AnyOperation;
 
   const run = async (ctx: Ctx, input: Record<string, unknown>): Promise<unknown> => {
+    /*
+      ⚠️ READ ON THE SUBMIT PATH RATHER THAN CACHED, and it costs one row. A
+      workspace's numbering is edited from a settings screen by one person and
+      read by everybody, so a cache would hold the old format for whoever had
+      the app open — and the document they raise next carries a number the
+      workspace stopped using, permanently, in a run an auditor reads.
+
+      ⚠️ AND ONLY FOR A SUBMIT. A cancel and an amendment take no number, so
+      asking would be a query to answer a question nothing is about to use.
+    */
+    const chosen = what === "submit"
+      ? await seriesFor(ctx.db, ctx.tenantId, spec.id)
+      : null;
     const done = await move(
       ctx.db, spec, scopeOf(spec, ctx), String(input.id ?? ""), what,
-      { now: ctx.now, by: ctx.accountId ?? null, tenantId: ctx.tenantId });
+      {
+        now: ctx.now, by: ctx.accountId ?? null, tenantId: ctx.tenantId,
+        ...(chosen ? { series: chosen } : {}),
+      });
 
     if ("why" in done) {
       if (done.why === "not_found") ctx.fail("platform.not_found");
@@ -605,6 +622,12 @@ export function compose(app: AppSpec): Composed {
      so a trash over it would be a screen that is empty for ever. */
   if (app.collections.length) {
     for (const [id, resolved] of Object.entries(binOps(app))) byId.set(id, resolved);
+  }
+  /* ⚠️ ONLY WHERE SOMETHING IS NUMBERED — see `seriesOps`. An app with no
+     documents would answer two routes about a numbering it does not do, and a
+     settings screen listing nothing reads as one that failed to load. */
+  if (app.collections.some((c) => c.document)) {
+    for (const [id, resolved] of Object.entries(seriesOps(app))) byId.set(id, resolved);
   }
   /* ⚠️ ONLY WHERE THERE IS A CHECKLIST OR SOMETHING TO CONGRATULATE. An app
      declaring neither would answer two routes about a guide it does not have —

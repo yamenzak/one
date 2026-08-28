@@ -5127,3 +5127,55 @@ gains the rail on its next boot with nothing migrated. A global-scoped document
 is refused — its counter would be one every tenant increments, so one business's
 numbers would skip wherever another raised a document, leaking how busy the
 neighbours are and handing an auditor a gapped run.
+
+## D125
+
+**A workspace's numbering format is its own, and changing it is never a deploy.**
+`series.list` and `series.set`, two routes for the whole app rather than two per
+document, over a `series` table the workspace writes.
+
+### Why it is not a setting
+
+The settings rail resolves one declared key to one value. A numbering format is
+per COLLECTION — a product with six document types has six of them — so as
+settings it would be six declarations an app has to remember to write, one per
+document, with nothing checking that it did. Derived from `document.series`
+instead, it exists the moment a collection declares one.
+
+### The bug this stage found in the last one
+
+`MoveAt.series` was declared in AC-1 and no caller supplied it: the
+workspace-editable half of the rail was inert — a capability built, guarded and
+reachable by nothing, which is the failure class this repository has the most
+history with. And the reason it could not be
+supplied is worth keeping: **the pattern was stored on the counter row.** A
+counter is keyed by its PERIOD — `invoice:2026` — which is derived from the
+pattern, so a read that begins "what is this workspace's pattern" cannot use
+that key, because it does not have the pattern yet. Two facts, conflated:
+
+- `numbering.pattern` is the record of what a counter COUNTED, and is the answer
+  to a question asked of an old count.
+- `series.pattern` is what the workspace CHOSE, and is read before a number is
+  issued.
+
+### The three rules
+
+- **Absent means the app's, for ever.** No row is written at founding. Seeding
+  one would freeze every workspace against the declaration as it stood on the
+  day they signed up, so a later change to the default would reach new
+  workspaces and no existing one.
+- **The way back is deleting the row, never copying the default into it.** Same
+  reason, one step later: a workspace that undid its own format by having the
+  app's written in would be frozen against a declaration that afterwards moved.
+- **Changing the format does not restart the count.** A workspace fourteen
+  documents in still has fourteen behind it. Where the new pattern implies a
+  different PERIOD the restart happens by itself, because the period is part of
+  the counter's key — which is the same mechanism, doing the right thing without
+  a second rule.
+
+### And the screen shows the result, not the pattern
+
+`INV-{YYYY}-{#####}` is not what an accountant recognises; `INV-2026-00042` is,
+and it is the only form in which a wrong answer is obvious before a document has
+gone out carrying it. `numberingIn` works it out from where the count actually
+stands rather than describing what would happen.

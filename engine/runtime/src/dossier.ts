@@ -293,6 +293,13 @@ export const HOLDINGS: readonly HeldBy[] = [
      is correct, because it is a different business. */
   { table: "numbering", person: [], workspace: its(),
     why: "how far a workspace's own document series has counted" },
+  /* ⚠️ THE FORMAT, WHICH IS A DIFFERENT FACT FROM THE COUNT — see
+     `NUMBERING_SCHEMA`. `by` names whoever set it, which is the one thing here
+     about a person: an audit question ("who changed how our invoices are
+     numbered") rather than a record kept about them. */
+  { table: "series", workspace: its(), label: "How your documents are numbered",
+    person: [{ column: "by", on: "anonymise",
+      why: "it is the workspace's own record that somebody changed the format, kept without a name in it" }] },
   { table: "notify_policy", person: [], why: "a workspace's own routing", workspace: its() },
   { table: "notify_letter", person: [], why: "a workspace's own words for its own messages", workspace: its() },
   { table: "custom_role", person: [], why: "a workspace's own roles", workspace: its() },

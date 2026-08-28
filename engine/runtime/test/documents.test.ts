@@ -17,9 +17,13 @@
 import { env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
 import { collection, field, type CollectionSpec } from "@engine/kernel";
-import { applySchema, type Db, type SchemaModule } from "../src/schema.js";
+import { applySchema, type SchemaModule } from "../src/schema.js";
+import type { Db } from "../src/sql.js";
 import { statementsFor, columnsFor } from "../src/schema.js";
-import { NUMBERING_SCHEMA, documentAt, move, takeNumber } from "../src/documents.js";
+import {
+  NUMBERING_SCHEMA, clearSeries, documentAt, move, numberingIn, seriesFor, setSeries,
+  takeNumber,
+} from "../src/documents.js";
 import { patch, put } from "../src/records.js";
 
 const db = () => env.SHARD_EU_1 as unknown as Db;
@@ -62,6 +66,7 @@ beforeEach(async () => {
   await applySchema(db(), [MODULE, NUMBERING_SCHEMA]);
   await db().exec(`DELETE FROM minute;`);
   await db().exec(`DELETE FROM numbering;`);
+  await db().exec(`DELETE FROM series;`);
 });
 
 /* ---------------------------------------------------------------- the row --- */
@@ -289,5 +294,102 @@ describe("withdrawing and correcting one", () => {
 
     expect(await move(db(), minute, TENANT, made, "submit", at))
       .toMatchObject({ number: "MIN-2026-0002" });
+  });
+});
+
+/* --------------------------------------------------------- what they call it --- */
+
+describe("the format a workspace numbers by", () => {
+  /*
+    ⚠️ ABSENT IS THE COMMON ANSWER AND IT MUST NOT COST A WRITE. Seeding a row at
+    founding would mean a deployment that later edits its declared default
+    reaches new workspaces and no existing one — the same failure a
+    version-stamped catalogue exists to avoid.
+  */
+  it("is the app's until somebody changes it", async () => {
+    expect(await seriesFor(db(), TENANT, "minute")).toBeNull();
+    const [one] = await numberingIn(db(), TENANT, [minute], NOW);
+    expect(one).toMatchObject({ pattern: "MIN-{YYYY}-{####}", theirs: false });
+  });
+
+  it("is theirs once they set one, and the next document takes it", async () => {
+    expect(await setSeries(db(), TENANT, "minute", "AGREED/{YYYY}/{###}", NOW, "acc_x"))
+      .toEqual({ ok: true });
+    expect(await seriesFor(db(), TENANT, "minute")).toBe("AGREED/{YYYY}/{###}");
+
+    const id = await draft();
+    const chosen = await seriesFor(db(), TENANT, "minute");
+    const done = await move(db(), minute, TENANT, id, "submit",
+      { ...at, ...(chosen ? { series: chosen } : {}) });
+    expect(done).toMatchObject({ number: "AGREED/2026/001" });
+  });
+
+  /*
+    ⚠️ CHECKED IN THE STORE AND NOT ONLY ON THE SCREEN. A pattern with no counter
+    numbers every document a workspace ever raises the same — which does not
+    throw and is found by whoever tries to work out which of forty identical
+    invoices was paid.
+  */
+  it("refuses a pattern that would number everything the same", async () => {
+    expect(await setSeries(db(), TENANT, "minute", "MIN-{YYYY}", NOW, "acc_x"))
+      .toEqual({ why: "series_without_a_counter" });
+    expect(await seriesFor(db(), TENANT, "minute")).toBeNull();
+  });
+
+  it("refuses a placeholder nothing fills", async () => {
+    expect(await setSeries(db(), TENANT, "minute", "MIN-{YEAR}-{###}", NOW, "acc_x"))
+      .toEqual({ why: "series_unknown_token" });
+  });
+
+  /* ⚠️ CHANGING THE FORMAT IS NOT RESTARTING THE COUNT. A workspace fourteen
+     documents in still has fourteen behind it. */
+  it("leaves the count where it was", async () => {
+    const first = await draft("one");
+    await move(db(), minute, TENANT, first, "submit", at);
+
+    await setSeries(db(), TENANT, "minute", "MIN-{YYYY}-{#####}", NOW, "acc_x");
+    const second = await draft("two");
+    const chosen = await seriesFor(db(), TENANT, "minute");
+    expect(await move(db(), minute, TENANT, second, "submit",
+      { ...at, ...(chosen ? { series: chosen } : {}) }))
+      .toMatchObject({ number: "MIN-2026-00002" });
+  });
+
+  /* ⚠️ THE WAY BACK IS DELETING THE ROW, NEVER WRITING THE DEFAULT INTO IT —
+     otherwise the workspace is frozen against a declaration that later moves. */
+  it("goes back to the app's by forgetting theirs rather than copying it", async () => {
+    await setSeries(db(), TENANT, "minute", "X-{###}", NOW, "acc_x");
+    await clearSeries(db(), TENANT, "minute");
+    expect(await seriesFor(db(), TENANT, "minute")).toBeNull();
+    const [one] = await numberingIn(db(), TENANT, [minute], NOW);
+    expect(one).toMatchObject({ pattern: "MIN-{YYYY}-{####}", theirs: false });
+  });
+
+  it("is one workspace's own", async () => {
+    await setSeries(db(), TENANT, "minute", "X-{###}", NOW, "acc_x");
+    expect(await seriesFor(db(), "ten_other", "minute")).toBeNull();
+  });
+
+  /*
+    ⚠️ THE SCREEN SHOWS WHAT THE NEXT ONE WOULD BE CALLED, NOT THE PATTERN. Nobody
+    recognises `MIN-{YYYY}-{####}`; `MIN-2026-0003` is the only form in which a
+    wrong answer is obvious before a document goes out carrying it.
+  */
+  it("says what the next one would be called, from where the count stands", async () => {
+    expect((await numberingIn(db(), TENANT, [minute], NOW))[0]?.next).toBe("MIN-2026-0001");
+
+    const id = await draft();
+    await move(db(), minute, TENANT, id, "submit", at);
+    expect((await numberingIn(db(), TENANT, [minute], NOW))[0]?.next).toBe("MIN-2026-0002");
+  });
+
+  it("says nothing about a collection that is not a document", async () => {
+    const plain = collection({
+      id: "shelf", label: { one: "Shelf", many: "Shelves" },
+      scope: { of: "tenant" }, permission: "shelf", retention: null,
+      onClose: { then: "purge" },
+      fields: { name: field.text({ label: "Name", holds: "none" }) },
+    });
+    expect(await numberingIn(db(), TENANT, [plain], NOW)).toEqual([]);
   });
 });

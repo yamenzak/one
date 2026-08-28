@@ -21,6 +21,7 @@ import {
   DOCUMENT_STANDINGS, counterKey, documentEditable, eraseBy, mayMoveDocument, newId,
   readSeries, renderSeries, standingAfter,
 } from "@engine/kernel";
+import type { SeriesRefusal } from "@engine/kernel";
 import { column, table, type Db } from "./sql.js";
 import type { SchemaModule } from "./schema.js";
 
@@ -35,11 +36,11 @@ import type { SchemaModule } from "./schema.js";
  * a number back out of a string whose shape a workspace's pattern chose, and
  * hands out a duplicate the moment the newest document is cancelled and binned.
  *
- * ⚠️ AND THE PATTERN IS STORED BESIDE THE COUNT, because a workspace that edits
- * its series is asking for the NEXT document to be numbered differently rather
- * than for the count to restart — while one whose new pattern implies a
- * different period is asking for exactly that. Keeping what the count was
- * counting is what lets the two be told apart.
+ * ⚠️ AND THE PATTERN ON THIS ROW IS A RECORD OF WHAT THE COUNTER COUNTED, NEVER
+ * THE WORKSPACE'S CHOICE. Those are two facts and conflating them made the
+ * second unreadable — see the `series` table below. What this column is for is
+ * telling somebody looking at a counter which format the numbers it issued were
+ * in, which is the question asked of an old count and of no current one.
  */
 export const NUMBERING_SCHEMA: SchemaModule = {
   id: "numbering",
@@ -48,8 +49,93 @@ export const NUMBERING_SCHEMA: SchemaModule = {
     + `tenant_id TEXT NOT NULL, series_key TEXT NOT NULL, pattern TEXT NOT NULL, `
     + `next INTEGER NOT NULL, at TEXT NOT NULL, `
     + `PRIMARY KEY (tenant_id, series_key));`,
+    /*
+      ⚠️ WHAT THE WORKSPACE CHOSE IS A DIFFERENT FACT FROM WHAT A COUNTER
+      COUNTED, AND KEEPING BOTH ON THE COUNTER ROW MADE THE FIRST UNREADABLE.
+      A counter is keyed by its PERIOD — `invoice:2026` — which is derived from
+      the pattern; so a read that starts by asking "what is this workspace's
+      pattern" cannot use that key, because it does not have the pattern yet.
+      Two tables because they answer at two different moments: this one before a
+      number is issued, `numbering` as it is issued.
+    */
+    `CREATE TABLE IF NOT EXISTS series (`
+    + `tenant_id TEXT NOT NULL, collection TEXT NOT NULL, pattern TEXT NOT NULL, `
+    + `at TEXT NOT NULL, by TEXT, `
+    + `PRIMARY KEY (tenant_id, collection));`,
   ],
 };
+
+/* ----------------------------------------------------------- the pattern --- */
+
+/**
+ * THE PATTERN THIS WORKSPACE NUMBERS BY, OR NULL FOR THE DECLARED ONE.
+ *
+ * ⚠️ ABSENT IS THE COMMON ANSWER AND IT MUST NOT COST A WRITE. Seeding every
+ * workspace's row at founding would mean a deployment that edits a declared
+ * default reaches new workspaces and no existing one — the same failure a
+ * version-stamped catalogue exists to avoid. A missing row means "whatever the
+ * app declares", for ever, including after the app changes its mind.
+ */
+export async function seriesFor(
+  db: Db, tenantId: string, collection: string,
+): Promise<string | null> {
+  const row = await db.prepare(
+    `SELECT pattern FROM series WHERE tenant_id = ? AND collection = ?`)
+    .bind(tenantId, collection).first<{ pattern: string }>();
+  return row?.pattern ?? null;
+}
+
+export type SeriesSet = { readonly ok: true } | { readonly why: SeriesRefusal };
+
+/**
+ * SET IT, OR SAY WHY THE PATTERN CANNOT BE USED.
+ *
+ * ⚠️ CHECKED HERE AND NOT ONLY ON THE SCREEN. The screen is one caller; an agent
+ * and the API are two more, and a pattern with no counter in it numbers every
+ * document a workspace ever raises the same — which does not throw, does not
+ * fail a test, and is found by whoever tries to work out which of forty
+ * identical invoices was paid.
+ *
+ * ⚠️ AND IT DOES NOT TOUCH THE COUNTER. Changing the format is not restarting
+ * the count — a workspace that switched from `INV-` to `2026/` mid-year still
+ * has fourteen documents behind it. Where the new pattern implies a different
+ * PERIOD the restart happens by itself, because the period is part of the
+ * counter's key.
+ */
+export async function setSeries(
+  db: Db, tenantId: string, collection: string, pattern: string,
+  now: string, by: string | null,
+): Promise<SeriesSet> {
+  const read = readSeries(pattern);
+  if (typeof read === "string") return { why: read };
+  await db.prepare(
+    `INSERT INTO series (tenant_id, collection, pattern, at, by) VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT (tenant_id, collection)
+     DO UPDATE SET pattern = excluded.pattern, at = excluded.at, by = excluded.by`)
+    .bind(tenantId, collection, pattern, now, by).run();
+  return { ok: true };
+}
+
+/** ⚠️ Back to what the app declares — deleting the row, never writing the default
+    into it, so a later change to the declaration still reaches this workspace. */
+export async function clearSeries(
+  db: Db, tenantId: string, collection: string,
+): Promise<void> {
+  await db.prepare(`DELETE FROM series WHERE tenant_id = ? AND collection = ?`)
+    .bind(tenantId, collection).run();
+}
+
+/** What one document collection's numbering looks like right now. */
+export interface Numbering {
+  readonly collection: string;
+  /** ⚠️ The collection's own word for one of them — "Invoice", never "invoice". */
+  readonly of: string;
+  readonly pattern: string;
+  /** ⚠️ Whether the workspace set it, or it is still what the app declares. */
+  readonly theirs: boolean;
+  /** What the next document would be called, worked out rather than guessed. */
+  readonly next: string;
+}
 
 /* ------------------------------------------------------------------ read --- */
 
@@ -264,4 +350,46 @@ async function amend(
     .bind(...values).run();
 
   return { id: held.id, stands: held.stands, number: held.number, draft };
+}
+
+/**
+ * WHAT THE NEXT ONE WOULD BE CALLED — worked out, never a sentence describing it.
+ *
+ * ⚠️ A SETTINGS SCREEN THAT SHOWED THE PATTERN AND NOT THE RESULT WOULD BE
+ * ASKING SOMEBODY TO RUN THE GRAMMAR IN THEIR HEAD. `INV-{YYYY}-{#####}` is not
+ * what an accountant recognises; `INV-2026-00042` is, and it is the only form in
+ * which a wrong answer is obvious before it is issued.
+ *
+ * ⚠️ AND IT DOES NOT TAKE A NUMBER. Reading the counter to preview a number is a
+ * read that races the write that would take it — so the preview shows where the
+ * count stands, and the document that is actually raised takes the next one.
+ */
+export async function numberingIn(
+  db: Db, tenantId: string, specs: readonly CollectionSpec[], now: string,
+): Promise<readonly Numbering[]> {
+  const documents = specs.filter((c) => c.document);
+  const found = await Promise.all(documents.map(async (spec) => {
+    const theirs = await seriesFor(db, tenantId, spec.id);
+    const pattern = theirs ?? spec.document!.series;
+    const parts = readSeries(pattern);
+    if (typeof parts === "string") {
+      /* ⚠️ A WORKSPACE'S OWN PATTERN CAN BE UNREADABLE ONLY IF IT WAS WRITTEN
+         BEFORE `setSeries` CHECKED — the declared one is refused at composition.
+         Reported as itself rather than swallowed, so the screen can say which
+         setting is wrong instead of drawing a blank where a number goes. */
+      return { collection: spec.id, of: spec.label.one, pattern, theirs: !!theirs, next: "" };
+    }
+    const seen = await db.prepare(
+      `SELECT next FROM numbering WHERE tenant_id = ? AND series_key = ?`)
+      .bind(tenantId, counterKey(spec.id, parts, { now }))
+      .first<{ next: number }>();
+    return {
+      collection: spec.id,
+      of: spec.label.one,
+      pattern,
+      theirs: !!theirs,
+      next: renderSeries(parts, { now, counter: seen?.next ?? 1, fields: {} }),
+    };
+  }));
+  return found;
 }

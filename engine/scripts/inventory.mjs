@@ -205,6 +205,7 @@ if (what === "guards") {
     ["serve", "the one path every request ends in — both doors"],
     ["records", "the generated reads and writes behind a collection"],
     ["documents", "the three moves a document makes, and the counter its number comes from"],
+    ["series-ops", "reading and changing the format a workspace numbers its documents by"],
     ["settings", "reading and writing a workspace's own switches"],
     ["billing", "plans, subscriptions, the bill, the ladder"],
     ["wallet", "OneWallet: the allowance, what was bought, and reserve → settle → release"],

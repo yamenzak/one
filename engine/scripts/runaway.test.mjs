@@ -384,6 +384,15 @@ const ALL = [
     one fails until somebody writes down what bounds it.
   */
   const BOUNDED = new Map([
+    /* ⚠️ ONE PER DOCUMENT COLLECTION, WHICH IS A NUMBER IN THE MANIFEST. The
+       settings screen answers "how is each kind of document numbered, and what
+       would the next one be called" — so the fan-out is over the DOCUMENT
+       collections a product declares, fixed at build time, and it cannot grow
+       with a workspace's data. Three today across the whole suite; a product
+       with a dozen document types would still be a dozen. */
+    ["runtime/src/documents.ts",
+      [1, "one per DOCUMENT collection the manifest declares — fixed at build "
+        + "time, never one per row"]],
     /* ⚠️ THE HOPS, NOT THE ROWS, AND THAT IS THE WHOLE POINT OF THE MODULE. A
        body names a handful of `<ref>.<field>` paths; `hopsIn` deduplicates them
        to one query per REFERENCE, and the ids of every row are collected into a
