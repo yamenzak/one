@@ -431,6 +431,12 @@
         "path": "/api/tenant.alone"
       },
       {
+        "id": "tenant.currency",
+        "kind": "write",
+        "method": "POST",
+        "path": "/api/tenant.currency"
+      },
+      {
         "id": "setting.write",
         "kind": "write",
         "method": "POST",

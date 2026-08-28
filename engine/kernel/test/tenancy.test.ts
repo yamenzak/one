@@ -9,8 +9,9 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  HEADROOM, allowanceLeft, mayBecome, mayBrand, mayIsolate, placeOn, refuseCommercial,
-  refusePlacement, shardsWanted, type Enablement, type Shard,
+  CURRENCIES, EEA, HEADROOM, allowanceLeft, currencyFor, isCurrency, mayBecome, mayBrand,
+  mayIsolate, placeOn, refuseCommercial, refusePlacement, shardsWanted,
+  type Enablement, type Shard,
 } from "../src/tenancy.js";
 import type { AppId, Instant, TenantId } from "../src/primitives.js";
 
@@ -237,5 +238,66 @@ describe("wanting the next shard before the last one fills", () => {
   it("answers per jurisdiction, because a shard in one is no room in the other", () => {
     expect(shardsWanted([at({ tenants: 100 })], ["eu", "global"]))
       .toEqual([{ id: "eu-2", where: "eu" }, { id: "global-1", where: "global" }]);
+  });
+});
+
+/*
+  ⚠️ A WORKSPACE WITH NO CURRENCY DRAWS NO MONEY AT ALL — `DRAWN.money` returns
+  nothing rather than guessing, which is right, and which makes every way of
+  arriving at "no currency" a blank column on somebody's stock report.
+*/
+describe("what a workspace keeps its books in", () => {
+  it("takes the country's own currency", () => {
+    expect(currencyFor("GB")).toBe("GBP");
+    expect(currencyFor("AE")).toBe("AED");
+    expect(currencyFor("JP")).toBe("JPY");
+  });
+
+  /* ⚠️ A COUNTRY IS A CODE SOMEBODY TYPED, and it arrives in whatever case they
+     typed it in — `createTenant` upper-cases before storing, and this must not
+     depend on that having happened first. */
+  it("does not care what case the country arrived in", () => {
+    expect(currencyFor("de")).toBe(currencyFor("DE"));
+  });
+
+  /*
+    ⚠️ THE FALLBACK IS A CURRENCY, NEVER NOTHING. Answering null for a code this
+    table does not hold would put the workspace back into the blank-column state
+    above, over a country somebody mistyped — and a default in the wrong currency
+    is visible and one control away, where a blank is neither.
+  */
+  it("answers a currency for a code it has never heard of", () => {
+    expect(isCurrency(currencyFor("ZZ"))).toBe(true);
+    expect(isCurrency(currencyFor(""))).toBe(true);
+  });
+
+  /* ⚠️ EVERY EEA COUNTRY IS ONE THIS DEPLOYMENT ACTIVELY SELLS TO, so a fallback
+     reached there would be a real customer on the wrong currency rather than a
+     theoretical one. */
+  it("knows every country the residency rule names", () => {
+    for (const country of EEA) {
+      expect(isCurrency(currencyFor(country)), country).toBe(true);
+    }
+  });
+
+  /* ⚠️ THE PICKER'S OPTIONS ARE THE SAME SET FOUNDING CAN PRODUCE. Derived, so a
+     country added to the table is a currency the screen offers on the same
+     commit — a curated list is one that omits somebody. */
+  it("offers every currency founding can produce", () => {
+    expect(CURRENCIES).toContain(currencyFor("GB"));
+    expect(CURRENCIES.every((c) => isCurrency(c))).toBe(true);
+    expect([...CURRENCIES]).toEqual([...CURRENCIES].sort());
+  });
+
+  /*
+    ⚠️ WELL-FORMED, NOT KNOWN — a closed list would refuse a currency that works,
+    on the day it is minted. What must be refused is anything that is not a code
+    at all, because `Intl` prints whatever it is handed straight onto a price.
+  */
+  it("refuses what is not a currency code, and takes what is", () => {
+    expect(isCurrency("GBP")).toBe(true);
+    expect(isCurrency("gbp")).toBe(false);
+    expect(isCurrency("POUNDS")).toBe(false);
+    expect(isCurrency("")).toBe(false);
   });
 });

@@ -40,7 +40,7 @@ all of it is refused, gated, audited and erasable on the same terms as everythin
 an app writes itself.
 
 <!-- generated: node scripts/inventory.mjs surface -->
-**42 operations for declaring nothing.** A roster, an inbox and its
+**43 operations for declaring nothing.** A roster, an inbox and its
 two-level policy, the workspace's brand, the package rail it sells with, its
 settings, its bill, and the one bootstrap read every screen stands on.
 
@@ -82,6 +82,7 @@ settings, its bill, and the one bootstrap read every screen stands on.
 | `flag.person` | write | *the session* |
 | `flag.set` | write | *the session* |
 | `tenant.alone` | write | *the session* |
+| `tenant.currency` | write | *the session* |
 | `setting.write` | write | *the session* |
 | `money.view` | read | `billing:read` |
 | `money.checkout` | write | `billing:manage` |
@@ -431,7 +432,7 @@ and a manifest that does not compose refuses to boot.
 | `credit` | metered work: the reserve, the rate, the ceiling | 15 | — |
 | `dunning` | the ladder from past due to erased | 5 | — |
 | `package` | a priced bundle of timed grants | 8 | 1 |
-| `tenancy` | workspaces, kinds, shards, placement, standing | 17 | — |
+| `tenancy` | workspaces, kinds, shards, placement, standing | 20 | — |
 | `door` | the five doors, and which host is which | 2 | — |
 | `setting` | a switch a workspace owns, and the page it lives on | 9 | — |
 | `flag` | a switch WE own, with a date it stops being one | 8 | — |
@@ -448,7 +449,7 @@ and a manifest that does not compose refuses to boot.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**327 of them**, 326 reached by something today.
+**330 of them**, 329 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -465,7 +466,7 @@ env or a binding.
 |---|---|---|---|
 | `schema` | the composed schema runner — declarations become tables | 7 | — |
 | `sql` | the one typed seam onto D1 | 5 | — |
-| `directory` | accounts, workspaces, placement, enablement, allowances | 44 | — |
+| `directory` | accounts, workspaces, placement, enablement, allowances | 45 | — |
 | `handles` | which binding holds which shard | 4 | — |
 | `locate` | who is asking, where they are, and what they hold | 2 | — |
 | `flags` | what somebody switched, per deployment and per workspace | 10 | — |
@@ -531,7 +532,7 @@ env or a binding.
 | `bin-ops` | the trash: what is in it, putting a record back, and freezing one — one set of routes across every collection | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 9 | — |
 
-**474 of them**, 473 reached by something today.
+**475 of them**, 474 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 
@@ -1034,6 +1035,7 @@ its own header, cited by other files, and doing nothing.
 | `an-account-door-screen-knows-its-door` | D20 | a screen on the account door calling an operation that needs a tenancy, which 404s there — and it looks identical to a screen that works, because the door it is on is not visible in the file that draws it |
 | `a-declared-job-is-run-by-the-composed-book` | D12 | a job declared in a manifest, validated for its cron and its floor, drawn on a screen an operator opens — and run by nothing; it held for three stages and every suite was green throughout |
 | `a-quantity-is-multiplied-once` | D76 | a quantity multiplied twice or not at all — the fault that put nine hundred tablets on a shelf, where both halves of the arithmetic were individually correct and the number the person expected showed the whole time |
+| `a-money-field-has-a-currency` | D117 | every price on every app screen drawn as an empty cell — a prop declared, typed, documented and never passed, which no compiler and no test can see because its absence is a legitimate state |
 | `a-settled-field-is-refused-by-the-write` | D78 | a generated update changing the unit every other number is counted in — twenty boxes on a shelf become twenty sheets, every balance reinterpreted, with no write anywhere near a quantity |
 | `one-answer-per-question-through-one-door` | D36 | the same question asked several times for one screen, which is round trips a person waits through — and a read outside the door is one nothing can dedupe, cache or count against a budget |
 | `a-total-is-asked-for-and-never-counted-by-hand` | D57 | three round trips to put three numbers over a screen, each carrying identity, workspace, membership and standing in order to run one SELECT COUNT(*) |
@@ -1199,6 +1201,7 @@ its own header, cited by other files, and doing nothing.
 | D114 | A subject with no screen is a failure, and a table two schemas create is a 503 | 1 |
 | D115 | A name that is announced and not drawn is not a name | 0 |
 | D116 | A sold capability with no door, and a vocabulary nobody can see | 0 |
+| D117 | A workspace has one currency, and it re-labels rather than converts | 1 |
 <!-- /generated -->
 
 ---

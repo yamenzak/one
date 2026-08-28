@@ -95,9 +95,16 @@ export const drawnBy = (
   return mounted ? "mounted" : "notice";
 };
 
-export function AppSurface({ app, route, onGo }: {
+export function AppSurface({ app, route, currency, onGo }: {
   readonly app: CentreApp;
   readonly route: string;
+  /**
+   * ⚠️ WHAT THE WORKSPACE'S OWN AMOUNTS ARE IN — see `CentreView.tenant`. Every
+   * money field on every declared screen is drawn from it, and without it
+   * `DRAWN.money` correctly draws nothing at all, which on a screen is
+   * indistinguishable from a figure that failed to load.
+   */
+  readonly currency?: string | undefined;
   /** Takes a WHOLE path — the centre's own address, prefix and all. */
   readonly onGo: (path: string) => void;
 }) {
@@ -182,6 +189,7 @@ export function AppSurface({ app, route, onGo }: {
             screens={app.screens}
             at={beneath(declared.route, route)}
             go={go}
+            currency={currency}
             /* ⚠️ THE BOOKS AND THE GRANTS, NOT A SECOND REQUEST FOR EITHER — see
                `Declared.app`. The centre already resolved both to draw the nav. */
             app={{

@@ -4603,3 +4603,61 @@ dead-end. Tags uses a plain row, because every plan has them.
 behind it; a table a flow writes and nothing reads; a promise about a mechanism
 in a comment with no verb under it; or a second way to change a value where one
 of the two checks a rule and the other does not.
+
+## D117 — A workspace has one currency, and it re-labels rather than converts
+
+**Date:** 2026-08-28 · **Status:** shipped
+
+**THE FAULT THIS CLOSES WAS A BLANK COLUMN, NOT AN ERROR.** `Has.currency` had
+been declared on the renderer since the surface was founded, with a paragraph
+saying why a declaration cannot guess which currency's minor units a `money`
+field holds. `Declared` accepted it and spread it into `Has`. Nothing ever passed
+one. So `DRAWN.money` took the branch that draws NOTHING — correctly, because the
+alternative is one workspace's prices in another's symbol — and every price on
+every app screen would have been an empty cell. Nothing failed: not the compiler
+(absent is a legitimate state, since the account door has no workspace), not a
+test, not a photograph, because no screen had yet shipped a money field. It was
+found by asking what SV-3 would need before writing it.
+
+**SO THE CURRENCY IS A WORKSPACE FACT, BESIDE THE COUNTRY, IN THE DIRECTORY.** Not
+a setting a product declares: two products in one workspace would each declare
+their own, and a business would have two currencies with nothing saying which a
+figure was in. It travels on `centre.view` — the read every screen already waits
+on — because asked separately it would be a round trip before any price could be
+drawn at all.
+
+**AND IT IS NOT WHAT WE BILL THEM IN.** `billing_account` carries the deployment's
+own currency, which is a fact about our catalogue. This is what THEIR books are
+in. The two sit on one screen precisely so they cannot be confused: a business in
+Cairo invoicing in dollars is the ordinary case rather than the corner.
+
+**THE DEFAULT COMES FROM THE COUNTRY, WHICH IS AGAINST `present.ts`'S OWN GRAIN.**
+`minorPer` asks `Intl` how many decimals a currency has, so no list can go stale.
+There is no equivalent to ask for country → currency: no shipping runtime maps a
+region to one. The alternative is asking at founding for something most people do
+not care about at that moment. So it is a table, and it is a DEFAULT — and the
+fallback for a code the table does not hold is a currency rather than nothing,
+because a wrong default is visible and one control away while a blank column is
+neither.
+
+**AND CHANGING IT RE-LABELS EVERY FIGURE ALREADY RECORDED.** A conversion needs a
+rate on a date, and inventing one prints a guess as a fact. The screen says so
+above the button: right on the first day, wrong once there is real money in the
+books, and the person decides. What is stored is stored — deriving the currency
+on every read would let a correction to the table silently redenominate every
+amount a customer had entered, with nothing on any screen changing.
+
+**THE GUARD IS DERIVED FROM WHAT `DRAWN` ACTUALLY READS.** Every `has.<name>`
+inside that table is a fact the browser must supply or that format draws blank,
+so a second one added tomorrow is asked the same three questions — the server
+sends it, the view declares it, every mount passes it — with no edit to the
+guard. A hand-kept list of "things that must be threaded" is exactly the artefact
+that was already missing an entry.
+
+**AND `present.ts`'S FILE EXEMPTION BECAME A RULE ABOUT THE CALL.**
+`countries.ts` was waived wholesale so it could build an `Intl.DisplayNames`;
+`currencies.ts` wanted the same waiver, which is how a list that can only shrink
+grows. The real rule is that `DisplayNames` NAMES a thing rather than formatting
+a value, and only where it is handed the reader's own locale — so
+`new Intl.DisplayNames(undefined, …)` passes anywhere and a hardcoded locale
+fails, in `countries.ts` too, which the file exemption never checked.

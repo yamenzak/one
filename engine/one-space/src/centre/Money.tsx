@@ -16,13 +16,18 @@
  * have I got and where is it going", in that order.
  */
 
-import { Chip } from "@heroui/react";
+import { useMemo, useState } from "react";
+import { Button, Chip } from "@heroui/react";
 import { isBusiness, sayDate, type Instant, type Kind } from "@engine/kernel";
 import {
-  AmountRow, Bill, Credits, Group, Screen, Storage, Wallet, glyphOf, notice, useMoney, useShown,
+  AmountRow, Bill, Confirm, ControlRow, Credits, Group, Lookup, Screen, Storage, TYPE, Wallet,
+  glyphOf, notice, useMoney, useShown,
 } from "@engine/design";
 import { api } from "../api.js";
-import { useLoad, type CentreView, type MoneyView } from "./data.js";
+/* ⚠️ Aliased, because `money` is this screen's own loader and the list is the
+   currencies somebody may pick from — two different things one word away. */
+import { money as currencyList, moneyName } from "../currencies.js";
+import { useCentre, useLoad, type CentreView, type MoneyView } from "./data.js";
 
 export function Money({ view, onGo }: {
   readonly view: CentreView;
@@ -30,8 +35,12 @@ export function Money({ view, onGo }: {
 }) {
   const price = useMoney();
   const shown = useShown();
-  void view;
   const money = useLoad<MoneyView>("money.view");
+  /* ⚠️ THE SAME READ THE SCREEN ABOVE ALREADY WAITED ON — `useLoad` answers from
+     its cache, so this is a handle on the refetch rather than a second call. The
+     currency is on `centre.view`, so changing it has to re-read that one. */
+  const { again } = useCentre();
+  const may = view.you.platform.includes("tenant:manage");
 
   /*
     ⚠️ THE CHECKOUT ANSWERS WITH A URL AND WE FOLLOW IT. Nothing is granted here
@@ -123,8 +132,86 @@ export function Money({ view, onGo }: {
               ))}
             </Group>
           ) : null}
+
+          {/* ⚠️ WHAT THIS WORKSPACE'S OWN FIGURES ARE IN, WHICH IS NOT WHAT WE
+              BILL IT IN. Both live here because both are money and somebody
+              looking for either looks here — and the two being on one screen is
+              exactly what stops them being confused for each other. */}
+          <TheirCurrency
+            currency={view.tenant.currency ?? ""}
+            may={may}
+            onSaved={() => { void again(); }}
+          />
         </>
       )}
     />
+  );
+}
+
+/**
+ * WHAT THIS WORKSPACE KEEPS ITS BOOKS IN.
+ *
+ * ⚠️ IT RE-LABELS, IT NEVER CONVERTS, AND THAT IS THE SENTENCE ON THE SHEET. A
+ * conversion needs a rate on a date, and inventing one prints a guess as a fact;
+ * so changing this asserts what the workspace's figures always meant. Right on
+ * the first day, wrong once there is real money in the books — which is a
+ * judgement the person makes, and can only make if we say it plainly.
+ *
+ * ⚠️ AND IT IS READ-ONLY WHERE SOMEBODY MAY NOT CHANGE IT, never hidden. Which
+ * currency a figure is in is a fact everybody here needs; only setting it is an
+ * administration.
+ */
+function TheirCurrency({ currency, may, onSaved }: {
+  readonly currency: string;
+  readonly may: boolean;
+  readonly onSaved: () => void;
+}) {
+  const [want, setWant] = useState(currency);
+  const options = useMemo(
+    () => currencyList().map((one) => ({ id: one.code, label: one.label })),
+    [],
+  );
+
+  const save = async () => {
+    const got = await api.post("tenant.currency", { currency: want });
+    if (!got.ok) { notice.fail(got.problem.title); return; }
+    notice.ok(`Amounts here are now in ${want}`);
+    onSaved();
+  };
+
+  return (
+    <Group label="Your own currency">
+      <ControlRow
+        label="Amounts in this workspace"
+        under={may
+          ? "Changing this re-labels every figure already recorded — it converts nothing"
+          : "Set by whoever runs this workspace"}
+      >
+        {may
+          ? (
+            <Lookup
+              label="Currency"
+              value={want}
+              options={options}
+              onChange={setWant}
+            />
+          )
+          : <span className={TYPE.note}>{moneyName(currency)}</span>}
+      </ControlRow>
+      {may && want && want !== currency
+        ? (
+          <ControlRow label="" under={`Every amount already recorded will read as ${want}`}>
+            <Confirm
+              trigger={<Button variant="primary">Change it</Button>}
+              title={`Read every amount here as ${want}?`}
+              act={{ label: "Change it", onDo: () => { void save(); } }}
+            >
+              Nothing is converted. Figures recorded in {moneyName(currency)} keep
+              their numbers and will be shown in {moneyName(want)}.
+            </Confirm>
+          </ControlRow>
+        )
+        : null}
+    </Group>
   );
 }

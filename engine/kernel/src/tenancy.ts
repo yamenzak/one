@@ -90,6 +90,94 @@ export const EEA: readonly string[] = [
 export const residencyFor = (country: string): Residency =>
   EEA.includes(country.toUpperCase()) ? "eu" : "global";
 
+/* -------------------------------------------------------------- currency --- */
+
+/**
+ * WHAT A BUSINESS KEEPS ITS BOOKS IN, BY WHERE IT IS.
+ *
+ * ⚠️ A WORKSPACE HAS A CURRENCY OR IT HAS NO MONEY AT ALL. Every amount a
+ * product records is minor units of SOMETHING, and the something is a fact about
+ * the workspace rather than about the record — so a screen with no currency in
+ * scope cannot draw a price, and the renderer correctly draws nothing. That is
+ * the state this table exists to make impossible on the first day.
+ *
+ * ⚠️ A TABLE RATHER THAN A QUESTION, AND THAT IS AGAINST THIS FILE'S OWN GRAIN —
+ * `minorPer` asks `Intl` how many decimals a currency has precisely so no list
+ * goes stale. There is no equivalent to ask here: no shipping runtime maps a
+ * region to a currency, and the alternative is asking a person at founding for
+ * something they mostly do not care about at that moment. So it is a default
+ * they can change, never a fact we assert.
+ *
+ * ⚠️ AND IT IS A DEFAULT IN BOTH DIRECTIONS. A business trading in a currency
+ * other than its country's is ordinary — a Cairo exporter invoicing in dollars,
+ * a Zurich firm on euros — so this decides only what the field starts at.
+ */
+const CURRENCY: Readonly<Record<string, string>> = {
+  AD: "EUR", AE: "AED", AF: "AFN", AG: "XCD", AI: "XCD", AL: "ALL", AM: "AMD", AO: "AOA",
+  AQ: "USD", AR: "ARS", AS: "USD", AT: "EUR", AU: "AUD", AW: "AWG", AX: "EUR", AZ: "AZN",
+  BA: "BAM", BB: "BBD", BD: "BDT", BE: "EUR", BF: "XOF", BG: "BGN", BH: "BHD", BI: "BIF",
+  BJ: "XOF", BL: "EUR", BM: "BMD", BN: "BND", BO: "BOB", BQ: "USD", BR: "BRL", BS: "BSD",
+  BT: "BTN", BV: "NOK", BW: "BWP", BY: "BYN", BZ: "BZD", CA: "CAD", CC: "AUD", CD: "CDF",
+  CF: "XAF", CG: "XAF", CH: "CHF", CI: "XOF", CK: "NZD", CL: "CLP", CM: "XAF", CN: "CNY",
+  CO: "COP", CR: "CRC", CU: "CUP", CV: "CVE", CW: "ANG", CX: "AUD", CY: "EUR", CZ: "CZK",
+  DE: "EUR", DJ: "DJF", DK: "DKK", DM: "XCD", DO: "DOP", DZ: "DZD", EC: "USD", EE: "EUR",
+  EG: "EGP", EH: "MAD", ER: "ERN", ES: "EUR", ET: "ETB", FI: "EUR", FJ: "FJD", FK: "FKP",
+  FM: "USD", FO: "DKK", FR: "EUR", GA: "XAF", GB: "GBP", GD: "XCD", GE: "GEL", GF: "EUR",
+  GG: "GBP", GH: "GHS", GI: "GIP", GL: "DKK", GM: "GMD", GN: "GNF", GP: "EUR", GQ: "XAF",
+  GR: "EUR", GS: "GBP", GT: "GTQ", GU: "USD", GW: "XOF", GY: "GYD", HK: "HKD", HM: "AUD",
+  HN: "HNL", HR: "EUR", HT: "HTG", HU: "HUF", ID: "IDR", IE: "EUR", IL: "ILS", IM: "GBP",
+  IN: "INR", IO: "USD", IQ: "IQD", IR: "IRR", IS: "ISK", IT: "EUR", JE: "GBP", JM: "JMD",
+  JO: "JOD", JP: "JPY", KE: "KES", KG: "KGS", KH: "KHR", KI: "AUD", KM: "KMF", KN: "XCD",
+  KP: "KPW", KR: "KRW", KW: "KWD", KY: "KYD", KZ: "KZT", LA: "LAK", LB: "LBP", LC: "XCD",
+  LI: "CHF", LK: "LKR", LR: "LRD", LS: "LSL", LT: "EUR", LU: "EUR", LV: "EUR", LY: "LYD",
+  MA: "MAD", MC: "EUR", MD: "MDL", ME: "EUR", MF: "EUR", MG: "MGA", MH: "USD", MK: "MKD",
+  ML: "XOF", MM: "MMK", MN: "MNT", MO: "MOP", MP: "USD", MQ: "EUR", MR: "MRU", MS: "XCD",
+  MT: "EUR", MU: "MUR", MV: "MVR", MW: "MWK", MX: "MXN", MY: "MYR", MZ: "MZN", NA: "NAD",
+  NC: "XPF", NE: "XOF", NF: "AUD", NG: "NGN", NI: "NIO", NL: "EUR", NO: "NOK", NP: "NPR",
+  NR: "AUD", NU: "NZD", NZ: "NZD", OM: "OMR", PA: "PAB", PE: "PEN", PF: "XPF", PG: "PGK",
+  PH: "PHP", PK: "PKR", PL: "PLN", PM: "EUR", PN: "NZD", PR: "USD", PS: "ILS", PT: "EUR",
+  PW: "USD", PY: "PYG", QA: "QAR", RE: "EUR", RO: "RON", RS: "RSD", RU: "RUB", RW: "RWF",
+  SA: "SAR", SB: "SBD", SC: "SCR", SD: "SDG", SE: "SEK", SG: "SGD", SH: "SHP", SI: "EUR",
+  SJ: "NOK", SK: "EUR", SL: "SLE", SM: "EUR", SN: "XOF", SO: "SOS", SR: "SRD", SS: "SSP",
+  ST: "STN", SV: "USD", SX: "ANG", SY: "SYP", SZ: "SZL", TC: "USD", TD: "XAF", TF: "EUR",
+  TG: "XOF", TH: "THB", TJ: "TJS", TK: "NZD", TL: "USD", TM: "TMT", TN: "TND", TO: "TOP",
+  TR: "TRY", TT: "TTD", TV: "AUD", TW: "TWD", TZ: "TZS", UA: "UAH", UG: "UGX", UM: "USD",
+  US: "USD", UY: "UYU", UZ: "UZS", VA: "EUR", VC: "XCD", VE: "VES", VG: "USD", VI: "USD",
+  VN: "VND", VU: "VUV", WF: "XPF", WS: "WST", YE: "YER", YT: "EUR", ZA: "ZAR", ZM: "ZMW",
+  ZW: "ZWG",
+};
+
+/**
+ * ⚠️ THE FALLBACK IS A CURRENCY, NEVER NOTHING, and that is the whole reason
+ * this function exists rather than a lookup at each call site. Answering `null`
+ * for a code the table does not hold would put a workspace back in the state
+ * described above — every price on every screen drawing blank — over a country
+ * somebody typed with a lower-case letter or an entry this list is missing. A
+ * default in the wrong currency is visible and one control away; a blank column
+ * is neither.
+ */
+export const currencyFor = (country: string): string =>
+  CURRENCY[country.toUpperCase()] ?? "EUR";
+
+/**
+ * ⚠️ EVERY CURRENCY A WORKSPACE COULD BE IN, DERIVED FROM THE TABLE ABOVE rather
+ * than curated beside it. A hand-picked "major currencies" list for the picker
+ * is a list that omits somebody's — and the business it omits is the one that
+ * cannot answer the question at all. Deriving it means the set the screen offers
+ * and the set founding can produce are the same set, by construction.
+ */
+export const CURRENCIES: readonly string[] =
+  [...new Set(Object.values(CURRENCY))].sort();
+
+/**
+ * ⚠️ WELL-FORMED, NOT KNOWN — and the difference is deliberate. `Intl` renders
+ * any three-letter code and prints it verbatim where it holds no symbol, so a
+ * closed list here would refuse a currency that works, on the day it is minted.
+ * What must be refused is a value that is not a currency code at all, because
+ * that is what reaches every price in the workspace.
+ */
+export const isCurrency = (code: string): boolean => /^[A-Z]{3}$/.test(code);
+
 /**
  * WHAT A JURISDICTION IS CALLED IN FRONT OF SOMEBODY.
  *

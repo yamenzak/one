@@ -136,7 +136,17 @@ export function Product({ path, onGo, onOpenSpace, onOpenInbox }: {
             onOpenInbox={onOpenInbox}
             onOpenSpace={onOpenSpace}
           >
-            <AppSurface app={app} route={route} onGo={onGo} />
+            {/* ⚠️ THE WORKSPACE'S CURRENCY REACHES THE SCREEN FROM HERE, and
+                nothing below can work it out. `field.money` is minor units of
+                something the declaration cannot know, so a screen drawn without
+                it renders every price as an empty cell — a blank that reads as a
+                figure which failed to load rather than as a missing fact. */}
+            <AppSurface
+              app={app}
+              route={route}
+              currency={view.tenant.currency}
+              onGo={onGo}
+            />
           </Shell>
         );
       }}

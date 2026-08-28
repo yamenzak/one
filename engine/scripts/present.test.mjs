@@ -64,20 +64,32 @@ const FILES = [
 /* ------------------------------------------------------------ the formatter --- */
 
 /**
- * ⚠️ ONE FILE MAY BUILD A FORMATTER, AND THE LIST CAN ONLY SHRINK. `countries.ts`
- * is the one exemption and it is a different question: `DisplayNames` NAMES a
- * country rather than formatting a value, and it is handed the reader's own
- * locale rather than reaching for the browser's.
+ * ⚠️ ONE FILE MAY BUILD A FORMATTER, AND THE LIST CAN ONLY SHRINK.
  */
 const DEFINES = new Set([
   "kernel/src/present.ts",
-  "one-space/src/countries.ts",
   /* ⚠️ `said.tsx` ASKS THE MACHINE WHAT IT IS, which is the opposite of
      formatting a value for it: `resolvedOptions().timeZone` is the one reading
      that has to come from the browser, and it is the input every `auto` above
      resolves against. */
   "design/src/parts/said.tsx",
 ]);
+
+/**
+ * ⚠️ NAMING A THING IS NOT FORMATTING A VALUE, AND THAT IS A FACT ABOUT THE CALL
+ * RATHER THAN ABOUT THE FILE. `DisplayNames` turns `GB` into "United Kingdom"
+ * and `GBP` into "British Pound" — it has no value to place, no separator to
+ * choose and no reader to assume. `countries.ts` was a file exemption for
+ * exactly this, and a second file wanting the same thing is how a shrinking list
+ * grows: the honest fix is to name the call.
+ *
+ * ⚠️ AND ONLY WITH THE READER'S OWN LOCALE, which the file exemption never
+ * checked. `new Intl.DisplayNames(undefined, …)` takes whatever the device is
+ * set to; a literal locale there is somebody deciding what language a person
+ * reads in, which is the whole fault D7 is about — so that one still fails, in
+ * `countries.ts` too.
+ */
+const NAMES = /\bnew\s+Intl\.DisplayNames\s*\(\s*undefined\s*,/;
 
 /** `new Intl.X(…)`, `Intl.X(…)`, and every `toLocale*` method. */
 const FORMATS = /\bnew\s+Intl\.\w+|\bIntl\.[A-Z]\w*\s*\(|\.toLocale(?:String|DateString|TimeString)\s*\(/g;
@@ -87,7 +99,11 @@ for (const file of FILES) {
   const name = rel(file);
   if (DEFINES.has(name)) continue;
   const src = strip(readFileSync(file, "utf8"));
-  for (const [whole] of src.matchAll(FORMATS)) {
+  for (const hit of src.matchAll(FORMATS)) {
+    const whole = hit[0];
+    /* ⚠️ NAMING, NOT FORMATTING — see `NAMES`. Matched from the call's own start
+       so a locale somebody hardcoded is still a finding. */
+    if (NAMES.test(src.slice(hit.index ?? 0, (hit.index ?? 0) + 60))) continue;
     formatted++;
     fail(`${name}: formats a value itself — \`${whole.trim()}\` (D7).\n` +
          `       That is a reader somebody assumed. Take the person's own conventions:\n` +

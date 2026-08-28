@@ -229,6 +229,15 @@ export function centreOps(app: AppSpec): Readonly<Record<string, Resolved>> {
           slug: tenant?.slug ?? "",
           kind: tenant?.kind ?? "personal",
           /*
+            ⚠️ THE CURRENCY TRAVELS ON THE SAME READ, and it has to. `field.money`
+            is minor units of SOMETHING, and the something is a fact about the
+            workspace — so the renderer draws NOTHING for a money field with no
+            currency in scope, which is correct and is indistinguishable from a
+            value that failed to load. Asked separately it would be a second
+            round trip before any price on any screen could be drawn at all.
+          */
+          currency: tenant?.currency ?? "",
+          /*
             ⚠️ NO THEME IS SENT, AND NOTHING ON A SCREEN WANTS ONE. A workspace's
             ground, ink and letter are the TILE's — resolved where the tile and
             the letterhead are served (`installableFor`), which is the only place

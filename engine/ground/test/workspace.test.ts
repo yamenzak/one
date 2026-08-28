@@ -744,3 +744,68 @@ describe("a setting a handler can read", () => {
     expect(said.kind).toBe("question");
   });
 });
+
+/**
+ * A WORKSPACE HAS A CURRENCY, AND IT REACHES THE SCREEN.
+ *
+ * ⚠️ THE FAULT THIS IS AGAINST IS A BLANK COLUMN, NOT AN ERROR. `field.money` is
+ * minor units of something a declaration cannot know, so `DRAWN.money` draws
+ * NOTHING without a currency in scope — correctly, because guessing would print
+ * one workspace's prices in another's symbol. Every step below is a place that
+ * silence could have come from, and none of them throws.
+ */
+describe("what a workspace keeps its books in", () => {
+  it("is set from the country at founding, and travels on the boot read", async () => {
+    const cookie = await workspace();
+
+    /* ⚠️ STORED, NOT DERIVED ON READ. Once an amount is recorded, what its minor
+       units are OF must not move when a table is corrected. */
+    const tenant = (await tenantBySlug(directory(), SLUG))!;
+    expect(tenant.currency).toBe("EUR");
+
+    const view = await (await get(SLUG, "/api/centre.view", cookie)).json() as
+      { tenant: { currency?: string } };
+    expect(view.tenant.currency).toBe("EUR");
+  });
+
+  /*
+    ⚠️ IT RE-LABELS AND CONVERTS NOTHING, which is why it is the workspace's own
+    decision rather than ours — and why the screen says so above the button.
+  */
+  it("is changed by whoever runs the workspace", async () => {
+    const cookie = await workspace();
+
+    expect((await post(SLUG, "/api/tenant.currency", { currency: "gbp" }, cookie)).status)
+      .toBe(200);
+    expect((await tenantBySlug(directory(), SLUG))!.currency).toBe("GBP");
+
+    const view = await (await get(SLUG, "/api/centre.view", cookie)).json() as
+      { tenant: { currency?: string } };
+    expect(view.tenant.currency).toBe("GBP");
+  });
+
+  /*
+    ⚠️ AND WHAT IS NOT A CURRENCY IS REFUSED AT THE DOOR. `Intl` prints whatever
+    it is handed, so a word that reached this column would appear verbatim beside
+    every price in the workspace rather than failing anywhere.
+  */
+  it("refuses a value that is not a currency code", async () => {
+    const cookie = await workspace();
+    const no = await post(SLUG, "/api/tenant.currency", { currency: "pounds" }, cookie);
+    expect(no.status).toBe(400);
+    expect((await tenantBySlug(directory(), SLUG))!.currency).toBe("EUR");
+  });
+
+  /* ⚠️ A MEMBER READS IT AND DOES NOT SET IT. Which currency a figure is in is a
+     fact everybody here needs; deciding it is an administration. */
+  it("is not changed by somebody who does not run the workspace", async () => {
+    const owner = await workspace();
+    await post(SLUG, "/api/member.invite",
+      { email: "kit@example.com", platformRole: "member" }, owner);
+    const theirs = await signIn("kit@example.com");
+
+    const no = await post(SLUG, "/api/tenant.currency", { currency: "USD" }, theirs);
+    expect(no.status).toBe(403);
+    expect((await tenantBySlug(directory(), SLUG))!.currency).toBe("EUR");
+  });
+});

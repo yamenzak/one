@@ -80,6 +80,15 @@ export interface CentreView {
     readonly name: string;
     readonly slug: string;
     readonly kind?: "personal" | "commercial";
+    /**
+     * ⚠️ WHAT THIS WORKSPACE'S OWN AMOUNTS ARE IN, AND EVERY PRICE ON EVERY APP
+     * SCREEN NEEDS IT. `field.money` is minor units of something, and the
+     * something is a fact about the workspace — so `DRAWN.money` draws NOTHING
+     * without it, which on a screen is a blank cell where a figure belongs.
+     * That is why it travels here rather than being asked for: this is the read
+     * every screen already waits on.
+     */
+    readonly currency?: string;
     /*
       ⚠️ NO THEME TRAVELS HERE, AND THAT IS THE DESIGN. A workspace's brand is
       its NAMEPLATE — the tile on a phone, the letterhead on its mail — and it is

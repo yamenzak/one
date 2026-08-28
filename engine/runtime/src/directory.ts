@@ -21,8 +21,9 @@ import type {
   PresentationRefusal, Residency, Shard, TenantId,
 } from "@engine/kernel";
 import {
-  DEFAULT_PRESENTATION, allowanceLeft, giftIsLive, giftedWorkspaces, mayBecome, newAccountId,
-  newId, newTenantId, placeOn, refuseCommercial, refusePlacement, refusePresentation,
+  DEFAULT_PRESENTATION, allowanceLeft, currencyFor, giftIsLive, giftedWorkspaces, isCurrency,
+  mayBecome, newAccountId, newId, newTenantId, placeOn, refuseCommercial, refusePlacement,
+  refusePresentation,
 } from "@engine/kernel";
 import { openAccount } from "./wallet.js";
 import type { SchemaModule } from "./schema.js";
@@ -99,7 +100,20 @@ export const DIRECTORY_SCHEMA: SchemaModule = {
     stored, `Placing.alone` was a parameter nothing ever set, and isolation was
     an operator typing two commands in the right order.
   */
-  columns: { tenant: { wants_alone: "INTEGER" } },
+  /*
+    ⚠️ WHAT THIS WORKSPACE'S OWN MONEY IS IN, AND IT IS STORED RATHER THAN
+    DERIVED. `currencyFor` gives the default, and a row that predates this column
+    reads through it — but once a workspace holds an amount, the currency those
+    minor units are IN must never move underneath them. Deriving on every read
+    would mean a correction to that table silently redenominating every price a
+    customer had already recorded, with nothing on any screen changing.
+
+    ⚠️ AND IT IS NOT WHAT WE BILL THEM IN. `billing_account` carries the
+    deployment's own currency — see `openAccount` — because that is a fact about
+    our catalogue. This is a fact about their books, and a business in Cairo
+    invoicing in dollars is the ordinary case rather than the corner.
+  */
+  columns: { tenant: { wants_alone: "INTEGER", currency: "TEXT" } },
 };
 
 /* ------------------------------------------------------------------- rows --- */
@@ -109,6 +123,8 @@ export interface TenantRow {
   readonly slug: string;
   readonly name: string;
   readonly country: string;
+  /** ⚠️ What its own amounts are minor units OF — never what we bill it in. */
+  readonly currency: string;
   readonly shardId: string;
   readonly residency: Residency;
   readonly kind: Kind;
@@ -125,6 +141,10 @@ const asTenant = (r: Record<string, unknown>): TenantRow => ({
   slug: r.slug as string,
   name: r.name as string,
   country: r.country as string,
+  /* ⚠️ A ROW WRITTEN BEFORE THE COLUMN EXISTED READS THROUGH THE TABLE, which is
+     the whole migration — and it lands where founding would have put it, so a
+     workspace cannot tell which side of the column it was made on. */
+  currency: (r.currency as string | null) || currencyFor(r.country as string),
   shardId: r.shard_id as string,
   residency: r.residency as Residency,
   /* ⚠️ A row written before the column existed reads null, and null is
@@ -417,10 +437,15 @@ export async function createTenant(
     either taking money inside a wizard or writing `commercial` on a row that has
     met neither condition, and the second is a one-way door opened by accident.
   */
+  /* ⚠️ THE CURRENCY IS WRITTEN HERE, NOT LEFT TO A READ — see the schema note.
+     Once an amount is recorded, what those minor units are OF has to be a fact
+     the workspace holds rather than one a table can revise under it. */
+  const country = wants.country.toUpperCase();
   await db.prepare(`INSERT INTO tenant
-      (id, slug, name, country, shard_id, residency, kind, legal_name, became_commercial_at, at, closed_at)
-    VALUES (?, ?, ?, ?, ?, ?, 'personal', NULL, NULL, ?, NULL)`)
-    .bind(id, wants.slug, wants.name, wants.country.toUpperCase(), shard.id, wants.where, at).run();
+      (id, slug, name, country, currency, shard_id, residency, kind, legal_name, became_commercial_at, at, closed_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'personal', NULL, NULL, ?, NULL)`)
+    .bind(id, wants.slug, wants.name, country, currencyFor(country), shard.id, wants.where, at)
+    .run();
   /* ⚠️ TOGETHER. One insert per product, awaited in turn, is a wait per product
      on the one request that creates a workspace — a cost that grows with the
      catalogue rather than with anything the person did. */
@@ -440,7 +465,7 @@ export async function createTenant(
 
   return {
     tenant: {
-      id, slug: wants.slug, name: wants.name, country: wants.country.toUpperCase(),
+      id, slug: wants.slug, name: wants.name, country, currency: currencyFor(country),
       shardId: shard.id, residency: wants.where,
       kind: "personal", legalName: null, movingTo: null, wantsAlone: false, closedAt: null,
     },
@@ -876,6 +901,29 @@ export async function askAlone(
 ): Promise<void> {
   await db.prepare(`UPDATE tenant SET wants_alone = ? WHERE id = ?`)
     .bind(yes ? 1 : 0, tenantId).run();
+}
+
+/**
+ * WHAT THIS WORKSPACE KEEPS ITS BOOKS IN.
+ *
+ * ⚠️ IT RE-LABELS, IT NEVER CONVERTS, AND THE SCREEN HAS TO SAY SO. Every amount
+ * already recorded is minor units of the OLD currency; nothing here rewrites
+ * one, because a conversion needs a rate on a date and inventing one prints a
+ * guess as a fact. So a workspace that changes this is asserting what its
+ * figures always meant — which is right when it was set wrong on the first day,
+ * and wrong once real money is in the books.
+ *
+ * ⚠️ AND THE CODE IS CHECKED FOR SHAPE, NOT AGAINST A LIST — see `isCurrency`.
+ * What this must never take is a value that is not a currency at all, because it
+ * reaches every price in the workspace and `Intl` prints whatever it is given.
+ */
+export async function setCurrency(
+  db: Db, tenantId: TenantId, code: string,
+): Promise<"not_a_currency" | { readonly currency: string }> {
+  const want = code.trim().toUpperCase();
+  if (!isCurrency(want)) return "not_a_currency";
+  await db.prepare(`UPDATE tenant SET currency = ? WHERE id = ?`).bind(want, tenantId).run();
+  return { currency: want };
 }
 
 /**

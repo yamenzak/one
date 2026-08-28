@@ -27,7 +27,7 @@ import { brandingOf } from "./branding.js";
 import {
   deploymentFlags, flagCounts, flagPeople, setPersonFlag, setTenantFlag, tenantFlags,
 } from "./flags.js";
-import { askAlone, tenantById } from "./directory.js";
+import { askAlone, setCurrency, tenantById } from "./directory.js";
 import { memberFor, membersOf } from "./membership.js";
 import type { PlatformCtx } from "./member-ops.js";
 import type { Resolved } from "./compose.js";
@@ -449,6 +449,36 @@ export function settingOps(app: AppSpec): Readonly<Record<string, Resolved>> {
         const yes = input.on !== false;
         await askAlone(ctx.directory, tenant.id, yes);
         return { asked: yes };
+      }),
+
+    /*
+      ⚠️ WHAT THIS WORKSPACE'S OWN MONEY IS IN, AND IT IS A WORKSPACE FACT RATHER
+      THAN A SETTING A PRODUCT DECLARES. Two products in one workspace declaring
+      their own would give one business two currencies and no way to tell which
+      a figure was in — so it sits beside the country in the directory and
+      travels on `centre.view`, where every screen in the workspace can reach it.
+
+      ⚠️ AND IT IS NOT WHAT WE BILL THEM IN. Our own catalogue prices in the
+      deployment's currency; this is what THEIR books are in, and a business
+      invoicing in a currency other than its country's is ordinary.
+    */
+    "tenant.currency": op("tenant.currency", "write",
+      "Change what this workspace's own amounts are in.",
+      async (ctx, input) => {
+        if (!ctx.accountId) return ctx.fail("platform.unauthorized");
+        const tenant = await tenantById(ctx.directory, ctx.tenantId as TenantId);
+        if (!tenant) return ctx.fail("platform.not_found");
+        const held = await ctx.permissionsIn(null);
+        if (!held.has("tenant:manage")) return ctx.fail("platform.forbidden");
+
+        const done = await setCurrency(ctx.directory, tenant.id, String(input.currency ?? ""));
+        /* ⚠️ AGAINST THE FIELD, because "invalid" over a control with one input
+           does not say what would be taken instead. */
+        if (done === "not_a_currency") {
+          return ctx.fail("platform.invalid", {},
+            { fields: { currency: "Three letters, like GBP or AED." } });
+        }
+        return done;
       }),
 
     "setting.write": op("setting.write", "write", "Change a setting.",

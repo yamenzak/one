@@ -1323,6 +1323,7 @@ Some of this is guarded and some is judgement:
 - `census` — every guard that sweeps a product says what happens to its question once the screen is declared, and only one of the five answers is "nothing".
 - `chrome` — one crown, one foot, and nothing else pinned to an edge — the head carries slots, the foot carries the navigation or the one act.
 - `copied` — a copy is the same database only when every table says so.
+- `currency` — a workspace fact a declared screen draws with is threaded from the
 - `descend` — a settings page is a declared destination, a level lists its pages rather than stacking them, and an authority is a screen rather than a tab.
 - `doors` — a screen the account door renders decides for itself which door it is on, in its own file.
 - `drawn` — every block a screen may declare is drawn by one, so a vocabulary cannot grow entries nothing composes.

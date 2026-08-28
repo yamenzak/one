@@ -3844,6 +3844,15 @@
       "becomes": "elsewhere: the server's arithmetic, where a quantity meets exactly one packing factor"
     },
     {
+      "id": "a-money-field-has-a-currency",
+      "protects": "D117",
+      "status": "live",
+      "impl": "scripts/currency.test.mjs",
+      "proves": "sent, declared and passed",
+      "fails": "every price on every app screen drawn as an empty cell — a prop declared, typed, documented and never passed, which no compiler and no test can see because its absence is a legitimate state",
+      "becomes": "elsewhere: the browser, where a workspace fact reaches the renderer that cannot work it out"
+    },
+    {
       "id": "a-settled-field-is-refused-by-the-write",
       "protects": "D78",
       "status": "live",
