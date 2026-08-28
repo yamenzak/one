@@ -74,13 +74,24 @@ export function NewWorkspace({ where }: { readonly where: Where }) {
       setProblem(null);
       setProducts(out.value.items);
       /*
-        ⚠️ THE FIRST ONE IS TICKED, AND ONLY WHERE THERE IS A CHOICE TO MAKE.
-        Every workspace needs at least one product, so an empty form is a form
-        whose primary action refuses — and a deployment with one product has
-        nothing to decide, so the card below stands down entirely rather than
-        asking a question with one answer.
+        ⚠️ EVERY PRODUCT IS TICKED, BECAUSE ONE MEMBERSHIP BUYS ALL OF THEM. The
+        plans are the deployment's and their entitlement keys are the UNION of
+        every app's — Solo's own line is "everything we make" — so a workspace
+        that lands with one product switched on is not a workspace that saved
+        money, it is one that was quietly given less than it paid for.
+
+        ⚠️ THIS TOOK THE FIRST ONE, AND THE DAY A SECOND PRODUCT WAS REGISTERED
+        THAT STOPPED BEING THE SAME THING. With one product in the catalogue,
+        "the first" and "all of them" are indistinguishable and the card below
+        stands down; with two, founding began asking a question and pre-answering
+        it with half the answer. Nothing failed — the new workspace simply had a
+        destination missing from its bar, and no screen anywhere said why.
+
+        ⚠️ SO THE CARD IS AN UNTICK RATHER THAN A CHOICE. Somebody who knows they
+        will never keep stock turns it off here or later; the default is what the
+        membership actually includes.
       */
-      setWant(out.value.items.slice(0, 1).map((p) => p.id));
+      setWant(out.value.items.map((p) => p.id));
     })();
   }, []);
 
@@ -195,8 +206,8 @@ export function NewWorkspace({ where }: { readonly where: Where }) {
         */}
         {products && products.length > 1 ? (
           <Group
-            label="What is it for?"
-            under="You can add or remove these later, in the workspace's settings"
+            label="Everything is included"
+            under="Turn off what you will not use. You can change this later"
           >
             {products.map((p) => (
               <ToggleRow

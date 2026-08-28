@@ -692,6 +692,7 @@ its own header, cited by other files, and doing nothing.
 | `nothing-hand-rolls-a-control-the-library-ships` | D7 | a control missing the focus ring, the pressed state and the keyboard behaviour, which looks fine and so survives review |
 | `every-positioned-component-sits-inside-its-anchor` | D7 | a count that lands on top of the time beside it, because a positioned component written without its anchor still compiles, still renders, and still looks like a component |
 | `a-stored-secret-is-never-rendered-back` | D11 | a live credential handed to every script in the page and to whatever the browser saved |
+| `founding-starts-with-every-product` | D121 | a workspace founded holding a subset of what one membership already bought — a destination missing from its bar, on a plan whose own copy says "everything we make", and no screen anywhere saying why |
 | `a-destination-nobody-can-reach-is-never-drawn` | D10 | a nav item that leads to a 403, which the person cannot tell from something simply broken |
 | `a-colour-is-one-variable-and-it-is-the-products` | D7 | the ground behind every page and the wash on every card being a colour somebody picked in a settings card, so no screen can be composed against anything |
 | `one-workspace-with-two-products-pays-one-membership` | D1 | a customer of two products becoming two customers - two cards, two renewal dates, two companies as far as they can tell |
@@ -1213,6 +1214,7 @@ its own header, cited by other files, and doing nothing.
 | D118 | Carriage is spread by value, derived on read, and fixed once anything arrives | 2 |
 | D119 | One valuation method, and back-dating is refused in writing | 0 |
 | D120 | One record, one owner: apps share rather than each keep a copy | 3 |
+| D121 | One membership buys every product, and a workspace starts with all of them | 1 |
 <!-- /generated -->
 
 ---

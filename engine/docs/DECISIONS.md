@@ -4853,3 +4853,51 @@ swallowed.
 The asymmetry in `refuseHears` follows from that. An event nothing hears is
 quiet — a workspace without OneBook installed is the ordinary case. A handler for
 an event NO app raises is dead code that looks live, and refuses.
+
+---
+
+## D121 — One membership buys every product, and a workspace starts with all of them
+
+**Date:** 2026-08-28 · **Status:** shipped
+
+There is **one price for the whole deployment**, not one per product. `PLANS` is
+the deployment's; `entitlementKeys` is the UNION of the platform's keys and every
+app's; `refuseCatalog` fails the build if any plan is silent about any of them.
+Solo's own line is *"One person, everything we make."*
+
+**So a new workspace starts with every product switched on.** What a plan sells
+is SIZE — seats, storage, products, locations, parties — never which products you
+are allowed to open.
+
+### What a workspace still chooses
+
+Switching a product OFF, at founding or later (`app.add` / `app.remove`, and the
+last one cannot be removed — a workspace with nothing on has no screens,
+including the one that would switch something back on). That is a decision about
+what is in the navigation bar, not about what was bought. A business that will
+never keep stock should not carry a Stock destination; it is not being sold
+anything less by turning it off.
+
+### The defect this replaces, and why it was invisible
+
+`NewWorkspace.tsx` seeded the founding form with `items.slice(0, 1)` — the FIRST
+product. With one product in the catalogue that is the same list as all of them,
+and the card offering the choice stands down entirely, so the narrowing was
+indistinguishable from correct for as long as OneInventory was alone. Registering
+OneParty made founding start asking a question and pre-answering it with half the
+catalogue: the new workspace came up missing a destination, on a plan that
+included it, with nothing failing and no screen saying why.
+
+**`space.test.mjs` is what stops it recurring**, and it checks the SHAPE rather
+than the value: `slice`, `filter`, `at`, an index, and a hardcoded id are each a
+way to write the same defect and each reads as ordinary code. All five are
+mutation-tested.
+
+### What this settles about OneBook
+
+BUSINESS.md asked whether OneBook is installable or an always-present engine
+service. It is neither: it is **a product like the others** — included in the
+membership, on by default, and switchable off by a workspace that does not want
+a chart of accounts. The worry that motivated the question (a workshop counting
+stock being handed accounting it never asked for) is answered by the switch, not
+by the price.

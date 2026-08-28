@@ -18,6 +18,11 @@
  * ⚠️ EVERY SCREEN THE PICKER CAN NAME IS DRAWN. A name with no branch renders
  * nothing at all, and a blank page and a page that failed to load are the same
  * picture — so the person reloads for a minute and then gives up.
+ *
+ * ⚠️ AND FOUNDING STARTS WITH EVERY PRODUCT ON. One membership buys all of them
+ * — the plans are the deployment's and their entitlement keys are the union of
+ * every app's — so a founding form that ticks a SUBSET hands somebody less than
+ * they paid for, silently, in the one place they cannot yet tell.
  */
 
 import { readFileSync, readdirSync, existsSync } from "node:fs";
@@ -109,7 +114,47 @@ if (!declared) {
   }
 }
 
+/* ------------------------------------------------- what founding starts with --- */
+
+/**
+ * ⚠️ THE DEFAULT WAS `items.slice(0, 1)` AND IT WAS RIGHT FOR EXACTLY AS LONG AS
+ * THERE WAS ONE PRODUCT. With one, "the first" and "all of them" are the same
+ * list and the card stands down entirely; the day a second was registered,
+ * founding began asking a question and pre-answering it with half the catalogue.
+ * Nothing failed — the new workspace simply had a destination missing from its
+ * bar, on a plan whose own copy says "everything we make".
+ *
+ * ⚠️ SO WHAT IS CHECKED IS THAT NOTHING NARROWS THE CATALOGUE ON THE WAY IN.
+ * `slice`, `filter`, `at` and an index are each a way to write the same defect,
+ * and each of them reads as ordinary code — which is why this is a guard rather
+ * than a comment somebody was supposed to have read.
+ */
+{
+  const file = "one-space/src/screens/NewWorkspace.tsx";
+  const src = readFileSync(join(SPACE, "screens", "NewWorkspace.tsx"), "utf8")
+    /* ⚠️ COMMENTS FIRST. This file's own header quotes the narrowing it exists
+       to have removed, and a guard reading its explanation as the offence is one
+       nobody could write the explanation for. */
+    .replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+
+  const seeds = src.match(/setWant\(([^;]*)\);/);
+  if (!seeds) {
+    fail(`${file}: nothing seeds \`setWant\` — this guard names its shape, so a\n`
+      + `       rewrite that moved it would pass by finding nothing to check.`);
+  } else if (/\.(slice|filter|at)\s*\(|items\s*\[/.test(seeds[1])) {
+    fail(`${file}: founding starts with a NARROWED catalogue — \`${seeds[1].trim()}\`.\n`
+      + `       One membership buys every product, so a subset is somebody handed less\n`
+      + `       than they paid for, in the one place they cannot yet tell. See the note\n`
+      + `       above this check.`);
+  } else if (!/out\.value\.items/.test(seeds[1])) {
+    fail(`${file}: founding does not start from the catalogue it was just handed.\n`
+      + `       Whatever it starts from is a second answer to what this deployment sells.`);
+  } else {
+    ok("founding: a new workspace starts with every product this deployment sells");
+  }
+}
+
 console.log(bad
   ? `\nspace: ${bad} finding(s) — each one fails as something other than itself.`
-  : `\nspace: one API door, one door classifier, no screen that is never drawn.`);
+  : `\nspace: one API door, one classifier, every screen drawn, every product on.`);
 process.exit(bad ? 1 : 0);

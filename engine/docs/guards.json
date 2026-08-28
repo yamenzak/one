@@ -691,6 +691,15 @@
       "fails": "a live credential handed to every script in the page and to whatever the browser saved"
     },
     {
+      "id": "founding-starts-with-every-product",
+      "protects": "D121",
+      "stage": "99",
+      "status": "live",
+      "impl": "scripts/space.test.mjs",
+      "proves": "founding: a new workspace starts with every product",
+      "fails": "a workspace founded holding a subset of what one membership already bought \u2014 a destination missing from its bar, on a plan whose own copy says \"everything we make\", and no screen anywhere saying why"
+    },
+    {
       "id": "a-destination-nobody-can-reach-is-never-drawn",
       "protects": "D10",
       "stage": "5",
