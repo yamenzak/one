@@ -3853,6 +3853,23 @@
       "becomes": "elsewhere: the browser, where a workspace fact reaches the renderer that cannot work it out"
     },
     {
+      "id": "a-value-is-told-how-loudly-to-say-it",
+      "protects": "D118",
+      "status": "live",
+      "impl": "scripts/money.test.mjs",
+      "proves": "said:",
+      "fails": "an order's two line totals drawn at forty pixels each inside a table cell, because the declared renderer became a call site of a component whose size defaults to the hero — the size documented as the one thing a screen exists to show and never twice on a screen, drawn twice, with the compiler happy (the prop is optional) and every test green",
+      "becomes": "unrepresentable: a formatter that cannot be called without saying where it is drawing"
+    },
+    {
+      "id": "a-sub-unit-scale-converts-where-it-is-declared",
+      "protects": "D118",
+      "status": "live",
+      "impl": "scripts/money.test.mjs",
+      "proves": "scale:",
+      "fails": "a stock rate in thousandths converted at its own call site as well as in the module that owns the constant — rounding before the divide instead of after, or dividing by what somebody typed instead of by what the packing ladder resolved, each a rate that is plausible and wrong and throws nothing"
+    },
+    {
       "id": "a-settled-field-is-refused-by-the-write",
       "protects": "D78",
       "status": "live",

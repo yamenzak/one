@@ -29,7 +29,8 @@ import { inventory } from "../index.js";
 import { INVENTORY_SESSIONS, INVENTORY_SURFACES } from "./index.js";
 import {
   BUYING, CODES, COUNTED, COUNTS, DAILY, DISAGREES, DUE_FOR_SERVICE, ITEMS, KIT_MEMBERS,
-  FILINGS, JOBS, JOB_USED, KIT_ROWS, KIT_SHORT, LEFT, LINES, MOVING, ORDERS, ORDER_LINES, PLACES,
+  FILINGS, JOBS, JOB_USED, KIT_ROWS, KIT_SHORT, LEFT, LINES, MOVING, ORDERS, ORDER_LINES,
+  ORDER_WORTH, PLACES,
   RUNNING, RUNS,
   RUN_ITEMS, SUPPLIERS, SUPPLIES, THINGS, TOLD, WORDS, WRONG,
 } from "./sample.js";
@@ -613,6 +614,12 @@ const SEEN: Has = {
     "orders-with": rows(ORDERS
       .filter((one) => one.supplier === SUPPLIER_FIRST.id).map((one) => ({ ...one }))),
     "on-this-order": rows(ORDER_LINES
+      .filter((one) => one.buying === ORDER_FIRST.id).map((one) => ({ ...one }))),
+    /* ⚠️ THE FIGURE OVER THE SAME ROWS THE LIST DRAWS — see `worth-of-this`. The
+       order's total and its lines come from one `landing` in the fixture for the
+       reason they come from one in the operation: two would let a photograph
+       show a total that does not add up. */
+    "what-this-order-comes-to": rows(ORDER_WORTH
       .filter((one) => one.buying === ORDER_FIRST.id).map((one) => ({ ...one }))),
     "jobs": rows(JOBS.map((one) => ({ ...one }))),
     /* ⚠️ NOT NARROWED BY A COLUMN, because the trace is not one. `job.trace`

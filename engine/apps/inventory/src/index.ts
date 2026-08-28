@@ -36,7 +36,8 @@ import {
    methods and the reason argued in its own header. The chokepoint decides WHICH
    verb gets which; every number comes from there. */
 import {
-  MILLI, adjusted, received, taken, worth, type Costed, type Held,
+  adjusted, landed, landing, rateOf, received, saysOrderWorth, taken, worth,
+  type Costed, type Held, type Priced,
 } from "./costing.js";
 import { PROFILES, wordsFor, type Words } from "./words.js";
 import { columnsFor, planIn, readSheet, tallyIn, type Planned } from "./sheet.js";
@@ -651,6 +652,18 @@ const buying = collection({
        average and a promise is a promise. */
     due: field.day({ label: "Expected", holds: "none" }),
     closed: field.instant({ label: "Closed", holds: "none" }),
+    /*
+      ⚠️ FREIGHT, DUTY AND HANDLING, CHARGED ONCE FOR THE WHOLE VAN — which is
+      why it is here and not on a line. An order that recorded only what the
+      goods cost would value the shelf below what the business actually paid,
+      and by the one component that is never small on a small order.
+
+      ⚠️ IT IS SPREAD BY VALUE AT THE MOMENT A DELIVERY IS PRICED, NEVER STAMPED
+      — see `landed`. And it stops being editable as soon as anything arrives,
+      because a share already charged to a shelf cannot be recalculated without
+      a subsystem that reposts history.
+    */
+    carriage: field.money({ label: "Carriage", holds: "none" }),
     note: field.long({ label: "Note", holds: "none", max: 2_000 }),
   },
 });
@@ -682,6 +695,18 @@ const buyingLine = collection({
     product: field.ref({ label: "Product", required: true, holds: "none", to: "product" }),
     asked: field.number({ label: "Ordered", required: true, holds: "none", min: 1 }),
     had: field.number({ label: "Arrived", required: true, holds: "none", min: 0 }),
+    /*
+      ⚠️ WHAT THE QUOTE SAID FOR THE WHOLE LINE, WHICH IS WHAT IS PRINTED ON IT.
+      A unit price is a division somebody does from the two numbers already in
+      front of them, and asking for it instead means the one figure on the paper
+      is the one figure the product will not accept.
+
+      ⚠️ AND IT IS WHAT A DELIVERY IS PRICED AT WHEN THE NOTE SAYS NOTHING — see
+      `landed`. Without it a receipt against a placed order has no price at all
+      unless somebody types one, so the shelf's value would rest on whoever
+      happened to be holding the box.
+    */
+    cost: field.money({ label: "What it should cost", holds: "none" }),
   },
 });
 
@@ -1539,15 +1564,12 @@ function valueOf(
 ): Costed {
   if (move === "received") {
     /*
-      ⚠️ THE TOTAL BECOMES A RATE HERE, DIVIDED ONCE, AT THE END. `cost` is what
-      the line cost and `step` is what arrived in base units — so the division is
-      against the number the packing ladder already resolved, never against what
-      somebody typed on a screen holding last week's ladder.
+      ⚠️ THE TOTAL BECOMES A RATE AGAINST WHAT THE LADDER RESOLVED, never against
+      what somebody typed on a screen holding last week's ladder. `step` is the
+      arrival in base units; the division itself is `rateOf`'s, because the milli
+      scale has one door in each direction.
     */
-    const paid = input.cost === undefined || input.cost === null || step <= 0
-      ? null
-      : Math.round((input.cost * MILLI) / step);
-    return received(line, step, paid);
+    return received(line, step, rateOf(input.cost, step));
   }
   if (move === "taken") return taken(line, Math.abs(step));
   /*
@@ -5265,11 +5287,13 @@ const lateResult = operation<
 
 /* ------------------------------------------------------------ the orders --- */
 
-interface Ordering { id: string; state: Order; supplier: string }
+interface Ordering {
+  id: string; state: Order; supplier: string; carriage: number | null;
+}
 
 const orderIn = async (c: Ctx, id: string): Promise<Ordering> => {
   const of = await (c.db as Db).prepare(
-    `SELECT id, state, supplier FROM buying WHERE id = ? AND tenant_id = ?`)
+    `SELECT id, state, supplier, carriage FROM buying WHERE id = ? AND tenant_id = ?`)
     .bind(id, c.tenantId).first<Ordering>();
   if (!of) return c.fail("platform.not_found");
   return of;
@@ -5284,12 +5308,19 @@ const refuseOrderOn = (c: Ctx, state: Order, act: OrderAct): void => {
   if (why) c.fail("inventory.wrongOrder", { why });
 };
 
-/** ⚠️ Every line on an order, in the shape the pure arithmetic reads. */
-const linesOf = async (c: Ctx, order: string): Promise<readonly Line[]> => {
+/**
+ * ⚠️ Every line on an order, in the shape BOTH pure rules read — the promise
+ * arithmetic in `ordering.ts` and the money in `costing.ts`. One read, because
+ * two would be two lists that can be narrowed differently and a carriage spread
+ * over a set the outstanding count never saw.
+ */
+type OrderLine = Line & Priced;
+
+const linesOf = async (c: Ctx, order: string): Promise<readonly OrderLine[]> => {
   const rows = await (c.db as Db).prepare(
-    `SELECT product, asked, had FROM buying_line
+    `SELECT id, product, asked, had, cost FROM buying_line
       WHERE buying = ? AND tenant_id = ? ORDER BY at ASC`)
-    .bind(order, c.tenantId).all<{ product: string; asked: number; had: number }>();
+    .bind(order, c.tenantId).all<OrderLine>();
   return rows.results ?? [];
 };
 
@@ -5329,7 +5360,7 @@ const openOrder = operation<
  * question with no answer, asked of the person holding the box.
  */
 const addLine = operation<
-  { buying: string; product: string; quantity: number }, { lines: number }
+  { buying: string; product: string; quantity: number; cost?: number }, { lines: number }
 >({
   id: "buying.add",
   kind: "write",
@@ -5338,6 +5369,11 @@ const addLine = operation<
     buying: field.text({ label: "Order", required: true, holds: "none" }),
     product: field.ref({ label: "Product", required: true, holds: "none", to: "product" }),
     quantity: field.number({ label: "How many", required: true, holds: "none", min: 1 }),
+    /* ⚠️ THE WHOLE LINE, FROM THE QUOTE — see `buying-line.cost`. Optional,
+       because an order placed before a price is agreed is ordinary and a
+       required price would make the product refuse the commonest draft there
+       is. */
+    cost: field.money({ label: "What it should cost", holds: "none" }),
   },
   output: { lines: field.number({ label: "Lines", holds: "none" }) },
   permission: "order:write",
@@ -5364,13 +5400,20 @@ const addLine = operation<
     /* ⚠️ THE ID IS DERIVED FROM THE PAIR, which is what makes the raise above
        one statement instead of a read and a branch — and what makes a repeated
        press idempotent in the same breath. */
+    /* ⚠️ THE PRICE ADDS WITH THE QUANTITY, because `cost` is the whole line and
+       raising a line is ordering more of the same thing. And a raise that names
+       no price leaves the standing one alone rather than blanking it — an
+       unconditional `COALESCE(cost, 0) + excluded.cost` would read the absence
+       as free and quietly halve what the order says it will cost. */
     await db.prepare(
-      `INSERT INTO buying_line (id, tenant_id, buying, product, asked, had, at, by)
-        VALUES (?, ?, ?, ?, ?, 0, ?, ?)
+      `INSERT INTO buying_line (id, tenant_id, buying, product, asked, had, cost, at, by)
+        VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?)
         ON CONFLICT (id) DO UPDATE SET asked = asked + excluded.asked,
+          cost = CASE WHEN excluded.cost IS NULL THEN cost
+                      ELSE COALESCE(cost, 0) + excluded.cost END,
           edited_at = excluded.at, edited_by = excluded.by`)
       .bind(`pln_${of.id}_${input.product}`, c.tenantId, of.id, input.product,
-        input.quantity, c.now, c.accountId ?? null).run();
+        input.quantity, input.cost ?? null, c.now, c.accountId ?? null).run();
     return { lines: (await linesOf(c, of.id)).length };
   },
 });
@@ -5398,6 +5441,58 @@ const dropLine = operation<{ buying: string; product: string }, { lines: number 
       `DELETE FROM buying_line WHERE buying = ? AND product = ? AND tenant_id = ?`)
       .bind(of.id, input.product, c.tenantId).run();
     return { lines: (await linesOf(c, of.id)).length };
+  },
+});
+
+/**
+ * WHAT THE VAN COST, ONCE, FOR THE WHOLE ORDER.
+ *
+ * ⚠️ IT IS SET AFTER PLACING AS WELL AS BEFORE, BECAUSE THAT IS WHEN IT IS
+ * KNOWN. Freight, duty and handling are quoted on the invoice that travels with
+ * the goods, not on the order that went out a fortnight earlier — a field only a
+ * draft could carry would be one nobody could ever fill in truthfully.
+ *
+ * ⚠️ AND IT IS REFUSED THE MOMENT ANYTHING ARRIVES — see `refuseOrder`. A
+ * receipt already on a shelf holds the share of the carriage that stood when it
+ * landed; moving the total afterwards leaves the shares adding up to a figure
+ * that was never charged. The refusal names what happened rather than only
+ * saying no.
+ */
+const setCarriage = operation<
+  { buying: string; carriage: number }, { carriage: number }
+>({
+  id: "buying.carriage",
+  kind: "write",
+  summary: "Say what the carriage cost",
+  input: {
+    buying: field.text({ label: "Order", required: true, holds: "none" }),
+    carriage: field.money({ label: "Carriage", required: true, holds: "none" }),
+  },
+  output: { carriage: field.money({ label: "Carriage", holds: "none" }) },
+  permission: "order:write",
+  idempotency: { mode: "key" },
+  emits: ["buying.lined"],
+  outcome: { message: "Saved.", tone: "success", invalidates: ["buying.list"] },
+  fails: ["platform.not_found", "platform.invalid", "inventory.wrongOrder"],
+  audit: (input) => ({ subject: input.buying, verb: "said what the carriage cost" }),
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const of = await orderIn(c, input.buying);
+    refuseOrderOn(c, of.state, "carriage");
+    /* ⚠️ UNDER THE NUMBER IT IS ABOUT — the same rule `buying.add` follows.
+       Negative carriage is a credit note, which is a different act with a
+       different sentence, and nought is how it is taken off. */
+    if (!Number.isFinite(input.carriage) || input.carriage < 0
+      || Math.floor(input.carriage) !== input.carriage) {
+      return c.fail("platform.invalid", {}, {
+        fields: { carriage: "Carriage cannot be less than nothing" },
+      });
+    }
+    await (c.db as Db).prepare(
+      `UPDATE buying SET carriage = ?, edited_at = ?, edited_by = ?
+        WHERE id = ? AND tenant_id = ?`)
+      .bind(input.carriage, c.now, c.accountId ?? null, of.id, c.tenantId).run();
+    return { carriage: input.carriage };
   },
 });
 
@@ -5464,7 +5559,7 @@ const receiveLine = operation<
     buying: string; product: string; location: string; quantity: number;
     day: string; capture: string; batch?: string; cost?: number;
   },
-  { state: string; had: number; left: number }
+  { state: string; had: number; left: number; landed: number | null }
 >({
   id: "buying.receive",
   kind: "write",
@@ -5487,6 +5582,12 @@ const receiveLine = operation<
     state: field.text({ label: "Standing", holds: "none" }),
     had: field.number({ label: "Arrived so far", holds: "none" }),
     left: field.number({ label: "Still to come", holds: "none" }),
+    /* ⚠️ WHAT THE DELIVERY WAS ACTUALLY VALUED AT, CARRIAGE INCLUDED, said back
+       rather than left to be inferred. Somebody who typed £200 and sees £214 has
+       been told the freight landed on it; somebody who typed nothing and sees a
+       figure has been told the order's own price stood in. Both are facts about
+       their money, and neither is guessable from the screen otherwise. */
+    landed: field.money({ label: "Valued at", holds: "none" }),
   },
   permission: "stock:move",
   idempotency: { mode: "key" },
@@ -5509,12 +5610,25 @@ const receiveLine = operation<
     const why = refuseArrival(input.quantity);
     if (why) return c.fail("platform.invalid", {}, { fields: { quantity: why } });
 
-    const line = await db.prepare(
-      `SELECT product, asked, had FROM buying_line
-        WHERE buying = ? AND product = ? AND tenant_id = ?`)
-      .bind(of.id, input.product, c.tenantId)
-      .first<{ product: string; asked: number; had: number }>();
+    /* ⚠️ THE WHOLE ORDER IS READ, NOT THE ONE LINE, BECAUSE THE CARRIAGE IS
+       SPREAD ACROSS ALL OF THEM. What this delivery is worth depends on what
+       every other line on the order was quoted at — that is what "by value, not
+       by count" means — so a receipt priced from its own row alone would put the
+       same freight on a pallet of paper and a box of scalpels. */
+    const lines = await linesOf(c, of.id);
+    const line = lines.find((one) => one.product === input.product);
     if (!line) return c.fail("platform.not_found");
+
+    /*
+      ⚠️ PRICED ONCE, HERE, AND HANDED TO THE CHOKEPOINT AS A NUMBER. The
+      delivery note wins where there is one; the order's own quote stands in
+      where there is not; the share of the carriage rides on top either way. All
+      three are `landed`, which is pure and tested — a second arrangement of the
+      same three facts at this call site is the shape `planRun` exists to stop.
+    */
+    const at = landed(lines, Number(of.carriage ?? 0), {
+      id: line.id, quantity: input.quantity, given: input.cost ?? null,
+    });
 
     /* ⚠️ THE SHELF MOVES FIRST, so a refusal from the one chokepoint — a place
        that is not there, a stale move — leaves the order untouched. Bumping the
@@ -5527,10 +5641,10 @@ const receiveLine = operation<
       capture: input.capture,
       against: of.id,
       ...(input.batch ? { batch: input.batch } : {}),
-      /* ⚠️ PASSED THROUGH, NEVER RE-DERIVED. The rate is worked out in exactly
-         one place — see `valueOf` — so a second division here would be a second
-         answer to what a delivery cost per unit. */
-      ...(input.cost === undefined ? {} : { cost: input.cost }),
+      /* ⚠️ THE LANDED FIGURE, NEVER THE TYPED ONE. Passing `input.cost` on would
+         value the shelf at the goods alone and leave the carriage as money the
+         business spent that nothing anywhere accounts for. */
+      ...(at === null ? {} : { cost: at }),
     });
 
     await db.prepare(
@@ -5547,7 +5661,7 @@ const receiveLine = operation<
         of.id, c.tenantId).run();
 
     const had = line.had + input.quantity;
-    return { state: after, had, left: outstanding({ ...line, had }) };
+    return { state: after, had, left: outstanding({ ...line, had }), landed: at };
   },
 });
 
@@ -5634,14 +5748,25 @@ const cancelOrder = operation<{ buying: string; reason?: string }, { state: stri
  */
 const orderLines = operation<
   { buying: string },
-  { items: { id: string; product: string; name: string; says: string; left: number }[] }
+  {
+    items: {
+      id: string; product: string; name: string; says: string;
+      left: number; worth: number | null;
+    }[];
+    /* ⚠️ ONE ROW, SO A FIGURE CAN READ IT — the shape `stock.lines` already
+       uses, and for the same reason: `Read`'s `first` is how an aggregate
+       reaches a `Stat`, and a total asked separately from the rows behind it is
+       two narrowings that can disagree. */
+    worth: { total: number | null; carriage: number; says: string }[];
+  }
 >({
   id: "buying.lines",
   kind: "read",
-  summary: "What is on an order",
+  summary: "What is on an order, and what it is expected to cost",
   input: { buying: field.text({ label: "Order", required: true, holds: "none" }) },
   output: {
     items: field.json({ label: "Lines", holds: "none" }),
+    worth: field.json({ label: "What it comes to", holds: "none" }),
   },
   permission: "order:read",
   idempotency: { mode: "none" },
@@ -5651,19 +5776,39 @@ const orderLines = operation<
     const of = await orderIn(c, input.buying);
     const rows = await (c.db as Db).prepare(
       `SELECT l.id AS id, l.product AS product, p.name AS name,
-              l.asked AS asked, l.had AS had
+              l.asked AS asked, l.had AS had, l.cost AS cost
          FROM buying_line l JOIN product p ON p.id = l.product
         WHERE l.buying = ? AND l.tenant_id = ? ORDER BY l.at ASC`)
       .bind(of.id, c.tenantId)
-      .all<{ id: string; product: string; name: string; asked: number; had: number }>();
+      .all<OrderLine & { name: string }>();
+    const lines = rows.results ?? [];
+
+    /* ⚠️ THE SAME SPREAD THE RECEIPT USES — see `landing`. The figure this
+       screen shows and the money the shelf ends up carrying have to be one
+       calculation, or the order page promises a number the ledger never
+       records. */
+    const carriage = Number(of.carriage ?? 0);
+    const at = landing(lines, carriage);
+
+    const priced = lines.filter((one) => one.cost !== null).length;
     return {
-      items: (rows.results ?? []).map((one) => ({
+      items: lines.map((one) => ({
         id: one.id,
         product: one.product,
         name: one.name,
         says: saysLine(one),
         left: outstanding(one),
+        /* ⚠️ THE LINE WITH ITS SHARE OF THE CARRIAGE ON IT, which is what it
+           will cost rather than what it was quoted at. Showing the quote here
+           and the landed figure on the shelf would be two numbers a person is
+           left to reconcile. */
+        worth: at.of.get(one.id) ?? null,
       })),
+      worth: [{
+        total: at.total,
+        carriage,
+        says: saysOrderWorth(priced, lines.length - priced, carriage),
+      }],
     };
   },
 });
@@ -7319,7 +7464,8 @@ const manifest = (): AppSpec => defineApp({
     assemble, putIn, takeOut, checking, build, breakUp,
     identify, readLabel, seeProduct, readNote, askInWords,
     openRun, loadRun, endRun, releaseRun, failRun, recallRun, liftHold, lateResult,
-    openOrder, addLine, dropLine, placeOrder, receiveLine, closeOrder, cancelOrder,
+    openOrder, addLine, dropLine, setCarriage, placeOrder, receiveLine,
+    closeOrder, cancelOrder,
     orderLines,
     openJob, closeJob, traceJob, renameTag,
     labelPlaces, labelThings, shelf, report, history, seeImport, doImport,
@@ -7508,6 +7654,12 @@ const manifest = (): AppSpec => defineApp({
       asked: { operation: "kit.check", take: "short", fills: { kit: "record" } } },
     { id: "on-this-order", of: "buying-line",
       asked: { operation: "buying.lines", take: "items", fills: { buying: "record" } } },
+    /* ⚠️ THE SAME READ, NARROWED TO ITS TOTAL — the shape `worth-of-this` draws
+       for a shelf. One row, so `first` can reach it, and one operation, so the
+       figure and the lines under it can never have been given different
+       narrowings. */
+    { id: "what-this-order-comes-to", of: "buying-line",
+      asked: { operation: "buying.lines", take: "worth", fills: { buying: "record" } } },
     /*
       ⚠️ ASKED, BECAUSE THIS SCREEN'S SUBJECT IS ARITHMETIC AND A `Match` IS
       EQUALITY — see `ViewSpec.asked`. When a delivery runs out is the earliest
@@ -10427,6 +10579,14 @@ const manifest = (): AppSpec => defineApp({
               shows: [
                 { field: "name", label: "Product" },
                 { field: "says", label: "How it stands" },
+                /* ⚠️ AND THE END SLOT IS WHAT THE LINE WILL COST, CARRIAGE
+                   INCLUDED — the one number `saysLine` does not already say, and
+                   the reason the fold has a third column to give. It is the
+                   LANDED figure rather than the quote, because the quote and the
+                   money the shelf ends up carrying being two different numbers
+                   on two different screens is what carriage does to a product
+                   that only records one of them. */
+                { field: "worth", label: "Cost", as: "money" },
               ],
               nothing: {
                 says: "Nothing on it yet",
@@ -10437,6 +10597,59 @@ const manifest = (): AppSpec => defineApp({
                 of: { from: { of: "view", view: "on-this-order" } },
               },
             }],
+          },
+          /*
+            ⚠️ WHAT IT COMES TO, AND WHAT THAT FIGURE LEAVES OUT — the shape the
+            product screen draws for a shelf, and for the same reason. A total
+            over an order half of which has no price is a confident number wrong
+            by however much is missing; the sentence under it is the server's,
+            because a screen re-deriving that rule is a second copy of it.
+          */
+          {
+            group: "What it comes to",
+            of: [
+              {
+                block: "Stat",
+                bind: {
+                  value: {
+                    from: { of: "first", view: "what-this-order-comes-to", field: "total" },
+                    as: "money",
+                  },
+                  /* ⚠️ "EXPECTED", BECAUSE NOTHING HERE HAS BEEN PAID. The shelf
+                     says "at cost" about money that left; an order says what it
+                     is going to cost, and the two must not wear one word. */
+                  label: { from: { of: "words", says: "Expected" } },
+                  mark: { from: { of: "words", says: "money" } },
+                },
+              },
+              {
+                block: "NoteRow",
+                bind: {
+                  children: {
+                    from: { of: "first", view: "what-this-order-comes-to", field: "says" },
+                  },
+                },
+              },
+              {
+                /*
+                  ⚠️ THE CARRIAGE IS SET AFTER PLACING AS WELL AS BEFORE, because
+                  freight is quoted on the invoice that travels with the goods —
+                  see `buying.carriage`. It disappears the moment anything
+                  arrives, which is the refusal drawn rather than only answered:
+                  a control that is offered and then refuses is a control that
+                  taught somebody nothing.
+                */
+                block: "ActionRow",
+                when: { is: { of: "field", field: "state" }, one: ["draft", "placed"] },
+                does: [{ op: "buying.carriage", fills: { buying: "record" } }],
+                bind: {
+                  icon: { from: { of: "words", says: "money" } },
+                  label: { from: { of: "words", says: "Say what the carriage cost" } },
+                  under: { from: { of: "words",
+                    says: "Spread across the lines by value — fixed once the first delivery lands" } },
+                },
+              },
+            ],
           },
           {
             group: "While it is being written",

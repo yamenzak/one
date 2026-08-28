@@ -1439,3 +1439,192 @@ describe("what the shelf is worth, on the screens", () => {
     expect(said.worth[0]?.worth).toBe(900);
   });
 });
+
+/**
+ * CARRIAGE, SPREAD ACROSS WHAT ARRIVED.
+ *
+ * ⚠️ THE ONLY WAY TO SEE THIS IS TO DRIVE IT. The spread is pure and tested, the
+ * line prices are a column, and the receipt is a chokepoint — and the thing that
+ * can be wrong is the wiring between the three: a receipt priced from its own
+ * row alone, a typed cost passed through instead of the landed one, a carriage
+ * that reaches the screen and never the shelf. Every one of those typechecks.
+ */
+describe("carriage, spread across what arrived", () => {
+  /** ⚠️ An order with two lines at known prices, in the state a van lands on. */
+  const ordered = async (name: string, carriage: number) => {
+    const place = idOf(await write("location.create", { name: `${name} bay`, kind: "room" }));
+    const supplier = idOf(await write("supplier.create", { name: `${name} Supplies` }));
+    const heavy = idOf(await write("product.create", {
+      name: `${name} pallet`, unit: "pallet", tracking: "counted" }));
+    const light = idOf(await write("product.create", {
+      name: `${name} box`, unit: "box", tracking: "counted" }));
+    const buying = idOf(await write("buying.open", { supplier, today: TODAY }));
+    /* ⚠️ £84.00 against £25.60 — by value the van costs the pallet £27.59 and
+       the box £8.41, where by count it would be £18.00 each. */
+    await write("buying.add", { buying, product: heavy, quantity: 20, cost: 8_400 });
+    await write("buying.add", { buying, product: light, quantity: 8, cost: 2_560 });
+    if (carriage) {
+      const said = await write("buying.carriage", { buying, carriage });
+      expect(said.status, JSON.stringify(said.body)).toBe(200);
+    }
+    await write("buying.place", { buying });
+    return { place, buying, heavy, light };
+  };
+
+  const rateOf = async (product: string): Promise<number | null> => {
+    const said = await read("stock.list");
+    expect(said.status, JSON.stringify(said.body)).toBe(200);
+    const rows = (said.body.items as { product: string; rate: number | null }[])
+      .filter((one) => one.product === product);
+    return rows[0]?.rate ?? null;
+  };
+
+  /*
+    ⚠️ THE SHELF CARRIES THE FREIGHT, WHICH IS THE WHOLE FEATURE. £84.00 of goods
+    and £27.59 of van is £111.59 for twenty — and a product that recorded only
+    the £84.00 would value the warehouse below what the business paid, by the one
+    component that is never small on a small order.
+  */
+  it("lands the carriage on the shelf, not just on the order", async () => {
+    const { place, buying, heavy } = await ordered("Harbour", 3_600);
+    const got = await write("buying.receive", {
+      buying, product: heavy, location: place, quantity: 20,
+      day: TODAY, capture: "typed",
+    });
+    expect(got.status, JSON.stringify(got.body)).toBe(200);
+    expect(got.body.landed).toBe(8_400 + 2_759);
+    /* ⚠️ Milli per unit: £111.59 over twenty is £5.5795 each, which is exactly
+       the sub-penny rate the milli column exists to hold. */
+    expect(await rateOf(heavy)).toBe(Math.round(((8_400 + 2_759) * 1000) / 20));
+  });
+
+  /* ⚠️ BY VALUE, NOT BY COUNT — the cheap line does not carry half the van. */
+  it("gives the cheaper line the smaller share", async () => {
+    const { place, buying, light } = await ordered("Northgate", 3_600);
+    const got = await write("buying.receive", {
+      buying, product: light, location: place, quantity: 8,
+      day: TODAY, capture: "typed",
+    });
+    expect(got.body.landed).toBe(2_560 + 841);
+  });
+
+  /*
+    ⚠️ THE DELIVERY NOTE WINS OVER THE QUOTE, AND THE FREIGHT STILL RIDES. A
+    supplier who invoices £90 for what they quoted £84 has been paid £90, and the
+    shelf has to say so — but the van cost what it cost.
+  */
+  it("takes the typed price over the quote and still adds the share", async () => {
+    const { place, buying, heavy } = await ordered("Fenwick", 3_600);
+    const got = await write("buying.receive", {
+      buying, product: heavy, location: place, quantity: 20,
+      day: TODAY, capture: "typed", cost: 9_000,
+    });
+    expect(got.body.landed).toBe(9_000 + 2_759);
+  });
+
+  /* ⚠️ AND A PART DELIVERY TAKES A PART SHARE. Half the pallet line is half its
+     goods and half its freight — not the whole van on the first van. */
+  it("takes a part share of the carriage on a part delivery", async () => {
+    const { place, buying, heavy } = await ordered("Cawdor", 3_600);
+    const got = await write("buying.receive", {
+      buying, product: heavy, location: place, quantity: 10,
+      day: TODAY, capture: "typed",
+    });
+    expect(got.body.landed).toBe(4_200 + 1_380);
+  });
+
+  /*
+    ⚠️ THE CARRIAGE IS FIXED THE MOMENT SOMETHING ARRIVES. This is the refusal
+    the whole design rests on — the alternative is a subsystem that reposts a
+    ledger, which is the thing `costing.ts`'s header refuses in writing.
+  */
+  it("refuses to move the carriage once a delivery has landed", async () => {
+    const { place, buying, heavy } = await ordered("Selby", 3_600);
+    await write("buying.receive", {
+      buying, product: heavy, location: place, quantity: 5,
+      day: TODAY, capture: "typed",
+    });
+    const said = await write("buying.carriage", { buying, carriage: 9_900 });
+    expect(said.status).toBe(409);
+    expect(JSON.stringify(said.body)).toContain("share of the carriage is fixed");
+  });
+
+  /* ⚠️ AND THE ORDER SAYS WHAT IT COMES TO, CARRIAGE AND ALL — the figure the
+     screen draws, from the same spread the receipt used. Two calculations would
+     let the page promise a number the ledger never records. */
+  it("says what the whole order comes to, carriage included", async () => {
+    const { buying } = await ordered("Ravenscar", 3_600);
+    const said = await read("buying.lines", { buying });
+    expect(said.status, JSON.stringify(said.body)).toBe(200);
+    const body = said.body as {
+      items: { worth: number | null }[];
+      worth: { total: number | null; carriage: number; says: string }[];
+    };
+    expect(body.worth[0]?.total).toBe(8_400 + 2_560 + 3_600);
+    expect(body.worth[0]?.says).toBe("2 lines · carriage included");
+    /* ⚠️ AND THE LINES ADD UP TO IT. A total larger than its own rows is the
+       figure somebody spends a morning reconciling. */
+    expect(body.items.reduce((sum, one) => sum + (one.worth ?? 0), 0))
+      .toBe(body.worth[0]?.total);
+  });
+
+  /*
+    ⚠️ AN UNPRICED LINE TAKES NO SHARE, so the whole van lands on what the order
+    could value. Spreading over an unknown would put a defensible-looking number
+    on a line nobody can check.
+  */
+  it("puts the whole carriage on the lines that have a price", async () => {
+    const place = idOf(await write("location.create", { name: "Mixed bay", kind: "room" }));
+    const supplier = idOf(await write("supplier.create", { name: "Mixed Supplies" }));
+    const known = idOf(await write("product.create", {
+      name: "Known crate", unit: "crate", tracking: "counted" }));
+    const blank = idOf(await write("product.create", {
+      name: "Unquoted crate", unit: "crate", tracking: "counted" }));
+    const buying = idOf(await write("buying.open", { supplier, today: TODAY }));
+    await write("buying.add", { buying, product: known, quantity: 10, cost: 10_000 });
+    await write("buying.add", { buying, product: blank, quantity: 10 });
+    await write("buying.carriage", { buying, carriage: 1_000 });
+    await write("buying.place", { buying });
+
+    const got = await write("buying.receive", {
+      buying, product: known, location: place, quantity: 10,
+      day: TODAY, capture: "typed",
+    });
+    expect(got.body.landed).toBe(11_000);
+
+    /* ⚠️ AND THE UNQUOTED ONE STAYS UNKNOWN RATHER THAN BECOMING THE CARRIAGE.
+       A shelf worth "the freight" is a number nobody could defend. */
+    const other = await write("buying.receive", {
+      buying, product: blank, location: place, quantity: 10,
+      day: TODAY, capture: "typed",
+    });
+    expect(other.body.landed).toBeNull();
+    expect(await rateOf(blank)).toBeNull();
+  });
+
+  /* ⚠️ RAISING A LINE ADDS ITS PRICE, because `cost` is the whole line and
+     adding the same product again is ordering more of the same thing. */
+  it("adds the price when the same product is put on twice", async () => {
+    const supplier = idOf(await write("supplier.create", { name: "Twice Supplies" }));
+    const product = idOf(await write("product.create", {
+      name: "Twice crate", unit: "crate", tracking: "counted" }));
+    const buying = idOf(await write("buying.open", { supplier, today: TODAY }));
+    await write("buying.add", { buying, product, quantity: 10, cost: 5_000 });
+    await write("buying.add", { buying, product, quantity: 10, cost: 5_000 });
+    const said = await read("buying.lines", { buying });
+    expect((said.body.worth as { total: number }[])[0]?.total).toBe(10_000);
+  });
+
+  /* ⚠️ AND A RAISE THAT NAMES NO PRICE LEAVES THE STANDING ONE ALONE. Reading
+     the absence as free would quietly halve what the order says it will cost. */
+  it("keeps the price when the raise names none", async () => {
+    const supplier = idOf(await write("supplier.create", { name: "Silent Supplies" }));
+    const product = idOf(await write("product.create", {
+      name: "Silent crate", unit: "crate", tracking: "counted" }));
+    const buying = idOf(await write("buying.open", { supplier, today: TODAY }));
+    await write("buying.add", { buying, product, quantity: 10, cost: 5_000 });
+    await write("buying.add", { buying, product, quantity: 5 });
+    const said = await read("buying.lines", { buying });
+    expect((said.body.worth as { total: number }[])[0]?.total).toBe(5_000);
+  });
+});

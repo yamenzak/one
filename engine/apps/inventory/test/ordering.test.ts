@@ -193,3 +193,33 @@ describe("what a line says", () => {
     expect(saysLine(line(10, 12))).toBe("10 ordered, 12 arrived — 2 more than asked");
   });
 });
+
+/**
+ * WHEN THE CARRIAGE MAY STILL BE SAID.
+ *
+ * ⚠️ THE RUNG THAT MATTERS IS `part`, AND IT IS EXACTLY "SOMETHING HAS ARRIVED".
+ * A receipt is priced with the share of the carriage that stood when it landed,
+ * so moving the total afterwards leaves the shares adding up to a figure that
+ * was never charged — the drift a reposting subsystem exists to chase, refused
+ * instead.
+ */
+describe("when the carriage may still be said", () => {
+  /* ⚠️ AFTER PLACING AS WELL AS BEFORE, WHICH IS THE POINT. Freight is quoted on
+     the invoice that travels with the goods, not on the order that went out a
+     fortnight earlier; a draft-only field is one nobody could fill in
+     truthfully. */
+  it("is open on a draft and on a placed order", () => {
+    expect(refuseOrder("draft", "carriage")).toBeNull();
+    expect(refuseOrder("placed", "carriage")).toBeNull();
+  });
+
+  it("closes the moment a delivery lands on it", () => {
+    expect(refuseOrder("part", "carriage"))
+      .toBe("Some of it has already arrived — its share of the carriage is fixed");
+  });
+
+  it("is refused on an order that is finished either way", () => {
+    expect(refuseOrder("closed", "carriage")).toBe("It is closed");
+    expect(refuseOrder("cancelled", "carriage")).toBe("This order was cancelled");
+  });
+});

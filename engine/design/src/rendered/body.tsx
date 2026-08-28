@@ -195,7 +195,26 @@ export interface Has {
  * but here, and the declaration cannot even name a format that is not one of
  * seven. That is the guard's `refused: format_wrong` answer made good.
  */
-const DRAWN: Record<Format, (v: unknown, has: Has) => React.ReactNode> = {
+/**
+ * HOW LOUDLY A VALUE IS SAID, WHICH IS DECIDED BY WHERE IT IS AND NOT BY WHAT IT
+ * IS.
+ *
+ * ⚠️ A `Binding` IS A FIGURE AND A `Column` IS A ROW, AND THAT IS THE WHOLE RULE.
+ * A block's bound value is the thing the block is about — a `Stat`'s amount, a
+ * hero's number — while a column is one cell of many and a folded row's end is
+ * one line of a list. Nothing else in this file needs to know the difference.
+ *
+ * ⚠️ IT EXISTS BECAUSE `Money` DEFAULTS TO THE HERO SIZE, correctly, for the
+ * call sites that were written by hand — and `DRAWN` is now a call site that
+ * renders in a table cell. Photographed, an order's two line totals came out at
+ * 40px each, twice the size of the screen's own hero and the first thing the eye
+ * landed on: `display` is documented as the one thing a screen exists to show
+ * and never twice on a screen, and a two-row list was showing it twice. No test
+ * could see it and the compiler was perfectly happy.
+ */
+type Scale = "figure" | "row";
+
+const DRAWN: Record<Format, (v: unknown, has: Has, at?: Scale) => React.ReactNode> = {
   /*
     ⚠️ `plain` IS `String(v)` WITH ONE EXCEPTION, AND THE EXCEPTION IS NOT A
     FORMATTER. `String(true)` is "true", which is programmer output: a column
@@ -212,8 +231,14 @@ const DRAWN: Record<Format, (v: unknown, has: Has) => React.ReactNode> = {
   num: (v) => <Num value={Number(v)} />,
   /* ⚠️ NO CURRENCY, NO PRICE. Drawing the number bare would read as a quantity;
      drawing it in a guessed currency reads as a price and is a different one. */
-  money: (v, has) => (has.currency
-    ? <Money minor={Number(v)} currency={has.currency} />
+  money: (v, has, at) => (has.currency
+    ? <Money
+        minor={Number(v)} currency={has.currency}
+        /* ⚠️ `label` IS THE ROW'S OWN SIZE, so a money column sits level with the
+           text beside it and a column of them still lines up on the decimal —
+           `Money` is `tabular-nums` at every size. See `Scale`. */
+        size={at === "row" ? "label" : "display"}
+      />
     : null),
   when: (v) => <When at={String(v)} />,
   size: (v) => <Size bytes={Number(v)} />,
@@ -243,7 +268,7 @@ const DRAWN: Record<Format, (v: unknown, has: Has) => React.ReactNode> = {
 const endOf = (col: Column, row: Readonly<Record<string, unknown>>, has: Has) =>
   (typeof row[col.field] === "boolean"
     ? (row[col.field] ? col.label : null)
-    : DRAWN[col.as ?? "plain"](row[col.field], has));
+    : DRAWN[col.as ?? "plain"](row[col.field], has, "row"));
 
 const rowsOf = (has: Has, view: string) => {
   const held = has.views[view];
@@ -293,7 +318,9 @@ const drawn = (binding: Binding, has: Has): unknown => {
      kernel's `FORMATS` has no entry that would accept one. */
   if (binding.from.of === "view" || binding.from.of === "subject") return value;
   if (value === undefined || value === null) return undefined;
-  return DRAWN[binding.as ?? "plain"](value, has);
+  /* ⚠️ A BINDING IS THE BLOCK'S OWN VALUE, so it is said at the figure scale —
+     see `Scale`. Every column goes the other way. */
+  return DRAWN[binding.as ?? "plain"](value, has, "figure");
 };
 
 /* -------------------------------------------------------------- whether --- */
@@ -508,7 +535,7 @@ function Placed({ block, has }: { readonly block: BlockSpec; readonly has: Has }
          is the column that exists to say whether a number is stale saying
          nothing at all. */
       cell: (row: Readonly<Record<string, unknown>>) =>
-        DRAWN[col.as ?? "plain"](row[col.field], has),
+        DRAWN[col.as ?? "plain"](row[col.field], has, "row"),
     }));
     props["rowKey"] = (row: Readonly<Record<string, unknown>>, i: number) =>
       String(row["id"] ?? i);
@@ -526,7 +553,7 @@ function Placed({ block, has }: { readonly block: BlockSpec; readonly has: Has }
        declaration, two answers, and only the one nobody works on was right. */
     props["asRow"] = (row: Readonly<Record<string, unknown>>) => ({
       name: String(row[first!.field] ?? ""),
-      ...(second ? { under: DRAWN[second.as ?? "plain"](row[second.field], has) } : {}),
+      ...(second ? { under: DRAWN[second.as ?? "plain"](row[second.field], has, "row") } : {}),
       ...(third ? { aside: endOf(third, row, has) } : {}),
     });
   }

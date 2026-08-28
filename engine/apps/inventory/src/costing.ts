@@ -95,6 +95,25 @@ export const worth = (quantity: number, rate: number | null): number | null =>
   (rate === null ? null : Math.round(milliOf(quantity, rate) / MILLI));
 
 /**
+ * WHAT A LINE TOTAL MEANS PER UNIT — the other direction, and the only one.
+ *
+ * ⚠️ THE CONVERSION INTO MILLI HAPPENS HERE AND NOWHERE ELSE, which is the same
+ * rule `worth` keeps on the way out. It lived at the chokepoint's own call site
+ * as `Math.round((cost * MILLI) / step)` — correct, and one edit away from a
+ * second version somewhere that rounds first or divides by the wrong quantity.
+ * The unit is the thing being protected: a rate that is out by a thousand looks
+ * exactly like a price and passes every test that does not know the scale.
+ *
+ * ⚠️ AND NOTHING OVER NOTHING IS UNKNOWN, NOT NOUGHT. A movement of no base
+ * units has no rate to derive, and answering `0` would reprice the shelf to free
+ * on a delivery that never happened.
+ */
+export const rateOf = (cost: number | null | undefined, base: number): number | null =>
+  (cost === null || cost === undefined || base <= 0
+    ? null
+    : Math.round((cost * MILLI) / base));
+
+/**
  * STOCK ARRIVES AT A PRICE, AND THE RATE BLENDS.
  *
  * ⚠️ THE BLEND IS OVER WHAT IS ALREADY THERE, WHICH IS WHY THE OLD RATE MATTERS
@@ -212,6 +231,137 @@ export function spread(
   });
   return share;
 }
+
+/**
+ * ONE LINE OF AN ORDER, PRICED — what was asked for, and what it was quoted at.
+ *
+ * ⚠️ `cost` IS THE WHOLE LINE, NOT THE UNIT, and that is what somebody reads off
+ * a quotation. A unit price is a division a person does in their head from the
+ * two numbers already in front of them, and asking for it instead means the one
+ * figure on the paper is the one figure the product will not take.
+ */
+export interface Priced {
+  readonly id: string;
+  readonly asked: number;
+  /** ⚠️ Minor units, whole line. `null` is "the quote did not say". */
+  readonly cost: number | null;
+}
+
+/**
+ * ⚠️ A SHARE OF A LINE TOTAL, FOR THE PART OF IT THAT ARRIVED. Rounded once,
+ * here, so a delivery of three against a line of ten is a third of the money and
+ * not three tenths computed twice with different rounding.
+ *
+ * ⚠️ AND MORE THAN WAS ASKED FOR COSTS MORE, which falls out rather than being
+ * special-cased. Twelve against an order for ten at £100 is £120 — the supplier
+ * over-shipped and will invoice for what they sent. `refuseArrival` allows that
+ * on purpose; pricing it at the line total would make the two extra free.
+ *
+ * ⚠️ THE PARAMETER IS `cost` BECAUSE THAT IS WHAT IT IS, and the packing guard
+ * reads the operand's NAME to tell money from a pack factor — see its `PRICES`.
+ * Both callers hand it minor units: a line's quote, or that line's share of the
+ * carriage. A pack factor called `cost` would slip past that guard, and it would
+ * also be lying about itself.
+ */
+const partOf = (cost: number | null, quantity: number, asked: number): number | null =>
+  (cost === null ? null : asked <= 0 ? cost : Math.round((cost * quantity) / asked));
+
+/**
+ * WHAT A RECEIPT COST, ONCE THE CARRIAGE IS ON IT.
+ *
+ * ⚠️ ONE SENTENCE, AND IT IS THE WHOLE RULE: what a receipt cost is what the
+ * delivery note says, plus this line's share of the order's carriage, both
+ * pro-rata to how much of the line arrived — and where the delivery note said
+ * nothing, the order's own quoted price stands in.
+ *
+ * ⚠️ THE SHARE IS COMPUTED FROM THE ORDER'S OWN ROWS, NEVER STORED. A stamped
+ * share is a second number that has to be kept in step with the carriage and the
+ * line prices, and the moment one of the three is edited the other two are a
+ * ledger nobody can reconcile. `spread` over what the order says right now is one
+ * answer, derived, with nothing to drift against — which is the same decision the
+ * header takes about a line's value.
+ *
+ * ⚠️ AND THAT IS EXACTLY WHY THE CARRIAGE STOPS BEING EDITABLE ONCE ANYTHING HAS
+ * ARRIVED — see `refuseOrder`. A receipt already posted holds the share that
+ * stood when it landed; changing the divisor afterwards would leave the shares
+ * summing to something other than the carriage, with no rung between them saying
+ * which was right. Refusing is the whole of the alternative to a reposting
+ * subsystem.
+ *
+ * ⚠️ A LINE WITH NO QUOTED PRICE COSTS NOTHING KNOWN, EVEN WITH CARRIAGE ON THE
+ * ORDER. `spread` gives an unvalued line no share, so the freight cannot arrive
+ * here without the goods — the `?? 0` below is a line that genuinely took no
+ * share, never an unknown flattened to nought.
+ */
+export function landed(
+  lines: readonly Priced[],
+  carriage: number,
+  of: { readonly id: string; readonly quantity: number; readonly given: number | null },
+): number | null {
+  const line = lines.find((one) => one.id === of.id);
+  /* ⚠️ A RECEIPT AGAINST A LINE THAT IS NOT THERE IS WORTH WHAT WAS TYPED. It
+     should not happen — the door reads the line first — and inventing a price
+     for it would be worse than carrying the one fact we were handed. */
+  if (!line) return of.given;
+
+  const goods = of.given ?? partOf(line.cost, of.quantity, line.asked);
+  if (goods === null) return null;
+
+  const share = spread(
+    lines.map((one) => ({ id: one.id, value: one.cost })), carriage,
+  ).get(of.id) ?? 0;
+  return goods + (partOf(share, of.quantity, line.asked) ?? 0);
+}
+
+/**
+ * WHAT A WHOLE ORDER IS EXPECTED TO COST, LINE BY LINE AND IN TOTAL.
+ *
+ * ⚠️ THE SAME `spread` THE RECEIPT USES, so the figure on the order page and the
+ * money the shelf ends up carrying are one calculation read twice. Two would
+ * disagree the first time somebody changed a line, and the disagreement would be
+ * between a screen and a database with nothing to compare them against.
+ */
+export const landing = (
+  lines: readonly Priced[], carriage: number,
+): { readonly of: ReadonlyMap<string, number | null>; readonly total: number | null } => {
+  const share = spread(lines.map((one) => ({ id: one.id, value: one.cost })), carriage);
+  const of = new Map<string, number | null>();
+  let total: number | null = null;
+  for (const line of lines) {
+    const at = line.cost === null ? null : line.cost + (share.get(line.id) ?? 0);
+    of.set(line.id, at);
+    if (at !== null) total = (total ?? 0) + at;
+  }
+  return { of, total };
+};
+
+/**
+ * WHAT AN ORDER'S TOTAL SAYS BESIDE ITSELF.
+ *
+ * ⚠️ THE SAME RULE A SHELF'S TOTAL FOLLOWS: a total is the sum of what is known,
+ * and how much is NOT known is part of the answer. An order half of which nobody
+ * has priced draws a confident figure that is wrong by however much is missing,
+ * with nothing on the screen saying so.
+ *
+ * ⚠️ AND THE CARRIAGE IS NAMED WHEN THERE IS ONE, because a total silently
+ * larger than the sum of the lines above it is a number somebody will spend a
+ * morning reconciling against a quotation. It is said only where something is
+ * priced, since with no priced line the carriage was spread over nothing and is
+ * not in the total at all.
+ *
+ * ⚠️ IT IS HERE RATHER THAN AT ITS CALL SITE SO THE BOARD CAN SAY IT TOO. A
+ * screenshot fixture that wrote its own version of this sentence would photograph
+ * copy the product does not use — which is a picture of a design nobody shipped.
+ */
+export const saysOrderWorth = (
+  priced: number, unpriced: number, carriage: number,
+): string => {
+  const said = !priced && !unpriced ? "Nothing on it yet"
+    : !priced ? (unpriced === 1 ? "The one line has no price" : "No line has a price")
+      : unpriced ? (unpriced === 1 ? "One line has no price" : `${unpriced} lines have no price`)
+        : (priced === 1 ? "One line" : `${priced} lines`);
+  return [said, priced && carriage ? "carriage included" : null].filter(Boolean).join(" · ");
+};
 
 /**
  * WHAT A LINE'S WORTH SAYS.

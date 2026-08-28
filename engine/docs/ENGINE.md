@@ -1035,7 +1035,9 @@ its own header, cited by other files, and doing nothing.
 | `an-account-door-screen-knows-its-door` | D20 | a screen on the account door calling an operation that needs a tenancy, which 404s there — and it looks identical to a screen that works, because the door it is on is not visible in the file that draws it |
 | `a-declared-job-is-run-by-the-composed-book` | D12 | a job declared in a manifest, validated for its cron and its floor, drawn on a screen an operator opens — and run by nothing; it held for three stages and every suite was green throughout |
 | `a-quantity-is-multiplied-once` | D76 | a quantity multiplied twice or not at all — the fault that put nine hundred tablets on a shelf, where both halves of the arithmetic were individually correct and the number the person expected showed the whole time |
-| `a-money-field-has-a-currency` | D117 | every price on every app screen drawn as an empty cell — a prop declared, typed, documented and never passed, which no compiler and no test can see because its absence is a legitimate state |
+| `a-money-field-has-a-currency` | D117 | every price on every app screen drawn as an empty cell — a prop declared, typed, documented and never passed, which no compiler and no test can see because its absence is a legitimate state; and the same blank photographed by a screenshot board, filed under the screen own name, where it reads as the design somebody chose |
+| `a-value-is-told-how-loudly-to-say-it` | D118 | an order's two line totals drawn at forty pixels each inside a table cell, because the declared renderer became a call site of a component whose size defaults to the hero — the size documented as the one thing a screen exists to show and never twice on a screen, drawn twice, with the compiler happy (the prop is optional) and every test green |
+| `a-sub-unit-scale-converts-where-it-is-declared` | D118 | a stock rate in thousandths converted at its own call site as well as in the module that owns the constant — rounding before the divide instead of after, or dividing by what somebody typed instead of by what the packing ladder resolved, each a rate that is plausible and wrong and throws nothing |
 | `a-settled-field-is-refused-by-the-write` | D78 | a generated update changing the unit every other number is counted in — twenty boxes on a shelf become twenty sheets, every balance reinterpreted, with no write anywhere near a quantity |
 | `one-answer-per-question-through-one-door` | D36 | the same question asked several times for one screen, which is round trips a person waits through — and a read outside the door is one nothing can dedupe, cache or count against a budget |
 | `a-total-is-asked-for-and-never-counted-by-hand` | D57 | three round trips to put three numbers over a screen, each carrying identity, workspace, membership and standing in order to run one SELECT COUNT(*) |
@@ -1202,6 +1204,8 @@ its own header, cited by other files, and doing nothing.
 | D115 | A name that is announced and not drawn is not a name | 0 |
 | D116 | A sold capability with no door, and a vocabulary nobody can see | 0 |
 | D117 | A workspace has one currency, and it re-labels rather than converts | 1 |
+| D118 | Carriage is spread by value, derived on read, and fixed once anything arrives | 2 |
+| D119 | One valuation method, and back-dating is refused in writing | 0 |
 <!-- /generated -->
 
 ---

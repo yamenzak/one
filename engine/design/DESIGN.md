@@ -1338,6 +1338,7 @@ Some of this is guarded and some is judgement:
 - `keeping` — a content-hashed asset is kept; the document that names it is not.
 - `menu` — a screen composes the vocabulary; it does not re-derive it.
 - `metrics` — one source for every measurement: no screen picks its own padding, gap or tap target, and a pressable row has a floor under it.
+- `money` — a value is drawn at the volume its place deserves, and a sub-unit scale converts only where it is declared.
 - `motion` — one set of curves and roles, reduced motion answered both ways, and no pinned element whose travel changes the page's height.
 - `moving` — a tab switch is not a journey; only the journey still running may land.
 - `packing` — a quantity is multiplied by exactly one packing factor, on the server.

@@ -454,6 +454,43 @@ all: `Listing` folds to three. A stockroom sees where, when and how many; a desk
 sees those and what it is worth. Nobody standing at a shelf is auditing a
 valuation, and nobody auditing one is doing it on a handset.
 
+### The carriage, spread across what arrived
+
+An order carries a **carriage** — freight, duty and handling, charged once for
+the whole van — and every line may carry **what the quote said it would cost**.
+What a delivery is worth is one sentence: *what the delivery note says, plus this
+line's share of the carriage, both pro-rata to how much of the line arrived — and
+where the note said nothing, the order's own quote stands in.*
+
+**Spread by value, not by count.** A pallet of paper and a box of scalpels on one
+van did not consume the same share of the freight; splitting it per line puts most
+of a delivery's carriage on whatever happened to be cheapest. £84 of gloves and
+£25.60 of paper on a £36 van is £27.59 and £8.41 — by count it would be £18 each.
+The **last line takes the remainder**, so the shares add up to the carriage
+exactly: a penny that appears from nowhere on a value report is the whole report's
+credibility.
+
+**A line with no quoted price takes no share.** A share of an unknown is a number
+nobody can defend, so the whole van lands on whatever the order could value, and
+an unpriced receipt stays unknown rather than becoming the freight alone.
+
+**The share is derived, never stamped.** It is `spread` over what the order says
+right now, so there is no second number to keep in step with the carriage and the
+line prices. That is why **the carriage is refused the moment anything arrives** —
+a receipt already on a shelf holds the share that stood when it landed, and moving
+the total afterwards leaves the shares adding up to a figure that was never
+charged. Refusing is the whole of the alternative to a subsystem that reposts
+history. It stays editable while the order is `placed`, because freight is quoted
+on the invoice that travels with the goods rather than on the order that went out
+a fortnight earlier.
+
+**Where the carriage appears.** The order page's line rows end in what each will cost,
+carriage included; under them a figure says what the whole order comes to, with
+the same "how much is not priced" sentence a shelf's total carries and the word
+*carriage included* when there is one. The receipt says back what it was actually
+valued at, so somebody who typed £200 and sees £214 has been told the freight
+landed on it.
+
 ### The count session
 
 A count is a job somebody spends an afternoon on, so it is a destination rather

@@ -33,7 +33,9 @@ export const ORDERS = ["draft", "placed", "part", "closed", "cancelled"] as cons
 export type Order = typeof ORDERS[number];
 
 /** What can be done to an order. */
-export const ORDER_ACTS = ["add", "drop", "place", "receive", "close", "cancel"] as const;
+export const ORDER_ACTS = [
+  "add", "drop", "place", "receive", "close", "cancel", "carriage",
+] as const;
 export type OrderAct = typeof ORDER_ACTS[number];
 
 /**
@@ -77,6 +79,24 @@ export function refuseOrder(state: Order, act: OrderAct): string | null {
       return state === "draft" || state === "placed" ? null
         : state === "part" ? "Some of it has already arrived — close it short instead"
           : "It is already finished";
+    case "carriage":
+      /*
+        ⚠️ THE CARRIAGE STOPS BEING EDITABLE THE MOMENT ANYTHING ARRIVES, AND
+        `part` IS EXACTLY THAT MOMENT. A receipt is priced with the share of the
+        carriage that stood when it landed — see `landed` — so moving the total
+        afterwards leaves the shares adding up to a figure that was never
+        charged, with nothing anywhere saying which of the two is the delivery
+        note. Refusing is the whole of the alternative to a reposting subsystem.
+
+        ⚠️ AND IT IS EDITABLE AFTER PLACING, WHICH IS THE POINT OF THE RUNG.
+        Freight is quoted on the invoice, not on the order, so a carriage that
+        could only be entered on a draft would be a field nobody could ever fill
+        in truthfully.
+      */
+      return state === "draft" || state === "placed" ? null
+        : state === "part" ? "Some of it has already arrived — its share of the carriage is fixed"
+          : state === "cancelled" ? "This order was cancelled"
+            : "It is closed";
   }
 }
 

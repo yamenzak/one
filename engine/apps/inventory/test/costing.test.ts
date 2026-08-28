@@ -9,7 +9,8 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  MILLI, adjusted, moved, received, saysWorth, spread, taken, worth, type Held,
+  MILLI, adjusted, landed, landing, moved, received, saysOrderWorth, saysWorth, spread,
+  taken, worth, type Held, type Priced,
 } from "../src/costing.js";
 
 const held = (quantity: number, rate: number | null): Held => ({ quantity, rate });
@@ -228,5 +229,109 @@ describe("what a line's worth says", () => {
   */
   it("drops the each-rate rather than rounding a sub-penny one into a lie", () => {
     expect(saysWorth(held(1000, 2300), money)).toBe("£23.00");
+  });
+});
+
+/* ⚠️ A quoted line, in the shape the order's own rows arrive in. */
+const quoted = (id: string, asked: number, cost: number | null): Priced =>
+  ({ id, asked, cost });
+
+/**
+ * WHAT A DELIVERY COST ONCE THE VAN IS ON IT.
+ *
+ * ⚠️ EVERY CASE HERE IS A WAY OF LOSING THE CARRIAGE SILENTLY. Freight is money
+ * the business paid for stock; a receipt that values the goods alone puts the
+ * shelf below what it cost and nothing anywhere is short.
+ */
+describe("what a delivery cost, carriage included", () => {
+  /* ⚠️ £84.00 of gloves and £25.60 of paper on one £36.00 van. By VALUE the
+     gloves take £27.59 of it and the paper £8.41 — by count they would take
+     £18.00 each, which is most of the freight on the cheaper half. */
+  const ORDER = [quoted("a", 20, 8_400), quoted("b", 8, 2_560)];
+
+  it("adds this line's share of the carriage to what the note said", () => {
+    expect(landed(ORDER, 3_600, { id: "a", quantity: 20, given: 8_400 }))
+      .toBe(8_400 + 2_759);
+  });
+
+  it("spreads by value, so the cheap line does not carry half the van", () => {
+    expect(landed(ORDER, 3_600, { id: "b", quantity: 8, given: 2_560 }))
+      .toBe(2_560 + 841);
+  });
+
+  /* ⚠️ THE SHARES SUM TO THE CARRIAGE EXACTLY — the last line takes the
+     remainder. A penny that appears from nowhere on a value report is the whole
+     report's credibility. */
+  it("puts the whole carriage on the order and not a penny more", () => {
+    const all = landing(ORDER, 3_600);
+    expect(all.total).toBe(8_400 + 2_560 + 3_600);
+  });
+
+  /* ⚠️ THE ORDER'S OWN QUOTE STANDS IN WHERE THE DELIVERY NOTE SAID NOTHING.
+     Without it a receipt against a placed order has no price at all unless
+     somebody types one, so the shelf's value would rest on whoever was holding
+     the box. */
+  it("falls back to what the order said, pro-rata to what came", () => {
+    expect(landed(ORDER, 0, { id: "a", quantity: 5, given: null })).toBe(2_100);
+  });
+
+  it("takes the same share of the carriage pro-rata on a part delivery", () => {
+    expect(landed(ORDER, 3_600, { id: "a", quantity: 5, given: null }))
+      .toBe(2_100 + 690);
+  });
+
+  /* ⚠️ AND MORE THAN WAS ASKED FOR COSTS MORE. `refuseArrival` allows an
+     over-ship on purpose; pricing twelve at the ten-line's total would make the
+     two extra free. */
+  it("prices an over-delivery at the line's own unit price", () => {
+    expect(landed([quoted("a", 10, 10_000)], 0, { id: "a", quantity: 12, given: null }))
+      .toBe(12_000);
+  });
+
+  /*
+    ⚠️ AN UNPRICED LINE TAKES NO SHARE, WHICH IS WHY THE FREIGHT CANNOT ARRIVE
+    WITHOUT THE GOODS. A share of an unknown is a number nobody can defend, so
+    the whole receipt stays unknown rather than becoming the carriage alone.
+  */
+  it("is unknown where the line has no price and the note said nothing", () => {
+    expect(landed([quoted("a", 10, null)], 5_000, { id: "a", quantity: 10, given: null }))
+      .toBeNull();
+  });
+
+  it("still takes the typed price where the line has no quote", () => {
+    expect(landed([quoted("a", 10, null)], 5_000, { id: "a", quantity: 10, given: 9_900 }))
+      .toBe(9_900);
+  });
+
+  /* ⚠️ AND THE UNPRICED LINE DOES NOT DILUTE THE PRICED ONE'S SHARE. The whole
+     carriage lands on whatever the order could value. */
+  it("puts the whole carriage on the lines that have a price", () => {
+    const mixed = [quoted("a", 10, 10_000), quoted("b", 10, null)];
+    expect(landed(mixed, 1_000, { id: "a", quantity: 10, given: null })).toBe(11_000);
+    expect(landing(mixed, 1_000).total).toBe(11_000);
+  });
+
+  it("is what was typed where the line is not on the order at all", () => {
+    expect(landed(ORDER, 3_600, { id: "gone", quantity: 1, given: 500 })).toBe(500);
+  });
+});
+
+describe("what an order's total says", () => {
+  it("says nothing is on it before a line is", () => {
+    expect(saysOrderWorth(0, 0, 0)).toBe("Nothing on it yet");
+  });
+
+  it("names the carriage, because the total is bigger than the lines", () => {
+    expect(saysOrderWorth(2, 0, 3_600)).toBe("2 lines · carriage included");
+  });
+
+  it("says how much of the order has no price", () => {
+    expect(saysOrderWorth(2, 1, 0)).toBe("One line has no price");
+  });
+
+  /* ⚠️ AND SAYS NOTHING ABOUT CARRIAGE WHERE NOTHING IS PRICED, because the
+     spread ran over nothing and the freight is not in the total. */
+  it("does not claim carriage is included in a total of nothing", () => {
+    expect(saysOrderWorth(0, 2, 3_600)).toBe("No line has a price");
   });
 });

@@ -4673,3 +4673,115 @@ grows. The real rule is that `DisplayNames` NAMES a thing rather than formatting
 a value, and only where it is handed the reader's own locale — so
 `new Intl.DisplayNames(undefined, …)` passes anywhere and a hardcoded locale
 fails, in `countries.ts` too, which the file exemption never checked.
+
+---
+
+## D118 — Carriage is spread by value, derived on read, and fixed once anything arrives
+
+**Date:** 2026-08-28 · **Status:** shipped
+
+Freight, duty and handling are a real part of what stock cost. An order that
+recorded only what the goods cost values the shelf below what the business paid,
+by the one component that is never small on a small order — so `buying` carries a
+`carriage` and `buying_line` carries `cost`, the whole line as it appears on the
+quote rather than a per-unit price nobody has to hand.
+
+**Spread by value, not by count.** A pallet of paper and a box of scalpels on one
+van did not consume the same share of the freight. Splitting per line puts most of
+a delivery's carriage on whatever happened to be cheapest, which is a number that
+looks defensible and is wrong on every order with a range of prices in it. The
+last line takes the remainder so the shares sum to the carriage exactly; rounding
+each independently loses or invents a penny, and a penny from nowhere on a value
+report is the whole report's credibility.
+
+**A line with no price takes no share**, because a share of an unknown is a number
+nobody can defend. The consequence falls out rather than being coded: the freight
+cannot reach a receipt without the goods, so an unpriced delivery stays unknown
+instead of becoming the carriage alone.
+
+**And the share is DERIVED, never stamped.** `spread` runs over what the order
+says at the moment a delivery is priced. A stored share would be a third number
+that has to stay in step with the carriage and the line prices, and the moment one
+of the three is edited the other two are a ledger nobody can reconcile — the same
+accumulated-beside-the-derivation shape `costing.ts`'s header refuses for a
+shelf's value.
+
+### What that costs, said out loud
+
+**The carriage stops being editable the moment anything arrives.** A receipt
+already on a shelf holds the share that stood when it landed; moving the divisor
+afterwards would leave the posted shares adding up to a figure that was never
+charged, with no rung between them saying which was right. Making that work is a
+reposting subsystem — a job runner, concurrency gates, and the reports that exist
+only to find ledgers that have gone wrong, which is precisely the machinery the
+moving average was chosen to do without. So the refusal IS the design, `refuseOrder(state, "carriage")` is where
+it lives, and `part` — "something has arrived" — is already a rung of the state
+machine, so nothing new had to be invented to express it.
+
+It stays editable while the order is `placed`, and that rung is what makes the
+field usable at all: freight is quoted on the invoice that travels with the goods,
+not on the order that went out a fortnight earlier. A draft-only carriage would be
+a field nobody could ever fill in truthfully.
+
+**What is refused with it:** a per-delivery carriage. Freight is a fact about a
+van, and one order delivered in three vans is three charges — but a receipt here
+is one line at a time, so a per-delivery figure would need a multi-line receipt
+the declared surface has no shape for. An order-level carriage answers the case
+that actually happens (one order, one consignment) exactly, and the case it does
+not is a second order.
+
+---
+
+## D119 — One valuation method, and back-dating is refused in writing
+
+**Date:** 2026-08-28 · **Status:** shipped
+
+Stock is valued at a **moving average rate per (product × place × batch)**, held
+in thousandths of a minor unit, derived fresh on every read. The other three
+methods a mature stock system offers are refused, and so is the one capability
+that would make them workable.
+
+### Why not FIFO or LIFO
+
+Both need a **queue per key** — a list of `[quantity, rate]` bins that has to be
+replayed from the beginning whenever anything lands out of order. That queue is
+not an implementation detail; it is the reason a mature stock ledger grows a
+**reposting subsystem**: ERPNext's is a job runner, a set of concurrency gates, a
+repost-item-valuation doctype with its own queue and error states, and six
+reports whose only job is to find ledgers that have gone wrong. A moving average
+holds one number per key and needs none of it.
+
+**The price is said out loud:** a moving average cannot tell you which delivery a
+unit came from, so it cannot value a recall by lot. Where that matters the
+product already has **batches**, and the rate is per batch — which is FIFO's
+answer to the only question FIFO is better at, arrived at from the other
+direction and without the queue.
+
+Standard cost is refused for a different reason: it needs a variance account and
+a periodic revaluation run, which is an accounting workflow rather than a stock
+one, and this product does not have a ledger to post the variance to.
+
+### And back-dating is refused, which is what makes the choice hold
+
+**A movement is priced at the rate that stood when it landed, and there is no way
+to insert one behind that.** Every write goes through the chokepoint with the
+server's own clock; `day` is what a person says about the world, and it never
+reorders the ledger. A correction to a past figure is a **new movement today**
+with its own reason, which is what `product.recount` and the undo already are.
+
+That refusal is the whole of the alternative to reposting. Allowing an
+out-of-order insert means every rate after it is wrong until something replays
+them — and replaying them means the queue, the job runner, the gates, and the
+reports that exist because those three do not always agree. Nothing here can
+disagree with anything, because there is nothing accumulated to disagree with: a
+shelf's value is `quantity × rate` computed at the moment it is asked, and the
+ledger's `value` column is a separate fact about what each movement cost, which a
+repricing must never rewrite.
+
+**What this costs, plainly:** a workspace that discovers in March that a January
+delivery was invoiced at a different price cannot make January's reports change.
+They can correct the shelf today, with a reason, and the correction is visible as
+a movement. For a business that needs January restated, this is the wrong
+product, and that is a better answer than a subsystem nobody asked for.
+
+The same refusal governs an order's **carriage** — D118 is that case in detail.

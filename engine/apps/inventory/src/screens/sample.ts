@@ -18,6 +18,7 @@
 import { dayPlus, type Day } from "@engine/kernel";
 import { saysDue, saysMove } from "../ledger.js";
 import { saysLine } from "../ordering.js";
+import { landing, saysOrderWorth } from "../costing.js";
 
 export type Tracking = "listed" | "counted" | "batched" | "itemised" | "assembled";
 
@@ -540,6 +541,8 @@ export interface Ordered {
   readonly raised: string;
   readonly ref: string;
   readonly due: string;
+  /** ⚠️ Minor units, the whole van, spread by value at receipt — see `landed`. */
+  readonly carriage: number;
 }
 
 export const SUPPLIERS = [
@@ -551,15 +554,22 @@ export const SUPPLIERS = [
     leadDays: 12 },
 ] as const;
 
+/* ⚠️ THE ORDER THE DETAIL PAGE OPENS ON CARRIES A CARRIAGE, because the whole
+   point of the figure is that it is larger than the sum of the lines. A fixture
+   where every order paid nothing for freight would photograph the one case the
+   spread never runs on. */
 export const ORDERS: readonly Ordered[] = [
   { id: "ord-1", supplier: "sup-1", "supplier.name": "Harbour Supplies",
-    state: "placed", raised: "2026-08-26", ref: "HS-99120", due: "2026-09-01" },
+    state: "placed", raised: "2026-08-26", ref: "HS-99120", due: "2026-09-01",
+    carriage: 3_600 },
   { id: "ord-2", supplier: "sup-2", "supplier.name": "Northgate Chemicals",
-    state: "part", raised: "2026-08-21", ref: "NG-4402", due: "2026-08-28" },
+    state: "part", raised: "2026-08-21", ref: "NG-4402", due: "2026-08-28",
+    carriage: 0 },
   { id: "ord-3", supplier: "sup-1", "supplier.name": "Harbour Supplies",
-    state: "closed", raised: "2026-08-11", ref: "HS-98771", due: "2026-08-18" },
+    state: "closed", raised: "2026-08-11", ref: "HS-98771", due: "2026-08-18",
+    carriage: 0 },
   { id: "ord-4", supplier: "sup-2", "supplier.name": "Northgate Chemicals",
-    state: "draft", raised: "2026-08-27", ref: "", due: "" },
+    state: "draft", raised: "2026-08-27", ref: "", due: "", carriage: 0 },
 ];
 
 /**
@@ -567,19 +577,50 @@ export const ORDERS: readonly Ordered[] = [
  * list exists to show. A fixture where the two columns matched would photograph
  * the one case nobody opens an order to check.
  */
-/* ⚠️ THE SHAPE `buying.lines` ANSWERS WITH, NOT THE TABLE'S — the view is ASKED,
-   so a fixture built out of columns would draw the right headings over blank
-   cells. `says` is the sentence the screen exists to show. */
-export const ORDER_LINES = [
+/*
+  ⚠️ THE SHAPE `buying.lines` ANSWERS WITH, NOT THE TABLE'S — the view is ASKED,
+  so a fixture built out of columns would draw the right headings over blank
+  cells. `says` is the sentence the screen exists to show.
+
+  ⚠️ AND `worth` IS DERIVED BY THE SAME `landing` THE SERVER USES, never typed.
+  A hand-written total is a photograph of arithmetic nobody ran: it agrees with
+  the code on the day it is written and drifts silently every time the spread
+  changes. One line here has no price on purpose, because "a total is the sum of
+  what is known" is a sentence that needs a fixture to say it in.
+*/
+const ORDER_QUOTES = [
   { id: "oln-1", buying: "ord-1", product: "t-glove", name: "Nitrile gloves, blue",
-    says: saysLine({ product: "t-glove", asked: 20, had: 0 }), left: 20 },
+    asked: 20, had: 0, cost: 8_400 },
   { id: "oln-2", buying: "ord-1", product: "t-paper", name: "A4 paper",
-    says: saysLine({ product: "t-paper", asked: 8, had: 3 }), left: 5 },
+    asked: 8, had: 3, cost: 2_560 },
   { id: "oln-3", buying: "ord-2", product: "t-resin", name: "Casting resin, clear",
-    says: saysLine({ product: "t-resin", asked: 12, had: 12 }), left: 0 },
+    asked: 12, had: 12, cost: 14_400 },
   { id: "oln-4", buying: "ord-2", product: "t-screw", name: "Screws, M4 × 20",
-    says: saysLine({ product: "t-screw", asked: 500, had: 520 }), left: 0 },
+    asked: 500, had: 520, cost: null },
 ] as const;
+
+export const ORDER_LINES = ORDER_QUOTES.map((one) => {
+  const order = ORDERS.find((each) => each.id === one.buying);
+  const kin = ORDER_QUOTES.filter((each) => each.buying === one.buying);
+  const at = landing(kin, order?.carriage ?? 0);
+  return {
+    id: one.id, buying: one.buying, product: one.product, name: one.name,
+    says: saysLine(one), left: Math.max(0, one.asked - one.had),
+    worth: at.of.get(one.id) ?? null,
+  };
+});
+
+/** ⚠️ The order's own total, from the same `landing` — see `ORDER_LINES`. */
+export const ORDER_WORTH = ORDERS.map((order) => {
+  const kin = ORDER_QUOTES.filter((each) => each.buying === order.id);
+  const priced = kin.filter((each) => each.cost !== null).length;
+  return {
+    buying: order.id,
+    total: landing(kin, order.carriage).total,
+    carriage: order.carriage,
+    says: saysOrderWorth(priced, kin.length - priced, order.carriage),
+  };
+});
 
 /** ⚠️ What a supplier supplies, with THEIR reference — see `sourcing`. */
 export const SUPPLIES = [
