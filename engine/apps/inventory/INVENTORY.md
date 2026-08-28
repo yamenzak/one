@@ -449,10 +449,18 @@ Over a catalogue nobody has finished costing, a lone figure is a confident numbe
 wrong by however much is missing — on the one screen somebody would take to an
 accountant.
 
-**And the value column is the fourth,** which means a phone does not draw it at
-all: `Listing` folds to three. A stockroom sees where, when and how many; a desk
-sees those and what it is worth. Nobody standing at a shelf is auditing a
-valuation, and nobody auditing one is doing it on a handset.
+**And the value column is the fourth, which means it is drawn wherever the list
+is wide enough to be a table and nowhere else.** `Listing` folds to three — a
+name, a line under it and an end — and it folds **by its own measured box, not by
+the device**, so a card in a stacked column is rows on a desk as much as on a
+phone. Every shelf list in this product is one of those today, so in practice the
+column elaborates and never announces.
+
+That is why **the figure carries the answer and the column only elaborates it**. A
+screen whose only statement of worth was a column would say nothing at all in a
+narrow frame, and a photograph of that is indistinguishable from a screen where
+the value was never built. The order page draws its value because there it is the
+*third* column, which is the slot the fold keeps.
 
 ### The carriage, spread across what arrived
 
