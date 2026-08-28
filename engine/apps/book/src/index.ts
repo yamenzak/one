@@ -42,6 +42,9 @@ import { refusePlacing, rollUp, within, type Centre } from "./dimensions.js";
 import {
   RATE_SCALE, inBase, refuseRate, revalueLines, unrated, type Holding,
 } from "./money.js";
+import {
+  RATE_BASIS, chargeOf, entryFor, refuseItems, type Item, type Way,
+} from "./invoice.js";
 
 /* ------------------------------------------------------------------ shapes --- */
 
@@ -369,6 +372,48 @@ const posting = collection({
 });
 
 /**
+ * A TAX CODE — A RATE WITH A NAME AND A RETURN LINE BEHIND IT.
+ *
+ * ⚠️ A RATE IS A ROW, NOT A NUMBER ON A LINE. Rates change, by statute, on a
+ * date — and every invoice already raised has to keep the rate it was raised at
+ * while every new one gets the new figure. A number typed on a line makes that
+ * impossible to report on: "how much did we charge at the standard rate" becomes
+ * a query over distinct values, and a mistyped 4% is a rate that quietly exists.
+ *
+ * ⚠️ AND THE ACCOUNT IS THE ROLE'S, NOT THE CODE'S. Tax charged is a liability
+ * and tax paid is an asset, and the SAME code appears on both sides of a
+ * business — 5% VAT on what it sells and 5% on what it buys. So the code carries
+ * the rate and the books decide the account from which way the document faces
+ * (`tax_output` or `tax_input`), which is why there is no account column here.
+ */
+const tax = collection({
+  id: "tax",
+  label: { one: "Tax code", many: "Tax codes" },
+  scope: { of: "tenant" },
+  permission: "account",
+  retention: null,
+  onClose: { then: "keep", why: "the rate a filed return was made of" },
+  searchable: ["name"],
+  names: "name",
+  fields: {
+    name: field.text({ label: "Name", required: true, holds: "none", max: 60 }),
+    /*
+      ⚠️ BASIS POINTS. Five per cent is 500 and seven and a half is 750 — a whole
+      number, because a rate held as a float multiplies into every line of every
+      invoice and the error is pennies that differ per document.
+    */
+    basis: field.number({
+      label: "Hundredths of a per cent", required: true, holds: "none",
+      min: 0, max: RATE_BASIS,
+      help: "5% is 500. 7.5% is 750.",
+    }),
+    /* ⚠️ CLOSED RATHER THAN DELETED, for the account's reason: last quarter's
+       return was made of it. */
+    closed: field.bool({ label: "No longer charged", holds: "none" }),
+  },
+});
+
+/**
  * WHAT A CURRENCY WAS WORTH ON A DAY.
  *
  * ⚠️ TYPED, NOT FETCHED, AND THAT IS DELIBERATE FOR NOW. A rate a business
@@ -407,6 +452,106 @@ const rate = collection({
     }),
     said: field.text({ label: "From", holds: "none", max: 120,
       help: "Where it came from. A central bank, or your own bank's advice." }),
+  },
+});
+
+/**
+ * AN INVOICE SENT TO A CUSTOMER.
+ *
+ * ⚠️ IT IS A DOCUMENT, WHICH IS THE WHOLE OF WHY THE RAIL EXISTS (D124). It is a
+ * draft while somebody builds it, it takes a number when they commit to it, and
+ * from that instant it is evidence: a customer holds a copy, a tax return is made
+ * of it, and editing it is changing a fact after the fact.
+ *
+ * ⚠️ AND IT CANNOT BE CANCELLED, WHICH IS THE SHARPEST THING HERE. A tax invoice
+ * that can be withdrawn is a compliance problem wearing a convenience feature —
+ * the customer has the paper, the number is issued, and the correction the law
+ * wants is a SECOND document that says what changed. `cancel: { by: "refusing" }`
+ * is the kernel's word for that, and it names the credit note as the way out so
+ * nobody is left holding a wrong invoice with no route at all.
+ */
+const sale = collection({
+  id: "sale",
+  label: { one: "Invoice", many: "Invoices" },
+  scope: { of: "tenant" },
+  permission: "journal",
+  retention: null,
+  /* ⚠️ KEPT PAST THE WORKSPACE. What was invoiced to whom is the shape of a
+     return somebody filed, and that does not stop having happened. */
+  onClose: { then: "keep", why: "what was invoiced, which a tax authority may ask about" },
+  searchable: ["memo"],
+  names: "memo",
+  document: {
+    /* ⚠️ THE DEFAULT, NOT THE SETTING — a workspace edits its own (D125). */
+    series: "INV-{YYYY}-{####}",
+    /* ⚠️ AND NOT AMENDABLE, WHICH FOLLOWS RATHER THAN BEING A SECOND DECISION.
+       An amendment is a cancellation and a fresh draft, so a document that
+       refuses the first cannot offer the second — the kernel refuses the pair,
+       which is how this comment came to be written rather than the bug. */
+    amendable: false,
+    cancel: {
+      by: "refusing",
+      instead: "credit note",
+      why: "the customer holds this invoice and a return may be made of it",
+    },
+    posts: [{ to: "book", rule: "sale.posted" }],
+  },
+  fields: {
+    /*
+      ⚠️ THE CUSTOMER IS ONEPARTY'S AND ONLY THEIR NAME CROSSES (D122). One
+      address book for every product is the whole of B1 — an invoice pointing at
+      a party OneInventory already buys from is the same person, and OneBook
+      holds none of who they are.
+    */
+    party: field.ref({ label: "Customer", required: true, holds: "none", to: "party" }),
+    memo: field.text({ label: "What it is for", required: true, holds: "none", max: 200 }),
+    /* ⚠️ THE DAY IT BELONGS TO, which is not the day it was typed — the same
+       rule the journal keeps, and the day the tax point falls on. */
+    day: field.day({ label: "Date", required: true, holds: "none" }),
+    due: field.day({ label: "Due", holds: "none",
+      help: "When it is payable. Blank means on receipt." }),
+    /*
+      ⚠️ A FOREIGN INVOICE CARRIES ITS RATE — see `money.ts`. What the customer
+      owes is in THEIR currency and what the books record is in the workspace's,
+      and the rate is what ties them together on a document that will be paid
+      months later at a different one.
+    */
+    currency: field.text({ label: "Billed in", holds: "none", max: 3 }),
+    rate: field.number({ label: "Rate", holds: "none", min: 0 }),
+    note: field.long({ label: "Note", holds: "none", max: 2_000 }),
+  },
+});
+
+/**
+ * ONE LINE OF AN INVOICE.
+ *
+ * ⚠️ IT NAMES AN ACCOUNT RATHER THAN A PRODUCT, AND THAT IS THE SEAM (B1). What
+ * was sold is OneInventory's or OneTrade's to know; what the books need is which
+ * income account it lands in. "Consulting, 2.5 hours at 90" against the
+ * consulting account is a complete invoice for a business with no stock at all,
+ * and the field a product-shaped document fills in when there is one.
+ */
+const saleLine = collection({
+  id: "sale-line",
+  label: { one: "Line", many: "Lines" },
+  scope: { of: "tenant" },
+  permission: "journal",
+  retention: null,
+  onClose: { then: "keep", why: "what an invoice was made of" },
+  names: "said",
+  fields: {
+    sale: field.ref({ label: "Invoice", required: true, holds: "none", to: "sale" }),
+    said: field.text({ label: "What it is", required: true, holds: "none", max: 200 }),
+    /* ⚠️ THOUSANDTHS, because half an hour is a real invoice line — see
+       `QUANTITY_SCALE`. */
+    quantity: field.number({
+      label: "How many (thousandths)", required: true, holds: "none",
+      help: "2.5 hours is 2500.",
+    }),
+    price: field.money({ label: "Each", required: true, holds: "none" }),
+    account: field.ref({ label: "Goes to", required: true, holds: "none", to: "account" }),
+    tax: field.ref({ label: "Tax", holds: "none", to: "tax" }),
+    centre: field.ref({ label: "Cost centre", holds: "none", to: "centre" }),
   },
 });
 
@@ -1066,6 +1211,167 @@ const centres = operation<
   },
 });
 
+/* ---------------------------------------------------- what an invoice posts --- */
+
+interface SaleRow {
+  readonly id: string;
+  readonly day: string;
+  readonly memo: string;
+  readonly party: string;
+  readonly currency: string | null;
+  readonly rate: number | null;
+}
+
+interface ItemRow {
+  readonly account: string;
+  readonly said: string;
+  readonly quantity: number;
+  readonly price: number;
+  readonly tax: string | null;
+  readonly centre: string | null;
+}
+
+/**
+ * THE NAME OF A PARTY THIS APP DOES NOT OWN.
+ *
+ * ⚠️ ONE STATEMENT, IN THE OPEN, AND THAT IS THE WHOLE OF D122. What crosses the
+ * seam is a record's NAME and nothing else — so this reads two columns rather
+ * than `SELECT *`, which would put another product's tax numbers, terms and
+ * contact rows in this one's memory with nothing in the manifest to say so.
+ *
+ * ⚠️ AND WITHOUT IT AN INVOICE DRAWS AN IDENTIFIER. A document naming
+ * `pty_0m7…` instead of a customer is a document nobody can check, and the
+ * borrowed guard fails on the statement rather than on the screen — which is
+ * where it is cheap to notice.
+ */
+async function namesOf(db: Db, tenantId: string): Promise<ReadonlyMap<string, string>> {
+  const said = await db.prepare(`SELECT id, name FROM party WHERE tenant_id = ?`)
+    .bind(tenantId).all<{ id: string; name: string }>();
+  return new Map(said.results.map((row) => [String(row.id), String(row.name)] as const));
+}
+
+/**
+ * ⚠️ ONE READ FOR THE WHOLE DOCUMENT, AND IT IS ASKED TWICE ON PURPOSE — once by
+ * `may` before a number is taken and once by `post` after. The alternative is
+ * carrying state between the two halves of a seam whose whole point is that the
+ * first half can refuse; a second read of a handful of rows is cheaper than a
+ * cache that can be stale between them.
+ */
+async function invoiceAt(
+  db: Db, tenantId: string, id: string,
+): Promise<{ sale: SaleRow; items: readonly ItemRow[]; rates: ReadonlyMap<string, number> } | null> {
+  const sale = await db.prepare(
+    `SELECT id, day, memo, party, currency, rate FROM sale WHERE id = ? AND tenant_id = ?`)
+    .bind(id, tenantId).first<SaleRow>();
+  if (!sale) return null;
+
+  const [lines, codes] = await Promise.all([
+    db.prepare(
+      `SELECT account, said, quantity, price, tax, centre FROM sale_line
+        WHERE sale = ? AND tenant_id = ?`)
+      .bind(id, tenantId).all<ItemRow>(),
+    db.prepare(`SELECT id, basis FROM tax WHERE tenant_id = ?`)
+      .bind(tenantId).all<{ id: string; basis: number }>(),
+  ]);
+  return {
+    sale,
+    items: lines.results ?? [],
+    rates: new Map((codes.results ?? []).map((r) => [r.id, r.basis] as const)),
+  };
+}
+
+/** ⚠️ The two lines an invoice's own arithmetic needs, gathered from the rows. */
+const itemsOf = (rows: readonly ItemRow[]): readonly Item[] =>
+  rows.map((r) => ({
+    account: r.account, said: r.said, quantity: r.quantity, price: r.price,
+    ...(r.tax ? { tax: r.tax } : {}),
+    ...(r.centre ? { centre: r.centre } : {}),
+  }));
+
+/**
+ * WHERE AN INVOICE'S SIDES LAND.
+ *
+ * ⚠️ THE ROLE DECIDES, NOT THE DOCUMENT, WHICH IS THE WHOLE INTERNATIONAL DESIGN.
+ * A sale debits whatever account the workspace tagged `receivable` and credits
+ * whatever it tagged `tax_output`; a German chart and a British one differ in
+ * every name and in nothing this function reads.
+ */
+async function homesFor(
+  c: Ctx, db: Db, way: Way,
+): Promise<{ party: string; taxTo: (code: string) => string } | null> {
+  const roles = await rolesOf(db, c.tenantId);
+  const party = roles.get(way === "out" ? "receivable" : "payable");
+  const taxes = roles.get(way === "out" ? "tax_output" : "tax_input");
+  if (!party || !taxes) return null;
+  /* ⚠️ ONE TAX ACCOUNT PER SIDE, WHICH IS THE HONEST SHIPPING SHAPE. A workspace
+     filing several taxes separately wants an account each, and that is a column
+     on the code — deliberately not built until a workspace has two, because the
+     role already answers it for everyone who has one. */
+  return { party, taxTo: () => taxes };
+}
+
+/**
+ * ⚠️ EVERY REFUSAL AN INVOICE HAS, ASKED BEFORE ITS NUMBER IS ISSUED. That order
+ * is the whole of `AppSpec.postings`: a number cannot be given back, so a
+ * document that took one and then found the month shut is evidence with no entry
+ * behind it and no way to undo either half.
+ */
+async function maySell(ctx: unknown, id: string): Promise<void> {
+  const c = ctx as Ctx;
+  const db = c.db as Db;
+  const held = await invoiceAt(db, c.tenantId, id);
+  if (!held) return c.fail("platform.not_found");
+
+  const wrong = refuseItems(itemsOf(held.items));
+  if (wrong === "no_items") return c.fail("book.empty_invoice");
+  if (wrong === "nothing_charged") return c.fail("book.nil_invoice");
+  if (wrong) return c.fail("platform.invalid", {}, { fields: { lines: "Check the lines" } });
+
+  const homes = await homesFor(c, db, "out");
+  if (!homes) return c.fail("book.no_account", {},
+    { fields: { party: "No account is marked for what customers owe" } });
+
+  /* ⚠️ THE CALENDAR, ASKED HERE RATHER THAN BY THE WRITE. `writeEntry` would
+     refuse it too — and by then the number is issued. */
+  const { years, periods } = await calendarOf(db, c.tenantId);
+  const shut = refusePostingOn(held.sale.day, years, periods);
+  if (shut) refuseCalendar(c, shut);
+}
+
+/**
+ * ⚠️ AND NOW IT STANDS, SO THIS HALF ONLY WRITES. The entry is filed under the
+ * number the customer's copy carries, which is what makes a figure in the ledger
+ * traceable to a piece of paper somebody holds.
+ */
+async function postSale(ctx: unknown, at: { id: string; number: string }): Promise<void> {
+  const c = ctx as Ctx;
+  const db = c.db as Db;
+  const held = await invoiceAt(db, c.tenantId, at.id);
+  if (!held) return;
+  const homes = await homesFor(c, db, "out");
+  if (!homes) return;
+
+  const items = itemsOf(held.items);
+  const lines = entryFor(items, chargeOf(items, held.rates), homes, "out", at.number);
+  /* ⚠️ THE CUSTOMER BY NAME, because a journal entry reading `pty_0m7…` is a
+     figure nobody can check against the invoice it came from. */
+  const called = (await namesOf(db, c.tenantId)).get(held.sale.party) ?? "";
+  const posted = await writeEntry(c, db, {
+    day: held.sale.day,
+    memo: called ? `${at.number} · ${called}` : `${at.number} · ${held.sale.memo}`,
+    source: "sale.posted",
+    /* ⚠️ THE DOCUMENT'S OWN ID, so the journal entry and the invoice can be read
+       from each other — which is B2's "why is this account moving", answered by
+       a row rather than by reading source. */
+    ref: at.id,
+    lines,
+  });
+  /* ⚠️ IT CANNOT REFUSE HERE, because `maySell` asked. If it somehow does, the
+     throw is loud and the operation fails rather than answering success over an
+     invoice with no entry. */
+  if ("why" in posted) throw new Error(`invoice ${at.number} could not post: ${posted.why}`);
+}
+
 /**
  * RESTATING WHAT THE FOREIGN ACCOUNTS ARE WORTH TODAY.
  *
@@ -1645,7 +1951,23 @@ const manifest = (): AppSpec => defineApp({
   */
   entitlements: {},
 
-  collections: [account, centre, journal, posting, rate, rule, year, period],
+  /*
+    ⚠️ THE ADDRESS BOOK IS ONEPARTY'S AND THIS IS THE WHOLE OF THE SEAM (D120).
+    An invoice names a customer; who that customer IS lives in one place for
+    every product, so a party OneInventory buys from and a party OneBook invoices
+    are the same row. What crosses is the record's name and nothing else (D122).
+  */
+  borrows: ["party"],
+
+  /*
+    ⚠️ WHAT A SUBMITTED INVOICE ACTUALLY DOES — see `AppSpec.postings`. The rail
+    sets a standing and issues a number, and neither of those is what an invoice
+    is FOR. `may` is asked before the number is taken and holds every refusal;
+    `post` writes the entry once the document stands.
+  */
+  postings: { "sale.posted": { may: maySell, post: postSale } },
+
+  collections: [account, centre, journal, posting, rate, rule, sale, saleLine, tax, year, period],
 
   operations: [start, extend, post, trial, standing, centres, revalue,
     openYear, closeYear, reopenYear, shutPeriod],
@@ -1909,6 +2231,21 @@ const manifest = (): AppSpec => defineApp({
       configuration gap rather than a mistake this person made, so the sentence
       says where to fix it.
     */
+    "book.empty_invoice": {
+      status: 409, retryable: false, tone: "warning",
+      title: "This invoice has no lines",
+      detail: "Add what it is for before sending it.",
+    },
+    /*
+      ⚠️ THE ONE THAT PASSES EVERY OTHER CHECK. An invoice coming to nothing is a
+      numbered document, sent to a customer, asking for no money — and every
+      arithmetic rule is satisfied by it.
+    */
+    "book.nil_invoice": {
+      status: 409, retryable: false, tone: "warning",
+      title: "This invoice asks for nothing",
+      detail: "Every line comes to zero. A credit note is how to say nothing is owed.",
+    },
     "book.no_currency": {
       status: 409, retryable: false, tone: "warning",
       title: "This workspace has no currency",
@@ -1964,6 +2301,15 @@ const manifest = (): AppSpec => defineApp({
     /* ⚠️ NEWEST FIRST, because "what is it worth today" is the question, and the
        history under it is what somebody checks afterwards. */
     { id: "rates", of: "rate", limit: 100 },
+    { id: "invoices", of: "sale", limit: 50 },
+    { id: "lines-of-invoice", of: "sale-line",
+      where: [{ field: "sale", is: { here: "record" } }] },
+    /* ⚠️ WHAT SENDING IT DID, ON THE DOCUMENT THAT DID IT. Without this the
+       rail's whole effect is invisible to whoever caused it: they press Send,
+       the ledger moves, and no screen connects the two. */
+    { id: "entry-of-invoice", of: "journal",
+      where: [{ field: "ref", is: { here: "record" } }] },
+    { id: "taxes", of: "tax", limit: 50 },
     /* ⚠️ NEWEST FIRST IS WRONG FOR A YEAR. The books are read forwards — 2025,
        then 2026 — because "which year am I in" is answered by the last row, and
        a reversed list makes somebody read up the screen to find it. */
@@ -1997,13 +2343,17 @@ const manifest = (): AppSpec => defineApp({
         shape: "list",
         layout: { as: "stack" },
         blocks: [
-          /* ⚠️ RATES SIT BESIDE THE CHART BECAUSE AN ACCOUNT NAMES A CURRENCY.
-             It is not a sixth destination — the bar holds five (D10) — and what
-             a currency is worth is a question somebody asks while looking at the
-             account that holds it. */
+          /*
+            ⚠️ THE THREE THAT SHAPE THE CHART, REACHED FROM IT. An account names a
+            cost centre, a tax code and a currency, so all three are questions
+            somebody asks while looking at the chart — and the bar holds five
+            (D10). Cost centres was a destination for one round and lost the seat
+            to Invoices, which is the right trade: a document a customer holds
+            outranks the configuration behind it.
+          */
           {
             group: null,
-            of: [{ block: "QuickActions", leads: ["rates"] }],
+            of: [{ block: "QuickActions", leads: ["centres", "taxes", "rates"] }],
           },
           /*
             ⚠️ OPENING THE BOOKS WAS UNREACHABLE, AND THIS IS THE CONTROL THAT
@@ -2358,7 +2708,7 @@ const manifest = (): AppSpec => defineApp({
       rows' own figures would show a zero beside the one line somebody opened
       this screen to read.
     */
-    { id: "centres", route: "/centres", label: "Cost centres", nav: "primary", icon: "tag",
+    { id: "centres", route: "/centres", label: "Cost centres", nav: "none", icon: "tag",
       permission: "account:read", tone: "neutral",
       body: {
         shape: "list",
@@ -2507,7 +2857,172 @@ const manifest = (): AppSpec => defineApp({
         ],
       } },
 
-    { id: "journal", route: "/journal", label: "Journal", nav: "primary", icon: "note",
+    /*
+      INVOICES — the document a customer holds, and the only screen in this
+      product whose subject is a piece of paper rather than a figure.
+
+      ⚠️ IT IS A DESTINATION AND THE JOURNAL IS ONE TOO, and that is not a
+      duplicate. An invoice is what was agreed; the journal is what it did. A
+      bookkeeper lives in the second and everybody else lives in the first.
+    */
+    { id: "invoices", route: "/invoices", label: "Invoices", nav: "primary", icon: "note",
+      permission: "journal:read", tone: "neutral",
+      body: {
+        shape: "list",
+        layout: { as: "stack" },
+        blocks: [{
+          group: null,
+          of: [{
+            block: "Listing",
+            shows: [
+              /* ⚠️ THE NUMBER LEADS ONCE THERE IS ONE, and a draft has none —
+                 which is exactly the difference a person is looking for. */
+              { field: "number", label: "Number" },
+              { field: "memo", label: "What it is for" },
+              { field: "day", label: "Date", as: "when" },
+              { field: "stands", label: "Standing" },
+            ],
+            goes: "invoice",
+            nothing: {
+              says: "No invoices yet",
+              under: "Raise one and it takes its number when you send it",
+            },
+            bind: {
+              label: { from: { of: "words", says: "Invoices" } },
+              of: { from: { of: "view", view: "invoices" } },
+            },
+          }],
+        }],
+      } },
+
+    /* ⚠️ ONE INVOICE — what it says, what it is made of, and the one control
+       that turns it from a draft into evidence. */
+    { id: "invoice", route: "/invoice", label: "Invoice", nav: "none", icon: "note",
+      permission: "journal:read", of: "sale",
+      body: {
+        shape: "detail",
+        layout: { as: "stack" },
+        blocks: [
+          {
+            group: null,
+            of: [{
+              block: "ActionRow",
+              does: ["sale.submit"],
+              /* ⚠️ OFFERED ONLY WHILE IT IS A DRAFT. A control that exists to be
+                 refused is a control somebody presses — and this one cannot be
+                 undone, so it must never be offered on something already sent. */
+              when: { is: { of: "field", field: "stands" }, one: ["draft"] },
+              bind: {
+                icon: { from: { of: "words", says: "check" } },
+                label: { from: { of: "words", says: "Send it" } },
+                under: { from: { of: "words",
+                  says: "It takes its number and cannot be withdrawn" } },
+              },
+            }],
+          },
+          {
+            group: "What it says",
+            of: [
+              { block: "FieldRow",
+                when: { has: { of: "field", field: "number" } },
+                bind: {
+                  label: { from: { of: "words", says: "Number" } },
+                  value: { from: { of: "field", field: "number" } },
+                } },
+              { block: "FieldRow",
+                bind: {
+                  label: { from: { of: "words", says: "Date" } },
+                  value: { from: { of: "field", field: "day" }, as: "when" },
+                } },
+              { block: "FieldRow",
+                when: { has: { of: "field", field: "due" } },
+                bind: {
+                  label: { from: { of: "words", says: "Due" } },
+                  value: { from: { of: "field", field: "due" }, as: "when" },
+                } },
+              { block: "FieldRow",
+                bind: {
+                  label: { from: { of: "words", says: "Standing" } },
+                  value: { from: { of: "field", field: "stands" } },
+                } },
+            ],
+          },
+          {
+            group: "What it did",
+            /* ⚠️ EMPTY UNTIL IT IS SENT, which is the honest reading: a draft has
+               done nothing to the books and saying so is the point. */
+            of: [{
+              block: "Listing",
+              shows: [
+                { field: "memo", label: "Entry" },
+                { field: "day", label: "Date", as: "when" },
+              ],
+              goes: "entry",
+              nothing: {
+                says: "Nothing posted yet",
+                under: "Sending it writes the entry behind it",
+              },
+              bind: {
+                label: { from: { of: "words", says: "In the books" } },
+                of: { from: { of: "view", view: "entry-of-invoice" } },
+              },
+            }],
+          },
+          {
+            group: "What it is made of",
+            of: [{
+              block: "Listing",
+              shows: [
+                { field: "said", label: "What it is" },
+                { field: "quantity", label: "How many" },
+                { field: "price", label: "Each", as: "money" },
+              ],
+              nothing: {
+                says: "Nothing on it yet",
+                under: "Add a line for each thing being charged for",
+              },
+              bind: {
+                label: { from: { of: "words", says: "Lines" } },
+                of: { from: { of: "view", view: "lines-of-invoice" } },
+              },
+            }],
+          },
+        ],
+      } },
+
+    /* ⚠️ TAX CODES SIT UNDER THE CHART, not in settings — a rate is a row a
+       return is made of, and it is closed rather than edited when it changes. */
+    { id: "taxes", route: "/taxes", label: "Tax codes", nav: "none", icon: "tag",
+      permission: "account:read", tone: "neutral",
+      body: {
+        shape: "list",
+        layout: { as: "stack" },
+        blocks: [{
+          group: null,
+          of: [{
+            block: "Listing",
+            shows: [
+              { field: "name", label: "Name" },
+              { field: "basis", label: "Hundredths of a per cent" },
+              { field: "closed", label: "No longer charged" },
+            ],
+            nothing: {
+              says: "No tax codes yet",
+              under: "Add one for each rate you charge or are charged",
+            },
+            bind: {
+              label: { from: { of: "words", says: "Tax codes" } },
+              of: { from: { of: "view", view: "taxes" } },
+            },
+          }],
+        }],
+      } },
+
+    /* ⚠️ THE JOURNAL WEARS `tally` AND THE INVOICES WEAR `note`, and the swap is
+       the reading rather than a tie-break. A journal is a running count of
+       entries; an invoice is a piece of paper. Two identical marks in one bar
+       cannot say which is which, which is what the glyph guard caught. */
+    { id: "journal", route: "/journal", label: "Journal", nav: "primary", icon: "tally",
       permission: "journal:read", tone: "neutral",
       body: {
         shape: "list",

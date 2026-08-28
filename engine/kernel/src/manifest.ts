@@ -717,6 +717,27 @@ export interface AppSpec {
    * mistaken for permission.
    */
   readonly hears?: HearsBook;
+  /**
+   * WHAT A SUBMITTED DOCUMENT ACTUALLY DOES.
+   *
+   * ⚠️ THE RAIL SETS A STANDING AND ISSUES A NUMBER, AND THAT IS NOT WHAT AN
+   * INVOICE IS FOR (D124). `DocumentSpec.posts` says which rule turns the
+   * document into entries; this is where that rule LIVES. Without it the
+   * declaration was a promise with nothing behind it — the composer checked that
+   * a rule was named and nothing checked that anything ran.
+   *
+   * ⚠️ TWO HALVES, AND THE SPLIT IS THE ORDER OF OPERATIONS. `may` is asked
+   * BEFORE a number is taken, and it is where every refusal belongs: a shut
+   * month, a closed account, an entry that will not balance. `post` runs once the
+   * document stands and the number is issued, and by then the answer has to be
+   * yes — because a document that took a number and posted nothing is evidence
+   * with no entry behind it, and there is no way back from an issued number.
+   *
+   * ⚠️ AND A RULE NAMED BY NO DOCUMENT IS REFUSED, in both directions. A handler
+   * nothing reaches is dead code that looks live; a `posts` naming a rule with no
+   * handler is a document the engine believes has an effect and that has none.
+   */
+  readonly postings?: PostingBook;
   readonly settings?: SettingBook;
   /**
    * ⚠️ THE PAGES ITS SETTINGS LIVE ON. Every declared setting names one, and an
@@ -974,6 +995,38 @@ export interface HearsSpec {
 export type HearsBook = Readonly<Record<string, HearsSpec>>;
 
 /**
+ * WHAT A DOCUMENT DOES WHEN SOMEBODY COMMITS TO IT.
+ *
+ * ⚠️ THE CONTEXT IS `unknown` HERE FOR THE REASON EVERY HANDLER'S IS. The kernel
+ * describes what an app declares and never what a binding looks like; the
+ * runtime hands over its own `Ctx` and the app casts it, which is the same shape
+ * `operation` has used since the beginning.
+ */
+export interface PostingSpec {
+  /**
+   * ⚠️ ASKED BEFORE THE NUMBER IS TAKEN, AND EVERY REFUSAL BELONGS HERE. A shut
+   * month, a closed account, an entry that will not balance — all of them are
+   * knowable in advance, and all of them are unrecoverable afterwards, because
+   * an issued number cannot be given back.
+   */
+  readonly may: (ctx: unknown, id: string) => Promise<void>;
+  /**
+   * ⚠️ RUNS ONCE THE DOCUMENT STANDS, AND BY THEN THE ANSWER IS YES. Anything
+   * that throws here leaves evidence with no entry behind it — which is why the
+   * question is asked above, and why this half is a write rather than a decision.
+   */
+  readonly post: (ctx: unknown, at: PostingAt) => Promise<void>;
+}
+
+export interface PostingAt {
+  readonly id: string;
+  /** ⚠️ The number just issued — what the entry is filed under. */
+  readonly number: string;
+}
+
+export type PostingBook = Readonly<Record<string, PostingSpec>>;
+
+/**
  * WHAT ONE APP LISTENS FOR AND NO APP RAISES.
  *
  * ⚠️ THE OTHER DIRECTION IS NOT A FAULT, AND THAT ASYMMETRY IS THE DESIGN. An
@@ -1217,6 +1270,27 @@ export function refuseApp(spec: AppSpec): readonly Refusal[] {
       + ` is a coupling between two products, and unexplained it is the line`
       + ` somebody deletes in a year because nothing says what breaks`);
   }
+  /*
+    ⚠️ A POSTING RULE IS CHECKED IN BOTH DIRECTIONS, and neither half is optional
+    — see `AppSpec.postings`. A document declaring `posts` and naming a rule that
+    does not exist is one the engine believes has an effect and that has none; a
+    handler no document names is dead code that reads as live. Both are the shape
+    every other guard in this file exists to catch.
+  */
+  const posted = new Set(
+    spec.collections.flatMap((one) => (one.document?.posts ?? []).map((p) => p.rule)));
+  for (const rule of posted) {
+    if (spec.postings?.[rule]) continue;
+    at("postings", `a document posts through "${rule}" and no rule of that name is`
+      + ` declared — the engine would know the document had an effect and nothing`
+      + ` would carry it out`);
+  }
+  for (const rule of Object.keys(spec.postings ?? {})) {
+    if (posted.has(rule)) continue;
+    at("postings", `"${rule}" is declared and no document posts through it — a rule`
+      + ` nothing reaches is dead code that reads as live`);
+  }
+
   for (const id of idleBorrows(holds, spec.borrows ?? [])) {
     at("reference",
       `borrows "${id}" and points at it nowhere — a dependency that makes this app`

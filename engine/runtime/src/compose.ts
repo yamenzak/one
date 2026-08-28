@@ -484,7 +484,7 @@ const verbSummary = (spec: CollectionSpec, verb: CrudVerb): string => {
  * question, and roles are the app's.
  */
 function moveOp(
-  spec: CollectionSpec, what: DocumentMove, places: string,
+  spec: CollectionSpec, what: DocumentMove, places: string, app: AppSpec,
 ): Resolved {
   const one = spec.label.one.toLowerCase();
   const operation: AnyOperation = {
@@ -525,6 +525,20 @@ function moveOp(
     const chosen = what === "submit"
       ? await seriesFor(ctx.db, ctx.tenantId, spec.id)
       : null;
+
+    /*
+      ⚠️ ASKED BEFORE THE NUMBER IS TAKEN, AND THAT ORDER IS THE WHOLE SEAM — see
+      `AppSpec.postings`. Everything a posting can refuse is knowable in advance
+      and unrecoverable afterwards: an issued number cannot be given back, so a
+      document that took one and then failed to post is evidence with no entry
+      behind it and no way to undo either half.
+    */
+    if (what === "submit") {
+      for (const p of spec.document?.posts ?? []) {
+        await app.postings?.[p.rule]?.may(ctx, String(input.id ?? ""));
+      }
+    }
+
     const done = await move(
       ctx.db, spec, scopeOf(spec, ctx), String(input.id ?? ""), what,
       {
@@ -546,6 +560,14 @@ function moveOp(
           { fields: { series: "This workspace's numbering cannot be read. Check it in settings." } });
       }
       ctx.fail("platform.conflict", { was: SAYS[done.because] ?? done.standing });
+    }
+
+    /* ⚠️ AND NOW THE DOCUMENT STANDS, SO THE ANSWER IS ALREADY YES. `may` above
+       is where a refusal belongs; this half writes what was agreed. */
+    if (what === "submit") {
+      for (const p of spec.document?.posts ?? []) {
+        await app.postings?.[p.rule]?.post(ctx, { id: done.id, number: done.number ?? "" });
+      }
     }
     return done;
   };
@@ -593,7 +615,7 @@ export function compose(app: AppSpec): Composed {
        collection that is not one, which is most of them. */
     for (const opId of movesFor(spec)) {
       const what = opId.slice(spec.id.length + 1) as DocumentMove;
-      byId.set(opId, moveOp(spec, what, app.reach?.label.many.toLowerCase() ?? "places"));
+      byId.set(opId, moveOp(spec, what, app.reach?.label.many.toLowerCase() ?? "places", app));
     }
   }
   /*

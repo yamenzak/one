@@ -84,9 +84,15 @@ const LADDERED = FILES.filter((f) => /\blevels\s*:\s*field\.json\b/.test(strip(r
  * is the whole rule, it is mechanical, and it is exactly the edit that caused the
  * fault.
  */
-const RAW = /\b(?:input\.)?quantity\b[^;\n]{0,40}?\*\s*(?:Math\.\w+\([^)]*\)|\b(\w+)\b)/g;
+/* ⚠️ THE CAPTURE IS THE LAST SEGMENT OF A PATH, NOT THE FIRST WORD IT MEETS.
+   `item.quantity * item.price` names `price` as the multiplier; capturing `item`
+   reported the OBJECT, which is in no vocabulary this file has and therefore
+   failed on a price it was written to allow. A guard that names the wrong
+   operand is a guard whose findings have to be read past. */
+const RAW =
+  /\b(?:\w+\.)?quantity\b[^;\n]{0,40}?\*\s*(?:Math\.\w+\([^)]*\)|(?:\w+\.)*\b(\w+)\b)/g;
 /** ⚠️ The other way round — the multiplier first. */
-const RAW_BACK = /\b(\w+)\s*\*\s*(?:Math\.abs\()?\s*(?:input\.)?quantity\b/g;
+const RAW_BACK = /(?:\w+\.)*\b(\w+)\s*\*\s*(?:Math\.abs\()?\s*(?:\w+\.)?quantity\b/g;
 
 /** ⚠️ Where the arithmetic itself lives, and may be written out freely. */
 const RESOLVERS = new Set([
@@ -107,7 +113,7 @@ const RESOLVERS = new Set([
  * live everywhere: a pack factor called `rate` would slip through, and it would
  * also be wrong about what it was called.
  */
-const PRICES = new Set(["rate", "paid", "cost", "carriage"]);
+const PRICES = new Set(["rate", "paid", "cost", "carriage", "price"]);
 
 /** ⚠️ Names this file binds from the resolver — those are resolved factors. */
 const resolvedIn = (src) => {

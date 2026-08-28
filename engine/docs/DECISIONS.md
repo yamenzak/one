@@ -5431,3 +5431,82 @@ that needs no allocation, and it is complete.
 one — so the column is `original`, which is the standard phrase anyway ("the
 amount in the original currency"). The refusal arrived at composition rather than
 as a `CREATE TABLE` that would not parse on a deployment.
+
+## D129
+
+**A document that posts is a declaration with a handler behind it.** The rail set
+a standing and issued a number, and neither of those is what an invoice is for.
+`AppSpec.postings` is where a `DocumentSpec.posts` rule lives; OneBook gains a
+tax code, a sales invoice on that rail, its lines, and the entry submitting it
+writes.
+
+### The declaration had nothing behind it
+
+`posts` shipped in D124 and the composer checked that a rule was NAMED. Nothing
+checked that anything ran — so an invoice could submit, take its number, become
+evidence, and leave the ledger untouched with every screen green. The refusal is
+now two-way: a rule no handler declares, and a handler no document names. Both
+are the shape every other guard in the manifest exists to catch.
+
+### Two halves, and the split is the order of operations
+
+`may` is asked **before** a number is taken and holds every refusal — a shut
+month, a closed account, an entry that will not balance. `post` runs once the
+document stands and by then the answer has to be yes. An issued number cannot be
+given back, so a document that took one and then failed is evidence with no entry
+behind it and no way to undo either half. The seam is two functions rather than
+one for exactly that reason, and the runtime test asserts the ORDER rather than
+that both ran: a test that only checked "both happened" would pass on the
+arrangement this exists to prevent.
+
+### A sales invoice cannot be cancelled
+
+The customer holds the paper, the number is issued, and a return may be made of
+it. `cancel: { by: "refusing" }` is the kernel's word for that and it names the
+credit note as the way out, so nobody is left holding a wrong invoice with no
+route. **Amendable follows rather than being a second decision** — an amendment
+is a cancellation and a fresh draft, so a document refusing the first cannot
+offer the second. The kernel refuses the pair, which is how that came to be
+written down rather than shipped as a control that is always refused.
+
+### Tax is a row, and it is rounded once per code
+
+A rate typed on a line makes "how much did we charge at the standard rate" a
+query over distinct values, and a mistyped 4% a rate that quietly exists. And
+rounding each line's tax and adding up gives a figure that differs by a penny
+from the tax on the total — so the invoice disagrees with itself and the
+customer's own addition is the right one. Jurisdictions differ on per-line versus
+per-code; what is not optional is picking one.
+
+**A line with no tax code is untaxed, not zero-rated.** The two look identical on
+a total and are different on a return in most of the world, so an untaxed line
+appears in no tax group and a workspace that means zero-rated makes a code for it.
+
+### The line names an account, not a product
+
+What was sold is OneInventory's or OneTrade's to know; what the books need is
+which income account it lands in. "Consulting, 2.5 hours at 90" against the
+consulting account is a complete invoice for a business with no stock at all, and
+the field a product-shaped document fills in when there is one. **A quantity is
+thousandths**, because half an hour is a real invoice line.
+
+### What the gate found, and it was all real
+
+Five findings on the first run, and none of them was noise:
+
+- **A NUL byte** in a template literal, written by the tool that generated the
+  file. The invisible-character guard is the only thing in the repository that
+  could have seen it, and the block is a map of maps now — nesting cannot be
+  split wrongly, and any separator is a character an id could one day contain.
+- **Two destinations wearing one mark.** A journal is a running count and an
+  invoice is a piece of paper; they read differently once they are not identical.
+- **`postings` declared and rendered by nothing**, which is D12 asked of the
+  field I had just added. Its surface is the entry an invoice posted, shown on
+  the invoice — B2's "why is this account moving" asked from the other end.
+- **A borrowed party with its name unresolved**, which would have put an
+  identifier on a document and in a journal entry.
+- **A price read as a packing factor.** That one was the guard's own fault: it
+  captured the first word after the operator, so `item.quantity * item.price`
+  reported `item` — an object in no vocabulary it has. It captures the last
+  segment of a path now, which is what makes its own `PRICES` list work at all,
+  and it still fires on the fault it was written for.

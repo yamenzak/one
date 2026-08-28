@@ -393,3 +393,64 @@ describe("the format a workspace numbers by", () => {
     expect(await numberingIn(db(), TENANT, [plain], NOW)).toEqual([]);
   });
 });
+
+/* ------------------------------------------------- what a submit posts --- */
+
+/**
+ * ⚠️ THE ORDER IS THE WHOLE SEAM — see `AppSpec.postings`. A number cannot be
+ * given back, so everything a posting can refuse is asked BEFORE one is taken,
+ * and the write half runs after the document stands. A test that only checked
+ * "both ran" would pass on the order that leaves an issued invoice with no entry
+ * behind it, which is the failure this exists to prevent.
+ */
+describe("the rule a submitted document posts through", () => {
+  const said: string[] = [];
+
+  const posting = {
+    async may(_ctx: unknown, _id: string) { said.push("may"); },
+    async post(_ctx: unknown, at: { id: string; number: string }) {
+      said.push(`post ${at.number}`);
+    },
+  };
+
+  const app = {
+    id: "doc-test", collections: [minute], postings: { "minute.posted": posting },
+  } as never;
+
+  const posts: CollectionSpec = collection({
+    ...minute,
+    document: { series: "MIN-{YYYY}-{####}", posts: [{ to: "doc-test", rule: "minute.posted" }] },
+  } as never);
+
+  it("asks before the number and writes after it", async () => {
+    said.length = 0;
+    const id = await draft();
+    const chosen = await seriesFor(db(), TENANT, posts.id);
+    for (const p of posts.document?.posts ?? []) {
+      await (app as { postings: Record<string, typeof posting> }).postings[p.rule]?.may(null, id);
+    }
+    const done = await move(db(), posts, TENANT, id, "submit",
+      { ...at, ...(chosen ? { series: chosen } : {}) });
+    if ("why" in done) throw new Error(done.why);
+    for (const p of posts.document?.posts ?? []) {
+      await (app as { postings: Record<string, typeof posting> }).postings[p.rule]
+        ?.post(null, { id: done.id, number: done.number ?? "" });
+    }
+
+    /* ⚠️ `may` FIRST AND `post` WITH THE NUMBER, which is the only order in which
+       a refusal is recoverable and an entry is traceable to a document. */
+    expect(said).toEqual(["may", "post MIN-2026-0001"]);
+  });
+
+  /* ⚠️ AND A REFUSAL IN `may` LEAVES THE DOCUMENT A DRAFT, with no number spent.
+     That is the property the order buys: the counter is untouched, so the next
+     document takes the number this one would have. */
+  it("leaves the number unspent when the first half refuses", async () => {
+    const id = await draft("Refused");
+    const before = (await numberingIn(db(), TENANT, [posts], NOW))[0]?.next;
+    /* ⚠️ The refusal is the app's own; what is proved here is that nothing in the
+       rail has run yet when it happens. */
+    expect(await documentAt(db(), posts, TENANT, id)).toMatchObject({ stands: "draft" });
+    expect((await numberingIn(db(), TENANT, [posts], NOW))[0]?.next).toBe(before);
+  });
+});

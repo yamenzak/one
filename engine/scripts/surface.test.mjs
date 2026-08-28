@@ -117,6 +117,16 @@ const SURFACES = {
   borrows: { owed: "99" },
 
   /*
+    ⚠️ WHAT A SUBMITTED DOCUMENT DID, SHOWN ON THE DOCUMENT. `postings` is server
+    machinery and its SURFACE is not a settings page — it is the entry an invoice
+    posted, listed under the invoice that posted it. That is B2's "why is this
+    account moving" asked from the other end, and without it the rail's whole
+    effect is invisible to the person who caused it: they press Send, something
+    happens in the ledger, and no screen connects the two.
+  */
+  postings: { file: "apps/book/src/index.ts", renders: 'view: "entry-of-invoice"' },
+
+  /*
     ⚠️ WHAT THIS PRODUCT DOES WITH ANOTHER'S EVENTS — owed to the same screen,
     and it is the half a person is more likely to ask about. `borrows` is a
     dependency somebody chose; `hears` is a consequence they did not, and the
