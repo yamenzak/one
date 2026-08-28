@@ -4785,3 +4785,71 @@ a movement. For a business that needs January restated, this is the wrong
 product, and that is a better answer than a subsystem nobody asked for.
 
 The same refusal governs an order's **carriage** — D118 is that case in detail.
+
+---
+
+## D120 — One record, one owner: apps share rather than each keep a copy
+
+**Date:** 2026-08-28 · **Status:** shipped
+
+A deployment serves several products to one workspace, and they have facts in
+common: a supplier OneInventory buys from is a customer OneBook invoices and a
+person OneHR pays. **Each of those is one record with an owner, not three tables
+that agree most of the time.** The seam is three declarations and no imports:
+`shared: true` on the owning collection, `borrows: ["party"]` on the app that
+references it, and `hears` for the event that makes one app's write another
+app's consequence.
+
+### Why not the obvious alternatives
+
+**Not a shared package.** A package of common tables is a package every product
+must depend on, deploy with, and migrate in step — and the day one product needs
+a column the others do not, the package grows a flag. What is actually wanted is
+one product OWNING the record and the others naming it, which is what a manifest
+can express and an import cannot.
+
+**Not an import between apps.** It typechecks and it is wrong in a way nothing
+else would catch: a workspace that installed OneInventory would carry OneBook's
+whole surface, and one product's deploy would be the other's. `apps.test.mjs`
+refuses the package name and the relative path out of a tree, and refuses both
+against the proving ground too.
+
+**Not "whoever declares it first wins".** Every app in a deployment applies its
+schema to the same shard, so two apps declaring `party` is a
+`CREATE TABLE IF NOT EXISTS` won by whichever runs first: the loser's columns
+never exist, its inserts fail on a field it declared, and every manifest is
+correct when asked on its own. That is D114's outage between an app and the
+platform, one layer out — and it is why the check is structural rather than
+behavioural.
+
+### The reserved concepts, and why a list rather than a discovery
+
+`shadow.test.mjs` refuses a duplicate collection id across apps, which fires once
+BOTH apps exist. That is a year too late: the moment worth catching is the FIRST
+one, when the name is being chosen and changing it is free. So a short list names
+the concepts that are spoken for — `party`, `contact`, `customer`, `supplier`,
+`vendor`, `employee` for OneParty; `account`, `journal`, `posting`, `fiscal`,
+`tax` for OneBook — and any other app declaring one is refused.
+
+The list is deliberately short. A concept earns a line when a second product
+would otherwise need its own copy of it. **`ledger` is not on it**: a stock
+ledger and a general ledger are two different things that share a word, and
+reserving the noun would be reserving English.
+
+**The exemptions can only shrink.** `MIGRATING` names a collection that already
+exists under a reserved name and the stage that moves it — today only
+OneInventory's `supplier`, which BS-9 moves. An entry whose app has STOPPED
+declaring the name fails the guard until the line is deleted, so an exemption
+cannot outlive its reason.
+
+### What an event may and may not do
+
+`hears` is delivered AFTER the emitting operation's write, and it cannot undo it.
+An accounting entry is a consequence of a goods receipt, not a precondition of
+one: refusing the receipt because a chart of accounts is misconfigured would make
+one product's setup another product's outage. A handler that throws is logged and
+swallowed.
+
+The asymmetry in `refuseHears` follows from that. An event nothing hears is
+quiet — a workspace without OneBook installed is the ordinary case. A handler for
+an event NO app raises is dead code that looks live, and refuses.

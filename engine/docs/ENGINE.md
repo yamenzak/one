@@ -984,6 +984,9 @@ its own header, cited by other files, and doing nothing.
 | `a-ground-is-composed-once-per-scene` | D53 | moving between screens reads as the app reloading rather than as a page sliding over a world, because several hundred marks are rebuilt and handed to React under a page that is also changing |
 | `a-screen-off-the-bar-is-reached-from-its-subject` | D53 | a screen nothing in the product leads to — declared, mounted, rendering perfectly at an address only a person who types it can open, with every other lane green |
 | `an-apps-table-never-shadows-the-platforms` | D114 | two schema modules creating one table name — `CREATE TABLE IF NOT EXISTS` is won by whichever runs first, the loser's indexes then name columns that are not there, `ensureSchema` throws, and every route that touches D1 answers 500 including `/health` |
+| `no-two-apps-declare-one-collection` | D120 | two products declaring `party` on the one shard every app applies its schema to — `CREATE TABLE IF NOT EXISTS` is won by whichever runs first, the loser's columns silently never exist, its inserts fail on a field it declared, and every manifest is correct when asked on its own |
+| `a-reserved-concept-belongs-to-the-app-that-owns-it` | D120 | a fourth product keeping its own `customer` table, so a company's suppliers are half-known in four places that disagree about which is current — and the duplicate check cannot see it until the second app exists, which is a year after the name stopped being free to change |
+| `an-app-never-imports-another-app` | D120 | one product reaching another's source instead of borrowing its records — a workspace that installed OneInventory would carry OneBook whole, and one product's deploy would be the other's; the relative path out of a tree does it with nothing in the module graph to say so |
 | `the-chrome-slot-and-the-bar-seat-are-exclusive` | D53 | one screen offered twice in one row of chrome, and a scarce bar slot spent on a door the crown is already holding open |
 | `the-first-destination-is-the-app-s-own-root` | D53 | a product whose bar opens on its second screen — two answers to where it starts, and the one somebody lands on is unmarked |
 | `nothing-outside-the-frame-pins-to-an-edge` | D53 | a second chrome — a screen's own bar stuck to an edge, wearing no hem, so the page is sliced by it and the product has two answers to where its controls live |
@@ -1209,6 +1212,7 @@ its own header, cited by other files, and doing nothing.
 | D117 | A workspace has one currency, and it re-labels rather than converts | 1 |
 | D118 | Carriage is spread by value, derived on read, and fixed once anything arrives | 2 |
 | D119 | One valuation method, and back-dating is refused in writing | 0 |
+| D120 | One record, one owner: apps share rather than each keep a copy | 3 |
 <!-- /generated -->
 
 ---

@@ -127,6 +127,125 @@ if (!shard) {
    only in the directory shares a NAME with one and never a database. */
 ok("shadow: the directory's own tables are a different database, and are not asked about");
 
+/* -------------------------------------------------- and one app over another --- */
+
+/**
+ * ⚠️ THE SAME COLLISION ONE LAYER OUT: TWO APPS, ONE TABLE, ONE SHARD. Every app
+ * a workspace installs applies its schema to the SAME database — that is what
+ * makes a deployment cheap and it is also the thing composition cannot see, because
+ * each manifest is asked on its own and each one is correct. Two apps declaring
+ * `party` is `CREATE TABLE IF NOT EXISTS` won by whichever runs first: the loser's
+ * columns never exist, its inserts fail on a field it declared, and every check in
+ * the repository is green.
+ *
+ * ⚠️ THE RUNTIME ASKS THIS TOO (`deploymentFaults`), AND THAT IS NOT THE SAME
+ * CHECK. It runs against the apps a DEPLOYMENT wires, at boot, and reports; this
+ * runs against every manifest on disk, in the gate, before anything is wired. A
+ * product that is written and not yet installed is exactly the one somebody is
+ * still choosing collection names for.
+ */
+const declaredBy = new Map();
+for (const [app, manifest] of appManifests()) {
+  if (!existsSync(manifest)) continue;
+  const src = strip(readFileSync(manifest, "utf8"));
+  for (const m of src.matchAll(/(?:^|\n)const \w+ = collection\(\{\s*\n\s*id:\s*"([^"]+)"/g)) {
+    (declaredBy.get(m[1]) ?? declaredBy.set(m[1], []).get(m[1])).push(app);
+  }
+}
+
+let twice = 0;
+for (const [id, apps] of declaredBy) {
+  if (apps.length < 2) continue;
+  twice++;
+  fail(`shadow: ${apps.join(" and ")} both declare collection "${id}".\n`
+    + "       Every app in a deployment applies its schema to the same shard, so whichever\n"
+    + "       runs first wins and the other's columns silently never exist. One of them\n"
+    + "       owns it — mark it `shared: true` and let the other `borrows` the name.");
+}
+if (!declaredBy.size) {
+  fail("shadow: no collection ids were read at all, so this pair of checks compared nothing.");
+} else if (!twice) {
+  ok(`shadow: ${declaredBy.size} collection id(s) across the apps, each declared by one`);
+}
+
+/* ------------------------------------------------------- the reserved concepts --- */
+
+/**
+ * ⚠️ AND SOME NAMES ARE SPOKEN FOR BEFORE ANYBODY DECLARES THEM. A customer is
+ * not a row in a shop's database and again in an invoicing app and again in a
+ * payroll one; an account is not a table each product keeps its own version of.
+ * That is the failure the whole business suite exists to refuse — not a crash,
+ * but four products that each half-know a company's suppliers and disagree about
+ * which is current.
+ *
+ * ⚠️ SO OWNERSHIP IS DECLARED HERE RATHER THAN DISCOVERED. The duplicate check
+ * above only fires once BOTH apps exist; this one fires on the first, which is
+ * the moment the name is being chosen and the only moment changing it is free.
+ * The list is short on purpose: a concept earns a line when a second product
+ * would otherwise need its own copy, and `ledger` is deliberately absent — a
+ * stock ledger and a general ledger are two different words that happen to
+ * collide, and reserving the noun would be reserving English.
+ */
+/* ⚠️ The app id is what a manifest is matched on; the product name is what the
+   message says, because "belongs to party" reads as a typo and "belongs to
+   OneParty" reads as an answer. */
+const OWNERS = { party: "OneParty", book: "OneBook" };
+
+const RESERVED = {
+  party: "party",
+  contact: "party",
+  customer: "party",
+  supplier: "party",
+  vendor: "party",
+  employee: "party",
+  account: "book",
+  journal: "book",
+  posting: "book",
+  fiscal: "book",
+  tax: "book",
+};
+
+/**
+ * ⚠️ AND IT CAN ONLY SHRINK. A collection that already exists under a reserved
+ * name is named here with the stage that moves it, and an entry whose app has
+ * stopped declaring it FAILS until the line is deleted — otherwise an exemption
+ * outlives its reason and the guard quietly stops covering the case it was
+ * written for.
+ */
+const MIGRATING = {
+  "inventory:supplier": "BS-9 moves it onto OneParty, which does not exist yet",
+};
+
+let claimed = 0;
+let taken = 0;
+for (const [id, apps] of declaredBy) {
+  const owner = RESERVED[id];
+  if (!owner) continue;
+  for (const app of apps) {
+    if (app === owner) { claimed++; continue; }
+    const excuse = MIGRATING[`${app}:${id}`];
+    if (excuse) { claimed++; continue; }
+    taken++;
+    fail(`shadow: ${app} declares "${id}", which belongs to ${OWNERS[owner] ?? owner}.\n`
+      + "       A party is one record with roles and an account is one chart, or every\n"
+      + "       product ends up half-knowing a company's suppliers and disagreeing about\n"
+      + "       which is current. Borrow it from its owner, or add a line to MIGRATING\n"
+      + "       naming the stage that moves it.");
+  }
+}
+for (const [key, why] of Object.entries(MIGRATING)) {
+  const [app, id] = key.split(":");
+  if (declaredBy.get(id)?.includes(app)) continue;
+  taken++;
+  fail(`shadow: MIGRATING still excuses ${app}'s "${id}" — ${why} — and ${app} no longer\n`
+    + "       declares it. Delete the line: an exemption that outlives its reason is a\n"
+    + "       hole nobody remembers opening.");
+}
+if (!taken) {
+  ok(`shadow: ${Object.keys(RESERVED).length} reserved concept(s), `
+    + `${claimed} declared by their owner or named as migrating`);
+}
+
 console.log(bad
   ? `\nshadow: ${bad} finding(s) — a table two schemas both create.`
   : "\nshadow: no app names a table the platform already puts beside it.");

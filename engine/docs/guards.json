@@ -579,7 +579,7 @@
       "protects": "D82",
       "status": "live",
       "impl": "scripts/apps.test.mjs",
-      "proves": "unbuilt: ${appDirs.length} product(s), none builds its manifest at startup",
+      "proves": "unbuilt: ${products.length} product(s), none builds its manifest at startup",
       "fails": "every product's manifest constructed and put through the whole refusal suite on every cold isolate, over declarations that have not changed since the deploy — a cost that grows with the catalogue and is charged to whichever request happens to be first"
     },
     {
@@ -3351,6 +3351,33 @@
       "proves": "the platform puts on every shard",
       "fails": "two schema modules creating one table name — `CREATE TABLE IF NOT EXISTS` is won by whichever runs first, the loser's indexes then name columns that are not there, `ensureSchema` throws, and every route that touches D1 answers 500 including `/health`",
       "becomes": "elsewhere: the shard's own table list, which the runtime owns and an app may not add a second answer to"
+    },
+    {
+      "id": "no-two-apps-declare-one-collection",
+      "protects": "D120",
+      "stage": "99",
+      "status": "live",
+      "impl": "scripts/shadow.test.mjs",
+      "proves": "collection id(s) across the apps, each declared by one",
+      "fails": "two products declaring `party` on the one shard every app applies its schema to \u2014 `CREATE TABLE IF NOT EXISTS` is won by whichever runs first, the loser's columns silently never exist, its inserts fail on a field it declared, and every manifest is correct when asked on its own"
+    },
+    {
+      "id": "a-reserved-concept-belongs-to-the-app-that-owns-it",
+      "protects": "D120",
+      "stage": "99",
+      "status": "live",
+      "impl": "scripts/shadow.test.mjs",
+      "proves": "reserved concept(s),",
+      "fails": "a fourth product keeping its own `customer` table, so a company's suppliers are half-known in four places that disagree about which is current \u2014 and the duplicate check cannot see it until the second app exists, which is a year after the name stopped being free to change"
+    },
+    {
+      "id": "an-app-never-imports-another-app",
+      "protects": "D120",
+      "stage": "99",
+      "status": "live",
+      "impl": "scripts/apps.test.mjs",
+      "proves": "import(s) of ours, all kernel or design",
+      "fails": "one product reaching another's source instead of borrowing its records \u2014 a workspace that installed OneInventory would carry OneBook whole, and one product's deploy would be the other's; the relative path out of a tree does it with nothing in the module graph to say so"
     },
     {
       "id": "the-chrome-slot-and-the-bar-seat-are-exclusive",

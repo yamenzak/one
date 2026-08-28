@@ -21,32 +21,38 @@
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { appTrees } from "./lib/trees.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ENGINE = join(HERE, "..");
-const APPS = join(ENGINE, "apps");
 
 let bad = 0;
 const fail = (m) => { console.error(`BAD  ${m}`); bad++; };
 const ok = (m) => console.log(`ok   ${m}`);
 const rel = (p) => p.slice(ENGINE.length + 1);
 
-const appDirs = existsSync(APPS)
-  ? readdirSync(APPS, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name)
-  : [];
+/**
+ * ⚠️ THE CORPUS IS `lib/trees.mjs`'S, NOT THIS FILE'S. This walked `engine/apps`
+ * by hand, so the day the proving ground moved out of the catalogue it left this
+ * guard's corpus too — silently, and the ground is the widest manifest in the
+ * repository and the one most worth asking. That is the whole reason that module
+ * exists; see its header.
+ */
+const trees = appTrees();
+const appDirs = trees.map(([id]) => id);
 
-const sourcesOf = (app) => {
-  const dir = join(APPS, app, "src");
-  if (!existsSync(dir)) return [];
+const sourcesOf = (dir) => {
+  const at = join(ENGINE, dir);
+  if (!existsSync(at)) return [];
   const out = [];
-  const walk = (at) => {
-    for (const e of readdirSync(at, { withFileTypes: true })) {
-      const path = join(at, e.name);
+  const walk = (where) => {
+    for (const e of readdirSync(where, { withFileTypes: true })) {
+      const path = join(where, e.name);
       if (e.isDirectory()) walk(path);
       else if (/\.(ts|tsx)$/.test(e.name)) out.push(path);
     }
   };
-  walk(dir);
+  walk(at);
   return out;
 };
 
@@ -58,22 +64,71 @@ const stripComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\
  * ⚠️ THE LIST IS WHAT AN APP MAY IMPORT, not what it may not. A deny-list is one
  * package behind for ever: the next cross-cutting module is reachable the day it
  * is written, and nobody finds out until it is being called from three apps.
+ *
+ * ⚠️ AND ANOTHER APP IS NOT ON IT, which is what makes a business suite possible.
+ * OneInventory names a supplier and OneBook posts a receipt, and NEITHER may
+ * import the other: the seam is `shared` on the owner, `borrows` on the borrower
+ * and `hears` for the event, all of them declarations the deployment resolves.
+ * An import would make one product's deploy the other's, and a workspace that
+ * installed one of them would carry both.
  */
 const APP_MAY_IMPORT = ["kernel", "design"];
 
+/**
+ * ⚠️ THE SCOPE IS `@engine/`, AND THIS GUARD SPENT ITS WHOLE LIFE MATCHING
+ * `@one/` — a name no file in this repository has ever used. It printed
+ * `reach: 1 app(s), none import the machinery` on every run, over nothing, and
+ * `ok` over a corpus of zero reads exactly like `ok` over a corpus that is
+ * clean. Hence the floor below: the check has to have SEEN the imports it is
+ * deciding about, or it reports its own blindness as a pass.
+ */
+const SCOPE = /from\s+["']@engine\/([a-z-]+)/g;
+
 let reached = 0;
-for (const app of appDirs) {
-  for (const file of sourcesOf(app)) {
-    for (const m of readFileSync(file, "utf8").matchAll(/from\s+["']@one\/([a-z-]+)/g)) {
+let seen = 0;
+for (const [, dir] of trees) {
+  for (const file of sourcesOf(dir)) {
+    for (const m of readFileSync(file, "utf8").matchAll(SCOPE)) {
+      seen++;
       if (!APP_MAY_IMPORT.includes(m[1])) {
         reached++;
         fail(`${rel(file)}: an app imports @engine/${m[1]} (D12).\n` +
-             `       A manifest declares; the platform does. Anything it could call, it could forget.`);
+             `       A manifest declares; the platform does. Anything it could call, it could\n` +
+             `       forget — and another app is not on the list either: a product reaches\n` +
+             `       another's records through \`borrows\`, never through its source.`);
       }
     }
   }
 }
-if (!reached) ok(`reach: ${appDirs.length} app(s), none import the machinery`);
+
+/*
+  ⚠️ AND NOT BY WALKING OUT OF ITS OWN DIRECTORY EITHER. A package name is the
+  shape the mistake takes when somebody means it; `../../inventory/src/costing`
+  is the shape it takes when somebody is in a hurry, and it typechecks, bundles
+  and reads as a local file.
+*/
+let escaped = 0;
+for (const [id, dir] of trees) {
+  const root = join(ENGINE, dir);
+  for (const file of sourcesOf(dir)) {
+    for (const m of readFileSync(file, "utf8").matchAll(/from\s+["'](\.[^"']*)["']/g)) {
+      const to = join(dirname(file), m[1]);
+      if (to.startsWith(root)) continue;
+      escaped++;
+      fail(`${rel(file)}: ${id} imports "${m[1]}", which is outside its own tree.\n` +
+           `       A relative path out of an app is the same reach as a package name, with\n` +
+           `       nothing in the module graph to say so.`);
+    }
+  }
+}
+
+if (!seen) {
+  fail("reach: no app imports anything of ours at all, so this check decided nothing.\n" +
+       "       It reads the `@engine/` scope — a rename would leave it passing over zero\n" +
+       "       imports, which is what it did for its whole life before this line existed.");
+} else if (!reached && !escaped) {
+  ok(`reach: ${appDirs.length} app(s), ${seen} import(s) of ours, all kernel or design`);
+}
 
 /* --------------------------------------------------------- the concerns --- */
 
@@ -90,8 +145,8 @@ const CONCERNS = [
   [/\bserve\s*\(\s*\{/, "the request path"],
 ];
 let raised = 0;
-for (const app of appDirs) {
-  for (const file of sourcesOf(app)) {
+for (const [, dir] of trees) {
+  for (const file of sourcesOf(dir)) {
     const code = stripComments(readFileSync(file, "utf8"));
     for (const [re, what] of CONCERNS) {
       if (re.test(code)) {
@@ -114,7 +169,7 @@ if (!raised) ok(`concerns: no app applies a gate, a schema, an audit or a route 
  */
 const TOP_LEVEL = /^(?:export\s+)?(?:const|let|var)\s+\w+\s*=\s*compose\s*\(/gm;
 let eager = 0;
-for (const dir of ["runtime/src", "design/src", ...appDirs.map((a) => `apps/${a}/src`)]) {
+for (const dir of ["runtime/src", "design/src", ...trees.map(([, d]) => d)]) {
   const at = join(ENGINE, dir);
   if (!existsSync(at)) continue;
   const walk = (path) => {
@@ -148,18 +203,34 @@ if (!eager) ok(`lazy: nothing composes an app at startup`);
  * ⚠️ THE THUNK IS THE WHOLE FIX, so what is checked is that the call is inside
  * one. A product nobody opens is then never built, and the four modules that ask
  * for one product's manifest build one between them.
+ *
+ * ⚠️ AND THIS ONE CHECK ASKS PRODUCTS ONLY, WHICH IS AN ARGUMENT AND NOT AN
+ * EXEMPTION. Every other check in this file was widened to the proving ground on
+ * purpose — it is the widest manifest here and the one most worth failing on.
+ * This one is about a COLD ISOLATE OF THE DEPLOYMENT, and the ground is not in
+ * one: it is absent from `APPS` (`fixture.test.mjs` refuses it back), it has no
+ * `live` entry a browser could load, and `one-space/src/Ground.tsx` is reached
+ * by a dev-only `import()`. What the ground pays instead is one build per test
+ * module graph, which is the proving ground running every refusal on every
+ * suite — the thing it is for.
+ *
+ * ⚠️ SO THE DAY THE GROUND BECOMES SERVED, THIS BECOMES WRONG — and the check
+ * that would catch that is `fixture.test.mjs`, which fails on the ground
+ * appearing in `APPS`, in `SELLS` or in the browser's product loader. This
+ * paragraph is what points the next reader at it.
  */
 {
   const DECLARED = /^(?:export\s+)?(?:const|let|var)\s+\w+\s*(?::[^=\n]*)?=\s*defineApp\s*\(/gm;
+  const products = trees.filter(([, dir]) => dir.startsWith("apps/"));
   const built = [];
-  for (const app of appDirs) {
-    const at = join(ENGINE, `apps/${app}/src/index.ts`);
+  for (const [, dir] of products) {
+    const at = join(ENGINE, dir, "index.ts");
     if (!existsSync(at)) continue;
     const code = stripComments(readFileSync(at, "utf8"));
-    for (const m of code.matchAll(DECLARED)) built.push(`apps/${app}/src/index.ts: ${m[0].trim()}`);
+    for (const m of code.matchAll(DECLARED)) built.push(`${dir}/index.ts: ${m[0].trim()}`);
   }
   /* ⚠️ A floor, because no app and a clean tree read the same in green. */
-  if (!appDirs.length) {
+  if (!products.length) {
     fail("apps: no product directories were found at all, so this is passing over nothing.");
   } else if (built.length) {
     fail(`${built.join("\n       ")}\n` +
@@ -168,7 +239,7 @@ if (!eager) ok(`lazy: nothing composes an app at startup`);
          "       that have not changed since the deploy. Put the literal inside the\n" +
          "       thunk the deployment already calls.");
   } else {
-    ok(`unbuilt: ${appDirs.length} product(s), none builds its manifest at startup`);
+    ok(`unbuilt: ${products.length} product(s), none builds its manifest at startup`);
   }
 }
 
@@ -196,7 +267,8 @@ const findConfigs = (dir) => {
     if (e.isFile() && /^vitest\..*config\.[cm]?ts$/.test(e.name)) CONFIGS.push(join(at, e.name));
   }
 };
-for (const dir of ["one", "one-space", "runtime", "design", "kernel", ...appDirs.map((a) => `apps/${a}`)]) {
+for (const dir of ["one", "one-space", "runtime", "design", "kernel",
+                   ...trees.map(([, d]) => d.replace(/\/src$/, ""))]) {
   findConfigs(dir);
 }
 
