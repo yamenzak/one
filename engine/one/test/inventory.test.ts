@@ -89,7 +89,7 @@ beforeAll(async () => {
   for (const id of Object.keys(APPS)) await noteShardApp(directory(), "eu-1", id);
 
   const made = await createTenant(directory(), {
-    slug: SLUG, name: "Ironworks", country: "DE", where: "eu", apps: ["inventory"],
+    slug: SLUG, name: "Ironworks", country: "DE", where: "eu", apps: ["inventory", "party"],
   });
   if (typeof made === "string") throw new Error(made);
   tenantId = made.tenant.id;
@@ -111,7 +111,7 @@ beforeAll(async () => {
   /* ⚠️ `keeper` holds `stock:adjust`, which is the grant the sharp half of this
      product is behind — correcting a number is not the same as taking one. */
   await found(shard, tenantId as never, who as never, "keeper@example.com",
-    { inventory: "keeper" });
+    { inventory: "keeper", party: "keeper" });
   await noteBelonging(directory(), who as never, tenantId as never);
   cookie = `one_session=${(await startSession(directory(), who as never)).id}`;
 
@@ -397,8 +397,16 @@ describe("bringing a spreadsheet in", () => {
     expect(done.body.changed).toBe(tally.update);
     /* ⚠️ Three rows carried a place, so three landed on a shelf. */
     expect(done.body.received).toBe(3);
-    /* ⚠️ Two suppliers named in the sheet, learned rather than dropped. */
-    expect(done.body.learned).toBe(2);
+    /*
+      ⚠️ TWO SUPPLIER NAMES IN THE SHEET AND NEITHER IS CREATED (D120, D122). The
+      address book is OneParty's, so an import that made a party would be this
+      app writing another product's table — and would skip `party.register`'s
+      duplicate check, which is the whole thing standing between one company and
+      "Acme Ltd" / "ACME" / "Acme Limited" in a list nobody can reconcile. They
+      are REPORTED instead, once each, and the products still land.
+    */
+    expect([...(done.body.unknownParties as string[])].sort())
+      .toEqual(["Kaufmann", "Medline"]);
 
     const refused = done.body.refused as string[];
     expect(refused).toHaveLength(tally.refused ?? 0);
@@ -409,9 +417,32 @@ describe("bringing a spreadsheet in", () => {
     const kinds = await read("product.list");
     expect((kinds.body.items as unknown[]).length).toBe(3);
 
-    const suppliers = await read("supplier.list");
-    expect((suppliers.body.items as { name: string }[]).map((s) => s.name).sort())
-      .toEqual(["Kaufmann", "Medline"]);
+    /* ⚠️ AND NOTHING WAS RECORDED AS A SUPPLIER, because nothing could be: a
+       `supplying` row is OUR side of a party that already exists. */
+    const suppliers = await read("supplying.list");
+    expect((suppliers.body.items as unknown[]).length).toBe(0);
+  });
+
+  /*
+    ⚠️ AND THE SAME SHEET LINKS UP ONCE THE PARTY IS THERE, which is the other
+    half of the decision and the half a report-only test would leave unproven. A
+    person adds the supplier where the duplicate check is, imports again, and the
+    product points at it — no second address book, no name matched twice.
+  */
+  it("links the supplier the moment somebody has added them", async () => {
+    await write("location.create", { name: "Import bay", kind: "room" });
+    /* ⚠️ `party`, NOT `id` — the operation answers with the name of the thing it
+       made, which is what `party.register`'s own output declares. */
+    const made = await write("party.register", {
+      name: "Medline", kind: "organisation", role: "supplier",
+    });
+    expect(made.status, JSON.stringify(made.body)).toBe(200);
+    const party = String(made.body.party);
+    const done = await write("product.import", { text: SHEET, day: TODAY });
+    expect(done.body.unknownParties).toEqual(["Kaufmann"]);
+
+    const suppliers = await read("supplying.list");
+    expect((suppliers.body.items as { id: string }[]).map((one) => one.id)).toEqual([party]);
   });
 
   /*
@@ -462,12 +493,12 @@ describe("what another workspace can see", () => {
   */
   it("sees none of somebody else's stock", async () => {
     const made = await createTenant(directory(), {
-      slug: "elsewhere", name: "Elsewhere", country: "DE", where: "eu", apps: ["inventory"],
+      slug: "elsewhere", name: "Elsewhere", country: "DE", where: "eu", apps: ["inventory", "party"],
     });
     if (typeof made === "string") throw new Error(made);
     const shard = env.SHARD_EU_1 as unknown as Db;
     const who = await upsertAccount(directory(), "other@example.com", null);
-    await found(shard, made.tenant.id, who as never, "other@example.com", { inventory: "keeper" });
+    await found(shard, made.tenant.id, who as never, "other@example.com", { inventory: "keeper", party: "keeper" });
     await noteBelonging(directory(), who as never, made.tenant.id);
     const theirs = `one_session=${(await startSession(directory(), who as never)).id}`;
 

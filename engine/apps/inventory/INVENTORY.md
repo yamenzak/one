@@ -563,10 +563,27 @@ on the floor books the van in — and committing the workspace to the next one i
 
 ### Who you buy from
 
-A supplier is a name, somebody to ask for, a way to reach them, **what they call
-us**, and how long they take. `sourcing` links them to a product with **their**
-reference for it, which is what goes on an order and is almost never what this
-workspace calls it.
+⚠️ **WHO THEY ARE IS ONEPARTY'S, AND THIS PRODUCT DOES NOT HOLD IT** (D120,
+D122). OneInventory used to declare its own `supplier` table with a name, a
+contact, an email and a phone number on it — which is an address book, and a
+workspace running both products then had two of them, with the same company typed
+into each and nothing keeping them in step. The name, the contact details and the
+tax number are OneParty's now; every ref here points at `party`, and the borrowed
+hop draws its **name** and nothing else.
+
+What is left is `supplying` — one row per party this workspace buys from, holding
+**what they call us** and **how long they take**. Both are facts about BUYING,
+which is why OneParty has no business holding them: they are meaningless on a
+customer and on a worker. Its id IS the party's, so there can only ever be one.
+
+`sourcing` links a party to a product with **their** reference for it, which is
+what goes on an order and is almost never what this workspace calls it.
+
+⚠️ **AND AN IMPORT CANNOT CREATE ONE.** A spreadsheet column naming a supplier
+nobody has added leaves the product's supplier blank and reports the name once —
+the products still land. Creating parties from a column is how one company becomes
+"Acme Ltd", "ACME" and "Acme Limited"; `party.register` has a duplicate check and
+a sheet does not.
 
 ⚠️ **BOTH WERE WRITTEN FOR MONTHS AND READ BY NOTHING.** Adding a product asks
 who supplies it and the handler writes both rows; no screen ever showed either
@@ -782,14 +799,19 @@ product in this repository to photograph any other way: the interesting states
 are a line that ran out, one nobody has touched since spring, and a shelf
 somebody labelled and never filled.
 
-### Twenty collections
+### Twenty collections, and one borrowed
 
-`product` · `supplier` · `code` · `location` · `batch` · `unit` · `kit` ·
+`product` · `supplying` · `code` · `location` · `batch` · `unit` · `kit` ·
 `process` · `process-item` · `job` · `count` · `tally` · `stock` · `ledger` ·
 `shot` · `tag` · `tagging` · `sourcing` · `buying` · `buying-line`
 
 Erasure is derived from what each one declares; nothing here carries a
 hand-written cascade.
+
+⚠️ **AND `party` IS NOT ONE OF THEM.** It is BORROWED from OneParty — this app may
+point at one and draw its name, and nothing else (D122). It is not in the list
+above, it is not in this app's schema, and erasing a workspace's parties is
+OneParty's cascade rather than this one's.
 
 ### Sixty-one operations
 

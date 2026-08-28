@@ -241,7 +241,7 @@ const product = collection({
      * product's own list is an order addressed to somebody the catalogue does
      * not say sells it.
      */
-    supplier: field.ref({ label: "Order from", holds: "none", to: "supplier" }),
+    supplier: field.ref({ label: "Order from", holds: "none", to: "party" }),
     /**
      * ⚠️ WHETHER CROSSING `par` IS WORTH ACTING ON, WHICH IS NOT THE SAME AS
      * WORTH KNOWING. Every product with a `par` is reported when it goes under;
@@ -325,45 +325,61 @@ const location = collection({
 });
 
 /**
- * WHO IT COMES FROM.
+ * WHAT THIS PRODUCT KNOWS ABOUT BUYING FROM A PARTY.
  *
- * ⚠️ A LIST RATHER THAN AN ADVISOR, and that is the whole of what was missing.
- * The reorder report can already say what to buy and how long it lasts; without
- * this it cannot say who to ring, so the last step of the one workflow the
- * report exists for happens in somebody's head or in a different app.
+ * ⚠️ WHO THEY ARE IS ONEPARTY'S AND THIS APP DOES NOT HOLD IT (D120, D122).
+ * OneInventory used to declare a `supplier` table with a name, a contact, an
+ * email and a phone number on it — which is an address book, and a workspace
+ * running both products then had two of them, with the same company typed into
+ * each and nothing keeping them in step. The name, the contact and the tax
+ * number are OneParty's; what is left here is the part that is genuinely about
+ * BUYING, which OneParty has no business holding because it is meaningless on a
+ * customer and on a worker.
  *
- * ⚠️ AND `leadDays` IS HERE AS WELL AS IN THE SETTINGS, because the workspace's
+ * ⚠️ SO THE ROW'S IDENTITY IS THE PARTY, AND ITS ID IS THE PARTY'S ID. There can
+ * only ever be one of these per party — "how we buy from Harbour Supplies" is
+ * not a thing there can be two of — so the party is the key rather than a column
+ * beside one, and a second row for one party is impossible rather than merely
+ * unlikely. It is also what lets this app's own lists ("what they supply",
+ * "orders with them") be narrowed by the record this screen is about: everything
+ * that names a supplier names the PARTY, so the two agree without a translation
+ * step somebody has to remember.
+ *
+ * ⚠️ AND `party` IS A FIELD AS WELL AS THE ID, WHICH IS ONE FACT IN TWO PLACES
+ * AND IS DELIBERATE. The id is the key; the FIELD is the only thing a screen can
+ * travel through to reach the name — a path resolves through a `ref`, never
+ * through `id` — so without it every list of these draws an identifier. Both are
+ * written from one input by `supplying.open` and the field is `settled`, so they
+ * cannot come apart afterwards.
+ *
+ * ⚠️ `leadDays` IS HERE AS WELL AS IN THE SETTINGS, because the workspace's
  * number is the slowest supplier it has and using it for everybody orders
  * everything three weeks early. Absent falls back to the setting — which is what
- * makes adding a supplier an improvement rather than a prerequisite.
+ * makes recording a supplier an improvement rather than a prerequisite.
  *
  * ⚠️ NO PRICES. What a workspace pays is a commercial relationship this product
  * has no business holding, and the moment it does, an import, an export and a
  * screen all carry it — see the code book's own line about a moat and a
  * disclosure.
  */
-const supplier = collection({
-  id: "supplier",
+const supplying = collection({
+  id: "supplying",
+  /* ⚠️ THE LABEL IS STILL "SUPPLIER", BECAUSE THAT IS THE WORD A PERSON USES.
+     The table is named for whose fact it is; the screen is named for what it is
+     about, and nothing on a screen ever says "supplying". */
   label: { one: "Supplier", many: "Suppliers" },
   scope: { of: "tenant" },
   permission: "product",
   retention: null,
   onClose: { then: "purge" },
   offline: "cache",
-  searchable: ["name"],
   fields: {
-    name: field.text({ label: "Name", required: true, holds: "none", max: 200 }),
-    /*
-      ⚠️ A PERSON'S NAME AND A WAY TO REACH THEM, AND THEY ARE DECLARED AS WHAT
-      THEY ARE. `holds` is not documentation — it is what the processing record
-      is generated from and what the export collects, and a contact filed as
-      `none` is a disclosure that is wrong in the direction nobody checks.
-    */
-    contact: field.text({ label: "Who to ask for", holds: "identity", max: 120 }),
-    email: field.email({ label: "Email", holds: "contact" }),
-    phone: field.text({ label: "Phone", holds: "contact", max: 40 }),
+    party: field.ref({
+      label: "Party", required: true, holds: "none", to: "party", settled: true,
+    }),
     /* ⚠️ WHAT THEY CALL US, which is what goes on an order and is the one thing
-       nobody can look up. */
+       nobody can look up. It is about the trade rather than about the company,
+       which is why it is here and not on the party. */
     account: field.text({ label: "Our account", holds: "none", max: 64 }),
     /* ⚠️ THEIRS, OVERRIDING THE WORKSPACE'S — see the header. Empty falls back
        to the setting rather than to zero, which would order everything the day
@@ -594,7 +610,7 @@ const sourcing = collection({
   offline: "queue",
   fields: {
     product: field.ref({ label: "Product", required: true, holds: "none", to: "product" }),
-    supplier: field.ref({ label: "Supplier", required: true, holds: "none", to: "supplier" }),
+    supplier: field.ref({ label: "Supplier", required: true, holds: "none", to: "party" }),
     /* ⚠️ WHAT THEY CALL IT, which is what goes on an order and is almost never
        what this workspace calls it. */
     ref: field.text({ label: "Their reference", holds: "none", max: 80 }),
@@ -634,7 +650,7 @@ const buying = collection({
   without: ["create", "update", "delete"],
   searchable: ["ref", "note"],
   fields: {
-    supplier: field.ref({ label: "Supplier", required: true, holds: "none", to: "supplier" }),
+    supplier: field.ref({ label: "Supplier", required: true, holds: "none", to: "party" }),
     state: field.enum({
       label: "Standing", required: true, holds: "none", values: [...ORDERS],
     }),
@@ -1318,6 +1334,29 @@ function mine(c: Ctx, location: string | null | undefined): void {
  * same and one of them does not: `location` everywhere, `id` on `location`
  * itself, where the place IS the row.
  */
+/* ------------------------------------------------------------- a supplier --- */
+
+/**
+ * THIS PARTY IS SOMEBODY WE BUY FROM — recorded once, and only once.
+ *
+ * ⚠️ THE ROW'S ID IS THE PARTY'S, SO `OR IGNORE` IS THE WHOLE OF THE RACE. Two
+ * products registered against one supplier in the same second cannot make two
+ * rows; a `SELECT` then an `INSERT` could, and the duplicate would be invisible
+ * — two identical lines in the Suppliers list, one of which nothing links to.
+ *
+ * ⚠️ AND IT WRITES NOTHING INTO ONEPARTY. The party already exists; this records
+ * OUR side of it — see `supplying`. An app that created the party here would be
+ * the coupling `borrows` exists to refuse, and would skip `party.register`'s
+ * duplicate check, which is what stops one company arriving three times.
+ */
+async function noteSupplier(db: Db, c: Ctx, party: string): Promise<void> {
+  if (!party) return;
+  await db.prepare(
+    `INSERT OR IGNORE INTO supplying (id, tenant_id, party, at, by)
+      VALUES (?, ?, ?, ?, ?)`)
+    .bind(party, c.tenantId, party, c.now, c.accountId ?? null).run();
+}
+
 function only(c: Ctx, column = "location"): { sql: string; bound: readonly string[] } {
   if (c.reach === null) return { sql: "", bound: [] };
   if (!c.reach.length) return { sql: " AND 1 = 0", bound: [] };
@@ -2218,7 +2257,7 @@ const register = operation<Registering, Registered>({
     shelfDays: field.number({ label: "Days from making", holds: "none", min: 0, max: 3_650 }),
     openDays: field.number({ label: "Days once opened", holds: "none", min: 0, max: 3_650 }),
     photo: field.media({ label: "Photo", holds: "none", purpose: "product-photo" }),
-    supplier: field.ref({ label: "Order from", holds: "none", to: "supplier" }),
+    supplier: field.ref({ label: "Order from", holds: "none", to: "party" }),
     reorder: field.bool({ label: "Raise a reorder", holds: "none" }),
     reorderQty: field.number({ label: "How many to order", holds: "none", min: 1 }),
     /* ⚠️ FOUR LISTS, SO FOUR `json` FIELDS — a field here is single-valued, and
@@ -2389,6 +2428,11 @@ const register = operation<Registering, Registered>({
           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
         .bind(newId("src", new Date(c.now)), c.tenantId, product, one.supplier,
           one.ref || null, one.leadDays, c.now, c.accountId ?? null).run();
+      /* ⚠️ AND THE PARTY BECOMES A SUPPLIER OF OURS, ONCE — see `supplying`. Its
+         id IS the party's, so this is idempotent by construction rather than by
+         a lookup that races itself; without it the Suppliers list is empty on a
+         workspace that has told the product who supplies everything. */
+      await noteSupplier(db, c, one.supplier);
     }
 
     /*
@@ -5331,7 +5375,7 @@ const openOrder = operation<
   kind: "write",
   summary: "Start an order",
   input: {
-    supplier: field.ref({ label: "Supplier", required: true, holds: "none", to: "supplier" }),
+    supplier: field.ref({ label: "Supplier", required: true, holds: "none", to: "party" }),
     today: field.day({ label: "Today", required: true, holds: "none" }),
     day: field.day({ label: "Expected", holds: "none" }),
   },
@@ -6140,8 +6184,8 @@ const seeImport = operation<
 const doImport = operation<
   { text: string; day: string; columns?: unknown },
   {
-    made: number; changed: number; received: number; learned: number;
-    refused: readonly string[];
+    made: number; changed: number; received: number;
+    unknownParties: readonly string[]; refused: readonly string[];
   }
 >({
   id: "product.import",
@@ -6165,7 +6209,14 @@ const doImport = operation<
     made: field.number({ label: "Added", holds: "none" }),
     changed: field.number({ label: "Changed", holds: "none" }),
     received: field.number({ label: "Put on a shelf", holds: "none" }),
-    learned: field.number({ label: "Suppliers added", holds: "none" }),
+    /* ⚠️ NAMED RATHER THAN COUNTED, AND THAT IS THE WHOLE OF WHAT CHANGED HERE.
+       This used to say "Suppliers added" and the import CREATED them from a
+       column — which is how one company becomes "Acme Ltd", "ACME" and "Acme
+       Limited" in an address book nobody can then reconcile. The address book is
+       OneParty's now (D120), so a name nobody has added is REPORTED: the product
+       still lands, its supplier is left blank, and the names are listed once so
+       somebody can add them where the duplicate check is. */
+    unknownParties: field.json({ label: "Not recognised", holds: "none" }),
     refused: field.json({ label: "Refused", holds: "none" }),
   },
   /* ⚠️ `stock:adjust` RATHER THAN `stock:move`, because an import that carries
@@ -6202,22 +6253,28 @@ const doImport = operation<
       .bind(c.tenantId, ...only(c, "id").bound).all<{ id: string; name: string }>();
     const placeOf = new Map(places.results.map((r) => [String(r.name).toLowerCase(), String(r.id)]));
 
-    /* ⚠️ A SUPPLIER IS LEARNED WHERE A SHELF IS REFUSED, and the asymmetry is the
-       point. A place is physical — it has a code stuck to it and a tree above
-       it, and one invented from a typo is a location nobody can walk to. A
-       supplier is a name and a phone number: a duplicate is untidy and a missing
-       one is the reorder report unable to say who to ring, which is the whole
-       reason the collection exists. */
-    const suppliers = await db.prepare(`SELECT id, name FROM supplier WHERE tenant_id = ?`)
+    /* ⚠️ A SUPPLIER IS MATCHED, NEVER CREATED — see the `unknownParties` output.
+       The address book is OneParty's (D120), so a name in a column that nobody
+       has added is reported rather than invented: a spreadsheet has no duplicate
+       check, and `party.register` does. A shelf is REFUSED for a stricter
+       reason — one invented from a typo is a location nobody can walk to, and a
+       row put on it is stock in a place that does not exist — while an
+       unrecognised supplier costs the product nothing but a blank field.
+
+       ⚠️ TWO COLUMNS OF ANOTHER PRODUCT'S TABLE, WHICH IS THE WHOLE OF WHAT A
+       BORROWED RECORD GIVES (D122). The id to point at and the name to match on;
+       nothing here reads what a party is, what it is taxed as, or where it is. */
+    const parties = await db.prepare(`SELECT id, name FROM party WHERE tenant_id = ?`)
       .bind(c.tenantId).all<{ id: string; name: string }>();
-    const supplierOf = new Map(
-      suppliers.results.map((r) => [String(r.name).toLowerCase(), String(r.id)]));
+    const partyOf = new Map(
+      parties.results.map((r) => [String(r.name).toLowerCase(), String(r.id)]));
 
     let made = 0;
     let changed = 0;
     let received = 0;
-    let learned = 0;
     const refused: string[] = [];
+    /* ⚠️ A SET, SO EIGHT HUNDRED ROWS NAMING ONE MISSING SUPPLIER SAY IT ONCE. */
+    const unknown = new Set<string>();
 
     for (const row of planned) {
       if (row.verdict === "refused") { refused.push(`Line ${row.line}: ${row.why}`); continue; }
@@ -6228,18 +6285,15 @@ const doImport = operation<
         continue;
       }
 
+      /* ⚠️ UNRECOGNISED LEAVES THE PRODUCT'S SUPPLIER BLANK AND SAYS SO ONCE.
+         The row still lands: a catalogue of eight hundred products missing three
+         supplier links is worth far more than three refused lines, and the names
+         are on the outcome for somebody to add in Parties. */
       let from: string | null = null;
       if (row.supplier) {
-        const key = row.supplier.toLowerCase();
-        from = supplierOf.get(key) ?? null;
-        if (!from) {
-          from = newId("sup", new Date(c.now));
-          await db.prepare(
-            `INSERT INTO supplier (id, tenant_id, name, at, by) VALUES (?, ?, ?, ?, ?)`)
-            .bind(from, c.tenantId, row.supplier, c.now, c.accountId ?? null).run();
-          supplierOf.set(key, from);
-          learned++;
-        }
+        from = partyOf.get(row.supplier.toLowerCase()) ?? null;
+        if (!from) unknown.add(row.supplier);
+        else await noteSupplier(db, c, from);
       }
 
       let product = row.product;
@@ -6310,7 +6364,7 @@ const doImport = operation<
       }
     }
 
-    return { made, changed, received, learned, refused };
+    return { made, changed, received, unknownParties: [...unknown], refused };
   },
 });
 
@@ -6722,9 +6776,17 @@ const report = operation<{ today: string; span?: string }, Reported>({
     /* ⚠️ WHO TO RING, AND HOW LONG THEY TAKE — the two facts that turn "buy 90"
        into an order. Read whole rather than joined per row: a workspace has tens
        of suppliers and hundreds of products, and the alternative is a query per
-       line of a report drawn on every visit. */
+       line of a report drawn on every visit.
+
+       ⚠️ AND THEY COME FROM TWO TABLES NOW, WHICH IS THE SEAM RATHER THAN A COST
+       (D122). The name is OneParty's — two columns of it, the id and the name,
+       which is the whole of what a borrowed record gives — and how long they take
+       is ours, in `supplying`. A `LEFT JOIN` because a party this workspace has
+       never recorded a lead time for still has to be ringable. */
     const from = await db.prepare(
-      `SELECT id, name, leadDays FROM supplier WHERE tenant_id = ?`)
+      `SELECT p.id AS id, p.name AS name, s.leadDays AS leadDays
+         FROM party p LEFT JOIN supplying s ON s.id = p.id AND s.tenant_id = p.tenant_id
+        WHERE p.tenant_id = ?`)
       .bind(c.tenantId).all<{ id: string; name: string; leadDays: number | null }>();
     const supplied = new Map(from.results.map((row) => [String(row.id), row]));
 
@@ -7452,8 +7514,23 @@ const manifest = (): AppSpec => defineApp({
     imports: { label: "Import a spreadsheet", withheld: "gate" },
   },
 
+  /*
+    ⚠️ WHO A SUPPLIER IS BELONGS TO ONEPARTY, AND THIS IS THE WHOLE OF HOW THIS
+    APP REACHES IT (D120, D122). No import, no shared module, no second address
+    book: three collections here point at `party` and every screen that names one
+    draws its `name` through the hop. What this app may read of another product's
+    record is that name — the tax number, the addresses and the contacts are
+    OneParty's screens behind OneParty's permission.
+
+    ⚠️ AND IT GRANTS NOTHING. A workspace without OneParty installed makes
+    `deploymentFaults` say so by name; a person without a `party:read` grant is
+    not stopped by any screen here, because a supplier's name on an order they
+    are already looking at is not the record behind it.
+  */
+  borrows: ["party"],
+
   collections: [
-    product, supplier, code, location, batch, unit, kit, process, processItem, job,
+    product, supplying, code, location, batch, unit, kit, process, processItem, job,
     count, tally, stock, ledger, shot, tag, tagging, sourcing, buying, buyingLine,
   ],
   operations: [
@@ -7618,9 +7695,10 @@ const manifest = (): AppSpec => defineApp({
     */
     { id: "used-on-this-job", of: "ledger",
       asked: { operation: "job.trace", take: "items", fills: { job: "record" } } },
-    /* ⚠️ EVERY SUPPLIER A WORKSPACE BUYS FROM — the collection `product.register`
-       has been writing into since OI-14 with nothing reading it back. */
-    { id: "suppliers", of: "supplier", limit: 200, sort: { by: "name", dir: "up" } },
+    /* ⚠️ EVERY PARTY A WORKSPACE BUYS FROM — one row per party, sorted by what
+       this app knows rather than by the name, because the name is OneParty's and
+       a borrowed field is drawn, never sorted on (D122). */
+    { id: "suppliers", of: "supplying", limit: 200, sort: { by: "account", dir: "up" } },
     /* ⚠️ WHAT THIS ONE SUPPLIES, WHICH IS WHAT `sourcing` IS FOR. The register
        flow asks who supplies a product and writes the row; until this view
        nothing ever showed one. */
@@ -10781,12 +10859,10 @@ const manifest = (): AppSpec => defineApp({
     /*
       WHO A WORKSPACE BUYS FROM.
 
-      ⚠️ `supplier` HAS BEEN WRITTEN SINCE OI-14 AND READ BY NOTHING. The register
-      flow asks who supplies a product, the handler writes the row and the
-      `sourcing` link, and no screen ever showed either back — so the honest
-      description of that step was that it asked somebody to do work and
-      discarded it politely. This is what the reach guard's collection pass found
-      the day it was widened.
+      ⚠️ THE NAME IS BORROWED AND THE REST IS OURS (D122). "Harbour Supplies" is
+      OneParty's fact, drawn here through the hop; our account number with them
+      and how long they take are facts about BUYING, which is why they are this
+      app's and are the other two columns.
     */
     { id: "suppliers", route: "/suppliers", label: "Suppliers", nav: "none", icon: "workspace",
       permission: "order:read",
@@ -10796,8 +10872,8 @@ const manifest = (): AppSpec => defineApp({
         blocks: [{
           block: "Listing",
           shows: [
-            { field: "name", label: "Name" },
-            { field: "contact", label: "Who to ask for" },
+            { field: "party.name", label: "Name" },
+            { field: "account", label: "Our account" },
             { field: "leadDays", label: "Takes", as: "num" },
           ],
           goes: "supplier",
@@ -10821,31 +10897,29 @@ const manifest = (): AppSpec => defineApp({
       information and three taps.
     */
     { id: "supplier", route: "/supplier", label: "Supplier", nav: "none", icon: "workspace",
-      permission: "order:read", of: "supplier",
+      permission: "order:read", of: "supplying",
       body: {
         shape: "detail",
         layout: { as: "stack" },
         blocks: [
           {
-            group: "How to reach them",
+            /*
+              ⚠️ HOW TO REACH THEM IS ONEPARTY'S PAGE NOW, AND THAT IS THE SEAM
+              RATHER THAN A LOSS (D122). Who to ask for, an email and a telephone
+              number are facts about a company, held once for every product that
+              deals with it; this app used to keep a second copy of all three,
+              which is how a workspace running both ends up ringing a number one
+              of them has not been told about. What is left here is what this
+              product actually knows — see the header on `supplying`.
+            */
+            group: "How we buy from them",
             of: [
+              /* ⚠️ THE NAME IS BORROWED, and it leads because it is who the page
+                 is about — the id is not something to show anybody. */
               { block: "FieldRow",
-                when: { has: { of: "field", field: "contact" } },
                 bind: {
-                  label: { from: { of: "words", says: "Who to ask for" } },
-                  value: { from: { of: "field", field: "contact" } },
-                } },
-              { block: "FieldRow",
-                when: { has: { of: "field", field: "email" } },
-                bind: {
-                  label: { from: { of: "words", says: "Email" } },
-                  value: { from: { of: "field", field: "email" } },
-                } },
-              { block: "FieldRow",
-                when: { has: { of: "field", field: "phone" } },
-                bind: {
-                  label: { from: { of: "words", says: "Phone" } },
-                  value: { from: { of: "field", field: "phone" } },
+                  label: { from: { of: "words", says: "Who" } },
+                  value: { from: { of: "field", field: "party.name" } },
                 } },
               /* ⚠️ WHAT THEY CALL US, which is the one thing on this page nobody
                  can look up and everybody is asked for on the telephone. */
@@ -10952,10 +11026,12 @@ const manifest = (): AppSpec => defineApp({
           by: "product.preview",
           with: { text: "text" },
           take: "tally",
-          says: {
-            made: "added", changed: "changed", received: "put on a shelf",
-            learned: "suppliers added", refused: "refused",
-          },
+          /* ⚠️ THE PREVIEW'S OWN KEYS, WHICH ARE `tallyIn`'S THREE — see
+             `sheet.ts`. This named five, of which one existed: the recap was
+             drawing "refused" and silently nothing else, and a `says` naming a
+             key the answer has not got is invisible in every direction. The
+             supplier line went with the import that created suppliers. */
+          says: { new: "added", update: "changed", refused: "refused" },
         },
         asks: [
           {

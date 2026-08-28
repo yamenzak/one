@@ -4955,3 +4955,61 @@ A rule about what may cross an app boundary has to refuse at composition.
 
 Every rule here is mutation-tested — the two refusals in `kernel/test/manifest.test.ts`,
 the name-only reach and both halves of the statement in `runtime/test/joined.test.ts`.
+
+---
+
+## D123 — One address book, and OneInventory reads it rather than keeping a second
+
+**Date:** 2026-08-28 · **Status:** shipped
+
+OneInventory declared a `supplier` table with a name, a contact, an email and a
+phone number on it. That is an address book — so a workspace running it beside
+OneParty had two, with the same company typed into each and nothing keeping them
+in step. `shadow.test.mjs` has named it as a collision since BS-3, with one
+`MIGRATING` entry excusing it until OneParty existed. **That entry is now deleted,
+which is the check paying itself off rather than rotting into an exemption.**
+
+Every ref that named a supplier — on `product`, on `sourcing`, on `buying` —
+points at `party`, and OneInventory declares `borrows: ["party"]`. No import, no
+shared module.
+
+### What OneInventory keeps, and why it is not nothing
+
+`supplying`: one row per party this workspace buys from, holding **our account
+number with them** and **how long they take**. Both are facts about BUYING and
+are meaningless on a customer or a worker, which is exactly why OneParty must not
+hold them — a shared record that every product adds a column to is the junk
+drawer this split exists to prevent.
+
+**Its id IS the party's id.** There can only be one "how we buy from Harbour
+Supplies", so the party is the key rather than a column beside one, a second row
+is impossible by construction, and this app's own lists — what they supply, orders
+with them — are narrowed by the record the screen is about with no translation
+step. The `party` field beside it is one fact in two places on purpose: the id is
+the key, and a `ref` field is the only thing a path can travel through to reach
+the name. It is `settled`, and one operation writes both.
+
+### The two things that got smaller, deliberately
+
+- **The supplier page lost its contact details.** Who to ask for, an email and a
+  telephone number are on the party's page in OneParty, held once for every
+  product that deals with that company. What stayed is what this product knows.
+- **The import can no longer create a supplier.** It matched a spreadsheet column
+  against its own table and inserted what it did not find. It now reports the
+  unrecognised names once and leaves the product's supplier blank; the products
+  still land. A column has no duplicate check and `party.register` does — creating
+  parties from a sheet is how one company becomes "Acme Ltd", "ACME" and "Acme
+  Limited" in a book nobody can then reconcile.
+
+### Two defects the migration found, both by RUNNING something
+
+- **`party.register` had never been executed.** It wrote `tax_id`, `pays_within`
+  and `paid_within`; the schema spells a column exactly as the field is spelled,
+  so all three threw `no such column` on the first real call. The manifest
+  composed, ninety-six guards were green, and nothing had ever pressed it.
+- **The engine does not check that a `ref` names a row that exists.** The deep
+  suite read `id` off an operation that answers with `party`, got the string
+  `"undefined"`, and raised six purchase orders against a supplier that is not
+  there — passing. That is pre-existing and is not what this stage changed; it is
+  recorded here because it is the reason a whole suite could be green over
+  references to nothing.

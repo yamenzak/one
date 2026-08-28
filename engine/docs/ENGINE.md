@@ -1216,6 +1216,7 @@ its own header, cited by other files, and doing nothing.
 | D120 | One record, one owner: apps share rather than each keep a copy | 3 |
 | D121 | One membership buys every product, and a workspace starts with all of them | 1 |
 | D122 | A borrowed record gives its name and nothing else | 0 |
+| D123 | One address book, and OneInventory reads it rather than keeping a second | 0 |
 <!-- /generated -->
 
 ---

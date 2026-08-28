@@ -59,6 +59,20 @@ const ok = (said: Said): Record<string, unknown> => {
 
 const idOf = (said: Said): string => String(ok(said).id);
 
+/**
+ * ⚠️ A PARTY, MADE THROUGH ONEPARTY'S OWN OPERATION — the only way this app can
+ * get one (D120, D122). It answers with `party` rather than `id`, and reading
+ * the wrong key here is not harmless: `String(undefined)` is the string
+ * "undefined", the engine does not check that a `ref` names a row that exists,
+ * and every order below would have been raised against a supplier that is not
+ * there — passing, all the way through, on a reference to nothing.
+ */
+const partyOf = (said: Said): string => {
+  const id = ok(said).party;
+  expect(typeof id, JSON.stringify(said)).toBe("string");
+  return String(id);
+};
+
 /** A product of a given tracking, and a place to put it. */
 const kindOf = async (name: string, tracking: string, extra: Record<string, unknown> = {}) =>
   idOf(await write("product.create", { name, unit: "item", tracking, ...extra }));
@@ -73,7 +87,7 @@ beforeAll(async () => {
   for (const id of Object.keys(APPS)) await noteShardApp(directory(), "eu-1", id);
 
   const made = await createTenant(directory(), {
-    slug: SLUG, name: "Foundry", country: "DE", where: "eu", apps: ["inventory"],
+    slug: SLUG, name: "Foundry", country: "DE", where: "eu", apps: ["inventory", "party"],
   });
   if (typeof made === "string") throw new Error(made);
   await compPlan(directory(), made.tenant.id, MEMBERSHIP, "studio");
@@ -84,7 +98,7 @@ beforeAll(async () => {
      on — loading a machine and signing for what came out of it are different
      acts by frequently different people. */
   await found(shard, made.tenant.id as never, who as never, "foreman@example.com",
-    { inventory: "keeper" });
+    { inventory: "keeper", party: "keeper" });
   await noteBelonging(directory(), who as never, made.tenant.id as never);
   cookie = `one_session=${(await startSession(directory(), who as never)).id}`;
 
@@ -987,9 +1001,13 @@ describe("who moved what, and when", () => {
  */
 describe("buying it in", () => {
   const world = async () => {
-    const supplier = idOf(await write("supplier.create", {
-      name: "Harbour Supplies", contact: "Dana", email: "dana@harbour.example",
-      leadDays: 5,
+    /* ⚠️ THE PARTY IS ONEPARTY'S AND IT IS MADE THROUGH ONEPARTY'S OWN
+       OPERATION (D120, D122). OneInventory has no way to create one and must
+       not — this is the seam driven end to end in a real deployment, which is
+       the only place both manifests are in the room together. */
+    const supplier = partyOf(await write("party.register", {
+      name: "Harbour Supplies", kind: "organisation", role: "supplier",
+      email: "dana@harbour.example",
     }));
     const place = idOf(await write("location.create", { name: "Goods in", kind: "room" }));
     const product = idOf(await write("product.create", {
@@ -1302,8 +1320,9 @@ describe("what a movement does to a line's worth", () => {
      order, so a receipt that could not cost one would leave the value of a
      warehouse resting on the ad-hoc screen. */
   it("costs a delivery received against an order", async () => {
-    const supplier = idOf(await write("supplier.create", {
-      name: "Chandlery", contact: "Iris", email: "iris@chandlery.example", leadDays: 3 }));
+    const supplier = partyOf(await write("party.register", {
+      name: "Chandlery", kind: "organisation", role: "supplier",
+      email: "iris@chandlery.example" }));
     const { place, product } = await shelved("Warp");
     const buying = idOf(await write("buying.open", { supplier, today: TODAY }));
     await write("buying.add", { buying, product, quantity: 8 });
@@ -1453,7 +1472,7 @@ describe("carriage, spread across what arrived", () => {
   /** ⚠️ An order with two lines at known prices, in the state a van lands on. */
   const ordered = async (name: string, carriage: number) => {
     const place = idOf(await write("location.create", { name: `${name} bay`, kind: "room" }));
-    const supplier = idOf(await write("supplier.create", { name: `${name} Supplies` }));
+    const supplier = partyOf(await write("party.register", { name: `${name} Supplies`, kind: "organisation", role: "supplier" }));
     const heavy = idOf(await write("product.create", {
       name: `${name} pallet`, unit: "pallet", tracking: "counted" }));
     const light = idOf(await write("product.create", {
@@ -1575,7 +1594,7 @@ describe("carriage, spread across what arrived", () => {
   */
   it("puts the whole carriage on the lines that have a price", async () => {
     const place = idOf(await write("location.create", { name: "Mixed bay", kind: "room" }));
-    const supplier = idOf(await write("supplier.create", { name: "Mixed Supplies" }));
+    const supplier = partyOf(await write("party.register", { name: "Mixed Supplies", kind: "organisation", role: "supplier" }));
     const known = idOf(await write("product.create", {
       name: "Known crate", unit: "crate", tracking: "counted" }));
     const blank = idOf(await write("product.create", {
@@ -1605,7 +1624,7 @@ describe("carriage, spread across what arrived", () => {
   /* ⚠️ RAISING A LINE ADDS ITS PRICE, because `cost` is the whole line and
      adding the same product again is ordering more of the same thing. */
   it("adds the price when the same product is put on twice", async () => {
-    const supplier = idOf(await write("supplier.create", { name: "Twice Supplies" }));
+    const supplier = partyOf(await write("party.register", { name: "Twice Supplies", kind: "organisation", role: "supplier" }));
     const product = idOf(await write("product.create", {
       name: "Twice crate", unit: "crate", tracking: "counted" }));
     const buying = idOf(await write("buying.open", { supplier, today: TODAY }));
@@ -1618,7 +1637,7 @@ describe("carriage, spread across what arrived", () => {
   /* ⚠️ AND A RAISE THAT NAMES NO PRICE LEAVES THE STANDING ONE ALONE. Reading
      the absence as free would quietly halve what the order says it will cost. */
   it("keeps the price when the raise names none", async () => {
-    const supplier = idOf(await write("supplier.create", { name: "Silent Supplies" }));
+    const supplier = partyOf(await write("party.register", { name: "Silent Supplies", kind: "organisation", role: "supplier" }));
     const product = idOf(await write("product.create", {
       name: "Silent crate", unit: "crate", tracking: "counted" }));
     const buying = idOf(await write("buying.open", { supplier, today: TODAY }));

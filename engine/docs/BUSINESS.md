@@ -577,6 +577,12 @@ have an obvious answer reads as a question nobody asked.
    data. Starting clean is cheaper and leaves two purchase-order concepts in one
    deployment, which is the duplication this whole plan exists to prevent.
 
+   **Still open — but narrower than it was.** BS-9 moved the SUPPLIER, not the
+   order: `buying` stays OneInventory's and now names a `party` (D123). So the
+   question is no longer "who owns the counterparty" — that is settled — but
+   whether a purchase order is an inventory document or a document-rail one. The
+   answer decides whether OneBook ever raises a bill from it.
+
 3. ~~**How does an app reference a party without importing OneParty?**~~
    **ANSWERED — D120: three declarations and no imports.** `shared: true` on the
    owning collection, `borrows: ["party"]` on the borrower, and `hears` for the

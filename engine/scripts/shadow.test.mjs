@@ -212,9 +212,15 @@ const RESERVED = {
  * outlives its reason and the guard quietly stops covering the case it was
  * written for.
  */
-const MIGRATING = {
-  "inventory:supplier": "BS-9 moves it onto OneParty, which does not exist yet",
-};
+/*
+  ⚠️ EMPTY, AND IT GOT THERE BY BEING PAID OFF RATHER THAN BY BEING FORGOTTEN.
+  Its one entry was `inventory:supplier`, and BS-9 moved it: OneInventory borrows
+  `party` now and keeps only what it knows about BUYING from one. The list can
+  only ever SHRINK — an entry whose app has stopped declaring the name fails the
+  check below until it is deleted — so a stage that quietly never happened cannot
+  become a permanent exemption.
+*/
+const MIGRATING = {};
 
 let claimed = 0;
 let taken = 0;

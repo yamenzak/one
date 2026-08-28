@@ -275,7 +275,7 @@ interface Registered {
 }
 
 /** ⚠️ Only what the sameness check reads — see `naming.ts`. */
-interface Row { readonly id: string; readonly name: string; readonly tax_id: string | null }
+interface Row { readonly id: string; readonly name: string; readonly taxId: string | null }
 
 /**
  * ADDING A PARTY, AND THE REASON IT IS NOT THE GENERATED `party.create`.
@@ -359,16 +359,16 @@ const register = operation<Registering, Registered>({
       .reduce((most, word) => (word.length > most.length ? word : most), "");
     const flat = taxId.replace(/\s/g, "").toUpperCase();
     const near = await db.prepare(
-      `SELECT id, name, tax_id FROM party
+      `SELECT id, name, taxId FROM party
         WHERE tenant_id = ?
-          AND ((? <> '' AND UPPER(REPLACE(tax_id, ' ', '')) = ?)
+          AND ((? <> '' AND UPPER(REPLACE(taxId, ' ', '')) = ?)
             OR (? <> '' AND name LIKE ?))
         LIMIT 20`)
       .bind(c.tenantId, flat, flat, longest, `%${longest}%`)
       .all<Row>();
 
     const book: readonly (Party & { readonly id: string })[] = near.results.map((row) => ({
-      id: row.id, name: row.name, kind: "organisation", taxId: row.tax_id,
+      id: row.id, name: row.name, kind: "organisation", taxId: row.taxId,
     }));
     const found = alreadyThere(book, { name, kind: "organisation", taxId });
     const proven = found.find((one) => one.how === "same");
@@ -386,8 +386,14 @@ const register = operation<Registering, Registered>({
 
     const id = newId("pty");
     await db.prepare(
+      /* ⚠️ THE COLUMN IS THE FIELD, SPELLED EXACTLY — see `schemaFor`. A field
+         called `taxId` is a column called `taxId`; this file wrote `tax_id`,
+         `pays_within` and `paid_within`, and every one of the three threw
+         `no such column` the first time anything actually ran it. Nothing caught
+         it because nothing had: the manifest composed, the guards were green,
+         and the operation had never been called. */
       `INSERT INTO party (id, tenant_id, name, kind, customer, supplier, worker,
-        country, tax_id, email, phone, pays_within, paid_within, at, by)
+        country, taxId, email, phone, paysWithin, paidWithin, at, by)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .bind(id, c.tenantId, name, input.kind,
         input.role === "customer" ? 1 : 0,
