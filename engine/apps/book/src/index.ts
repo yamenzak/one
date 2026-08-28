@@ -34,6 +34,10 @@ import { ROLES, ROOTS, missing, rowsOf, type Held, type Node, type Role } from "
 import {
   RULES, fire, refuseEntry, type Line, type Rule,
 } from "./posting.js";
+import {
+  closingLines, monthsIn, refusePeriod, refusePostingOn, refuseYear,
+  type Period, type PostRefusal, type Standing as AccountStanding, type Year,
+} from "./periods.js";
 
 /* ------------------------------------------------------------------ shapes --- */
 
@@ -131,6 +135,70 @@ const account = collection({
     */
     closed: field.bool({ label: "Closed to new postings", holds: "none" }),
     note: field.long({ label: "Note", holds: "none", max: 1_000 }),
+  },
+});
+
+/**
+ * THE YEAR THE BOOKS ARE KEPT IN.
+ *
+ * ⚠️ NOT JANUARY TO DECEMBER — see `periods.ts`. The United Kingdom's companies
+ * commonly run to March or April, Australia's to June, Japan's to March, and a
+ * business may pick its own. A calendar year assumed here would put a chunk of
+ * every profit-and-loss in the wrong one, for most of the world.
+ *
+ * ⚠️ AND CLOSING IT POSTS SOMETHING. A year that is only a flag is hidden rather
+ * than closed: what makes the next year's report start at zero is that income
+ * and expense were emptied into reserves in one entry. `closingLines` is that
+ * entry and `year.close` writes it.
+ */
+const year = collection({
+  id: "year",
+  label: { one: "Year", many: "Years" },
+  scope: { of: "tenant" },
+  permission: "year",
+  retention: null,
+  /* ⚠️ KEPT PAST THE WORKSPACE, like every other part of the record of what was
+     filed. A closed year is the shape of a return somebody sent to a tax
+     authority, and that does not stop having happened. */
+  onClose: { then: "keep", why: "the shape of what was filed, which outlives the business" },
+  names: "name",
+  fields: {
+    name: field.text({ label: "Name", required: true, holds: "none", max: 60 }),
+    /* ⚠️ `settled`, BOTH OF THEM. Moving the boundary of a year that has anything
+       posted in it moves entries between two profit-and-loss statements — one of
+       which may already have been filed — with no write anywhere near a figure
+       and every report afterwards balancing perfectly and being wrong. */
+    opens: field.day({ label: "First day", required: true, holds: "none", settled: true }),
+    closes: field.day({ label: "Last day", required: true, holds: "none", settled: true }),
+    closed: field.bool({ label: "Closed", holds: "none" }),
+  },
+});
+
+/**
+ * A PERIOD INSIDE A YEAR — usually a month.
+ *
+ * ⚠️ OPTIONAL, AND THAT IS THE POINT. A business whose accountant does the books
+ * once a year never makes one; a business closing every month makes twelve.
+ * Requiring them would put eleven rows of ceremony in front of somebody who
+ * wanted to record a sale.
+ */
+const period = collection({
+  id: "period",
+  label: { one: "Period", many: "Periods" },
+  scope: { of: "tenant" },
+  permission: "year",
+  retention: null,
+  onClose: { then: "keep", why: "which months were signed off, and when" },
+  names: "name",
+  fields: {
+    year: field.ref({ label: "Year", required: true, holds: "none", to: "year", settled: true }),
+    name: field.text({ label: "Name", required: true, holds: "none", max: 60 }),
+    opens: field.day({ label: "First day", required: true, holds: "none", settled: true }),
+    closes: field.day({ label: "Last day", required: true, holds: "none", settled: true }),
+    /* ⚠️ SHUT RATHER THAN CLOSED, so the word is not the year's. A shut period
+       refuses new postings and nothing else; a closed year has had its profit
+       moved and cannot be reopened without reversing that. */
+    shut: field.bool({ label: "Shut", holds: "none" }),
   },
 });
 
@@ -414,9 +482,68 @@ interface Written {
  * two places for "does it balance" to be asked — with the second one, written
  * later, in a hurry, by somebody who assumed the first had already asked.
  */
+/**
+ * ⚠️ THE TWO READS THE CHOKEPOINT MAKES BEFORE IT WRITES ANYTHING. Both are
+ * bounded by how a business keeps its books rather than by how much it has done
+ * — a handful of years and at most a year's worth of months — so this does not
+ * grow with the ledger, which is the property that makes asking on every entry
+ * affordable.
+ */
+async function calendarOf(
+  db: Db, tenantId: string,
+): Promise<{ years: readonly Year[]; periods: readonly Period[] }> {
+  const [years, periods] = await Promise.all([
+    db.prepare(`SELECT id, opens, closes, closed FROM year WHERE tenant_id = ?`)
+      .bind(tenantId).all<{ id: string; opens: string; closes: string; closed: number | null }>(),
+    db.prepare(
+      `SELECT id, year, name, opens, closes, shut FROM period WHERE tenant_id = ? AND shut = 1`)
+      .bind(tenantId).all<{
+        id: string; year: string; name: string; opens: string; closes: string; shut: number | null;
+      }>(),
+  ]);
+  return {
+    years: years.results.map((r) => ({ ...r, closed: !!r.closed })),
+    periods: periods.results.map((r) => ({ ...r, shut: !!r.shut })),
+  };
+}
+
+/**
+ * ⚠️ WHAT A SHUT PERIOD REFUSES, IN THE WORDS OF WHAT HAPPENED. "no_year" is
+ * what the rule answers; what a person needs is which year is missing and that
+ * they can open one — because the commonest cause of it is a workspace that has
+ * not set its year up yet, and the second commonest is a typo in a date.
+ */
+function refuseCalendar(c: Pick<Ctx, "fail">, said: PostRefusal): never {
+  if (said.why === "no_year") {
+    return c.fail("book.outside_a_year", { day: said.day });
+  }
+  if (said.why === "year_closed") return c.fail("book.year_closed");
+  return c.fail("book.period_shut", { period: said.name });
+}
+
+/**
+ * ⚠️ IT ANSWERS WITH THE REFUSAL RATHER THAN THROWING, because its two callers
+ * want different things from one. A person typing an entry is told which month
+ * is shut and can reopen it; an EVENT arriving from another product has nobody
+ * to tell — so that path throws, `heard()` logs which app heard what and threw,
+ * and the goods stay on the shelf while an operator is told the accounting
+ * behind them has stopped. Deciding here would have picked one of those for
+ * both.
+ */
 async function writeEntry(
   c: Pick<Ctx, "tenantId" | "now" | "accountId">, db: Db, of: Written,
-): Promise<Posted> {
+): Promise<Posted | PostRefusal> {
+  /*
+    ⚠️ ASKED HERE AND NOWHERE ELSE, WHICH IS WHY THE ONE WRITER MATTERS. A
+    hand-typed entry and one an event raised are the same rows under the same
+    rule; a second write path would be a second place to ask, and the automatic
+    one is the path that would quietly go on posting into a month somebody has
+    already filed a return for.
+  */
+  const { years, periods } = await calendarOf(db, c.tenantId);
+  const shut = refusePostingOn(of.day, years, periods);
+  if (shut) return shut;
+
   const id = newId("jnl");
   await db.prepare(
     `INSERT INTO journal (id, tenant_id, day, memo, source, ref, at, by)
@@ -524,7 +651,12 @@ const post = operation<Posting, Posted>({
       }
     }
 
-    return writeEntry(c, db, { day: input.day, memo: input.memo, lines });
+    const posted = await writeEntry(c, db, { day: input.day, memo: input.memo, lines });
+    /* ⚠️ THE PERSON PATH TELLS THEM WHICH MONTH IS SHUT — see `writeEntry`. They
+       can reopen it, or move the date; both are things they can do, which is
+       what separates this from the event path's throw. */
+    if ("why" in posted) refuseCalendar(c, posted);
+    return posted;
   },
 });
 
@@ -679,6 +811,291 @@ const suspenseSweep = declareJob({
   },
 });
 
+/* ------------------------------------------------------------------ years --- */
+
+interface YearRow {
+  readonly id: string;
+  readonly opens: string;
+  readonly closes: string;
+  readonly closed: number | null;
+}
+
+interface OpeningYear {
+  readonly name: string;
+  readonly opens: string;
+  readonly closes: string;
+  readonly months?: boolean;
+}
+interface OpenedYear { readonly year: string; readonly periods: number }
+interface OneYear { readonly year: string }
+interface ClosedYear { readonly moved: number; readonly journal: string }
+interface Reopened { readonly journal: string }
+interface Shutting { readonly period: string; readonly shut?: boolean }
+interface Shut { readonly shut: boolean }
+
+/** ⚠️ One read, and it is what both the refusals and the closing entry need. */
+const yearsOf = async (db: Db, tenantId: string): Promise<readonly Year[]> => {
+  const got = await db.prepare(
+    `SELECT id, opens, closes, closed FROM year WHERE tenant_id = ? ORDER BY opens`)
+    .bind(tenantId).all<YearRow>();
+  return got.results.map((r) => ({ ...r, closed: !!r.closed }));
+};
+
+/**
+ * OPEN A FINANCIAL YEAR, AND OFFER ITS MONTHS.
+ *
+ * ⚠️ THE MONTHS ARE MADE HERE RATHER THAN TYPED. A workspace closing monthly
+ * would otherwise enter twelve date ranges, and every one of them is a chance to
+ * leave a gap — a week belonging to no period, which nothing refuses because a
+ * period is optional. `monthsIn` cannot leave one.
+ */
+const openYear = operation<OpeningYear, OpenedYear>({
+  id: "year.open",
+  kind: "write",
+  summary: "Open a financial year",
+  input: {
+    name: field.text({ label: "Name", required: true, holds: "none", max: 60 }),
+    opens: field.day({ label: "First day", required: true, holds: "none" }),
+    closes: field.day({ label: "Last day", required: true, holds: "none" }),
+    months: field.bool({
+      label: "Make its months",
+      holds: "none",
+      help: "For books that are closed off every month rather than once a year.",
+    }),
+  },
+  output: {
+    year: field.text({ label: "Year", holds: "none" }),
+    periods: field.number({ label: "Periods", holds: "none" }),
+  },
+  permission: "year:write",
+  idempotency: { mode: "key" },
+  emits: ["year.opened"],
+  outcome: { message: "The year is open.", tone: "success", invalidates: ["year.list"] },
+  fails: ["book.year_overlaps", "book.year_backwards", "book.year_too_long"],
+  audit: (input) => ({ subject: String(input.name), verb: "opened a financial year" }),
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const db = c.db as Db;
+    const opens = String(input.opens);
+    const closes = String(input.closes);
+
+    const said = refuseYear({ opens, closes }, await yearsOf(db, c.tenantId));
+    if (said === "year_overlaps") return c.fail("book.year_overlaps");
+    if (said === "year_backwards") return c.fail("book.year_backwards");
+    if (said === "year_too_long") return c.fail("book.year_too_long");
+
+    const id = newId("yer");
+    await db.prepare(
+      `INSERT INTO year (id, tenant_id, name, opens, closes, closed, at, by)
+        VALUES (?, ?, ?, ?, ?, 0, ?, ?)`)
+      .bind(id, c.tenantId, String(input.name), opens, closes, c.now, c.accountId ?? null)
+      .run();
+
+    let periods = 0;
+    if (input.months) {
+      for (const one of monthsIn({ opens, closes })) {
+        await db.prepare(
+          `INSERT INTO period (id, tenant_id, year, name, opens, closes, shut, at, by)
+            VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)`)
+          .bind(newId("prd"), c.tenantId, id, one.name, one.opens, one.closes,
+            c.now, c.accountId ?? null)
+          .run();
+        periods++;
+      }
+    }
+    return { year: id, periods };
+  },
+});
+
+/**
+ * CLOSE A YEAR, WHICH POSTS SOMETHING.
+ *
+ * ⚠️ A YEAR THAT IS ONLY A FLAG IS HIDDEN RATHER THAN CLOSED — see
+ * `closingLines`. What makes next year's profit-and-loss start at zero is that
+ * this year's income and expense were emptied into reserves in one entry.
+ * Without it every "this year" figure is really "since the books began", and it
+ * is wrong by more every year.
+ *
+ * ⚠️ AND THE ENTRY IS DATED THE LAST DAY OF THE YEAR IT CLOSES, which is the one
+ * day it can be. Dated today it would land in the NEXT year and take the profit
+ * with it; dated the first of the new year it would do the same thing while
+ * looking deliberate.
+ */
+const closeYear = operation<OneYear, ClosedYear>({
+  id: "year.close",
+  kind: "write",
+  summary: "Close a year and move its profit to reserves",
+  input: { year: field.ref({ label: "Year", required: true, holds: "none", to: "year" }) },
+  output: {
+    moved: field.money({ label: "Moved to reserves", holds: "none" }),
+    journal: field.text({ label: "Entry", holds: "none" }),
+  },
+  permission: "year:write",
+  idempotency: { mode: "key" },
+  emits: ["year.closed"],
+  outcome: { message: "The year is closed.", tone: "success", invalidates: ["year.list"] },
+  fails: ["platform.not_found", "book.year_closed", "book.no_reserves"],
+  audit: (input) => ({ subject: String(input.year), verb: "closed a financial year" }),
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const db = c.db as Db;
+
+    const held = (await yearsOf(db, c.tenantId)).find((one) => one.id === String(input.year));
+    if (!held) return c.fail("platform.not_found");
+    if (held.closed) return c.fail("book.year_closed");
+
+    const reserves = await db.prepare(
+      `SELECT id FROM account WHERE tenant_id = ? AND role = 'retained' LIMIT 1`)
+      .bind(c.tenantId).first<Row>();
+    if (!reserves) return c.fail("book.no_reserves");
+
+    /*
+      ⚠️ SUMMED IN ONE STATEMENT OVER THE YEAR'S POSTINGS, and that is not a
+      micro-optimisation. A year's ledger is the largest thing this product
+      holds, and reading every line into the worker to add it up is the shape
+      that works in a demo and times out in a business.
+    */
+    const sums = await db.prepare(
+      `SELECT p.account AS account, a.type AS root, SUM(p.amount) AS amount
+         FROM posting p JOIN journal j ON j.id = p.journal
+         JOIN account a ON a.id = p.account
+        WHERE p.tenant_id = ? AND j.day >= ? AND j.day <= ?
+          AND a.type IN ('income', 'expense')
+        GROUP BY p.account, a.type`)
+      .bind(c.tenantId, held.opens, held.closes)
+      .all<{ account: string; root: string; amount: number }>();
+
+    const lines = closingLines(
+      sums.results.map((r) => ({
+        account: r.account,
+        root: r.root as AccountStanding["root"],
+        amount: r.amount,
+      })),
+      String(reserves.id),
+      `Year end ${held.closes}`);
+
+    /*
+      ⚠️ A YEAR WITH NOTHING IN IT STILL CLOSES. `closingLines` answers with no
+      lines, no entry is written, and the flag is set — because a business that
+      traded in none of a year still has to be able to say that year is finished,
+      and refusing would leave it permanently open and in the way.
+    */
+    let journal = "";
+    let moved = 0;
+    if (lines.length) {
+      const posted = await writeEntry(c, db, {
+        day: held.closes,
+        memo: `Year end ${held.closes}`,
+        source: "year.close",
+        lines,
+      });
+      if ("why" in posted) refuseCalendar(c, posted);
+      journal = posted.journal;
+      moved = lines[lines.length - 1]?.amount ?? 0;
+    }
+
+    /* ⚠️ THE FLAG LAST, AFTER THE ENTRY LANDED. Set first, the closing entry
+       would be refused by the check it had just turned on. */
+    await db.prepare(
+      `UPDATE year SET closed = 1, edited_at = ?, edited_by = ? WHERE id = ? AND tenant_id = ?`)
+      .bind(c.now, c.accountId ?? null, held.id, c.tenantId).run();
+
+    return { moved, journal };
+  },
+});
+
+/**
+ * ⚠️ REOPENING REVERSES THE CLOSING ENTRY RATHER THAN DELETING IT. A ledger that
+ * forgets is a ledger nobody can audit: what happened is that the year was
+ * closed and then reopened, and both are facts. The reversal is a new entry, so
+ * the trail reads in the order it happened.
+ */
+const reopenYear = operation<OneYear, Reopened>({
+  id: "year.reopen",
+  kind: "write",
+  summary: "Reopen a closed year",
+  input: { year: field.ref({ label: "Year", required: true, holds: "none", to: "year" }) },
+  output: { journal: field.text({ label: "Entry", holds: "none" }) },
+  permission: "year:write",
+  idempotency: { mode: "key" },
+  emits: ["year.reopened"],
+  outcome: { message: "The year is open again.", tone: "success", invalidates: ["year.list"] },
+  fails: ["platform.not_found", "book.year_not_closed"],
+  audit: (input) => ({ subject: String(input.year), verb: "reopened a financial year" }),
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const db = c.db as Db;
+
+    const held = (await yearsOf(db, c.tenantId)).find((one) => one.id === String(input.year));
+    if (!held) return c.fail("platform.not_found");
+    if (!held.closed) return c.fail("book.year_not_closed");
+
+    /* ⚠️ THE FLAG FIRST THIS TIME, so the reversing entry may be written into the
+       year it is about — the mirror of the order `year.close` uses, and for the
+       same reason. */
+    await db.prepare(
+      `UPDATE year SET closed = 0, edited_at = ?, edited_by = ? WHERE id = ? AND tenant_id = ?`)
+      .bind(c.now, c.accountId ?? null, held.id, c.tenantId).run();
+
+    const was = await db.prepare(
+      `SELECT p.account AS account, p.amount AS amount
+         FROM posting p JOIN journal j ON j.id = p.journal
+        WHERE p.tenant_id = ? AND j.source = 'year.close' AND j.day = ?`)
+      .bind(c.tenantId, held.closes)
+      .all<{ account: string; amount: number }>();
+
+    if (!was.results.length) return { journal: "" };
+
+    const posted = await writeEntry(c, db, {
+      day: held.closes,
+      memo: `Year end ${held.closes} reversed`,
+      source: "year.reopen",
+      lines: was.results.map((r) => ({
+        account: r.account, amount: -r.amount, memo: "Reopened",
+      })),
+    });
+    if ("why" in posted) refuseCalendar(c, posted);
+    return { journal: posted.journal };
+  },
+});
+
+/**
+ * ⚠️ SHUTTING A MONTH IS THE SMALL, REVERSIBLE HALF OF THE SAME IDEA. It posts
+ * nothing and moves nothing — it says an accountant has finished with those
+ * weeks — so it is a switch rather than an operation with an entry behind it,
+ * and undoing one costs nothing.
+ */
+const shutPeriod = operation<Shutting, Shut>({
+  id: "period.shut",
+  kind: "write",
+  summary: "Shut a period, or open it again",
+  input: {
+    period: field.ref({ label: "Period", required: true, holds: "none", to: "period" }),
+    shut: field.bool({ label: "Shut", holds: "none" }),
+  },
+  output: { shut: field.bool({ label: "Shut", holds: "none" }) },
+  permission: "year:write",
+  idempotency: { mode: "key" },
+  emits: ["period.shut"],
+  outcome: { message: "Saved.", tone: "success", invalidates: ["period.list"] },
+  fails: ["platform.not_found"],
+  audit: (input) => ({
+    subject: String(input.period),
+    verb: input.shut ? "shut a period" : "reopened a period",
+  }),
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const db = c.db as Db;
+    const shut = input.shut ? 1 : 0;
+    const done = await db.prepare(
+      `UPDATE period SET shut = ?, edited_at = ?, edited_by = ?
+        WHERE id = ? AND tenant_id = ?`)
+      .bind(shut, c.now, c.accountId ?? null, String(input.period), c.tenantId).run();
+    if (!done.meta?.changes) return c.fail("platform.not_found");
+    return { shut: !!shut };
+  },
+});
+
 /* --------------------------------------------------------------- the app --- */
 
 const manifest = (): AppSpec => defineApp({
@@ -705,6 +1122,14 @@ const manifest = (): AppSpec => defineApp({
     permissions: [
       "account:read", "account:write",
       /*
+        ⚠️ CLOSING A YEAR IS NOT POSTING TO IT, AND IT IS NOT SHAPING THE CHART
+        EITHER. It moves a year's profit into reserves and stops anybody adding
+        to what was filed — the one act in this product that reaches backwards
+        over everything already recorded. Whoever does the week's invoices
+        should not be able to do it by accident, so it is its own key.
+      */
+      "year:read", "year:write",
+      /*
         ⚠️ SHAPING THE CHART AND POSTING TO IT ARE DIFFERENT GRANTS. Somebody
         entering the week's invoices posts all day and must never be able to move
         what an account is FOR — that is the difference between a bookkeeper and
@@ -715,11 +1140,17 @@ const manifest = (): AppSpec => defineApp({
     ],
     roles: {
       /* ⚠️ Opens the books, shapes the chart, closes an account. */
-      keeper: ["account:read", "account:write", "journal:read", "journal:write"],
+      keeper: [
+        "account:read", "account:write", "journal:read", "journal:write",
+        "year:read", "year:write",
+      ],
       /* ⚠️ Reads the chart — which is what somebody coding an invoice needs and
          all they need. */
-      user: ["account:read", "journal:read", "journal:write"],
-      viewer: ["account:read", "journal:read"],
+      /* ⚠️ A user SEES which months are shut and cannot shut one — otherwise the
+         refusal they meet when posting has no explanation on any screen they
+         can reach. */
+      user: ["account:read", "journal:read", "journal:write", "year:read"],
+      viewer: ["account:read", "journal:read", "year:read"],
     },
     presets: [
       {
@@ -727,6 +1158,14 @@ const manifest = (): AppSpec => defineApp({
         said: "One person keeping the books. Opens them and shapes the chart.",
         permissions: [
       "account:read", "account:write",
+      /*
+        ⚠️ CLOSING A YEAR IS NOT POSTING TO IT, AND IT IS NOT SHAPING THE CHART
+        EITHER. It moves a year's profit into reserves and stops anybody adding
+        to what was filed — the one act in this product that reaches backwards
+        over everything already recorded. Whoever does the week's invoices
+        should not be able to do it by accident, so it is its own key.
+      */
+      "year:read", "year:write",
       /*
         ⚠️ SHAPING THE CHART AND POSTING TO IT ARE DIFFERENT GRANTS. Somebody
         entering the week's invoices posts all day and must never be able to move
@@ -742,6 +1181,14 @@ const manifest = (): AppSpec => defineApp({
         said: "Shapes the chart and closes what is no longer used.",
         permissions: [
       "account:read", "account:write",
+      /*
+        ⚠️ CLOSING A YEAR IS NOT POSTING TO IT, AND IT IS NOT SHAPING THE CHART
+        EITHER. It moves a year's profit into reserves and stops anybody adding
+        to what was filed — the one act in this product that reaches backwards
+        over everything already recorded. Whoever does the week's invoices
+        should not be able to do it by accident, so it is its own key.
+      */
+      "year:read", "year:write",
       /*
         ⚠️ SHAPING THE CHART AND POSTING TO IT ARE DIFFERENT GRANTS. Somebody
         entering the week's invoices posts all day and must never be able to move
@@ -775,9 +1222,10 @@ const manifest = (): AppSpec => defineApp({
   */
   entitlements: {},
 
-  collections: [account, journal, posting, rule],
+  collections: [account, journal, posting, rule, year, period],
 
-  operations: [start, extend, post, trial, standing],
+  operations: [start, extend, post, trial, standing,
+    openYear, closeYear, reopenYear, shutPeriod],
 
   /*
     ⚠️ ONE EVENT, AND THE COUNT IS HONEST RATHER THAN A START. `buying.received`
@@ -832,7 +1280,7 @@ const manifest = (): AppSpec => defineApp({
           throw new Error(`posting rule for ${raised.event} could not fire: ${out.why}`);
         }
 
-        await writeEntry(
+        const posted = await writeEntry(
           { tenantId: ctx.tenantId, now: ctx.now, accountId: ctx.by ?? undefined },
           db,
           {
@@ -846,6 +1294,18 @@ const manifest = (): AppSpec => defineApp({
             lines: out.lines,
           },
         );
+        /*
+          ⚠️ A SHUT MONTH ON THE EVENT PATH THROWS, WHICH IS THE SAME ANSWER AS A
+          BROKEN RULE ONE LINE UP. There is nobody to tell: the goods are on the
+          shelf whatever the books say, and the alternative — dropping the entry
+          — is a workspace whose ledger silently stops matching its stock. The
+          `hears` seam catches this, logs which app heard what, and lets the
+          receipt stand.
+        */
+        if ("why" in posted) {
+          throw new Error(
+            `${raised.event} could not post on ${String(raised.input.day ?? "")}: ${posted.why}`);
+        }
       },
     },
   },
@@ -946,6 +1406,53 @@ const manifest = (): AppSpec => defineApp({
       title: "One line has nowhere to go",
       detail: "Every line names an account that is open. Check the lines.",
     },
+    /*
+      ⚠️ THE COMMONEST CAUSE IS A WORKSPACE THAT HAS NOT SET ITS YEAR UP, and the
+      second is a typo in a date — so the sentence names the day rather than the
+      rule, because the day is what tells the two apart at a glance.
+    */
+    "book.outside_a_year": {
+      status: 409, retryable: false, tone: "warning",
+      title: "{day} is in no financial year",
+      plain: "That date is in no financial year",
+      detail: "Open the year it falls in, or check the date.",
+    },
+    "book.year_closed": {
+      status: 409, retryable: false, tone: "warning",
+      title: "That year is closed",
+      detail: "Its profit has been moved to reserves. Post to the current year.",
+    },
+    "book.period_shut": {
+      status: 409, retryable: false, tone: "warning",
+      title: "{period} is shut",
+      plain: "That month is shut",
+      detail: "Somebody signed that month off. Post to an open one, or reopen it.",
+    },
+    "book.year_overlaps": {
+      status: 409, retryable: false, tone: "warning",
+      title: "That overlaps a year you already have",
+      detail: "A day in two years appears in two profit-and-loss statements.",
+    },
+    "book.year_backwards": {
+      status: 409, retryable: false, tone: "warning",
+      title: "That year ends before it starts",
+      detail: "Check the two dates.",
+    },
+    "book.year_too_long": {
+      status: 409, retryable: false, tone: "warning",
+      title: "That year is longer than two years",
+      detail: "Check the last day — this is usually a mistyped year.",
+    },
+    "book.year_not_closed": {
+      status: 409, retryable: false, tone: "warning",
+      title: "That year is already open",
+      detail: "Nothing to reopen.",
+    },
+    "book.no_reserves": {
+      status: 409, retryable: false, tone: "warning",
+      title: "There is nowhere to put the profit",
+      detail: "One account has to be marked as reserves before a year can close.",
+    },
   },
 
   views: [
@@ -959,6 +1466,11 @@ const manifest = (): AppSpec => defineApp({
        and is never stored (B2) — see `balanceOf` in `posting.ts`. */
     { id: "landed-here", of: "posting", where: [{ field: "account", is: { here: "record" } }] },
     { id: "rules", of: "posting-rule", limit: 50 },
+    /* ⚠️ NEWEST FIRST IS WRONG FOR A YEAR. The books are read forwards — 2025,
+       then 2026 — because "which year am I in" is answered by the last row, and
+       a reversed list makes somebody read up the screen to find it. */
+    { id: "years", of: "year", limit: 50, sort: { by: "opens", dir: "up" } },
+    { id: "months", of: "period", limit: 50, sort: { by: "opens", dir: "up" } },
     /*
       ⚠️ ASKED, BECAUSE THIS SCREEN'S SUBJECT IS ARITHMETIC AND A `Match` IS
       EQUALITY — see `ViewSpec.asked`. A balance is a SUM over lines and will
@@ -1244,6 +1756,93 @@ const manifest = (): AppSpec => defineApp({
       bookkeeper LIVES in. The reports are groupings of these lines and arrive
       later; this is the thing they are groupings of.
     */
+    /*
+      ⚠️ ITS OWN DESTINATION RATHER THAN A SETTING, because closing a year is
+      not configuration — it posts an entry, it stops anybody adding to what was
+      filed, and it is the one act in this product that reaches backwards over
+      everything already recorded. A switch buried in settings would make it look
+      like a preference.
+    */
+    { id: "years", route: "/years", label: "Years", nav: "primary", icon: "calendar",
+      permission: "year:read", tone: "neutral",
+      body: {
+        shape: "list",
+        layout: { as: "stack" },
+        blocks: [
+          {
+            block: "ActionRow",
+            goes: "open-a-year",
+            bind: {
+              icon: { from: { of: "words", says: "add" } },
+              label: { from: { of: "words", says: "Open a year" } },
+              under: { from: { of: "words",
+                says: "Yours may not be January to December" } },
+            },
+          },
+          { group: "Years", of: [{
+            block: "Listing",
+            shows: [
+              { field: "name", label: "Year" },
+              { field: "opens", label: "First day", as: "when" },
+              { field: "closes", label: "Last day", as: "when" },
+              { field: "closed", label: "Closed" },
+            ],
+            nothing: {
+              says: "No years yet",
+              under: "Open one and the books have somewhere to put a date",
+            },
+            bind: {
+              label: { from: { of: "words", says: "Years" } },
+              of: { from: { of: "view", view: "years" } },
+            },
+          }] },
+          /* ⚠️ THE MONTHS BESIDE THE YEARS, because "which months are shut" is
+             the question somebody asks the moment a posting is refused — and a
+             refusal whose explanation is on another screen is a refusal that
+             reads as a fault. */
+          { group: "Months", of: [{
+            block: "Listing",
+            shows: [
+              { field: "name", label: "Period" },
+              { field: "opens", label: "From", as: "when" },
+              { field: "closes", label: "To", as: "when" },
+              { field: "shut", label: "Shut" },
+            ],
+            nothing: {
+              says: "No months",
+              under: "Books closed off once a year need none",
+            },
+            bind: {
+              label: { from: { of: "words", says: "Months" } },
+              of: { from: { of: "view", view: "months" } },
+            },
+          }] },
+        ],
+      } },
+    /* ⚠️ A STORY RATHER THAN A FORM, because the two dates are the whole
+       decision and getting them wrong is expensive — see `refuseYear`. */
+    { id: "open-a-year", route: "/years/open", label: "Open a year",
+      nav: "none", icon: "add", permission: "year:write", tone: "neutral",
+      story: {
+        writes: "year.open",
+        lands: "years",
+        asks: [
+          { id: "name", ask: "What is this year called?",
+            under: "Most people use the year it ends in",
+            takes: ["name"], always: true,
+            says: { as: "{name}" } },
+          /* ⚠️ THE TWO DATES TOGETHER, because they are one decision and asking
+             them apart invites a year that ends before it starts. */
+          { id: "when", ask: "When does it run?",
+            under: "The last day is the one inside it, which is what you file",
+            takes: ["opens", "closes"], always: true,
+            says: { as: "{opens} to {closes}" } },
+          { id: "months", ask: "Do you close the books every month?",
+            under: "If you do, the twelve periods are made for you",
+            takes: ["months"], always: true,
+            says: { as: "with its months" } },
+        ],
+      } },
     { id: "journal", route: "/journal", label: "Journal", nav: "primary", icon: "note",
       permission: "journal:read", tone: "neutral",
       body: {

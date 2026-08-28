@@ -5179,3 +5179,74 @@ that key, because it does not have the pattern yet. Two facts, conflated:
 and it is the only form in which a wrong answer is obvious before a document has
 gone out carrying it. `numberingIn` works it out from where the count actually
 stands rather than describing what would happen.
+
+## D126
+
+**A ledger without periods is a ledger nobody can finish.** OneBook gains a
+`year` and an optional `period`, one chokepoint asks whether a day may be posted
+to, and closing a year posts an entry rather than setting a flag.
+
+### The fiscal year is not January to December
+
+The United Kingdom's companies commonly run to March or April, Australia's to
+June, Japan's to March, and a business may pick its own. A calendar year assumed
+anywhere would put a chunk of every profit-and-loss in the wrong one for most of
+the world, by exactly the amount that fell on the wrong side of a date.
+
+### Periods are optional, and that is the point
+
+A business whose accountant does the books once a year never makes one; a
+business closing monthly makes twelve. Requiring them would put eleven rows of
+ceremony in front of somebody who wanted to record a sale. `monthsIn` offers the
+twelve so nobody types twelve date ranges — every one of which is a chance to
+leave a gap, and a gap is a week belonging to no period, which nothing refuses.
+
+### Three refusals, and one of them is the surprising one
+
+- **A closed year** refuses, because its profit has already been moved.
+- **A shut month** refuses, because somebody signed it off and a correction
+  typed afterwards silently changes a figure already filed.
+- **No year at all refuses too**, and that is the one worth stating. Treating
+  "outside every declared year" as permission makes the whole check useless in
+  the case it exists for: a mistyped date lands in 2062, in no year, and posts
+  happily — into a profit-and-loss no report will ever show it in, because every
+  report is bounded by a year.
+
+**Overlapping years are refused at the declaration** for the same class of
+reason: a day in two years belongs to two profit-and-loss statements, so the
+same sale appears in both — and the pair reconcile perfectly against the ledger
+while disagreeing with each other. There is no figure downstream that looks
+wrong.
+
+### Closing posts something
+
+A year that is only a flag is hidden rather than closed. What makes next year's
+report start at zero is that this year's income and expense were emptied into
+reserves in one entry; without it every "this year" figure is really "since the
+books began", wrong by more each year. **Only income and expense move** —
+sweeping the balance sheet would empty it, and the arithmetic looks identical,
+which is why it is named. The entry is dated the year's last day, which is the
+one day it can be: dated today it would land in the next year and take the
+profit with it.
+
+**Reopening reverses the entry rather than deleting it.** What happened is that
+the year was closed and then reopened, and both are facts; a ledger that forgets
+is a ledger nobody can audit.
+
+### Two callers, two answers to a refusal
+
+`writeEntry` returns the refusal rather than throwing, because its callers want
+different things from one. A person typing an entry is told which month is shut
+and can reopen it or move the date. An **event** arriving from another product
+has nobody to tell — so that path throws, `heard()` logs which app heard what,
+and the goods stay on the shelf while an operator is told the accounting behind
+them has stopped. Deciding inside `writeEntry` would have picked one of those
+for both, and the automatic path is the one that would quietly go on posting
+into a month somebody has already filed a return for.
+
+### And `year:write` is its own key
+
+Closing a year is not posting to it and is not shaping the chart. It moves a
+year's profit and stops anybody adding to what was filed — the one act in this
+product that reaches backwards over everything already recorded. Whoever enters
+the week's invoices should not be able to do it by accident.
