@@ -29,6 +29,7 @@ failing test, a capability that silently does not apply (D12).
 | [DECISIONS.md](DECISIONS.md) | what is forbidden, and why — cited by number from code and guards |
 | [../design/README.md](../design/README.md) | what a screen draws, and where a screen starts |
 | [SURFACE.md](SURFACE.md) | the arc that moves a screen out of an app and into its manifest |
+| [BUSINESS.md](BUSINESS.md) | how apps share money, parties and documents without importing each other |
 
 ---
 
