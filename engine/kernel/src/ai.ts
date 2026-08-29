@@ -34,6 +34,26 @@ export type Lane = "text" | "vision" | "speech" | "listen" | "image" | "embed";
 export const LANES: readonly Lane[] = ["text", "vision", "speech", "listen", "image", "embed"];
 
 /**
+ * THE LANES SOMETHING CAN ACTUALLY RUN, WHICH IS NOT THE SAME LIST AS `LANES`.
+ *
+ * ⚠️ A LANE WITH A CATALOGUE AND NO RUNNER PASSES EVERY OTHER CHECK. Models
+ * answer it, `refuseCatalogue` finds them, an operator switches one on, the
+ * console reports the lane healthy, composition passes and the meter prices it —
+ * and the call then reaches an endpoint that cannot do the job. Every one of
+ * those steps is a fact about the CATALOGUE; none of them is a fact about
+ * whether the deployment can make the request.
+ *
+ * ⚠️ SO THE TWO QUESTIONS ARE ASKED SEPARATELY. `refuseCatalogue` asks whether a
+ * model answers the lane; `refuseApp` asks whether anything can call it. A lane
+ * absent here is refused at COMPOSITION, which is a build failure rather than a
+ * runtime one — the trade this whole tree exists to make.
+ *
+ * ⚠️ AND A LANE JOINS THIS LIST IN THE SAME COMMIT AS ITS RUNNER, never before.
+ * Adding the name first is how the gap this constant closes was opened.
+ */
+export const RUNNABLE: readonly Lane[] = ["text", "vision"];
+
+/**
  * ⚠️ THE ALIASES ARE THE POINT OF THIS TABLE. See the header — a `WHERE task =`
  * against one of these names finds a subset of the models that can do the job.
  */
@@ -42,7 +62,7 @@ const ALIASES: Readonly<Record<Lane, readonly string[]>> = {
   vision: ["vision", "image-to-text", "multimodal"],
   speech: ["speech", "tts", "text-to-speech"],
   /*
-   * DEFER(engine-86) stage:86 — THIS LANE CAN BE FILLED AND CANNOT BE CALLED.
+   * DEFER(engine-86) stage:86 lane:listen — THIS LANE CAN BE FILLED AND CANNOT BE CALLED.
    * A catalogue's speech-recognition rows resolve here, an operator can switch
    * one on, and the console then reports the lane healthy — but `Ask` carries
    * words and pictures and nothing to hear, so no app can hand it a sound. The

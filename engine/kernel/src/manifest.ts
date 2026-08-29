@@ -31,7 +31,7 @@ import type { CollectionSpec } from "./collection.js";
 import { danglingRefs, eventsFor, operationsFor, quotasWithoutCeiling, refuseCollection } from "./collection.js";
 import type { MeterBook } from "./credit.js";
 import { unbounded } from "./credit.js";
-import { unknownInPrompt } from "./ai.js";
+import { RUNNABLE, unknownInPrompt } from "./ai.js";
 import type { EntitlementDef } from "./entitlement.js";
 import { ALLOWANCE_KEY, PLATFORM_ENTITLEMENTS, unenforced } from "./entitlement.js";
 import { holdingsIn, type Holding } from "./field.js";
@@ -695,6 +695,17 @@ export function refuseApp(spec: AppSpec): readonly Refusal[] {
   for (const o of spec.operations) {
     const ai = o.ai;
     if (!ai) continue;
+    /*
+      ⚠️ A LANE WITH A CATALOGUE IS NOT A LANE WITH A RUNNER, and every other
+      check here is about the catalogue. Models answer it, the console reports
+      it healthy, the meter prices it — and the call reaches an endpoint that
+      cannot do the job. Refused HERE because composition is a build failure and
+      the alternative is the first customer finding out.
+    */
+    if (!RUNNABLE.includes(ai.lane)) {
+      at(`operation ${o.id}`,
+        `generates in the "${ai.lane}" lane, which nothing can run yet — see RUNNABLE`);
+    }
     if (!(ai.maxOutput > 0)) {
       at(`operation ${o.id}`, "generates with no output ceiling, so the reserve is a guess");
     }

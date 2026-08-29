@@ -279,6 +279,36 @@ describe("what would fail on the first request", () => {
     expect(whyOf(broken)).toContain("which no catalogue has");
   });
 
+  /*
+    ⚠️ A LANE WITH A CATALOGUE IS NOT A LANE WITH A RUNNER, and every other check
+    over an action is about the catalogue. Models answer it, the console reports
+    the lane healthy, the meter prices it — and the request reaches an endpoint
+    that cannot do the job. This is the assertion `scripts/lanes.test.mjs`
+    deliberately does not make: a text match for the branch survives `false &&`
+    in front of it, and only calling the thing can tell.
+  */
+  it("refuses an action in a lane nothing can run", () => {
+    const generating = {
+      ...stub,
+      ai: {
+        lane: "listen", prompt: "Write it down.", variables: [], maxOutput: 400,
+      },
+    } as unknown as AnyOperation;
+    expect(whyOf(app({ operations: [generating] }))).toContain("which nothing can run yet");
+  });
+
+  /* ⚠️ AND THE RUNNABLE ONES STILL COMPOSE, which is the half a refusal that
+     rejected every lane would pass. */
+  it("accepts an action in a lane that runs", () => {
+    const generating = {
+      ...stub,
+      ai: {
+        lane: "text", prompt: "Write it down.", variables: [], maxOutput: 400,
+      },
+    } as unknown as AnyOperation;
+    expect(whyOf(app({ operations: [generating] }))).not.toContain("which nothing can run yet");
+  });
+
   /* ⚠️ A product that could reword "payment required" could describe its own
      arrears as something reassuring, to staff who would then not act on it. */
   it("refuses an app rewording a platform refusal", () => {
