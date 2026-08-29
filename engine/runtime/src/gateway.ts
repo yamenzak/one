@@ -21,9 +21,13 @@
  * the gateway's figures are right for a key we hold ourselves. Sending the
  * marked-up number would make the reconciliation compare a value against itself
  * and report perfect health for ever.
+ *
+ * vocabulary-exempt-file(studio): `google-ai-studio` is Cloudflare's own provider
+ * id, and it is what the gateway addresses a Gemini model by. Spelling it our way
+ * would make every Google call resolve to nothing.
  */
 
-import type { Meter, ModelRow } from "@engine/kernel";
+import type { Lane, Meter, ModelRow } from "@engine/kernel";
 import { CREDIT_USD, MILLI, type Usage } from "@engine/kernel";
 import type { Discovered } from "./models.js";
 
@@ -80,6 +84,22 @@ const said = (prompt: string, images?: readonly string[]): unknown =>
 
 export interface Answered {
   readonly text: string;
+  /**
+   * WHAT A LANE THAT DOES NOT ANSWER IN WORDS PRODUCED (D79).
+   *
+   * ⚠️ SEPARATE FROM `text` RATHER THAN ENCODED INTO IT. A picture base64'd into
+   * a string is a picture every downstream reader has to know is not text — the
+   * audit, the cache, anything that logs an answer — and the first one that
+   * forgets writes a megabyte of base64 where a sentence was expected.
+   *
+   * ⚠️ AND `mime` TRAVELS WITH THE BYTES, because bytes with no type are bytes
+   * nobody can store or serve. Deriving it from the lane is wrong the first time
+   * a provider answers `webp` where the last one answered `png`.
+   */
+  readonly bytes?: Uint8Array;
+  readonly mime?: string;
+  /** ⚠️ The embedding lane's answer: a vector, which is neither words nor bytes. */
+  readonly vector?: readonly number[];
   readonly usage: Usage | null;
   /**
    * ⚠️ THE HANDLE ON THE COST, NOT THE COST. What the gateway billed is behind
@@ -92,6 +112,103 @@ export interface Answered {
 
 export const gatewayUrl = (at: GatewayAt): string =>
   `https://gateway.ai.cloudflare.com/v1/${at.accountId}/${at.gateway}`;
+
+/* ------------------------------------------------------------- dialects --- */
+
+/**
+ * WHICH REQUEST A LANE MAKES, AND IT IS PER LANE RATHER THAN PER PROVIDER (D79).
+ *
+ * ⚠️ `/compat` IS CHAT COMPLETIONS AND NOTHING ELSE. That is a fact about
+ * Cloudflare's endpoint rather than a preference: there is no
+ * `/compat/embeddings`, no `/compat/images/generations`, no
+ * `/compat/audio/speech`. So the three lanes that are not a conversation cannot
+ * be expressed there at all, and the gateway's own passthrough —
+ * `{gateway}/{provider}/{the provider's own path}` — is the only way to reach
+ * them. The header above argues for one client and the argument still holds: the
+ * thing it refuses is twelve ideas of what a TOKEN is, and a lane speaking two
+ * dialects is not that.
+ *
+ * ⚠️ A PROVIDER WHOSE DIALECT WE DO NOT KNOW FOR A LANE IS REFUSED, NEVER
+ * GUESSED. `GATEWAY` already takes this position for the slug — a vendor absent
+ * from it is a row that is not stored rather than an invented address — and the
+ * same reasoning is sharper here: an invented path returns 404 on a model an
+ * operator has switched on and a workspace has chosen, and the reason reaches
+ * nobody.
+ */
+export type Dialect = "openai" | "workers-ai" | "google";
+
+/**
+ * ⚠️ READ OFF THE GATEWAY SLUG, WHICH IS THE NAME THE REQUEST ACTUALLY USES.
+ * Keying this on the catalogue's vendor name would be a second spelling of a
+ * thing that already has one, and the two differ (`xai` against `grok`).
+ */
+const DIALECT: Readonly<Record<string, Dialect>> = {
+  "workers-ai": "workers-ai",
+  "google-ai-studio": "google",
+  openai: "openai",
+  /* ⚠️ These publish an OpenAI-shaped `/v1`, which is what the name means here —
+     it is the SHAPE of the request, not the company. */
+  groq: "openai",
+  deepseek: "openai",
+  mistral: "openai",
+  cerebras: "openai",
+  "perplexity-ai": "openai",
+};
+
+export const dialectOf = (model: ModelRow): Dialect | null =>
+  DIALECT[model.provider] ?? null;
+
+/**
+ * ⚠️ THE MODEL'S OWN PATH, WITHOUT THE VENDOR PREFIX THE COMPAT NAME CARRIES.
+ * `compatName` composes `{provider}/{model}` because `/compat` addresses it that
+ * way; a passthrough request is already AT the provider, so sending it again
+ * asks for a model called `openai/openai/...`.
+ */
+const bare = (model: ModelRow): string => model.id;
+
+/** What each lane asks of each dialect, or `null` where we do not know. */
+const routeFor = (lane: Lane, model: ModelRow): string | null => {
+  const d = dialectOf(model);
+  if (!d) return null;
+  if (d === "workers-ai") {
+    /* ⚠️ Workers AI answers every task at the model's own path — one shape for
+       the whole vendor, which is why it is the lane's most reliable route. */
+    return `/workers-ai/${bare(model)}`;
+  }
+  if (d === "openai") {
+    return lane === "embed" ? "/openai/v1/embeddings"
+      : lane === "image" ? "/openai/v1/images/generations"
+        : lane === "speech" ? "/openai/v1/audio/speech"
+          : null;
+  }
+  /* google */
+  return lane === "embed"
+    ? `/google-ai-studio/v1/models/${bare(model)}:embedContent`
+    : lane === "image"
+      ? `/google-ai-studio/v1/models/${bare(model)}:generateContent`
+      : null;
+};
+
+/** The body each dialect expects for the lane. */
+const bodyFor = (
+  lane: Lane, model: ModelRow, planned: { system: string; prompt: string }, maxOutput: number,
+): unknown => {
+  const d = dialectOf(model);
+  const said = planned.system ? `${planned.system}\n\n${planned.prompt}` : planned.prompt;
+  if (d === "workers-ai") {
+    return lane === "embed" ? { text: [planned.prompt] }
+      : lane === "image" ? { prompt: said, num_steps: 8 }
+        : { prompt: said };
+  }
+  if (d === "openai") {
+    return lane === "embed" ? { model: bare(model), input: planned.prompt }
+      : lane === "image" ? { model: bare(model), prompt: said, n: Math.max(1, maxOutput) }
+        : { model: bare(model), input: said, voice: "alloy" };
+  }
+  return lane === "embed"
+    ? { content: { parts: [{ text: planned.prompt }] } }
+    : { contents: [{ parts: [{ text: said }] }] };
+};
 
 /**
  * ⚠️ THE PROVIDER PREFIX IS PART OF THE MODEL NAME AT THIS ENDPOINT, and the row
@@ -151,6 +268,36 @@ export interface Fetcher {
 }
 
 /**
+ * THE HEADERS EVERY CALL CARRIES, WHICHEVER ENDPOINT IT REACHES.
+ *
+ * ⚠️ SHARED BY THE COMPAT PATH AND THE PASSTHROUGH ON PURPOSE, because these are
+ * the money. The metadata is what lets the gateway's own bill be compared to what
+ * a workspace was charged, and `cf-aig-custom-cost` is what makes that bill right
+ * for a key we hold ourselves — a lane that assembled its own headers would be a
+ * lane whose spending is invisible to the nightly reconciliation, which is the
+ * only number in this system that is not our own arithmetic agreeing with itself.
+ */
+function headersFor(
+  at: GatewayAt, model: ModelRow, tag: { readonly t: string; readonly a: string; readonly o: string },
+): Record<string, string> {
+  const headers: Record<string, string> = {
+    "content-type": "application/json",
+    "cf-aig-authorization": `Bearer ${at.token}`,
+    "cf-aig-metadata": JSON.stringify(tag),
+    /* ⚠️ OUR RAW COST — see the header. Never the multiplier. */
+    "cf-aig-custom-cost": JSON.stringify({
+      per_token_in: perTokenUsd(model.input),
+      per_token_out: perTokenUsd(model.output),
+    }),
+  };
+  /* ⚠️ A KEY WE HOLD BEATS A KEY THE GATEWAY HOLDS, which is the whole reason to
+     hold one: a stored key falls through to unified billing and its fee. */
+  const own = at.keys?.[model.provider];
+  if (own) headers["authorization"] = `Bearer ${own}`;
+  return headers;
+}
+
+/**
  * Ask a model, through the gateway, tagged so the answer can be reconciled.
  *
  * ⚠️ IT REFUSES RATHER THAN FALLING BACK. A provider whose key we do not hold is
@@ -162,21 +309,7 @@ export async function askModel(
 ): Promise<Answered | GatewayRefusal> {
   if (!at?.token || !at.accountId || !at.gateway) return "no_gateway";
 
-  const headers: Record<string, string> = {
-    "content-type": "application/json",
-    "cf-aig-authorization": `Bearer ${at.token}`,
-    "cf-aig-metadata": JSON.stringify(ask.tag),
-    /* ⚠️ OUR RAW COST — see the header. Never the multiplier. */
-    "cf-aig-custom-cost": JSON.stringify({
-      per_token_in: perTokenUsd(ask.model.input),
-      per_token_out: perTokenUsd(ask.model.output),
-    }),
-  };
-
-  /* ⚠️ A KEY WE HOLD BEATS A KEY THE GATEWAY HOLDS, which is the whole reason to
-     hold one: a stored key falls through to unified billing and its fee. */
-  const own = at.keys?.[ask.model.provider];
-  if (own) headers["authorization"] = `Bearer ${own}`;
+  const headers = headersFor(at, ask.model, ask.tag);
 
   let res: Response;
   try {
@@ -213,6 +346,127 @@ export async function askModel(
        gateway serves it without touching a provider, so charging our multiplier
        over a cost of zero is charging for a lookup. */
     cached: (res.headers.get("cf-aig-cache-status") ?? "").toUpperCase() === "HIT",
+  };
+}
+
+/* ------------------------------------------------------------ other lanes --- */
+
+/** ⚠️ A route we do not know is its own refusal — see `DIALECT`. */
+export type LaneRefusal = GatewayRefusal | "no_route";
+
+interface Embedded {
+  readonly data?: readonly { readonly embedding?: readonly number[] }[];
+  readonly embedding?: { readonly values?: readonly number[] };
+  readonly result?: { readonly data?: readonly (readonly number[])[] };
+  readonly usage?: { readonly prompt_tokens?: number; readonly total_tokens?: number };
+}
+
+interface Pictured {
+  readonly data?: readonly { readonly b64_json?: string; readonly url?: string }[];
+  readonly result?: { readonly image?: string };
+  readonly candidates?: readonly {
+    readonly content?: { readonly parts?: readonly {
+      readonly inlineData?: { readonly data?: string; readonly mimeType?: string };
+    }[] };
+  }[];
+}
+
+const unb64 = (text: string): Uint8Array => {
+  const raw = atob(text);
+  const bytes = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+  return bytes;
+};
+
+/**
+ * ASK A MODEL FOR SOMETHING THAT IS NOT A CONVERSATION (D79).
+ *
+ * ⚠️ THE SAME HEADERS, THE SAME TAG, THE SAME CUSTOM COST — so a run in one of
+ * these lanes reconciles exactly like a run in the text lane. Nothing about the
+ * money path is different here; only the request and the answer are.
+ *
+ * ⚠️ AND THE USAGE IS OFTEN ABSENT, WHICH IS ALREADY HANDLED. An image endpoint
+ * reports no token count because tokens are not what it billed — `settle` falls
+ * back to the RESERVE for exactly this case, and the reserve for these lanes is
+ * arithmetic over a known quantity rather than a guess (D80). The nightly
+ * reconciliation then corrects it against what the gateway says it really cost.
+ */
+export async function askLane(
+  at: GatewayAt | null, lane: Lane, ask: RunAsk, fetcher: Fetcher = fetch,
+): Promise<Answered | LaneRefusal> {
+  if (!at?.token || !at.accountId || !at.gateway) return "no_gateway";
+
+  const route = routeFor(lane, ask.model);
+  /* ⚠️ REFUSED RATHER THAN GUESSED. An invented path 404s on a model an operator
+     switched on and a workspace chose, and the reason reaches nobody. */
+  if (!route) return "no_route";
+
+  let res: Response;
+  try {
+    res = await fetcher(`${gatewayUrl(at)}${route}`, {
+      method: "POST",
+      headers: headersFor(at, ask.model, ask.tag),
+      body: JSON.stringify(bodyFor(lane, ask.model, ask, ask.maxOutput)),
+    });
+  } catch {
+    return "refused";
+  }
+
+  if (!res.ok) return res.status === 401 || res.status === 403 ? "no_key" : "refused";
+
+  const logId = res.headers.get("cf-aig-log-id");
+  const cached = (res.headers.get("cf-aig-cache-status") ?? "").toUpperCase() === "HIT";
+  const type = res.headers.get("content-type") ?? "";
+
+  /*
+    ⚠️ A SPEECH ENDPOINT ANSWERS WITH THE AUDIO ITSELF, not with a document
+    describing it. Reading that as JSON throws, and the `unreadable` it would
+    return is a working call reported as a broken one.
+  */
+  if (lane === "speech" || (!type.includes("json") && lane === "image")) {
+    try {
+      const bytes = new Uint8Array(await res.arrayBuffer());
+      return {
+        text: "", bytes, mime: type || "application/octet-stream",
+        usage: null, logId, cached,
+      };
+    } catch {
+      return "unreadable";
+    }
+  }
+
+  let body: unknown;
+  try {
+    body = await res.json();
+  } catch {
+    return "unreadable";
+  }
+
+  if (lane === "embed") {
+    const it = body as Embedded;
+    /* ⚠️ THREE SHAPES FOR ONE ANSWER, and every one of them is somebody's
+       published contract: OpenAI nests under `data`, Google under `embedding`,
+       Workers AI under `result`. */
+    const vector = it.data?.[0]?.embedding ?? it.embedding?.values ?? it.result?.data?.[0];
+    if (!vector) return "unreadable";
+    return {
+      text: "", vector,
+      /* ⚠️ Embedding bills input only, which is why there is no output here to
+         report — see `unitsFor`. */
+      usage: it.usage?.prompt_tokens !== undefined
+        ? { input: it.usage.prompt_tokens, output: 0 }
+        : null,
+      logId, cached,
+    };
+  }
+
+  const it = body as Pictured;
+  const inline = it.candidates?.[0]?.content?.parts?.find((p) => p.inlineData)?.inlineData;
+  const b64 = it.data?.[0]?.b64_json ?? it.result?.image ?? inline?.data;
+  if (!b64) return "unreadable";
+  return {
+    text: "", bytes: unb64(b64), mime: inline?.mimeType ?? "image/png",
+    usage: null, logId, cached,
   };
 }
 

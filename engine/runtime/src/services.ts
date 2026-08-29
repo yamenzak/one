@@ -29,7 +29,7 @@
 import type { AppId, Channel, Instant, Lane, ModelRow, TenantId, Usage } from "@engine/kernel";
 import { boundModel, chargedFor, plan as planRun, type Planned } from "@engine/kernel";
 import {
-  askModel, askModelStream,
+  askLane, askModel, askModelStream,
   type Answered, type Fetcher, type GatewayAt, type GatewayRefusal, type Streamed,
 } from "./gateway.js";
 import { recordRun, type Priced, type Recording } from "./spend.js";
@@ -86,6 +86,16 @@ export interface Ask {
 
 export interface Generated {
   readonly text: string;
+  /**
+   * ⚠️ WHAT A LANE THAT DOES NOT ANSWER IN WORDS PRODUCED (D79), CARRIED ALL THE
+   * WAY OUT. Dropped here, an image or a spoken sentence would run, hold, charge
+   * and settle correctly — and return an empty string. The whole lane would be
+   * billed and useless with every meter reading healthy, which is the exact
+   * shape stage 87 exists to close.
+   */
+  readonly bytes?: Uint8Array;
+  readonly mime?: string;
+  readonly vector?: readonly number[];
   readonly model: string;
   /** Whole credits actually taken off the balance by this run. */
   readonly charged: number;
@@ -114,7 +124,13 @@ export interface MailInput {
 /* ------------------------------------------------------------------- lanes --- */
 
 export type AiRefusal =
-  | "no_model" | "not_enough_credits" | "provider_failed" | "mock_in_production" | "no_key";
+  | "no_model" | "not_enough_credits" | "provider_failed" | "mock_in_production" | "no_key"
+  /* ⚠️ ITS OWN REASON, because "provider_failed" would send an operator looking
+     at a provider that is working. This is a model whose vendor we have no route
+     to FOR THIS LANE — a decision of ours, fixed by a dialect rather than by a
+     key — and the header above is explicit that one message for every failure is
+     the thing this union exists to avoid. */
+  | "no_route";
 
 /**
  * ⚠️ WHAT A MODEL IS ASKED THROUGH. Injected rather than imported, because the
@@ -132,10 +148,17 @@ export interface Provider {
    * `Planned` is the words and what they were budgeted at. An image folded in
    * there would travel through the reserve arithmetic as text, which is exactly
    * the count it is not.
+   *
+   * ⚠️ AND THE LANE IS A PARAMETER BECAUSE THE ENDPOINT DEPENDS ON IT (D79).
+   * `/compat` is chat completions and nothing else, so an embedding, a picture
+   * and a spoken sentence each reach the provider's own path through the
+   * gateway's passthrough. What does NOT change is everything around the call:
+   * same headers, same tag, same custom cost, same reserve → settle.
    */
   run(
     model: ModelRow, planned: Planned, maxOutput: number, images?: readonly string[],
-  ): Promise<Answered | GatewayRefusal>;
+    lane?: Lane,
+  ): Promise<Answered | GatewayRefusal | "no_route">;
 }
 
 /**
@@ -150,11 +173,18 @@ export const gatewayProvider = (
   at: GatewayAt | null, tag: { readonly t: string; readonly a: string; readonly o: string },
   fetcher?: Fetcher,
 ): Provider => ({
-  run: (model, planned, maxOutput, images) =>
-    askModel(at, {
+  run: (model, planned, maxOutput, images, lane) => {
+    const ask = {
       model, system: planned.system, prompt: planned.prompt, maxOutput, tag,
       ...(images?.length ? { images } : {}),
-    }, fetcher ?? fetch),
+    };
+    /* ⚠️ TEXT AND VISION ARE A CONVERSATION AND KEEP `/compat`, which is one
+       client for fourteen providers and works. Moving them onto the passthrough
+       would be a rewrite bought with nothing. */
+    return lane && lane !== "text" && lane !== "vision"
+      ? askLane(at, lane, ask, fetcher ?? fetch)
+      : askModel(at, ask, fetcher ?? fetch);
+  },
 });
 
 export interface AiDeps {
@@ -224,7 +254,7 @@ export async function generate(deps: AiDeps, ask: Ask): Promise<Generated | AiRe
      outside development throws on purpose, and an unforeseen fault throws by
      accident. Handling only the first leaves the credits held on the second —
      a customer whose balance shrank and who got nothing. */
-  const out = await deps.provider.run(model, planned, ceiling, ask.images)
+  const out = await deps.provider.run(model, planned, ceiling, ask.images, ask.lane)
     .catch((why: unknown) => String(why instanceof Error ? why.message : why));
 
   /* ⚠️ AND A FAILURE STILL WRITES A ROW. A failure with no row is a button that
@@ -232,7 +262,7 @@ export async function generate(deps: AiDeps, ask: Ask): Promise<Generated | AiRe
   if (typeof out === "string") {
     await release(deps.directory, ask.tenantId, held);
     await record({ chargedMilli: 0, source: "reserve", ok: false, detail: out });
-    return out === "no_key" ? "no_key" : "provider_failed";
+    return out === "no_key" ? "no_key" : out === "no_route" ? "no_route" : "provider_failed";
   }
 
   /*
@@ -261,7 +291,13 @@ export async function generate(deps: AiDeps, ask: Ask): Promise<Generated | AiRe
     ok: true,
   });
 
-  return { text: out.text, model: model.id, charged: paid.credits, milli: paid.milli, runId };
+  return {
+    text: out.text,
+    ...(out.bytes ? { bytes: out.bytes } : {}),
+    ...(out.mime ? { mime: out.mime } : {}),
+    ...(out.vector ? { vector: out.vector } : {}),
+    model: model.id, charged: paid.credits, milli: paid.milli, runId,
+  };
 }
 
 /* ------------------------------------------------------------------ stream --- */

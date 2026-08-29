@@ -51,7 +51,7 @@ export const LANES: readonly Lane[] = ["text", "vision", "speech", "listen", "im
  * ⚠️ AND A LANE JOINS THIS LIST IN THE SAME COMMIT AS ITS RUNNER, never before.
  * Adding the name first is how the gap this constant closes was opened.
  */
-export const RUNNABLE: readonly Lane[] = ["text", "vision"];
+export const RUNNABLE: readonly Lane[] = ["text", "vision", "speech", "image", "embed"];
 
 /**
  * ⚠️ THE ALIASES ARE THE POINT OF THIS TABLE. See the header — a `WHERE task =`

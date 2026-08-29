@@ -109,7 +109,7 @@ if (lanes && runnable) {
   is BUILDING.md §5.6's rule about anchoring to an identifier rather than to
   something as it executes.
 
-  ⚠️ SO THE BEHAVIOUR IS ASSERTED WHERE BEHAVIOUR BELONGS — `kernel/test/ai.test.ts`
+  ⚠️ SO THE BEHAVIOUR IS ASSERTED WHERE BEHAVIOUR BELONGS — `kernel/test/manifest.test.ts`
   calls `refuseApp` with an unrunnable lane and requires a refusal, which no edit
   to the branch can satisfy without actually refusing. What is left here is the
   SHAPE question a unit test cannot ask: that the caller exists at all, so its
@@ -119,7 +119,7 @@ if (lanes && runnable) {
 {
   const manifest = read("kernel/src/manifest.ts");
   if (/\bRUNNABLE\b/.test(manifest)) {
-    ok("refused: composition still reads RUNNABLE (behaviour proved in kernel/test/ai.test.ts)");
+    ok("refused: composition still reads RUNNABLE (behaviour proved in kernel/test/manifest.test.ts)");
   } else {
     fail("lanes: `kernel/src/manifest.ts` no longer mentions RUNNABLE at all.\n"
       + "       The list is then a comment: an app declares an unrunnable lane, every\n"

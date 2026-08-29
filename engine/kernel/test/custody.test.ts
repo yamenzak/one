@@ -411,6 +411,52 @@ describe("what a call costs", () => {
     expect(four).toBe(one * 4);
   });
 
+  /*
+    ⚠️ AND IT DOES SO WITHOUT BEING TOLD, which is the half that matters (D80).
+    The test above hands `units` over by hand; every real caller is a generated
+    seam that has only the action's declaration, so a reserve that needs the
+    caller to have worked out the units is a reserve nothing computes correctly.
+    The meter travels with the rates, so nothing can price by one and count by
+    another.
+  */
+  it("counts a non-token lane from the meter, with no units handed to it", () => {
+    const perImage = { meter: "image" as const, input: 0, output: 4_000_000, multiplier: 5 };
+    /* Four pictures asked for, and not one character of the prompt priced. */
+    expect(estimate({ promptChars: 5_000, maxOutput: 4 }, perImage)).toBe(80);
+    /* ⚠️ The prompt's length must not move it — an image model bills pictures. */
+    expect(estimate({ promptChars: 5, maxOutput: 4 }, perImage)).toBe(80);
+  });
+
+  /* ⚠️ SPOKEN TEXT IS BILLED ON WHAT WENT IN, and there is no answer to guess. */
+  it("counts a spoken lane on the characters handed over", () => {
+    const perChar = { meter: "character" as const, input: 30_000, output: 0, multiplier: 5 };
+    const short = estimate({ promptChars: 100, maxOutput: 999_999 }, perChar);
+    const long = estimate({ promptChars: 1_000, maxOutput: 999_999 }, perChar);
+    /* ⚠️ `maxOutput` is not a second quantity here: ten times the text, ten
+       times the charge, and the ceiling changes nothing. */
+    expect(long).toBe(short * 10);
+  });
+
+  /*
+    ⚠️ THE TOKEN LANE'S OWN ARITHMETIC STAYS IN THE TOKEN LANE. Thinking headroom
+    is tokens and `TOKENS_PER_IMAGE` is tokens; applied to a count of pictures
+    they reserve for 1.4 images, and applied to a character meter they add two
+    thousand characters for a thing that is not text.
+  */
+  it("does not widen a picture count for a model that thinks", () => {
+    const perImage = { meter: "image" as const, input: 0, output: 4_000_000, multiplier: 5 };
+    const flat = estimate({ promptChars: 20, maxOutput: 2 }, perImage);
+    const thinking = estimate({ promptChars: 20, maxOutput: 2, thinks: true }, perImage);
+    expect(thinking).toBe(flat);
+  });
+
+  it("does not add image tokens to a lane that bills by the character", () => {
+    const perChar = { meter: "character" as const, input: 30_000, output: 0, multiplier: 5 };
+    const alone = estimate({ promptChars: 100, maxOutput: 0 }, perChar);
+    const withPictures = estimate({ promptChars: 100, maxOutput: 0, images: 3 }, perChar);
+    expect(withPictures).toBe(alone);
+  });
+
   /* ⚠️ The reserve must cover the real charge at the same rate, or the cap eats
      the difference on every honest call. */
   it("holds enough for the answer it asked for", () => {

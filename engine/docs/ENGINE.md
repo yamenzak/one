@@ -421,7 +421,7 @@ and a manifest that does not compose refuses to boot.
 | `gate` | the eight gates, in the order that decides which sentence somebody reads first | 3 | — |
 | `manifest` | the whole app, and the composition that refuses a broken one | 13 | — |
 | `entitlement` | what a plan includes, and the allowance algebra over it | 17 | — |
-| `credit` | metered work: the reserve, the rate, the ceiling | 15 | — |
+| `credit` | metered work: the reserve, the rate, the ceiling | 16 | — |
 | `dunning` | the ladder from past due to erased | 5 | — |
 | `package` | a priced bundle of timed grants | 8 | 1 |
 | `tenancy` | workspaces, kinds, shards, placement, standing | 17 | — |
@@ -437,11 +437,11 @@ and a manifest that does not compose refuses to boot.
 | `job` | scheduled work, and the record that it ran | 7 | — |
 | `brand` | which surfaces a workspace may put its own mark on | 9 | — |
 | `mark` | the logo as geometry, so the browser and the Worker draw one shape | 8 | — |
-| `ai` | a generating action: its lane, its prompt, its ceiling | 18 | — |
+| `ai` | a generating action: its lane, its prompt, its ceiling | 19 | — |
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**288 of them**, 287 reached by something today.
+**290 of them**, 289 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -489,7 +489,7 @@ env or a binding.
 | `raster` | a PNG drawn in a Worker, for the tabs and home screens an SVG cannot reach | 5 | — |
 | `ai-actions` | which model an action runs on, and in whose words | 7 | — |
 | `models` | the model catalogue — what exists, what it costs us, what a workspace pays | 15 | — |
-| `gateway` | the one door out to a model, and where a run's real cost is read | 8 | — |
+| `gateway` | the one door out to a model, and where a run's real cost is read | 10 | — |
 | `google` | the models Cloudflare does not host, and what Google publishes them at | 4 | — |
 | `spend` | one row per run: where a workspace's credits went, and never what was said | 4 | — |
 | `reconcile` | the check on the money that is not our own arithmetic | 6 | — |
@@ -520,7 +520,7 @@ env or a binding.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 1 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 9 | — |
 
-**460 of them**, 459 reached by something today.
+**462 of them**, 461 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 

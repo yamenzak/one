@@ -158,19 +158,80 @@ export function charsPerToken(text: string): number {
   return SPARSE - share * (SPARSE - DENSE);
 }
 
+/**
+ * WHAT A LANE'S OWN METER COUNTS, BEFORE ANY OF IT IS PRICED (D80).
+ *
+ * ⚠️ THE CHARACTER DERIVATION IS A TOKEN LANE'S ARITHMETIC AND MEANS NOTHING
+ * ANYWHERE ELSE. A picture is not four characters and a spoken sentence is not a
+ * completion; run through the token path, an image request reserves whatever its
+ * prompt happened to be long, which under `settle`'s cap is a bill we pay.
+ *
+ * ⚠️ AND FOR THREE OF THE FOUR THIS IS STRICTER THAN THE TOKEN LANE, NOT LOOSER.
+ * A token reserve estimates the answer's length from a density heuristic; these
+ * count something already known — how many images were asked for, how many
+ * characters were handed over — so the hold is arithmetic over a quantity rather
+ * than a guess about one. "We stopped estimating" reads as a weakening and it is
+ * the opposite.
+ *
+ * ⚠️ IT READS THE RATE'S OWN METER RATHER THAN TAKING ONE, which is what makes a
+ * mismatch unwriteable: the meter and the prices it goes with are one object, so
+ * nothing can price by the token and count by the second.
+ */
+export function unitsFor(shape: Shape, meter: Meter): Usage {
+  switch (meter) {
+    /* ⚠️ ONE REQUEST IN, `maxOutput` PICTURES OUT — and `promptChars` is not part
+       of it. An image model prices the images; the words that asked for them are
+       not what it bills. */
+    case "image":
+      return { input: 0, output: Math.max(1, Math.trunc(shape.maxOutput)) };
+    /* ⚠️ SPOKEN TEXT IS BILLED ON WHAT WENT IN, and there is no output to guess:
+       the audio's length is a consequence of the characters, which are already
+       counted. `maxOutput` is not a second quantity here. */
+    case "character":
+      return { input: Math.max(0, Math.trunc(shape.promptChars)), output: 0 };
+    /*
+      ⚠️ SECONDS ARE THE ONE A CALLER CANNOT COUNT — see `lane:listen`'s marker.
+      A caller holds bytes, and a container's duration is not derivable from its
+      length. Reserving zero would be a call with no hold at all, so this counts
+      what was HANDED OVER and leaves the lane refused at composition, where the
+      absence is a build failure rather than a free call.
+    */
+    case "second":
+      return { input: Math.max(0, Math.trunc(shape.units?.input ?? 0)), output: 0 };
+    case "token":
+      return shape.units ?? {
+        input: Math.ceil(shape.promptChars / SPARSE),
+        output: shape.maxOutput,
+      };
+  }
+}
+
 export function estimate(shape: Shape, rate: Rate): number {
-  const counted = shape.units ?? {
-    input: Math.ceil(shape.promptChars / SPARSE),
-    output: shape.maxOutput,
-  };
-  const output = shape.thinks ? Math.ceil(counted.output * THINKING_HEADROOM) : counted.output;
+  /* ⚠️ THE METER DECIDES WHAT IS COUNTED, and an explicit `units` still wins —
+     a caller that counted for itself (a vision call with its pictures already
+     tallied) is the case `units` exists for. */
+  const counted = shape.units && rate.meter === "token"
+    ? shape.units
+    : unitsFor(shape, rate.meter);
+  /* ⚠️ THINKING IS TOKENS, so the headroom belongs to the lane that counts them.
+     Applied to a count of images it would reserve for 1.4 pictures, which is not
+     a quantity anything can produce or bill for. */
+  const output = shape.thinks && rate.meter === "token"
+    ? Math.ceil(counted.output * THINKING_HEADROOM)
+    : counted.output;
   /*
     ⚠️ ADDED WHETHER OR NOT THE UNITS WERE GIVEN, and that is the safe direction
     rather than an oversight. A caller who counted its pictures already is
     over-reserved by one image and gets it back at settle; a caller who did not
     would be under-reserved by the largest single input in the whole request.
+
+    ⚠️ AND IT IS THE TOKEN LANE'S ARITHMETIC, because `TOKENS_PER_IMAGE` is
+    tokens. A picture SENT to a model that bills by the character would add two
+    thousand characters to the bill for a thing that is not text at all.
   */
-  const input = counted.input + Math.max(0, Math.trunc(shape.images ?? 0)) * TOKENS_PER_IMAGE;
+  const input = counted.input + (rate.meter === "token"
+    ? Math.max(0, Math.trunc(shape.images ?? 0)) * TOKENS_PER_IMAGE
+    : 0);
   const milli = (input / 1000) * rate.input + (output / 1000) * rate.output;
   /* ⚠️ THE RESERVE IS WHOLE CREDITS BECAUSE A BALANCE IS. Rounding UP here is a
      hold that is slightly too large, released the moment it settles; rounding
