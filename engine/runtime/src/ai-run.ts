@@ -26,6 +26,36 @@ import {
 } from "./services.js";
 import type { Db } from "./sql.js";
 
+/**
+ * WHAT A GENERATION HANDS BACK TO THE HANDLER THAT ASKED FOR IT.
+ *
+ * ⚠️ THE BYTES REACH THE APP AND THE PLATFORM STORES NOTHING. A picture or a
+ * spoken sentence is an ANSWER, and where an answer belongs is the app's
+ * decision: a cover image goes in the media library under a purpose, a
+ * one-off preview is thrown away unshown, a label is rendered and never kept.
+ * Writing every generation to the bucket would bill storage for the ones nobody
+ * keeps and put files in a library nobody asked to fill.
+ *
+ * ⚠️ SO A HANDLER THAT WANTS IT KEPT WRITES IT ITSELF, through `ctx.bucket` and
+ * the media ledger like any other file — which is what makes it show up in the
+ * storage meter, in the quota, and in erasure. A path that wrote to R2 from here
+ * would be a second way objects arrive in a bucket, and `storage-chokepoint`
+ * exists because the first one is the only one that is accounted for.
+ *
+ * ⚠️ AND `text` IS EMPTY RATHER THAN ABSENT FOR A LANE THAT ANSWERS IN BYTES, so
+ * a caller reading it gets "" instead of `undefined` — the same shape every text
+ * lane already returns.
+ */
+export interface Made {
+  readonly text: string;
+  /** ⚠️ An image or audio lane's answer, with the type it arrived as. */
+  readonly bytes?: Uint8Array;
+  readonly mime?: string;
+  /** ⚠️ An embedding's answer: a vector, which is neither words nor bytes. */
+  readonly vector?: readonly number[];
+  readonly credits: number;
+}
+
 export interface RunAt {
   readonly directory: Db;
   readonly db: Db;
@@ -56,7 +86,7 @@ export function generatorFor(at: RunAt): ((
    * reserves for an answer it has to reconcile itself.
    */
   look?: { readonly images?: readonly string[] },
-) => Promise<{ readonly text: string; readonly credits: number } | AiRefusal>) | undefined {
+) => Promise<Made | AiRefusal>) | undefined {
   const action = actionsOf(at.app).find((a) => a.id === at.operation);
   if (!action) return undefined;
 
@@ -109,7 +139,18 @@ export function generatorFor(at: RunAt): ((
     });
 
     if (typeof out === "string") return out;
-    return { text: out.text, credits: out.charged };
+    /* ⚠️ EVERYTHING THE RUN PRODUCED, NOT JUST THE WORDS. Dropped here, an image
+       or a spoken sentence runs, holds, charges and settles correctly and the
+       handler receives an empty string — billed and useless, with every meter
+       reading healthy. That is the same defect the gateway seam had one layer
+       down, and carrying it only that far is how it survived. */
+    return {
+      text: out.text,
+      ...(out.bytes ? { bytes: out.bytes } : {}),
+      ...(out.mime ? { mime: out.mime } : {}),
+      ...(out.vector ? { vector: out.vector } : {}),
+      credits: out.charged,
+    };
   };
 }
 

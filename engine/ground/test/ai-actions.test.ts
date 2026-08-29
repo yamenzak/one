@@ -21,6 +21,7 @@ import {
   generatorFor, personalOps, schemaFor, serve, sessionIdFrom, tenantBySlug, whoIs, type Db,
 } from "@engine/runtime";
 import { GROUND, ground } from "../src/index.js";
+import { decideModel, syncModels, topUp, type Answered } from "@engine/runtime";
 
 const directory = () => env.DIRECTORY as unknown as Db;
 const shard = () => env.SHARD_EU_1 as unknown as Db;
@@ -395,5 +396,69 @@ describe("pricing the whole catalogue at once", () => {
   it("is the operator's alone", async () => {
     expect((await post("northgate", "/api/op.models.multiplier", { multiplier: 6 }, owner)).status)
       .not.toBe(200);
+  });
+});
+
+
+/* --------------------------------------------------------- what comes back --- */
+
+/**
+ * A LANE THAT ANSWERS IN BYTES HANDS THEM TO THE HANDLER (D79).
+ *
+ * ⚠️ THIS IS THE THIRD LAYER OF ONE DROP, AND THE FIRST TWO WERE FOUND BY
+ * TESTS RATHER THAN BY READING. The gateway carried the bytes, `Generated`
+ * carried them, and `ctx.generate` returned `{ text, credits }` — so a picture
+ * ran, held, charged and settled correctly and the handler received an empty
+ * string. Billed and useless, with every meter reading healthy.
+ *
+ * ⚠️ AND THE PLATFORM STORES NOTHING. Where an answer belongs is the app's
+ * decision — a cover goes in the media library under a purpose, a preview is
+ * thrown away unshown. A generation that wrote to the bucket by itself would
+ * bill storage for the ones nobody keeps, and would be a second way objects
+ * arrive there.
+ */
+describe("what a generation hands back", () => {
+  const ran = async (answer: Partial<Answered> & { text: string }) => {
+    const tenant = (await tenantBySlug(directory(), "northgate"))!;
+    await topUp(directory(), tenant.id, 10_000);
+    /* ⚠️ THE RUN READS THE CATALOGUE FROM THE TABLE, not from the list the
+       console is handed — so a test that only injected models would prove
+       nothing about the path a real generation takes. */
+    await syncModels(directory(), [{
+      id: "@cf/meta/small", provider: "workers-ai", task: "Text Generation",
+      label: "Small", usdPerMillionIn: 0.1, usdPerMillionOut: 0.3, maxOutput: 1000,
+    }] as never, 5);
+    /* ⚠️ A DISCOVERED ROW IS NOT A SOLD ONE — the sync stores it disabled, and
+       an operator decides. Without this the lane elects nothing and the run
+       refuses `no_model`, which is the catalogue behaving correctly. */
+    await decideModel(directory(), "@cf/meta/small", { enabled: true, isDefault: true });
+    return generatorFor({
+      directory: directory(), db: shard(), tenantId: tenant.id, app: GROUND,
+      operation: "note.draft", environment: "development",
+      provider: { async run() { return { usage: null, logId: null, cached: false, ...answer }; } },
+    })!({ about: "a thing" });
+  };
+
+  it("carries bytes and their type through to the handler", async () => {
+    const out = await ran({ text: "", bytes: new Uint8Array([1, 2, 3]), mime: "image/png" });
+    if (typeof out === "string") throw new Error(`refused: ${out}`);
+    expect(out.bytes).toEqual(new Uint8Array([1, 2, 3]));
+    expect(out.mime).toBe("image/png");
+  });
+
+  it("carries a vector through to the handler", async () => {
+    const out = await ran({ text: "", vector: [0.5, 0.25] });
+    if (typeof out === "string") throw new Error(`refused: ${out}`);
+    expect(out.vector).toEqual([0.5, 0.25]);
+  });
+
+  /* ⚠️ AND A TEXT ANSWER IS UNCHANGED — a run that started carrying three new
+     optional fields must not start reporting them on the lane that has none. */
+  it("leaves a text answer exactly as it was", async () => {
+    const out = await ran({ text: "here you are" });
+    if (typeof out === "string") throw new Error(`refused: ${out}`);
+    expect(out.text).toBe("here you are");
+    expect(out.bytes).toBeUndefined();
+    expect(out.vector).toBeUndefined();
   });
 });
