@@ -188,6 +188,9 @@ describe("what the manifest produced", () => {
          is picked per action of one product rather than deployment-wide. */
       "POST /api/ground.ai.choose",
       "GET /api/ground.ai.mine",
+      /* ⚠️ ONLY WHERE AN ACTION SAYS IT MAY BE (D81) — the operation exists per
+         product that generates, and refuses an action that is not `optional`. */
+      "POST /api/ground.ai.switch",
       "POST /api/guide.seen",
       "GET /api/guide.view",
       "GET /api/inbox.list",
@@ -229,6 +232,9 @@ describe("what the manifest produced", () => {
       "GET /api/note.search",
       "POST /api/note.share",
       "GET /api/note.start",
+      /* ⚠️ The action that IS the generation — declares no `optional`, which is
+         what makes `ai.switch`'s refusal branch reachable from the ground. */
+      "POST /api/note.title",
       "POST /api/note.update",
       /* ⚠️ AND A PAIR PER PRODUCT FOR THE WORDS ITS MESSAGES GO OUT IN. Only
          the ones this app AUTHORS are listed by the read — a message from us to

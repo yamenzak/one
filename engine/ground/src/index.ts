@@ -250,6 +250,16 @@ const draft = operation<{ about: string; stream?: boolean }, { text: string }>({
     variables: ["about"],
     maxOutput: 800,
     brandable: true,
+    /*
+      ⚠️ THE GROUND HOLDS ONE OF EACH ON PURPOSE (D81). Drafting a note is help:
+      somebody who would rather write it themselves loses nothing by switching it
+      off, so it is `optional` — and `note.title` below is the other half, an
+      action that IS the generation and declares nothing, which is what makes the
+      refusal branch reachable. A branch with no instance in the reference app is
+      a branch no test can reach and one every app copied out of it inherits as a
+      silence.
+    */
+    optional: true,
   },
   async handler(ctx, input) {
     /*
@@ -289,11 +299,70 @@ const draft = operation<{ about: string; stream?: boolean }, { text: string }>({
     }
     if (!c.generate) c.fail("platform.unavailable");
     const out = await c.generate!({ about: input.about });
+    /*
+      ⚠️ THE WORKSPACE'S OWN DECISION IS NOT AN OUTAGE (D81). Every other refusal
+      here is ours — no gateway, no key, a provider that fell over — and
+      "something went wrong on our side" is the honest sentence for all of them.
+      For a feature this workspace switched off it is the opposite of honest: it
+      reports a fault that does not exist, and somebody goes looking for it.
+
+      ⚠️ AND THIS IS THE INSTANCE EVERY APP IS COPIED FROM. An app that folded
+      this into `unavailable` would ship a switch whose only visible effect is an
+      error message about us.
+    */
+    if (out === "switched_off") c.fail("platform.ai_off");
     if (typeof out === "string") c.fail("platform.unavailable", {}, { ref: out });
     return { text: (out as { text: string }).text };
   },
 });
 
+
+
+/**
+ * THE ACTION THAT *IS* THE GENERATION, AND SO CANNOT BE SWITCHED OFF (D81).
+ *
+ * ⚠️ IT DECLARES NO `optional`, AND THAT ABSENCE IS THE DECLARATION. What this
+ * returns is what the model said; with the model withheld there is no answer to
+ * give, so a switch here does not turn a feature off — it breaks one, and the
+ * person who pressed it reports the break as a bug.
+ *
+ * ⚠️ IT EXISTS IN THE GROUND SO THE REFUSAL BRANCH IS REACHABLE. `ai.switch`
+ * refuses an action that is not `optional`; without an instance here that branch
+ * has no test that can reach it, and every app copied out of this one inherits
+ * the same silence.
+ */
+const title = operation<{ body: string }, { title: string }>({
+  id: "note.title",
+  kind: "write",
+  summary: "Name a note from what is in it",
+  input: { body: field.text({ label: "Body", required: true, holds: "none" }) },
+  output: { title: field.text({ label: "Title", holds: "none" }) },
+  permission: "note:write",
+  idempotency: { mode: "none" },
+  outcome: { why: "the answer IS the report — the title arrives in the field that asked for it" },
+  audit: (input) => ({ subject: input.body.slice(0, 40), verb: "titled" }),
+  ai: {
+    lane: "text",
+    prompt: "Give this note a title of at most six words. Answer with the title alone.\n\n{body}",
+    variables: ["body"],
+    maxOutput: 40,
+    /* ⚠️ NOT `brandable` EITHER, and for a related reason: "at most six words,
+       the title alone" is the contract the field depends on, and a workspace
+       appending its own instruction after it can break the shape of the answer
+       rather than its tone. */
+  },
+  async handler(ctx, input) {
+    const c = ctx as {
+      generate?: (values: Readonly<Record<string, string>>) =>
+        Promise<{ readonly text: string; readonly credits: number } | string>;
+      fail: (code: string, values?: Record<string, string>, extra?: { ref?: string }) => never;
+    };
+    if (!c.generate) c.fail("platform.unavailable");
+    const out = await c.generate!({ body: input.body });
+    if (typeof out === "string") c.fail("platform.unavailable", {}, { ref: out });
+    return { title: (out as { text: string }).text.trim() };
+  },
+});
 
 /**
  * WHAT A NEW NOTE STARTS AS — the workspace's own answer, not the form's.
@@ -438,7 +507,7 @@ export const GROUND: AppSpec = defineApp({
   },
 
   collections: [note, checkIn],
-  operations: [publish, ask, draft, start, teamCheckIns, share],
+  operations: [publish, ask, draft, title, start, teamCheckIns, share],
 
   /*
     ⚠️ THREE OF EIGHT NAME A GROUND, AND THE FIVE THAT DO NOT ARE THE POINT.

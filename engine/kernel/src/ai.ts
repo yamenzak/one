@@ -313,6 +313,26 @@ export interface AiActionSpec {
   readonly maxOutput: number;
   /** Whether a workspace may add its own instructions after ours. */
   readonly brandable?: boolean;
+  /**
+   * WHETHER A WORKSPACE MAY TURN THIS OFF, AND ABSENT MEANS IT MAY NOT (D81).
+   *
+   * ⚠️ SOME OPERATIONS *ARE* THE GENERATION. Reading a label, identifying a
+   * product from photographs — the answer IS what the model said, and without it
+   * the operation has nothing to return. Offering a switch there is offering to
+   * break the feature, and the person who presses it will report the break as a
+   * bug rather than as their own decision.
+   *
+   * ⚠️ SO THE SAFE DEFAULT IS "MAY NOT", which is the opposite of the convenient
+   * one. Defaulting to switchable would make every action a product ships
+   * silently optional — including the ones it is built out of — and the app that
+   * never thought about it would ship a switch that guts it.
+   *
+   * ⚠️ AND IT IS PER ACTION, LIKE `brandable`, FOR THE SAME REASON. "Does this
+   * product use AI" is not a question with one answer: a draft somebody may
+   * prefer to write themselves and a lab extraction nobody can do by hand are
+   * both AI, and only the app knows which is which.
+   */
+  readonly optional?: true;
 }
 
 /** ⚠️ A workspace's own words are shorter than ours by construction. */

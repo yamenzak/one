@@ -176,6 +176,22 @@ export const PLATFORM_PROBLEMS: ProblemCatalog = {
     detail: "This costs {cost} and there are {balance} left.",
   },
   /*
+    ⚠️ NOT A PAYMENT PROBLEM AND NOT A PERMISSION ONE — the workspace switched
+    this off itself, and both other sentences would send somebody to fix
+    something that is not broken. "Upgrade your plan" for a thing they turned off
+    is the worst of the three, because it is an invitation to spend money on
+    something they already have.
+
+    ⚠️ AND IT IS 409 RATHER THAN 402 OR 403: the request is fine, the workspace's
+    own state is what refuses it, and it stops being refused the moment somebody
+    with `tenant:manage` changes their mind.
+  */
+  "platform.ai_off": {
+    status: 409, retryable: false, tone: "warning",
+    title: "This is switched off",
+    detail: "Somebody who can manage AI here turned this off.",
+  },
+  /*
     ⚠️ THE THREE A FILE PICKER CAN ANSWER WITHOUT ASKING THE SERVER, and they
     are in the catalogue for the same reason every other refusal is: the control
     used to write its own three sentences, in the file that draws it, painted in

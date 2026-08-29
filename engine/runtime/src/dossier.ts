@@ -295,6 +295,11 @@ export const HOLDINGS: readonly HeldBy[] = [
     why: "a workspace's own sale, named by membership rather than by account" },
   { table: "ai_binding", person: [], why: "which model an action runs on" },
   { table: "ai_wording", person: [], why: "a workspace's own prompt letterheads", workspace: its() },
+  /* ⚠️ A ROW MEANS OFF AND AN ABSENCE MEANS ON (D81), so this holds the
+     workspace's own decisions and nothing about any person. It goes with the
+     workspace: left behind, a closed workspace's switches would be waiting for
+     an id that will never be issued again. */
+  { table: "ai_off", person: [], why: "which AI actions a workspace turned off", workspace: its() },
   { table: "ai_model", person: [], why: "the deployment's model catalogue and its prices" },
   /*
     ⚠️ WHAT IT COST, NEVER WHAT WAS SAID. There is no prompt and no output on

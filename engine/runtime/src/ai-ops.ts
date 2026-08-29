@@ -18,17 +18,31 @@
 
 import type { AppSpec, TenantId } from "@engine/kernel";
 import { MAX_ADDENDUM, offeredIn, priceFor, refusePrompt } from "@engine/kernel";
-import { actionsOf, bindingsOf, running, word, wordingOf } from "./ai-actions.js";
+import {
+  actionsOf, bindingsOf, running, switchAction, switchedOff, word, wordingOf,
+} from "./ai-actions.js";
 import { modelsOf } from "./models.js";
 import type { PlatformCtx } from "./member-ops.js";
 import type { Resolved } from "./compose.js";
 
 /**
- * ⚠️ `ai:manage`, WHICH IS A MANAGER'S. Choosing a dearer model spends the
+ * ⚠️ `tenant:manage`, WHICH IS A MANAGER'S. Choosing a dearer model spends the
  * workspace's credits faster, and rewording what a model is told changes what
  * every person in the workspace gets back — neither is a thing a reader does.
+ *
+ * ⚠️ AND IT IS A PLATFORM KEY RATHER THAN ONE INVENTED HERE. This read
+ * `"ai:manage"` for as long as it existed: a key that is not in
+ * `PLATFORM_PERMISSIONS`, that no role in `PLATFORM_ROLES` holds, and that no
+ * app may declare — so the permission gate refused every caller including the
+ * owner, and the whole AI settings surface answered 403 to everybody. Nothing
+ * went red, because `unholdable` walks an APP's declarations and this is the
+ * platform's own operation.
+ *
+ * ⚠️ SO THE RULE TO CARRY IS THAT A PLATFORM OPERATION MAY ONLY NAME A PLATFORM
+ * KEY. There are five, they are the workspace's constitutional offices, and
+ * `tenant:manage` is exactly the one the paragraph above was reaching for.
  */
-const NEEDS = "ai:manage";
+const NEEDS = "tenant:manage";
 
 export function aiOps(app: AppSpec): Readonly<Record<string, Resolved>> {
   /* ⚠️ NO ACTIONS, NO OPERATIONS. A product with nothing generating gets no
@@ -55,6 +69,7 @@ export function aiOps(app: AppSpec): Readonly<Record<string, Resolved>> {
       const rows = await modelsOf(ctx.directory);
       const bound = await bindingsOf(ctx.directory, app.id);
       const theirs = await wordingOf(ctx.db, ctx.tenantId as TenantId, app.id);
+      const off = await switchedOff(ctx.db, ctx.tenantId as TenantId, app.id);
 
       return {
         actions: actionsOf(app).map((action) => {
@@ -68,6 +83,17 @@ export function aiOps(app: AppSpec): Readonly<Record<string, Resolved>> {
             /* ⚠️ WHETHER THEY MAY ADD TO IT AT ALL, from the app's declaration.
                A box that saves and is then ignored is worse than no box. */
             brandable: action.ai.brandable === true,
+            /* ⚠️ WHETHER A SWITCH IS DRAWN AT ALL, from the app's declaration
+               (D81). An action that IS the generation has no honest "off", so
+               the screen must not offer one — and absent means may-not, so a
+               product that never thought about it ships no switch rather than a
+               switch that guts it. */
+            optional: action.ai.optional === true,
+            /* ⚠️ AND WHAT IT IS SET TO. Only meaningful where `optional`, but
+               reported either way: a screen that had to infer the state from the
+               absence of a field is a screen that shows "on" for an action it
+               cannot see the switch for. */
+            off: off.has(action.id),
             /* ⚠️ THEIR OWN WORDS, WHICH ARE THEIRS TO READ BACK. Ours are not
                here, and `wordedBy` is all a screen needs to say whose they are. */
             addendum: now.addendum,
@@ -147,7 +173,55 @@ export function aiOps(app: AppSpec): Readonly<Record<string, Resolved>> {
     },
   };
 
-  return { [mine.id]: mine, [choose.id]: choose };
+  /**
+   * TURNING ONE ACTION OFF, AND ONLY ONE THE APP SAID MAY BE (D81).
+   *
+   * ⚠️ SEPARATE FROM `choose` BECAUSE IT IS A DIFFERENT DECISION. Picking a
+   * cheaper model and stopping a feature are not two settings on one form: the
+   * first changes what a thing costs and the second changes whether it happens.
+   * One operation taking both would make "I meant to change the model" and "I
+   * meant to switch it off" the same request shape.
+   */
+  const flip: Resolved = {
+    id: `${app.id}.ai.switch`,
+    kind: "write",
+    method: "POST",
+    path: `/api/${app.id}.ai.switch`,
+    permission: NEEDS,
+    spec: {
+      id: `${app.id}.ai.switch`, kind: "write",
+      summary: "Turn one AI action on or off for this workspace.",
+      input: {}, output: {},
+      permission: NEEDS,
+      idempotency: { mode: "none" },
+      async handler() { return {} as never; },
+    } as Resolved["spec"],
+    run: async (bare, input) => {
+      const ctx = bare as PlatformCtx;
+      const actionId = String(input.action ?? "");
+      const action = actionsOf(app).find((a) => a.id === actionId);
+      if (!action) return ctx.fail("platform.not_found");
+
+      /*
+        ⚠️ REFUSED AT THE WRITE, NOT HIDDEN ON THE SCREEN. `optional` is the
+        app's statement that this action has an honest "off"; an action that IS
+        the generation has none, and a request naming one is somebody reaching
+        past a control that was never drawn — through the API, through MCP, or
+        through a form somebody kept open while the product changed.
+      */
+      if (action.ai.optional !== true) {
+        return ctx.fail("platform.invalid", {}, { fields: {
+          action: "This one cannot be switched off — it is what the feature does.",
+        } });
+      }
+
+      await switchAction(ctx.db, ctx.tenantId as TenantId, app.id, actionId,
+        input.on === true, new Date(ctx.now));
+      return { ok: true };
+    },
+  };
+
+  return { [mine.id]: mine, [choose.id]: choose, [flip.id]: flip };
 }
 
 /**

@@ -19,7 +19,7 @@
 
 import type { AppSpec, TenantId } from "@engine/kernel";
 import { sayPrompt } from "@engine/kernel";
-import { actionsOf, bindingsOf, running, wordingOf } from "./ai-actions.js";
+import { actionsOf, bindingsOf, running, switchedOff, wordingOf } from "./ai-actions.js";
 import { modelsOf } from "./models.js";
 import {
   generate, generateStream, type AiDeps, type AiRefusal, type StreamDeps,
@@ -61,6 +61,26 @@ export function generatorFor(at: RunAt): ((
   if (!action) return undefined;
 
   return async (values, look) => {
+    /*
+      ⚠️ THE SWITCH IS ASKED HERE, WHICH IS THE ONLY PLACE IT CANNOT BE SKIPPED
+      (D81). A screen that merely hides the button leaves the operation answering
+      on the HTTP door, through MCP, and to a queued write replaying after a day
+      offline — so the workspace's decision would hold in the one place nobody
+      was trying to get around and nowhere else.
+
+      ⚠️ AND IT REFUSES RATHER THAN BEING ABSENT, unlike an operation that
+      declared no action at all. Absence says "this does not generate"; what is
+      true here is "this generates and your workspace turned it off", and only
+      the second sends somebody to the control that changes it.
+
+      ⚠️ ASKED BEFORE THE RESERVE, so nothing is held for a call that will not
+      happen.
+    */
+    if (action.ai.optional
+      && (await switchedOff(at.db, at.tenantId, at.app.id)).has(action.id)) {
+      return "switched_off";
+    }
+
     const rows = await modelsOf(at.directory);
     const bound = (await bindingsOf(at.directory, at.app.id)).find((b) => b.action === action.id);
     const theirs = await wordingOf(at.db, at.tenantId, at.app.id);
@@ -115,6 +135,26 @@ export function streamerFor(at: StreamAt): ((
   if (!action) return undefined;
 
   return async (values, look) => {
+    /*
+      ⚠️ THE SWITCH IS ASKED HERE, WHICH IS THE ONLY PLACE IT CANNOT BE SKIPPED
+      (D81). A screen that merely hides the button leaves the operation answering
+      on the HTTP door, through MCP, and to a queued write replaying after a day
+      offline — so the workspace's decision would hold in the one place nobody
+      was trying to get around and nowhere else.
+
+      ⚠️ AND IT REFUSES RATHER THAN BEING ABSENT, unlike an operation that
+      declared no action at all. Absence says "this does not generate"; what is
+      true here is "this generates and your workspace turned it off", and only
+      the second sends somebody to the control that changes it.
+
+      ⚠️ ASKED BEFORE THE RESERVE, so nothing is held for a call that will not
+      happen.
+    */
+    if (action.ai.optional
+      && (await switchedOff(at.db, at.tenantId, at.app.id)).has(action.id)) {
+      return "switched_off";
+    }
+
     const rows = await modelsOf(at.directory);
     const bound = (await bindingsOf(at.directory, at.app.id)).find((b) => b.action === action.id);
     const theirs = await wordingOf(at.db, at.tenantId, at.app.id);

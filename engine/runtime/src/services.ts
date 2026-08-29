@@ -130,7 +130,12 @@ export type AiRefusal =
      to FOR THIS LANE — a decision of ours, fixed by a dialect rather than by a
      key — and the header above is explicit that one message for every failure is
      the thing this union exists to avoid. */
-  | "no_route";
+  | "no_route"
+  /* ⚠️ THE WORKSPACE'S OWN DECISION, NOT A FAULT (D81). Folded into
+     "provider_failed" it would read as an outage and be reported as one; folded
+     into a payment problem it would invite somebody to spend money on a feature
+     they already have and switched off themselves. */
+  | "switched_off";
 
 /**
  * ⚠️ WHAT A MODEL IS ASKED THROUGH. Injected rather than imported, because the

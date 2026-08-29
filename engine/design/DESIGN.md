@@ -1181,6 +1181,7 @@ Some of this is guarded and some is judgement:
 - `spoken` — every refused mutation reaches a person; none returns into silence.
 - `states` — four outcomes, a placeholder the component draws itself, three kinds of motion, one rhythm.
 - `surface` — every declaration reaches a screen, and every field kind has a control.
+- `switchable` — the AI switch is asked at the seam every generation goes through, on both paths.
 - `tone` — one voice — label length, description length, sentence case, full stops.
 - `travel` — the route decides the direction and the world decides the gesture; nothing else moves the page.
 - `weight` — a component nobody has drawn yet is not in the bundle they are waiting for.

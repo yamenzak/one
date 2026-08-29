@@ -18,7 +18,7 @@ import {
   AI_ACTION_SCHEMA, AUDIT_SCHEMA, BILLING_SCHEMA, DIRECTORY_SCHEMA, IDENTITY_SCHEMA,
   MEMBERSHIP_SCHEMA, NOBODY, OPERATOR_SCHEMA, REPLAY_SCHEMA, SETTING_SCHEMA,
   addShard, applySchema, memberFor, noteShardApp, operatorOps, permissionsResolver,
-  personalOps, schemaFor, serve, sessionIdFrom, tenantBySlug, whoIs, type Db,
+  generatorFor, personalOps, schemaFor, serve, sessionIdFrom, tenantBySlug, whoIs, type Db,
 } from "@engine/runtime";
 import { GROUND, ground } from "../src/index.js";
 
@@ -104,7 +104,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   sent.length = 0;
-  for (const t of ["membership", "note", "audit", "replay", "ai_wording"]) {
+  for (const t of ["membership", "note", "audit", "replay", "ai_wording", "ai_off"]) {
     await shard().exec(`DELETE FROM ${t};`);
   }
   for (const t of ["invited", "belongs", "tenant_app", "tenant", "session", "code", "account",
@@ -259,5 +259,112 @@ describe("the one resolver", () => {
     const bound = { app: "ground", action: "note.draft", model: MODELS[0]!.id, prompt: null };
     expect(running(def, MODELS, bound, undefined).model?.id).toBe(MODELS[0]!.id);
     expect(running(def, MODELS, bound, undefined, MODELS[1]!.id).model?.id).toBe(MODELS[1]!.id);
+  });
+});
+
+
+/* ----------------------------------------------------------------- switch --- */
+
+/**
+ * A WORKSPACE SWITCHES ONE ACTION OFF, AND ONLY ONE THE APP SAID MAY BE (D81).
+ *
+ * ⚠️ THE HALF THAT MATTERS IS THAT IT REFUSES AT THE OPERATION. A screen hiding
+ * a button leaves the operation answering on the HTTP door, through MCP, and to a
+ * queued write replaying after a day offline — so the workspace's decision would
+ * hold in the one place nobody was trying to get around and nowhere else.
+ */
+describe("switching an action off", () => {
+  const seenBy = async (who: string) =>
+    (await (await get("northgate", "/api/ground.ai.mine", who)).json() as {
+      actions: { id: string; optional: boolean; off: boolean }[];
+    }).actions;
+
+  /* ⚠️ THE APP'S DECLARATION REACHES THE SCREEN, so a switch is drawn only where
+     there is an honest off. `note.draft` is help; `note.title` IS the answer. */
+  it("says which actions may be switched off at all", async () => {
+    const actions = await seenBy(owner);
+    expect(actions.find((a) => a.id === "note.draft")!.optional).toBe(true);
+    expect(actions.find((a) => a.id === "note.title")!.optional).toBe(false);
+    /* ⚠️ Nobody has switched anything, so an absence reads as on. */
+    expect(actions.every((a) => a.off === false)).toBe(true);
+  });
+
+  it("turns one off, reports it, and turns it back on", async () => {
+    expect((await post("northgate", "/api/ground.ai.switch",
+      { action: "note.draft", on: false }, owner)).status).toBe(200);
+    expect((await seenBy(owner)).find((a) => a.id === "note.draft")!.off).toBe(true);
+    /* ⚠️ AND ONLY THAT ONE. A switch that took the product's other actions with
+       it would be a workspace-wide off wearing a per-action control's clothes. */
+    expect((await seenBy(owner)).find((a) => a.id === "note.title")!.off).toBe(false);
+
+    expect((await post("northgate", "/api/ground.ai.switch",
+      { action: "note.draft", on: true }, owner)).status).toBe(200);
+    expect((await seenBy(owner)).find((a) => a.id === "note.draft")!.off).toBe(false);
+  });
+
+  /*
+    ⚠️ REFUSED AT THE WRITE RATHER THAN HIDDEN ON THE SCREEN. A request naming an
+    action that is not `optional` is somebody reaching past a control that was
+    never drawn — through the API, through MCP, or through a form left open while
+    the product changed its mind.
+  */
+  it("refuses to switch off an action that IS the generation", async () => {
+    expect((await post("northgate", "/api/ground.ai.switch",
+      { action: "note.title", on: false }, owner)).status).toBe(400);
+    expect((await seenBy(owner)).find((a) => a.id === "note.title")!.off).toBe(false);
+  });
+
+  it("refuses an action this app does not have", async () => {
+    expect((await post("northgate", "/api/ground.ai.switch",
+      { action: "note.imagined", on: false }, owner)).status).toBe(404);
+  });
+
+  /*
+    ⚠️ AND THE OPERATION ITSELF REFUSES, WHICH IS THE WHOLE POINT. This calls
+    `note.draft` over the real door with the action switched off: if only the
+    screen honoured the switch, this would generate and charge.
+  */
+  /*
+    ⚠️ ASKED OF THE SEAM ITSELF RATHER THAN OVER HTTP, because this deployment
+    has no gateway configured — so `ctx.generate` is absent and the route refuses
+    with `unavailable` long before the switch is consulted. What has to be proved
+    is that the SEAM refuses, since that is the one place the HTTP door, the MCP
+    door and a queued write replaying offline all pass through.
+  */
+  it("refuses at the seam once it is off, not merely on the screen", async () => {
+    const tenant = (await tenantBySlug(directory(), "northgate"))!;
+    const runs = () => generatorFor({
+      directory: directory(), db: shard(), tenantId: tenant.id, app: GROUND,
+      operation: "note.draft", environment: "development",
+      /* ⚠️ It must never get this far — a provider that answers would mean the
+         switch was consulted after the money, or not at all. */
+      provider: { async run() { throw new Error("the switch let a run through"); } },
+    })!;
+
+    expect(await runs()({ about: "before" })).not.toBe("switched_off");
+
+    await post("northgate", "/api/ground.ai.switch", { action: "note.draft", on: false }, owner);
+    expect(await runs()({ about: "after" })).toBe("switched_off");
+
+    /* ⚠️ AND TURNING IT BACK ON RESTORES IT, so the row is a decision rather
+       than a one-way door. */
+    await post("northgate", "/api/ground.ai.switch", { action: "note.draft", on: true }, owner);
+    expect(await runs()({ about: "again" })).not.toBe("switched_off");
+  });
+
+  /* ⚠️ AND AN ACTION THE APP DID NOT MARK `optional` IS NEVER REFUSED THIS WAY,
+     even with a row against it — the declaration decides, not the table, so a
+     row written before an app changed its mind cannot still be in force. */
+  it("ignores a stray row against an action that is not optional", async () => {
+    const tenant = (await tenantBySlug(directory(), "northgate"))!;
+    await shard().prepare(
+      `INSERT INTO ai_off (tenant_id, app, action, at) VALUES (?, ?, ?, ?)`)
+      .bind(tenant.id, "ground", "note.title", new Date().toISOString()).run();
+    const out = await generatorFor({
+      directory: directory(), db: shard(), tenantId: tenant.id, app: GROUND,
+      operation: "note.title", environment: "development",
+      provider: { async run() { return "no_gateway" as const; } },
+    })!({ body: "a note" });
+    expect(out).not.toBe("switched_off");
   });
 });

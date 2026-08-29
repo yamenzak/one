@@ -148,6 +148,13 @@
       "retryable": false
     },
     {
+      "code": "platform.ai_off",
+      "status": 409,
+      "title": "This is switched off",
+      "tone": "warning",
+      "retryable": false
+    },
+    {
       "code": "platform.wrong_kind",
       "status": 400,
       "title": "That kind of file will not work",
@@ -1203,6 +1210,13 @@
         "onClose": "tenant_id: delete"
       },
       {
+        "table": "ai_off",
+        "export": null,
+        "why": "which AI actions a workspace turned off",
+        "onForget": [],
+        "onClose": "tenant_id: delete"
+      },
+      {
         "table": "ai_model",
         "export": null,
         "why": "the deployment's model catalogue and its prices",
@@ -1312,6 +1326,13 @@
         "table": "ai_wording",
         "export": null,
         "why": "a workspace's own prompt letterheads",
+        "onForget": [],
+        "onClose": "tenant_id: delete"
+      },
+      {
+        "table": "ai_off",
+        "export": null,
+        "why": "which AI actions a workspace turned off",
         "onForget": [],
         "onClose": "tenant_id: delete"
       },

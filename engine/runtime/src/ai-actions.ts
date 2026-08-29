@@ -39,6 +39,18 @@ export const AI_ACTION_SCHEMA: SchemaModule = {
     `CREATE TABLE IF NOT EXISTS ai_binding (app TEXT NOT NULL, action TEXT NOT NULL, model TEXT, prompt TEXT, at TEXT NOT NULL, PRIMARY KEY (app, action));`,
     /* ⚠️ And the workspace's own wording, on its own shard beside its records. */
     `CREATE TABLE IF NOT EXISTS ai_wording (tenant_id TEXT NOT NULL, app TEXT NOT NULL, action TEXT NOT NULL, prompt TEXT NOT NULL, at TEXT NOT NULL, PRIMARY KEY (tenant_id, app, action));`,
+    /*
+      ⚠️ A ROW MEANS OFF, AND AN ABSENCE MEANS ON (D81). The other way round —
+      a row per action saying `on` — would need every action written for every
+      workspace at the moment it is created, so a product that ships a new action
+      would find every existing workspace missing a row and have to decide what
+      silence meant. It means what it means here: nobody has turned this off.
+
+      ⚠️ SO THE TABLE IS EMPTY ON EVERY DEPLOYMENT WHERE NOBODY HAS SWITCHED
+      ANYTHING OFF, which is most of them, and a workspace that never opens the
+      screen behaves exactly as it did before this existed.
+    */
+    `CREATE TABLE IF NOT EXISTS ai_off (tenant_id TEXT NOT NULL, app TEXT NOT NULL, action TEXT NOT NULL, at TEXT NOT NULL, PRIMARY KEY (tenant_id, app, action));`,
   ],
 };
 
@@ -94,6 +106,44 @@ export async function word(
     `INSERT INTO ai_wording (tenant_id, app, action, prompt, at) VALUES (?, ?, ?, ?, ?)
      ON CONFLICT(tenant_id, app, action) DO UPDATE SET prompt = excluded.prompt, at = excluded.at`)
     .bind(tenantId, app, action, prompt, now.toISOString()).run();
+}
+
+/* ---------------------------------------------------------------- the switch --- */
+
+/**
+ * WHICH OF A WORKSPACE'S ACTIONS ARE SWITCHED OFF (D81).
+ *
+ * ⚠️ A SET RATHER THAN A PER-ACTION ASK, because every caller wants more than
+ * one: the settings screen draws all of them, and a generation asks about its
+ * own while the same round trip could have answered for the rest. One indexed
+ * read on the primary key's prefix.
+ */
+export async function switchedOff(
+  db: Db, tenantId: TenantId, app: string,
+): Promise<ReadonlySet<string>> {
+  const rows = await db.prepare(
+    `SELECT action FROM ai_off WHERE tenant_id = ? AND app = ?`)
+    .bind(tenantId, app).all<{ action: string }>();
+  return new Set(rows.results.map((r) => r.action));
+}
+
+/**
+ * ⚠️ `on` IS A DELETE, WHICH IS WHAT MAKES ABSENCE MEAN ON. Writing a row that
+ * says `on` would be a second way to spell the same state, and the two disagree
+ * the first time anything reads only one of them.
+ */
+export async function switchAction(
+  db: Db, tenantId: TenantId, app: string, action: string, on: boolean, now = new Date(),
+): Promise<void> {
+  if (on) {
+    await db.prepare(`DELETE FROM ai_off WHERE tenant_id = ? AND app = ? AND action = ?`)
+      .bind(tenantId, app, action).run();
+    return;
+  }
+  await db.prepare(
+    `INSERT INTO ai_off (tenant_id, app, action, at) VALUES (?, ?, ?, ?)
+     ON CONFLICT(tenant_id, app, action) DO NOTHING`)
+    .bind(tenantId, app, action, now.toISOString()).run();
 }
 
 /* ------------------------------------------------------------- resolution --- */

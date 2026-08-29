@@ -309,6 +309,7 @@ it. A caller's job is to show it, never to invent one from a status code.
 | `platform.must_accept` | 451 | There is something to agree to first | — |
 | `platform.read_only` | 402 | This workspace is read-only | — |
 | `platform.no_credits` | 402 | Not enough credits | — |
+| `platform.ai_off` | 409 | This is switched off | — |
 | `platform.wrong_kind` | 400 | That kind of file will not work | — |
 | `platform.too_large` | 400 | That file is too big | — |
 | `platform.empty_file` | 400 | That file is empty | — |
@@ -356,6 +357,7 @@ before an app is resolved draws on them.
 | `maintenance` | — *the deployment's own switches* | — | kept |
 | `ai_binding` | — *which model an action runs on* | — | kept |
 | `ai_wording` | — *a workspace's own prompt letterheads* | — | `tenant_id: delete` |
+| `ai_off` | — *which AI actions a workspace turned off* | — | `tenant_id: delete` |
 | `ai_model` | — *the deployment's model catalogue and its prices* | — | kept |
 | `ai_run` | — *a workspace's own AI spending* | — | `tenant_id: delete` |
 | `plan_edit` | — *what the catalogue was edited to, and who edited it* | — | kept |
@@ -376,6 +378,7 @@ before an app is resolved draws on them.
 | `setting` | Your own preferences | `account_id: delete` | `tenant_id: delete` |
 | `ai_binding` | — *which model an action runs on* | — | kept |
 | `ai_wording` | — *a workspace's own prompt letterheads* | — | `tenant_id: delete` |
+| `ai_off` | — *which AI actions a workspace turned off* | — | `tenant_id: delete` |
 | `audit` | What you did here | `actor: anonymise` | `tenant_id: delete` |
 | `replay` | — *an idempotency key, not a record about anybody* | — | `tenant_id: delete` |
 | `inbox` | Your notifications | `account_id: delete` | `tenant_id: delete` |
@@ -487,7 +490,7 @@ env or a binding.
 | `branding` | a workspace's own theme and marks | 4 | — |
 | `icon` | the picture a business uploads, and where a public route can read it | 9 | — |
 | `raster` | a PNG drawn in a Worker, for the tabs and home screens an SVG cannot reach | 5 | — |
-| `ai-actions` | which model an action runs on, and in whose words | 7 | — |
+| `ai-actions` | which model an action runs on, and in whose words | 9 | — |
 | `models` | the model catalogue — what exists, what it costs us, what a workspace pays | 15 | — |
 | `gateway` | the one door out to a model, and where a run's real cost is read | 10 | — |
 | `google` | the models Cloudflare does not host, and what Google publishes them at | 4 | — |
@@ -520,7 +523,7 @@ env or a binding.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 1 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 9 | — |
 
-**462 of them**, 461 reached by something today.
+**464 of them**, 463 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 
