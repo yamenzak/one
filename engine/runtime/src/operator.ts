@@ -43,7 +43,7 @@ import {
 import { apply, plan, resources, wanted } from "./resources.js";
 import { beginMove } from "./move.js";
 import { actionsOf, bind, bindingsOf, running } from "./ai-actions.js";
-import { decideModel } from "./models.js";
+import { decideModel, priceEvery } from "./models.js";
 import { MEMBERSHIP, adjust, compPlan, subscriptionFor } from "./billing.js";
 import {
   catalogueProblems, editPlan, effectivePlans, onEachPlan, planEdits, resetPlan,
@@ -1195,6 +1195,42 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
           return ctx.fail("platform.not_found");
         }
         return { ok: true };
+      },
+    },
+
+
+    /**
+     * ONE MULTIPLIER ONTO THE WHOLE CATALOGUE, OR ONE VENDOR'S PART OF IT.
+     *
+     * ⚠️ THIS IS A BULK EDIT AND NOT A GLOBAL SETTING (D24). The number stays on
+     * the row, because one figure over twelve different costs is the cheapest
+     * model subsidising the dearest — and a deployment-wide value with per-row
+     * overrides would put a precedence layer under the column the credit
+     * arithmetic reads. What an operator wanted was the gesture, not a second
+     * source of truth.
+     *
+     * ⚠️ AND IT REFUSES AT OR BELOW COST FOR THE SAME REASON `op.model.decide`
+     * DOES. A reserve is a ceiling on revenue, so a row at one times cost breaks
+     * even at best — and this is the control that could do it to every row at
+     * once, which is the version of that mistake nobody notices until the bill.
+     */
+    "op.models.multiplier": {
+      kind: "write", needs: "session", doors: ["operator"],
+      async run(ctx, input): Promise<unknown> {
+        operator(ctx);
+        const n = Number(input.multiplier);
+        if (!Number.isFinite(n) || n <= MIN_MULTIPLIER) {
+          return ctx.fail("platform.invalid", {}, { fields: { multiplier:
+            `Above ${MIN_MULTIPLIER}× cost. At cost, every call loses money.` } });
+        }
+        const provider = input.provider === undefined || input.provider === null
+          ? undefined
+          : String(input.provider);
+        const changed = await priceEvery(ctx.directory, n,
+          provider ? { provider } : undefined, new Date(ctx.now));
+        /* ⚠️ THE COUNT IS THE ANSWER. A silent success over an empty selection
+           looks exactly like one over the whole catalogue. */
+        return { ok: true, changed };
       },
     },
 

@@ -3380,6 +3380,69 @@
       "lane": "seen",
       "proves": "lights the destination somebody is on",
       "fails": "the one place a product's colour touches the chrome, silently not painted — the light is a `color-mix` on the declared hue, so a manifest carrying an OKLCH triple instead of a colour makes the whole declaration invalid and nothing else about the bar changes"
+    },
+    {
+      "id": "a-lane-an-app-declares-is-a-lane-something-can-call",
+      "protects": "D79",
+      "stage": "87",
+      "status": "live",
+      "impl": "scripts/lanes.test.mjs",
+      "proves": "every lane either runs or names the stage that will make it run",
+      "fails": "an app declares a lane with a catalogue and no runner, composes, prices a meter, and posts an image request to a chat endpoint at a customer's first call"
+    },
+    {
+      "id": "composition-refuses-an-unrunnable-lane",
+      "protects": "D79",
+      "stage": "87",
+      "status": "live",
+      "impl": "kernel/test/manifest.test.ts",
+      "proves": "refuses an action in a lane nothing can run",
+      "fails": "a lane with no runner reaches production because the only check was a text match a `false &&` walks straight through"
+    },
+    {
+      "id": "a-non-token-lane-is-reserved-by-its-own-meter",
+      "protects": "D80",
+      "stage": "87",
+      "status": "live",
+      "impl": "kernel/test/custody.test.ts",
+      "proves": "counts a non-token lane from the meter, with no units handed to it",
+      "fails": "an image request reserves whatever its prompt happened to be long, and the settle cap makes the difference a bill the platform pays on every call"
+    },
+    {
+      "id": "a-lane-that-is-not-a-conversation-reaches-its-own-endpoint",
+      "protects": "D79",
+      "stage": "87",
+      "status": "live",
+      "impl": "runtime/test/lanes.test.ts",
+      "proves": "sends a conversation to compat and everything else to the provider's own path",
+      "fails": "every lane goes back to chat completions and the three that are not conversations fail at the provider, with the money path reporting perfect health"
+    },
+    {
+      "id": "the-ai-switch-is-asked-on-both-generation-paths",
+      "protects": "D81",
+      "stage": "88",
+      "status": "live",
+      "impl": "scripts/switchable.test.mjs",
+      "proves": "asked: both generation paths consult the switch",
+      "fails": "a workspace turns a feature off and it keeps running for anyone who asks for a stream, or through MCP, or from a write replaying after a day offline"
+    },
+    {
+      "id": "the-switch-refuses-at-the-seam-rather-than-the-screen",
+      "protects": "D81",
+      "stage": "88",
+      "status": "live",
+      "impl": "ground/test/ai-actions.test.ts",
+      "proves": "refuses at the seam once it is off, not merely on the screen",
+      "fails": "the control appears to work on the screen that draws it and changes nothing about what the operation actually does"
+    },
+    {
+      "id": "the-margin-moves-in-bulk-and-never-becomes-a-second-source",
+      "protects": "D24",
+      "stage": "89",
+      "status": "live",
+      "impl": "runtime/test/models-margin.test.ts",
+      "proves": "moves the margin and never the cost",
+      "fails": "a bulk write moves what a call cost us as well as what we charge, so the next nightly sync has nothing meaningful to diff and the reconciliation compares a number against itself"
     }
   ]
 }

@@ -220,6 +220,7 @@ live inside workspaces and an operator stands outside all of them.
 | `op.ai.bind` | write |
 | `op.models` | read |
 | `op.model.decide` | write |
+| `op.models.multiplier` | write |
 | `op.search` | read |
 | `op.jobs` | read |
 | `op.job.run` | write |
@@ -491,7 +492,7 @@ env or a binding.
 | `icon` | the picture a business uploads, and where a public route can read it | 9 | — |
 | `raster` | a PNG drawn in a Worker, for the tabs and home screens an SVG cannot reach | 5 | — |
 | `ai-actions` | which model an action runs on, and in whose words | 9 | — |
-| `models` | the model catalogue — what exists, what it costs us, what a workspace pays | 15 | — |
+| `models` | the model catalogue — what exists, what it costs us, what a workspace pays | 16 | — |
 | `gateway` | the one door out to a model, and where a run's real cost is read | 10 | — |
 | `google` | the models Cloudflare does not host, and what Google publishes them at | 4 | — |
 | `spend` | one row per run: where a workspace's credits went, and never what was said | 4 | — |
@@ -523,7 +524,7 @@ env or a binding.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 1 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 9 | — |
 
-**464 of them**, 463 reached by something today.
+**465 of them**, 464 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 
@@ -976,6 +977,13 @@ its own header, cited by other files, and doing nothing.
 | `the-bar-keeps-its-pitch` | D10 | a nav drawn for five destinations that reads as five-minus-one whenever a product has four — the closed items are `grow basis-0`, so without a ceiling they divide whatever is left and the marks sit half again as far apart on one plan as on another |
 | `the-bar-centres-what-it-has` | D10 | every item capped and the whole leftover collecting at one end, which is a bar with a hole in it rather than a bar with fewer things in it |
 | `the-destination-somebody-is-on-is-lit` | D7 | the one place a product's colour touches the chrome, silently not painted — the light is a `color-mix` on the declared hue, so a manifest carrying an OKLCH triple instead of a colour makes the whole declaration invalid and nothing else about the bar changes |
+| `a-lane-an-app-declares-is-a-lane-something-can-call` | D79 | an app declares a lane with a catalogue and no runner, composes, prices a meter, and posts an image request to a chat endpoint at a customer's first call |
+| `composition-refuses-an-unrunnable-lane` | D79 | a lane with no runner reaches production because the only check was a text match a `false &&` walks straight through |
+| `a-non-token-lane-is-reserved-by-its-own-meter` | D80 | an image request reserves whatever its prompt happened to be long, and the settle cap makes the difference a bill the platform pays on every call |
+| `a-lane-that-is-not-a-conversation-reaches-its-own-endpoint` | D79 | every lane goes back to chat completions and the three that are not conversations fail at the provider, with the money path reporting perfect health |
+| `the-ai-switch-is-asked-on-both-generation-paths` | D81 | a workspace turns a feature off and it keeps running for anyone who asks for a stream, or through MCP, or from a write replaying after a day offline |
+| `the-switch-refuses-at-the-seam-rather-than-the-screen` | D81 | the control appears to work on the screen that draws it and changes nothing about what the operation actually does |
+| `the-margin-moves-in-bulk-and-never-becomes-a-second-source` | D24 | a bulk write moves what a call cost us as well as what we charge, so the next nightly sync has nothing meaningful to diff and the reconciliation compares a number against itself |
 <!-- /generated -->
 
 ### And how well each decision is defended
@@ -1006,7 +1014,7 @@ its own header, cited by other files, and doing nothing.
 | D21 | A workspace is personal or commercial, and that is what it IS rather than what it bought | 9 |
 | D22 | Branding and the installable app belong to the workspace, never to one app inside it | 6 |
 | D23 | A stranger joins a workspace as a `customer`, and only ever as a `customer` | 0 |
-| D24 | A model's PRICE is discovered nightly; whether it is sold, and at what margin, never is | 0 |
+| D24 | A model's PRICE is discovered nightly; whether it is sold, and at what margin, never is | 1 |
 | D25 | A workspace picks its own model, because it pays for it — and that is only safe above cost | 0 |
 | D26 | A workspace ADDS to our instructions; it never replaces them, and it is never sent the base | 0 |
 | D27 | The charge is built on what the call cost, and something outside our arithmetic checks it | 0 |
@@ -1061,6 +1069,9 @@ its own header, cited by other files, and doing nothing.
 | D76 | A packaging level is a named multiplier, never a product | 0 |
 | D77 | Moving stock is a verb of its own | 0 |
 | D78 | Some fields are set once, and the write is what says so | 0 |
+| D79 | A lane is a verb, so a runner is per lane and never per provider | 3 |
+| D80 | A reserve for a meter that is not tokens is a declared ceiling, not a guess | 1 |
+| D81 | AI is the workspace's to switch off, unless the operation IS the AI | 2 |
 <!-- /generated -->
 
 ---
@@ -1175,8 +1186,11 @@ that names no stage, so this list cannot grow by forgetting.
 | 84 | A design rule is a guard, and the measuring is done in a browser | shipped |
 | 85 | The bar earns its material: bespoke marks, one lit destination, one movement | shipped |
 | 86 | A model is given something to hear, and the seconds are counted before they are spent | **planned** |
+| 87 | The lanes that could not run, run — a runner per lane, and a reserve for a meter that is not tokens | shipped |
+| 88 | A workspace switches AI off, unless the operation is the AI | shipped |
+| 89 | One multiplier onto many rows — the margin as a bulk edit, never a global column | shipped |
 
-**75 shipped, 11 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**78 shipped, 11 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---

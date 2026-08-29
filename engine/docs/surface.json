@@ -930,6 +930,10 @@
       "kind": "write"
     },
     {
+      "id": "op.models.multiplier",
+      "kind": "write"
+    },
+    {
       "id": "op.search",
       "kind": "read"
     },

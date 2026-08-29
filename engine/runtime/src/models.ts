@@ -141,6 +141,37 @@ export async function decideModel(
   return !!done?.meta?.changes;
 }
 
+/**
+ * ONE MULTIPLIER ONTO MANY ROWS, WHICH IS WHAT "APPLY A MARKUP TO EVERYTHING"
+ * ACTUALLY IS.
+ *
+ * ⚠️ A BULK EDIT, NEVER A GLOBAL COLUMN. `Rate`'s own comment says why the
+ * number is per model — one figure over twelve different costs is the cheapest
+ * model subsidising the dearest — and a deployment-wide column with per-row
+ * overrides would be a precedence layer underneath the number the credit
+ * arithmetic reads. This writes the same column every row already has, so there
+ * is nothing new for the metering to consult and nothing that can disagree.
+ *
+ * ⚠️ AND IT REPORTS WHAT IT TOUCHED. An operator pressing this needs to know it
+ * reached forty rows rather than none — a silent success over an empty
+ * selection looks identical to one over the whole catalogue.
+ *
+ * ⚠️ RETIRED ROWS ARE INCLUDED DELIBERATELY. A retired model still RESOLVES for
+ * an action bound to it (see `ModelRow.retired`), so a margin that skipped them
+ * would leave exactly the rows nobody is watching priced at last year's number.
+ */
+export async function priceEvery(
+  db: Db, multiplier: number, only?: { readonly provider?: string },
+  now = new Date(),
+): Promise<number> {
+  const where = only?.provider ? ` WHERE provider = ?` : "";
+  const args: unknown[] = only?.provider ? [multiplier, now.toISOString(), only.provider]
+    : [multiplier, now.toISOString()];
+  const out = await db.prepare(
+    `UPDATE ai_model SET multiplier = ?, at = ?${where}`).bind(...args).run();
+  return Number(out.meta?.changes ?? 0);
+}
+
 /* ------------------------------------------------------------------- sync --- */
 
 /**

@@ -485,6 +485,21 @@
       "status": "planned",
       "title": "A model is given something to hear, and the seconds are counted before they are spent",
       "ends": ""
+    },
+    {
+      "n": 87,
+      "title": "The lanes that could not run, run — a runner per lane, and a reserve for a meter that is not tokens",
+      "status": "shipped"
+    },
+    {
+      "n": 88,
+      "title": "A workspace switches AI off, unless the operation is the AI",
+      "status": "shipped"
+    },
+    {
+      "n": 89,
+      "title": "One multiplier onto many rows — the margin as a bulk edit, never a global column",
+      "status": "shipped"
     }
   ]
 }

@@ -2754,3 +2754,103 @@ mistyped it actually notices.
 
 **What this forbids:** a settled field in a patch, and a generated update that
 advertises one. `settled` fails on both.
+
+---
+
+## D79 — A lane is a verb, so a runner is per lane and never per provider
+
+**`/compat` is chat completions and nothing else.** That is a fact about
+Cloudflare's endpoint rather than a preference: there is no `/compat/embeddings`,
+no `/compat/images/generations`, no `/compat/audio/speech`. Four of six declared
+lanes could therefore be catalogued, elected, priced and declared, and could not
+execute — an app naming `lane: "image"` composed, found models, passed
+`refuseCatalogue` (which asks whether a model answers, not whether anything can
+call) and posted an image request to a chat endpoint.
+
+**`gateway.ts`'s header argues for one client and the argument still holds.** What
+it refuses is *"twelve subtly different ideas of what a token is"* — a
+per-VENDOR adapter layer. A lane speaking three dialects is not that: a `speech`
+runner speaks three, not fourteen, and the split is by verb rather than by
+company. Text and vision keep `/compat`, because it works and moving them would
+be a rewrite bought with nothing.
+
+**Everything around the call is unchanged, which is what makes the split safe.**
+Same headers, same `cf-aig-metadata`, same `cf-aig-custom-cost`, same
+reserve → run → settle, same nightly reconciliation. `headersFor` is shared
+precisely so a lane cannot assemble its own and become invisible to the one check
+in this system that is not our own arithmetic agreeing with itself.
+
+**A vendor whose dialect we do not know is refused, never guessed.** `GATEWAY`
+already takes this position for the provider slug — a vendor absent from it is a
+row that is not stored rather than an invented address — and the reasoning is
+sharper here: an invented path 404s on a model an operator switched on and a
+workspace chose, and the reason reaches nobody. `no_route` is its own refusal so
+an operator is not sent to look at a provider that is working.
+
+**What this forbids:** a lane an app may declare with nothing that can call it,
+and an invented endpoint for a vendor we have no dialect for. `RUNNABLE` and
+`lanes` fail on the first; `askLane` refuses the second.
+
+---
+
+## D80 — A reserve for a meter that is not tokens is a declared ceiling, not a guess
+
+**The character derivation is a token lane's arithmetic and means nothing
+elsewhere.** A picture is not four characters and a spoken sentence is not a
+completion. Run through the token path, an image request reserves whatever its
+prompt happened to be long — and under `settle`'s cap that is a bill the platform
+pays, silently, on every call.
+
+**`Shape.units` already existed for this and nothing computed it.** So `estimate`
+reads the meter off the `Rate` it is already given: an image reserves `n ×` the
+per-image rate for the `n` asked for, a spoken sentence reserves the characters
+handed over, an embedding reserves its input and has no output to guess. The
+meter travels with the prices it goes with, so nothing can price by the token and
+count by the second.
+
+**This is STRICTER than the token lane, not looser, and the wording matters.** A
+token reserve estimates an answer's length from a density heuristic; three of
+these count something already known. "We stopped estimating" reads as a
+weakening and it is the opposite.
+
+**And the token lane's own arithmetic stays in it.** Thinking headroom is tokens
+and `TOKENS_PER_IMAGE` is tokens — applied to a count of pictures they reserve
+for 1.4 images, and applied to a character meter they add two thousand characters
+for a thing that is not text.
+
+**What this forbids:** a non-token lane reserved by a character count, and token
+arithmetic applied to a meter that does not count tokens. `custody` fails on both.
+
+---
+
+## D81 — AI is the workspace's to switch off, unless the operation IS the AI
+
+**Some operations are the generation.** Reading a label, identifying a product
+from photographs — the answer IS what the model said, and without it the
+operation has nothing to return. Offering a switch there is offering to break the
+feature, and whoever presses it reports the break as a bug.
+
+**So `optional` is declared and absent means may-not.** The safe default is the
+inconvenient one: defaulting to switchable would make every action a product
+ships silently optional, including the ones it is built out of, and an app that
+never thought about it would ship a switch that guts it. It is per action for the
+same reason `brandable` is — a draft somebody would rather write themselves and
+an extraction nobody can do by hand are both AI, and only the app knows which.
+
+**A row means off and an absence means on.** The other way round needs a row per
+action per workspace written at creation, so a product shipping a new action
+finds every existing workspace missing one and has to decide what silence means.
+
+**The enforcement is at the seam, never the screen.** A screen that hides a
+button leaves the operation answering on the HTTP door, through MCP, and to a
+queued write replaying after a day offline. Both `generatorFor` and `streamerFor`
+ask, because a rule applied to one is a rule a caller escapes by asking for a
+stream.
+
+**And the refusal is its own sentence.** Folded into a payment problem it invites
+somebody to spend money on a feature they already have and switched off
+themselves; folded into `unavailable` it reports an outage that does not exist.
+
+**What this forbids:** a switch that only hides a control, a switch offered on an
+action the app did not mark `optional`, and a generation path that does not ask.
+`switchable` fails on all three.

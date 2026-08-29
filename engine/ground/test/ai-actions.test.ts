@@ -368,3 +368,32 @@ describe("switching an action off", () => {
     expect(out).not.toBe("switched_off");
   });
 });
+
+
+/* ------------------------------------------------------------- the margin --- */
+
+/**
+ * ⚠️ THE WRITE ITSELF IS PROVED IN `runtime/test/models-margin.test.ts`, against
+ * a real `ai_model` table. This deployment injects its catalogue rather than
+ * storing it, so what can honestly be asked HERE is the two things that are
+ * about the door: that a margin at cost is refused, and that only an operator
+ * may press it.
+ */
+describe("pricing the whole catalogue at once", () => {
+  /*
+    ⚠️ AT COST IS A LOSS ON EVERY CALL, and this is the control that could do it
+    to the whole catalogue in one press — the version of that mistake nobody
+    notices until an invoice.
+  */
+  it("refuses a multiplier at or below cost", async () => {
+    expect((await post("admin", "/api/op.models.multiplier", { multiplier: 1 }, ops)).status)
+      .toBe(400);
+    expect((await post("admin", "/api/op.models.multiplier", { multiplier: 0 }, ops)).status)
+      .toBe(400);
+  });
+
+  it("is the operator's alone", async () => {
+    expect((await post("northgate", "/api/op.models.multiplier", { multiplier: 6 }, owner)).status)
+      .not.toBe(200);
+  });
+});
